@@ -1,4 +1,3 @@
-"use server"
 
 import moment from "moment"
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib"

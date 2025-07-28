@@ -1,4 +1,4 @@
-'use client';
+
 
 import ErrorMessage from '@/components/shared/error-message';
 import { Input } from '@/components/ui/input';
