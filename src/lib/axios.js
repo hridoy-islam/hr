@@ -6,7 +6,10 @@ import store from '../redux/store';
 // Create Axios instance
 const axiosInstance = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
-  withCredentials: true // Allows cookies (for refresh token) to be sent
+  withCredentials: true,
+  headers: {
+    "Content-Type": "application/json",
+  },
 });
 
 // Request interceptor: Attach access token to all outgoing requests
