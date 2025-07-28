@@ -107,7 +107,7 @@ export const loginUser = createAsyncThunk<UserResponse, UserCredentials>(
     const response = await request.data;
 
     localStorage.setItem(
-      'recruitment',
+      'hr',
       JSON.stringify(response.data.accessToken)
     );
     return response;
@@ -130,7 +130,7 @@ export const authWithFbORGoogle = createAsyncThunk<
   );
   const response = await request.data;
   localStorage.setItem(
-    'recruitment',
+    'hr',
     JSON.stringify(response.data.access_token)
   );
   return response;
@@ -198,7 +198,7 @@ export const changePassword = createAsyncThunk<
 });
 
 export const logout = createAsyncThunk<void>('user/logout', async () => {
-  localStorage.removeItem('recruitment');
+  localStorage.removeItem('hr');
 });
 
 const authSlice = createSlice({

@@ -4,7 +4,7 @@ import storage from 'redux-persist/lib/storage';
 import authReducer from './features/authSlice';
 import profileReducer from './features/profileSlice';
 const persistConfig = {
-  key: 'taskplanner',
+  key: 'hr',
   storage
 };
 
