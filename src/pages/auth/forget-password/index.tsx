@@ -63,7 +63,7 @@ export default function ForgotPassword() {
           <div className="mx-auto flex w-full flex-col justify-center space-y-2 sm:w-[480px] lg:p-8">
             <div className="mb-4 flex items-center justify-center">
               {/* <img src="/logo.png" alt="Logo" className="w-1/2" /> */}
-              <h3 className="text-4xl font-bold text-supperagent">MultiPurpose</h3>
+              <h3 className="text-4xl font-bold text-supperagent">HR</h3>
             </div>
             <Card className="p-6">
               <div className="mb-2 flex flex-col space-y-2 text-left">
