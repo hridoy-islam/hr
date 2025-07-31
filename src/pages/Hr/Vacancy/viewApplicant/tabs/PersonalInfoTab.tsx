@@ -157,6 +157,25 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
             isSaving={isFieldSaving.nhsNumber}
             placeholder="Enter NHS number"
           />
+          <EditableField
+            id="passportNo"
+            label="Passport Number"
+            value={formData.passportNo}
+            onUpdate={(value) => onUpdate('passportNo', value)}
+            isSaving={isFieldSaving.nhsNumber}
+            placeholder="Enter Passport No"
+          />
+
+              <EditableField
+            id="passportExpiry"
+            label="Passport Expiry Date"
+            value={formData.passportExpiry ? moment(formData.passportExpiry).format('YYYY-MM-DD') : ''}
+            type="date"
+            onUpdate={(value) => onDateChange('passportExpiry', value)}
+            isSaving={isFieldSaving.dateOfBirth}
+            required
+          />
+
         </div>
       </div>
     </div>

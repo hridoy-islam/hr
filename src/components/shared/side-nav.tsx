@@ -31,14 +31,14 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { useEffect, useState } from 'react';
 import { logout } from '@/redux/features/authSlice';
-
+import axiosInstance from '@/lib/axios';
 const navItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/admin/hr' },
-  {
-    icon: UserRoundCheck,
-    label: 'Profile',
-    href: 'profile'
-  },
+  // {
+  //   icon: UserRoundCheck,
+  //   label: 'Profile',
+  //   href: 'profile'
+  // },
   {
     icon: Box,
     label: 'Holidays',
@@ -49,6 +49,8 @@ const navItems = [
     label: 'MyStuff',
     href: 'my-stuff'
   },
+  { icon: FileTextIcon, label: 'Notice', href: 'notice' },
+  { icon: DoorOpen, label: 'Vacancy', href: 'vacancy' },
   {
     icon: UsersIcon,
     label: 'Employee',
@@ -81,11 +83,8 @@ const navItems = [
     ]
   },
   { icon: CircleDollarSign, label: 'Payroll', href: 'payroll' },
-  { icon: CircleGauge, label: 'Leave',subItems: [
-      { icon: ReceiptText, label: 'Leave Approval', href: 'leave-approve'},
-    ] },
-  { icon: FileTextIcon, label: 'Notice', href: 'notice' },
-  { icon: DoorOpen, label: 'Vacancy', href: 'vacancy' },
+  { icon: CircleGauge, label: 'Leave', href: 'leave-approve' },
+  
   {
     icon: Settings,
     label: 'Settings',
@@ -164,9 +163,30 @@ export function SideNav() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
-  const user = useSelector((state) => state.auth?.user) || null;
+  const user = useSelector((state:any) => state.auth?.user) || null;
   const [expandedItems, setExpandedItems] = useState(new Set());
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [fetchedUser, setFetchedUser] = useState(null);
+
+
+  useEffect(() => {
+    const fetchUserInfo = async () => {
+      try {
+        if (user?._id) {
+          const res = await axiosInstance.get(`/users/${user._id}`);
+          setFetchedUser(res.data?.data); // assumes API returns { data: { firstName, lastName } }
+        }
+      } catch (err) {
+        console.error('Error fetching user info:', err);
+      }
+    };
+
+    fetchUserInfo();
+
+
+
+  }, [user?._id]);
+console.log(fetchedUser)
 
   // Auto logout if user is null
   useEffect(() => {
@@ -276,7 +296,7 @@ export function SideNav() {
   const sidebarContent = (
     <div className="flex h-full flex-col">
       {/* Header */}
-      <div className="flex h-16 items-center justify-between   px-4">
+      {/* <div className="flex h-16 items-center justify-between   px-4">
         <div className="flex items-center space-x-3">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-supperagent">
             <span className="text-sm font-bold text-white">HR</span>
@@ -285,13 +305,16 @@ export function SideNav() {
             <h1 className="text-lg font-semibold text-gray-900">HR System</h1>
           </div>
         </div>
+      </div> */}
+      <div className='lg:hidden flex items-center justify-end p-4'>
+
         <button
           onClick={() => setIsMobileMenuOpen(false)}
           className="lg:hidden"
-        >
+          >
           <X className="h-6 w-6 text-gray-500" />
         </button>
-      </div>
+          </div>
 
       <div className="flex  flex-col items-center space-x-3">
         <img
@@ -303,9 +326,9 @@ export function SideNav() {
           <p className="text-xl font-semibold text-gray-900">
             Welcome!
           </p>
-          <p className="text-md font-medium text-gray-900">
-            {user.name || 'User'}
-          </p>
+         <div onClick={() => navigate("/admin/hr/profile")} className="text-md font-medium text-gray-900 cursor-pointer underline">
+  {fetchedUser ? `${fetchedUser?.firstName} ${fetchedUser?.lastName}` : 'User'}
+</div>
         </div>
       </div>
 

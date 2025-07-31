@@ -33,12 +33,12 @@ function EmployeeForm() {
     try {
       const [designationRes, trainingRes, departmentRes] = await Promise.all([
         axiosInstance('/hr/designation'),
-        axiosInstance('/hr/training'),
+        // axiosInstance('/hr/training'),
         axiosInstance('/hr/department')
       ]);
 
       setDesignations(designationRes.data.data.result);
-      setTrainings(trainingRes.data.data.result);
+      // setTrainings(trainingRes.data.data.result);
       setDepartments(departmentRes.data.data.result);
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -55,7 +55,7 @@ function EmployeeForm() {
   
       const payload: Record<string, string> = {};
       if (selectedDepartment) payload.departmentId = selectedDepartment;
-      if (selectedTraining) payload.trainingId = selectedTraining;
+      // if (selectedTraining) payload.trainingId = selectedTraining;
       if (selectedDesignation) payload.designationId = selectedDesignation;
   
       await axiosInstance.patch(`/users/${userId}`, payload);
@@ -126,53 +126,53 @@ function EmployeeForm() {
           </div>
         );
 
-      case 2:
-        return (
-          <div className="space-y-6">
-            <h2 className="text-xl font-semibold text-gray-800">
-              What training is the employee enrolled in?
-            </h2>
+      // case 2:
+      //   return (
+      //     <div className="space-y-6">
+      //       <h2 className="text-xl font-semibold text-gray-800">
+      //         What training is the employee enrolled in?
+      //       </h2>
       
-            <ReactSelect
-              isMulti
-              options={trainings.map((training: any) => ({
-                value: training._id,
-                label: `${training.name} (Duration: ${training.validityDays} days)`              }))}
-              value={trainings
-                .filter((training) =>
-                  Array.isArray(selectedTraining)
-                    ? selectedTraining.includes(training._id)
-                    : false
-                )
-                .map((training) => ({
-                  value: training._id,
-                  label: `${training.name} (Duration: ${training.validityDays} days)`                }))}
-              onChange={(selectedOptions) =>
-                setSelectedTraining(selectedOptions.map((opt) => opt.value))
-              }
-              placeholder="Choose Trainings"
-              styles={{
-                control: (base) => ({
-                  ...base,
-                  borderRadius: '9px', 
-                  padding: '0px 5px',
-                }),
+      //       <ReactSelect
+      //         isMulti
+      //         options={trainings.map((training: any) => ({
+      //           value: training._id,
+      //           label: `${training.name} (Duration: ${training.validityDays} days)`              }))}
+      //         value={trainings
+      //           .filter((training) =>
+      //             Array.isArray(selectedTraining)
+      //               ? selectedTraining.includes(training._id)
+      //               : false
+      //           )
+      //           .map((training) => ({
+      //             value: training._id,
+      //             label: `${training.name} (Duration: ${training.validityDays} days)`                }))}
+      //         onChange={(selectedOptions) =>
+      //           setSelectedTraining(selectedOptions.map((opt) => opt.value))
+      //         }
+      //         placeholder="Choose Trainings"
+      //         styles={{
+      //           control: (base) => ({
+      //             ...base,
+      //             borderRadius: '9px', 
+      //             padding: '0px 5px',
+      //           }),
                 
                
                 
-              }}
-            />
+      //         }}
+      //       />
       
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setStep(3)}>
-                Skip
-              </Button>
-              <Button onClick={() => setStep(3)}>Next</Button>
-            </div>
-          </div>
-        );
+      //       <div className="flex justify-end gap-2">
+      //         <Button variant="outline" onClick={() => setStep(3)}>
+      //           Skip
+      //         </Button>
+      //         <Button onClick={() => setStep(3)}>Next</Button>
+      //       </div>
+      //     </div>
+      //   );
 
-      case 3:
+      case 2:
         return (
           <div className="space-y-6">
             <h2 className="text-xl font-semibold text-gray-800">

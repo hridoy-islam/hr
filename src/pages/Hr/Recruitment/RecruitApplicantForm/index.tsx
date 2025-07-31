@@ -101,10 +101,9 @@ const RecruitApplicantForm = () => {
         ...cleanApplicant,
         ...flatData,
         role: 'employee'
-
       };
-    
-// console.log(cleanApplicant)
+
+      // console.log(cleanApplicant)
       const res = await axiosInstance.post(`/auth/signup`, data);
 
       toast({
@@ -202,69 +201,79 @@ const RecruitApplicantForm = () => {
     );
   }
 
-  console.log(applicant);
-  return (
-    <div className="mx-auto w-full overflow-hidden">
-      {currentStep !== 3&& (<Card className="-mt-2 mb-2 w-full rounded-lg bg-white p-4 shadow-md">
-        <div className="flex w-full items-start justify-between gap-2 text-sm text-gray-700">
-          {/* Name */}
-          <div className="flex min-w-[200px] flex-col gap-1">
-            <span className="font-semibold">Name:</span>
-            <span className="truncate text-gray-800">
-              {applicant.title} {applicant.firstName} {applicant.initial}{' '}
-              {applicant.lastName}
-            </span>
-          </div>
+ return (
+  <div className="mx-auto w-full">
+    {/* Bounded container */}
+    <div className="mx-auto ">
+      {currentStep !== 3 && (
+        <Card className="mb-6 overflow-hidden rounded-lg bg-white p-4 shadow-md">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7">
+            {/* Name */}
+            <div className="flex flex-col gap-1">
+              <span className="font-semibold text-gray-700">Name:</span>
+              <span className="truncate font-medium text-gray-800">
+                {applicant.title} {applicant.firstName} {applicant.initial} {applicant.lastName}
+              </span>
+            </div>
 
-          {/* Email / Description */}
-          <div className="flex min-w-[250px] flex-col gap-1">
-            <span className="font-semibold">Description:</span>
-            <span className="line-clamp-1">{applicant.email}</span>
-          </div>
+            {/* Email */}
+            <div className="flex flex-col gap-1">
+              <span className="font-semibold text-gray-700">Email:</span>
+              <span className="truncate text-sm text-gray-600">{applicant.email}</span>
+            </div>
 
-          {/* Address */}
-          <div className="flex min-w-[180px] flex-col gap-1">
-            <span className="font-semibold">Location:</span>
-            <span>{applicant.address}</span>
-          </div>
+            {/* Location */}
+            <div className="flex flex-col gap-1">
+              <span className="font-semibold text-gray-700">Location:</span>
+              <span className="text-sm text-gray-600">{applicant.address || 'N/A'}</span>
+            </div>
 
-          {/* Date of Birth */}
-          <div className="flex min-w-[200px] flex-col gap-1">
-            <span className="font-semibold">DOB:</span>
-            <span>{moment(applicant.dateOfBirth).format('MMM D, YYYY')}</span>
-          </div>
+            {/* DOB */}
+            <div className="flex flex-col gap-1">
+              <span className="font-semibold text-gray-700">DOB:</span>
+              <span className="text-sm text-gray-600">
+                {moment(applicant.dateOfBirth).format('MMM D, YYYY')}
+              </span>
+            </div>
 
-          {/* Phone */}
-          <div className="flex min-w-[200px] flex-col gap-1">
-            <span className="font-semibold">Phone:</span>
-            <span>{applicant.mobilePhone}</span>
-          </div>
+            {/* Phone */}
+            <div className="flex flex-col gap-1">
+              <span className="font-semibold text-gray-700">Phone:</span>
+              <span className="text-sm text-gray-600">{applicant.mobilePhone || 'N/A'}</span>
+            </div>
 
-          {/* Employment Type */}
-          <div className="flex min-w-[200px] flex-col gap-1">
-            <span className="font-semibold">Employment Type:</span>
-            <span>{applicant.employmentType}</span>
-          </div>
+            {/* Employment Type */}
+            <div className="flex flex-col gap-1">
+              <span className="font-semibold text-gray-700">Employment Type:</span>
+              <span className="text-sm text-gray-600">{applicant.employmentType || 'N/A'}</span>
+            </div>
 
-          {/* Gender */}
-          <div className="flex min-w-[200px] flex-col gap-1">
-            <span className="font-semibold">Gender:</span>
-            <span>{applicant.gender}</span>
+            {/* Gender */}
+            <div className="flex flex-col gap-1">
+              <span className="font-semibold text-gray-700">Gender:</span>
+              <span className="text-sm text-gray-600">{applicant.gender || 'N/A'}</span>
+            </div>
           </div>
-        </div>
-      </Card>)}
+        </Card>
+      )}
 
-      <div className="mb-2 flex flex-row items-center justify-between">
-       {currentStep !== 3?  (<h1 className=" text-2xl font-semibold ">Recruit Applicant</h1>):(<h1 className=" text-2xl font-semibold ">Review Application</h1>)}
+      {/* Header */}
+      <div className="mb-6 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+        <h1 className="text-2xl font-semibold text-gray-800">
+          {currentStep !== 3 ? 'Recruit Applicant' : 'Review Application'}
+        </h1>
         <Button
-          className="h-8 cursor-pointer bg-supperagent text-white hover:bg-supperagent/90"
+          className="flex h-9 items-center gap-2 bg-supperagent text-white hover:bg-supperagent/90"
           onClick={() => navigate(-1)}
         >
-          <MoveLeft /> Back
+          <MoveLeft className="h-4 w-4" />
+          Back
         </Button>
       </div>
 
-      <Card>
+      {/* Step Indicator & Form */}
+      <Card className="overflow-hidden  bg-white shadow-lg">
+        {/* Uncomment if you want step indicator */}
         {/* <StepsIndicator
           currentStep={currentStep}
           completedSteps={completedSteps}
@@ -272,10 +281,13 @@ const RecruitApplicantForm = () => {
           onStepClick={handleStepClick}
         /> */}
 
-        {renderStep()}
+        <div className="p-6">
+          {renderStep()}
+        </div>
       </Card>
     </div>
-  );
+  </div>
+);
 };
 
 export default RecruitApplicantForm;

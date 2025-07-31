@@ -33,6 +33,7 @@ import axiosInstance from '@/lib/axios'; // Import configured axios
 import { useSelector } from 'react-redux';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
+import { useParams } from 'react-router-dom';
 
 interface HolidayAPI {
   userId: string;
@@ -49,7 +50,7 @@ interface HolidayAPI {
   updatedAt?: Date;
 }
 
-const Holiday: React.FC = () => {
+const HolidayTab: React.FC = () => {
   const [selectedYear, setSelectedYear] = useState('2025-2026');
   const [selectedType, setSelectedType] = useState('');
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
@@ -59,8 +60,7 @@ const Holiday: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
-  const { user } = useSelector((state: any) => state.auth);
-
+const{id} = useParams()
   // State for holidays and allowance
   const [holidays, setHolidays] = useState<HolidayAPI[]>([]);
   const [leaveAllowance, setLeaveAllowance] = useState({
@@ -78,22 +78,18 @@ const Holiday: React.FC = () => {
       setLoading(true);
       setError(null);
       
-      console.log('Fetching leave data for year:', selectedYear);
       
       // Fetch all leave requests for the user
-      const response = await axiosInstance.get(`/hr/leave?userId=${user._id}`);
-      console.log('API Response:', response.data);
+      const response = await axiosInstance.get(`/hr/leave?userId=${id}`);
       
       let data = response.data.data?.result || response.data.data || response.data || [];
-      console.log('Extracted data:', data);
+     
       
       // Filter by holidayYear (this matches your Leave model)
       const filteredData = data.filter((item: any) => {
-        console.log('Item holidayYear:', item.holidayYear, 'Selected year:', selectedYear);
         return item.holidayYear === selectedYear;
       });
       
-      console.log('Filtered data by year:', filteredData);
 
       const mappedHolidays = filteredData.map((item: any, idx: number) => ({
         id: idx + 1,
@@ -106,7 +102,6 @@ const Holiday: React.FC = () => {
         holidayYear: item.holidayYear
       }));
 
-      console.log('Mapped holidays:', mappedHolidays);
       setHolidays(mappedHolidays);
 
       // Recalculate leave summary based on filtered data
@@ -140,10 +135,10 @@ const Holiday: React.FC = () => {
 
   // Only fetch leave requests when user or year changes
   useEffect(() => {
-    if (user._id) {
+    if (id) {
       fetchLeaveRequests();
     }
-  }, [user._id, selectedYear]); // This will trigger when selectedYear changes
+  }, [id, selectedYear]); // This will trigger when selectedYear changes
 
   const mapStatus = (status: string): string => {
     switch (status) {
@@ -218,56 +213,12 @@ const Holiday: React.FC = () => {
     });
   };
 
-  const handleSubmitRequest = async () => {
-    if (!selectedType || !startDate || !endDate || !title || !reason) return;
-
-    const totalDays =
-      Math.ceil(
-        (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
-      ) + 1;
-    const totalHours = totalDays * 8; // assuming 8 hrs/day
-
-    try {
-      await axiosInstance.post(`/hr/leave`, {
-        holidayYear: selectedYear,
-        userId: user._id,
-        startDate,
-        endDate,
-        reason,
-        holidayType: selectedType,
-        totalDays,
-        totalHours,
-        status: 'pending',
-        title: title
-      });
-
-      toast({ title: 'Leave request submitted successfully!' });
-      setStartDate(undefined);
-      setEndDate(undefined);
-      setTitle('');
-      setReason('');
-      setSelectedType('');
-      fetchLeaveRequests(); // Refresh the data
-    } catch (err: any) {
-      toast({
-        title: err.response?.data?.message || 'Submission failed',
-        className: 'bg-destructive text-white border-none'
-      });
-      console.error('Error submitting leave:', err);
-    }
-  };
+ 
 
   if (loading)
     return <div className="p-8 text-center">Loading leave data...</div>;
 
-  if (error) {
-    return (
-      <div className="p-8 text-center">
-        <div className="text-red-600 mb-4">Error: {error}</div>
-        <Button onClick={() => fetchLeaveRequests()}>Retry</Button>
-      </div>
-    );
-  }
+
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -434,110 +385,7 @@ const Holiday: React.FC = () => {
               </CardContent>
             </Card>
 
-            {/* Submit Holiday Request */}
-            <Card className="shadow-sm">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <CheckCircle className="h-5 w-5 text-supperagent" />
-                  Submit Leave Request
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="holiday-year">Holiday Year</Label>
-                    <Select
-                      value={selectedYear}
-                      onValueChange={setSelectedYear}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select year" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="2025-2026">2025-2026</SelectItem>
-                        <SelectItem value="2024-2025">2024-2025</SelectItem>
-                        <SelectItem value="2023-2024">2023-2024</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="title">Title</Label>
-                    <Input
-                      id="title"
-                      placeholder="Enter leave title"
-                      value={title}
-                      onChange={(e) => setTitle(e.target.value)}
-                    />
-                  </div>
-
-                  {/* Reason field */}
-                  <div>
-                    <Label htmlFor="reason">Reason</Label>
-                    <Textarea
-                      id="reason"
-                      placeholder="Enter reason for leave"
-                      value={reason}
-                      onChange={(e) => setReason(e.target.value)}
-                      className="border-gray-300"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="type">Type</Label>
-                    <Select
-                      value={selectedType}
-                      onValueChange={setSelectedType}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="holiday">
-                          Holiday / Vacation
-                        </SelectItem>
-                        <SelectItem value="personal">Personal Day</SelectItem>
-                        <SelectItem value="sick">Sick Leave</SelectItem>
-                        <SelectItem value="family">Family Leave</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="flex flex-col gap-2">
-                    <Label>Select Date</Label>
-                    <DatePicker
-                      selectsRange
-                      startDate={startDate}
-                      endDate={endDate}
-                      onChange={(dates) => {
-                        const [start, end] = dates;
-                        setStartDate(start ?? undefined);
-                        setEndDate(end ?? undefined);
-                      }}
-                      isClearable
-                      placeholderText="Select start and end date"
-                      className="w-full rounded border border-gray-300 px-3 py-2"
-                      dateFormat="dd/MM/yyyy"
-                    />
-                  </div>
-
-                  <Button
-                    onClick={handleSubmitRequest}
-                    className="w-full bg-supperagent text-white hover:bg-supperagent/90"
-                    disabled={
-                      !selectedType ||
-                      !startDate ||
-                      !endDate ||
-                      !title ||
-                      !reason
-                    }
-                  >
-                    <Calendar className="mr-2 h-4 w-4" />
-                    Submit Request
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+          
           </div>
         </div>
       </div>
@@ -545,4 +393,4 @@ const Holiday: React.FC = () => {
   );
 };
 
-export default Holiday;
+export default HolidayTab;

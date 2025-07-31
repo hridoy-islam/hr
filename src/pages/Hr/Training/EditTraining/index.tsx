@@ -60,7 +60,6 @@ export default function EditTraining() {
   });
 
   const { setValue, watch } = form;
-  const isRecurring = watch('isRecurring');
 
   // Fetch the training data and set it in the form
   useEffect(() => {
@@ -87,7 +86,7 @@ export default function EditTraining() {
     console.log('Form Submitted:', data);
 
     try {
-      const response = await axiosInstance.put(`/hr/training/${id}`, data);
+      const response = await axiosInstance.patch(`/hr/training/${id}`, data);
       if (response) {
         navigate(`/admin/hr/training`);
       }
@@ -98,11 +97,15 @@ export default function EditTraining() {
   };
 
   return (
-    <div >
-      <div className='flex w-full items-center justify-between pb-2'>
-
-      <h1 className="mb-2 text-2xl font-semibold">Edit Training Module</h1>
-      <Button className='bg-supperagent text-white hover:bg-supperagent/90' onClick={()=> navigate(-1)}><MoveLeft/> Back</Button>
+    <div>
+      <div className="flex w-full items-center justify-between pb-2">
+        <h1 className="mb-2 text-2xl font-semibold">Edit Training Module</h1>
+        <Button
+          className="bg-supperagent text-white hover:bg-supperagent/90"
+          onClick={() => navigate(-1)}
+        >
+          <MoveLeft /> Back
+        </Button>
       </div>
       <Card>
         <div className="p-4">
@@ -131,7 +134,11 @@ export default function EditTraining() {
                   <FormItem>
                     <FormLabel>Description</FormLabel>
                     <FormControl>
-                      <Textarea placeholder="Enter training description" {...field} />
+                      <Textarea
+                        placeholder="Enter training description"
+                        {...field}
+                        className="border-gray-300"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -147,7 +154,9 @@ export default function EditTraining() {
                     <FormControl>
                       <Checkbox
                         checked={field.value}
-                        onCheckedChange={(checked) => field.onChange(Boolean(checked))}
+                        onCheckedChange={(checked) =>
+                          field.onChange(Boolean(checked))
+                        }
                       />
                     </FormControl>
                     <FormLabel>Is this training recurring?</FormLabel>
@@ -158,61 +167,63 @@ export default function EditTraining() {
 
               {/* Validity Days - conditional */}
               <div className="flex w-full flex-row items-center justify-between gap-4">
-                {isRecurring && (
-                  <FormField
-                    control={form.control}
-                    name="validityDays"
-                    render={({ field }) => (
-                      <FormItem className="w-full">
-                        <FormLabel>Validity Days</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            placeholder="e.g., 90"
-                            {...field}
-                            onChange={(e) =>
-                              field.onChange(
-                                e.target.value === '' ? undefined : Number(e.target.value)
-                              )
-                            }
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
+                <FormField
+                  control={form.control}
+                  name="validityDays"
+                  render={({ field }) => (
+                    <FormItem className="w-full">
+                      <FormLabel>Validity Days</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="e.g., 90"
+                          value={field.value ?? ''}
+                          onChange={(e) =>
+                            field.onChange(
+                              e.target.value === ''
+                                ? null
+                                : Number(e.target.value)
+                            )
+                          }
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-                {/* Reminder Before Days - conditional */}
-                {isRecurring && (
-                  <FormField
-                    control={form.control}
-                    name="reminderBeforeDays"
-                    render={({ field }) => (
-                      <FormItem className="w-full">
-                        <FormLabel>Remind how many days before expiry?</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            placeholder="e.g., 10"
-                            {...field}
-                            onChange={(e) =>
-                              field.onChange(
-                                e.target.value === '' ? undefined : Number(e.target.value)
-                              )
-                            }
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
+                <FormField
+                  control={form.control}
+                  name="reminderBeforeDays"
+                  render={({ field }) => (
+                    <FormItem className="w-full">
+                      <FormLabel>Remind how many days before expiry?</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="e.g., 10"
+                          value={field.value ?? ''}
+                          onChange={(e) =>
+                            field.onChange(
+                              e.target.value === ''
+                                ? null
+                                : Number(e.target.value)
+                            )
+                          }
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
 
               {/* Submit Button */}
               <div className="flex w-full items-center justify-end gap-4">
-                <Button type="submit" className="border-none bg-supperagent text-white hover:bg-supperagent/90">
+                <Button
+                  type="submit"
+                  className="border-none bg-supperagent text-white hover:bg-supperagent/90"
+                >
                   Submit
                 </Button>
               </div>

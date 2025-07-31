@@ -17,14 +17,14 @@ const SettingsTab = ({
   const [departments, setDepartments] = useState([]);
   const fetchData = async () => {
     try {
-      const [designationRes, trainingRes, departmentRes] = await Promise.all([
+      const [designationRes, departmentRes] = await Promise.all([
         axiosInstance('/hr/designation'),
-        axiosInstance('/hr/training'),
+        // axiosInstance('/hr/training'),
         axiosInstance('/hr/department')
       ]);
 
       setDesignations(designationRes.data.data.result);
-      setTrainings(trainingRes.data.data.result);
+      // setTrainings(trainingRes.data.data.result);
       setDepartments(departmentRes.data.data.result);
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -36,6 +36,8 @@ const SettingsTab = ({
   }, []);
 
 
+  console.log(departments)
+
   const designationOptions = designations.map((des: any) => ({
     value: des._id,
     label: des.title
@@ -45,10 +47,7 @@ const SettingsTab = ({
     value: dep._id,
     label: dep.departmentName
   }));
-  const trainingOptions = trainings.map((dep: any) => ({
-    value: dep._id,
-    label: dep.name
-  }));
+ 
 
   return (
     <Card>
@@ -77,7 +76,7 @@ const SettingsTab = ({
             isSaving={isFieldSaving['departmentId']}
           />
 
-          <EditableField
+          {/* <EditableField
             id="trainingId"
             label="Training"
             value={formData.trainingId || ''}
@@ -86,7 +85,7 @@ const SettingsTab = ({
             options={trainingOptions}
             onUpdate={(value) => onSelectChange('trainingId', value)}
             isSaving={isFieldSaving['trainingId']}
-          />
+          /> */}
         </div>
       </CardContent>
     </Card>

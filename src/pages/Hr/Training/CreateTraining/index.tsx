@@ -54,7 +54,7 @@ export default function CreateTraining() {
     }
   });
 
-  const isRecurring = form.watch('isRecurring');
+  // const isRecurring = form.watch('isRecurring');
 
   const navigate = useNavigate();
 
@@ -105,6 +105,7 @@ export default function CreateTraining() {
                       <Textarea
                         placeholder="Enter training description"
                         {...field}
+                        className='border-gray-300'
                       />
                     </FormControl>
                     <FormMessage />
@@ -134,7 +135,7 @@ export default function CreateTraining() {
 
               {/* Validity Days - conditional */}
               <div className="flex w-full  flex-row items-center justify-between gap-4">
-                {isRecurring && (
+               
                   <FormField
                     control={form.control}
                     name="validityDays"
@@ -159,10 +160,10 @@ export default function CreateTraining() {
                       </FormItem>
                     )}
                   />
-                )}
+            
 
                 {/* Reminder Before Days - conditional */}
-                {isRecurring && (
+               
                   <FormField
                     control={form.control}
                     name="reminderBeforeDays"
@@ -189,7 +190,7 @@ export default function CreateTraining() {
                       </FormItem>
                     )}
                   />
-                )}
+              
               </div>
               <div className='flex w-full items-center justify-end gap-4'>
 

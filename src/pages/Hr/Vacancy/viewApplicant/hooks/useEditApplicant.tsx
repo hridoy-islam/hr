@@ -53,7 +53,9 @@ export const useEditApplicant = () => {
     needsReasonableAdjustment: false,
     reasonableAdjustmentDetails: '',
     status: '',
-    notes: ''
+    notes: '',
+    passportNo:'',
+    passportExpiry:null as moment.Moment | null,
   });
 
   useEffect(() => {
@@ -97,7 +99,9 @@ export const useEditApplicant = () => {
           needsReasonableAdjustment: data.needsReasonableAdjustment || false,
           reasonableAdjustmentDetails: data.reasonableAdjustmentDetails || '',
           status: data.status || '',
-          notes: data.notes || ''
+          notes: data.notes || '',
+          passportNo:data.passportNo ||'',
+          passportExpiry:data.passportExpiry ? moment(data.passportExpiry) : null,
         });
       } catch (error) {
         toast({

@@ -33,6 +33,9 @@ const personalDetailsSchema = z.object({
   nationalInsuranceNumber: z.string().optional(),
   nhsNumber: z.string().optional(),
 
+  passportNo: z.string().min(1, { message: 'Passport number is required' }),
+  passportExpiry: z.date({ required_error: 'Passport expiry date is required' }),
+
   applicationDate: z.date({ required_error: 'Application date is required' }),
   availableFromDate: z.date({
     required_error: 'Available from date is required'
@@ -289,6 +292,42 @@ export function PersonalDetailsStep({
                   </FormItem>
                 )}
               />
+
+              <FormField
+  control={form.control}
+  name="passportNo"
+  render={({ field }) => (
+    <FormItem>
+      <FormLabel>Passport Number</FormLabel>
+      <FormControl>
+        <Input {...field} />
+      </FormControl>
+      <FormMessage />
+    </FormItem>
+  )}
+/>
+
+<FormField
+  control={form.control}
+  name="passportExpiry"
+  render={({ field }) => (
+    <FormItem>
+      <FormLabel>Passport Expiry Date</FormLabel>
+      <FormControl>
+        <Input
+          {...field}
+          type="date"
+          value={
+            field.value ? moment(field.value).format('YYYY-MM-DD') : ''
+          }
+          onChange={(e) => field.onChange(new Date(e.target.value))}
+        />
+      </FormControl>
+      <FormMessage />
+    </FormItem>
+  )}
+/>
+
             </div>
 
             {/* Application Details */}

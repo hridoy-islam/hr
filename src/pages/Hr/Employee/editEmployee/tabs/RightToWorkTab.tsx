@@ -1,6 +1,7 @@
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { EditableField } from '../EditableField';
+import moment from 'moment';
 
 interface RightToWorkTabProps {
   formData: any;
@@ -17,6 +18,13 @@ const RightToWorkTab: React.FC<RightToWorkTabProps> = ({
   onDateChange,
   isFieldSaving
 }) => {
+  // Safely get the expiry date as a Moment object or null
+  const expiryDate = formData.rightToWork.expiryDate 
+    ? moment.isMoment(formData.rightToWork.expiryDate) 
+      ? formData.rightToWork.expiryDate 
+      : moment(formData.rightToWork.expiryDate)
+    : null;
+
   return (
     <Card>
       <CardContent className="pt-6">
@@ -34,9 +42,13 @@ const RightToWorkTab: React.FC<RightToWorkTabProps> = ({
             <EditableField
               id="rightToWork.expiryDate"
               label="Expiry Date"
-              value={formData.rightToWork.expiryDate ? formData.rightToWork.expiryDate.format('YYYY-MM-DD') : ''}
+              value={expiryDate ? expiryDate.format('YYYY-MM-DD') : ''}
               type="date"
-              onUpdate={(value) => onUpdate('rightToWork', 'expiryDate', value)}
+              onUpdate={(value) => {
+                // Convert the string date to a Moment object before updating
+                const dateValue = value ? moment(value) : null;
+                onUpdate('rightToWork', 'expiryDate', dateValue);
+              }}
               isSaving={isFieldSaving['rightToWork.expiryDate']}
             />
           )}
