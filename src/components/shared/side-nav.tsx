@@ -32,6 +32,10 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useEffect, useState } from 'react';
 import { logout } from '@/redux/features/authSlice';
 import axiosInstance from '@/lib/axios';
+import { AppDispatch } from '@/redux/store';
+
+
+
 const navItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/admin/hr' },
   // {
@@ -84,7 +88,7 @@ const navItems = [
   },
   { icon: CircleDollarSign, label: 'Payroll', href: 'payroll' },
   { icon: CircleGauge, label: 'Leave', href: 'leave-approve' },
-  
+
   {
     icon: Settings,
     label: 'Settings',
@@ -101,8 +105,7 @@ const NavItem = ({ item, isExpanded, onToggle, depth = 0 }) => {
 
   const isActiveLeaf =
     !item.subItems && location.pathname.startsWith('/' + item.href);
-  const isActiveParent =
-    item.subItems && location.pathname === '/' + item.href;
+  const isActiveParent = item.subItems && location.pathname === '/' + item.href;
 
   const isActive = isActiveLeaf || isActiveParent;
 
@@ -118,7 +121,9 @@ const NavItem = ({ item, isExpanded, onToggle, depth = 0 }) => {
         >
           <div className="flex items-center space-x-3">
             <item.icon className="h-4 w-4 text-supperagent group-hover:text-white" />
-            <span className="text-black group-hover:text-white">{item.label}</span>
+            <span className="text-black group-hover:text-white">
+              {item.label}
+            </span>
           </div>
           {isExpanded ? (
             <ChevronDown className="h-4 w-4 text-supperagent group-hover:text-white" />
@@ -158,17 +163,15 @@ const NavItem = ({ item, isExpanded, onToggle, depth = 0 }) => {
   );
 };
 
-
 export function SideNav() {
-  const dispatch = useDispatch();
+  
   const navigate = useNavigate();
   const location = useLocation();
-  const user = useSelector((state:any) => state.auth?.user) || null;
+  const user = useSelector((state: any) => state.auth?.user) || null;
   const [expandedItems, setExpandedItems] = useState(new Set());
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [fetchedUser, setFetchedUser] = useState(null);
-
-
+const dispatch = useDispatch<AppDispatch>();
   useEffect(() => {
     const fetchUserInfo = async () => {
       try {
@@ -182,12 +185,11 @@ export function SideNav() {
     };
 
     fetchUserInfo();
-
-
-
   }, [user?._id]);
-console.log(fetchedUser)
-
+  const handleLogout = async () => {
+    await dispatch(logout());
+    navigate('/');
+  };
   // Auto logout if user is null
   useEffect(() => {
     if (!user) {
@@ -306,15 +308,14 @@ console.log(fetchedUser)
           </div>
         </div>
       </div> */}
-      <div className='lg:hidden flex items-center justify-end p-4'>
-
+      <div className="flex items-center justify-end p-4 lg:hidden">
         <button
           onClick={() => setIsMobileMenuOpen(false)}
           className="lg:hidden"
-          >
+        >
           <X className="h-6 w-6 text-gray-500" />
         </button>
-          </div>
+      </div>
 
       <div className="flex  flex-col items-center space-x-3">
         <img
@@ -323,12 +324,15 @@ console.log(fetchedUser)
           className="h-24 w-24 rounded-full object-cover"
         />
         <div className="flec flex-col items-center justify-center space-y-1">
-          <p className="text-xl font-semibold text-gray-900">
-            Welcome!
-          </p>
-         <div onClick={() => navigate("/admin/hr/profile")} className="text-md font-medium text-gray-900 cursor-pointer underline">
-  {fetchedUser ? `${fetchedUser?.firstName} ${fetchedUser?.lastName}` : 'User'}
-</div>
+          <p className="text-xl font-semibold text-gray-900">Welcome!</p>
+          <div
+            onClick={() => navigate('/admin/hr/profile')}
+            className="text-md cursor-pointer font-medium text-gray-900 underline"
+          >
+            {fetchedUser
+              ? `${fetchedUser?.firstName} ${fetchedUser?.lastName}`
+              : 'User'}
+          </div>
         </div>
       </div>
 
@@ -347,8 +351,16 @@ console.log(fetchedUser)
           />
         ))}
       </nav>
+      <div className="px-3 pb-3">
+  <button
+    onClick={handleLogout}
+    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-red-600 hover:bg-red-100 hover:text-red-700 transition-colors"
+  >
+    <DoorOpen className="h-4 w-4" />
+    <span className='font-medium'>Logout</span>
+  </button>
+</div>
 
-      
     </div>
   );
 
