@@ -151,12 +151,10 @@ export function NoticeDialog({
     }
   };
 
-  const shouldShowDepartment =
-    noticeSetting?.value === 'department' || noticeSetting?.value === 'all';
-  const shouldShowDesignation =
-    noticeSetting?.value === 'designation' || noticeSetting?.value === 'all';
-  const shouldShowUsers =
-    noticeSetting?.value === 'individual' || noticeSetting?.value === 'all';
+ const shouldShowDepartment = noticeSetting?.value === 'department';
+const shouldShowDesignation = noticeSetting?.value === 'designation';
+const shouldShowUsers = noticeSetting?.value === 'individual';
+
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

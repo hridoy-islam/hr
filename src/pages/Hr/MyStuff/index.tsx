@@ -202,9 +202,9 @@ const MyStuff = () => {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
       <div className="">
         {/* Header */}
-        <div className="mb-8">
+        
           <h1 className="text-4xl font-bold text-gray-900 mb-2">My Stuff</h1>
-        </div>
+    
 
         {/* Cards Grid */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">

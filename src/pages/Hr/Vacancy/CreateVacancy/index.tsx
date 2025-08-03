@@ -252,7 +252,7 @@ export default function CreateVacancy() {
           </div>
 
           {/* Description full width */}
-          <div className="col-span-full">
+          <div className="col-span-full pb-8">
             <Label htmlFor="description">Description</Label>
             <Controller
               name="description"
@@ -263,7 +263,7 @@ export default function CreateVacancy() {
                   theme="snow"
                   value={field.value}
                   onChange={field.onChange}
-                  className="mt-1 h-[300px] bg-white"
+                  className="mt-1 h-[300px] bg-white "
                 />
               )}
             />
