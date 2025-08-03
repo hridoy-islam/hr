@@ -178,6 +178,10 @@ const MyStuff = () => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
   };
 
+
+
+  
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending': return 'bg-yellow-100 text-yellow-800';
