@@ -48,9 +48,11 @@ import AttendanceApproveList from '@/pages/Hr/Attendance/Attendance-Approve/atte
 import EntryAttendance from '@/pages/Hr/Attendance/entry-attendance';
 import ApplicantDetailPage from '@/pages/Hr/Vacancy/viewApplicant';
 import LeaveApprovalPage from '@/pages/Hr/LeaveManagement/LeaveApproval';
-import PassportExpiryPage from '@/pages/Hr/Dashboard/components/PassportExpiray';
+
 import TrainingExpiryPage from '@/pages/Hr/Dashboard/components/trainingExprity';
-import RightToWorkExpiryPage from '@/pages/Hr/Dashboard/components/RightToWork';
+import RightToWorkExpiryPage from '@/pages/Hr/Dashboard/components/rightToWork';
+import PassportExpiryPage from '@/pages/Hr/Dashboard/components/passportExpiray';
+
 
 
 const SignInPage = lazy(() => import('@/pages/auth/signin'));
