@@ -33,6 +33,7 @@ import axiosInstance from '@/lib/axios'; // Import configured axios
 import { useSelector } from 'react-redux';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
+import { BlinkingDots } from '@/components/shared/blinking-dots';
 
 interface HolidayAPI {
   userId: string;
@@ -77,23 +78,17 @@ const Holiday: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      
-      console.log('Fetching leave data for year:', selectedYear);
-      
+
       // Fetch all leave requests for the user
       const response = await axiosInstance.get(`/hr/leave?userId=${user._id}`);
-      console.log('API Response:', response.data);
-      
-      let data = response.data.data?.result || response.data.data || response.data || [];
-      console.log('Extracted data:', data);
-      
+
+      let data =
+        response.data.data?.result || response.data.data || response.data || [];
+
       // Filter by holidayYear (this matches your Leave model)
       const filteredData = data.filter((item: any) => {
-        console.log('Item holidayYear:', item.holidayYear, 'Selected year:', selectedYear);
         return item.holidayYear === selectedYear;
       });
-      
-      console.log('Filtered data by year:', filteredData);
 
       const mappedHolidays = filteredData.map((item: any, idx: number) => ({
         id: idx + 1,
@@ -106,7 +101,6 @@ const Holiday: React.FC = () => {
         holidayYear: item.holidayYear
       }));
 
-      console.log('Mapped holidays:', mappedHolidays);
       setHolidays(mappedHolidays);
 
       // Recalculate leave summary based on filtered data
@@ -129,7 +123,6 @@ const Holiday: React.FC = () => {
         booked: totalBooked,
         leftThisYear: prev.openingThisYear - totalTaken - totalRequested
       }));
-
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to load leave requests');
       console.error('Error fetching leave requests:', err);
@@ -258,12 +251,16 @@ const Holiday: React.FC = () => {
   };
 
   if (loading)
-    return <div className="p-8 text-center">Loading leave data...</div>;
+    return (
+      <div className="flex justify-center py-12">
+        <BlinkingDots size="large" color="bg-supperagent" />
+      </div>
+    );
 
   if (error) {
     return (
       <div className="p-8 text-center">
-        <div className="text-red-600 mb-4">Error: {error}</div>
+        <div className="mb-4 text-red-600">Error: {error}</div>
         <Button onClick={() => fetchLeaveRequests()}>Retry</Button>
       </div>
     );
@@ -344,7 +341,9 @@ const Holiday: React.FC = () => {
                       <TableBody>
                         {holidays.length > 0 ? (
                           holidays.map((holiday, index) => (
-                            <TableRow key={`${holiday.startDate}-${holiday.title}-${index}`}>
+                            <TableRow
+                              key={`${holiday.startDate}-${holiday.title}-${index}`}
+                            >
                               <TableCell>
                                 {getStatusBadge(holiday.status)}
                               </TableCell>

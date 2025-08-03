@@ -303,13 +303,13 @@ const totalPages = Math.ceil(filteredData.length / entriesPerPage);
 
           {loading ? (
             <div className="flex justify-center py-12">
-              <BlinkingDots size="large" color="bg-blue-600" />
+              <BlinkingDots size="large" color="bg-supperagent" />
             </div>
           ) : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-gray-50">
+                  <TableRow className="">
                     <TableHead className="font-semibold text-gray-700">Employee ID</TableHead>
                     <TableHead className="font-semibold text-gray-700">Name</TableHead>
                     <TableHead className="font-semibold text-gray-700">Department</TableHead>
@@ -325,9 +325,9 @@ const totalPages = Math.ceil(filteredData.length / entriesPerPage);
                   {filteredData.map((employee) => (
                     <TableRow key={employee.employeeId} className="hover:bg-gray-50 transition-colors">
                       <TableCell>
-                        <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-md text-sm font-medium">
+                       
                           {employee.employeeId}
-                        </span>
+
                       </TableCell>
                       <TableCell className="font-medium text-gray-900">{employee.fullName}</TableCell>
                       <TableCell className="text-gray-600">{employee.department}</TableCell>

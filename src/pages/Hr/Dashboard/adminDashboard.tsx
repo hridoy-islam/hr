@@ -385,14 +385,14 @@ const AdminDashboardPage = () => {
           {/* Table */}
           {loading ? (
             <div className="flex justify-center py-12">
-              <BlinkingDots size="large" color="bg-blue-600" />
+              <BlinkingDots size="large" color="bg-supperagent" />
             </div>
           ) : (
             <>
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-gray-50">
+                    <TableRow className="">
                       <TableHead className="font-semibold text-gray-700">
                         Device ID
                       </TableHead>
@@ -433,7 +433,7 @@ const AdminDashboardPage = () => {
                           className="transition-colors hover:bg-gray-50"
                         >
                           <TableCell>
-                            <span className="rounded-md bg-blue-600 px-3 py-1 text-sm font-medium text-white">
+                            <span className="rounded-md bg-supperagent px-3 py-1 text-sm font-medium text-white">
                               {device.id}
                             </span>
                           </TableCell>

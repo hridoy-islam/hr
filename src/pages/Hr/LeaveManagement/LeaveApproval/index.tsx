@@ -39,6 +39,7 @@ import {
 import axiosInstance from '@/lib/axios';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
+import { BlinkingDots } from '@/components/shared/blinking-dots';
 
 interface LeaveRequest {
   _id: string;
@@ -200,34 +201,16 @@ const LeaveApprovalPage: React.FC = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {/* Action Buttons */}
-            <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-              {selectedRequests.length > 0 && (
-                <>
-                  <Button
-                    size="sm"
-                    className="bg-green-600 text-white hover:bg-green-700"
-                    onClick={() => setShowApproveModal(true)}
-                  >
-                    Approve Selected ({selectedRequests.length})
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    onClick={() => setShowRejectModal(true)}
-                  >
-                    Reject Selected ({selectedRequests.length})
-                  </Button>
-                </>
-              )}
-            </div>
-
-            {/* Table */}
-
-            <div className="overflow-x-auto">
+           {loading ? (
+             <div className="flex justify-center py-12">
+                          <BlinkingDots size="large" color="bg-supperagent" />
+                        </div>
+          ) :(
+            <>
+             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-gray-50">
+                  <TableRow className="">
                     <TableHead>Employee</TableHead>
                     <TableHead>Leave Type</TableHead>
                     <TableHead>Leave Date</TableHead>
@@ -385,9 +368,9 @@ const LeaveApprovalPage: React.FC = () => {
                         <TableCell>
                           <Badge
                             className={`
-                    ${request.status === 'pending' ? 'bg-yellow-500 text-white' : ''}
-                    ${request.status === 'approved' ? 'bg-green-500 text-white' : ''}
-                    ${request.status === 'rejected' ? 'bg-red-500 text-white' : ''}
+                    ${request.status === 'pending' ? 'bg-yellow-500 text-white hover:bg-yellow-500' : ''}
+                    ${request.status === 'approved' ? 'bg-green-500 text-white hover:bg-green-500' : ''}
+                    ${request.status === 'rejected' ? 'bg-red-500 text-white hover:bg-red-500' : ''}
                   `}
                           >
                             {request.status}
@@ -430,6 +413,10 @@ const LeaveApprovalPage: React.FC = () => {
                 </TableBody>
               </Table>
             </div>
+            </>
+          )}
+
+           
 
             {/* Individual Approve Confirmation Modal */}
             <Dialog
