@@ -45,7 +45,7 @@ export const useEditEmployee = () => {
     applicationDate: null as moment.Moment | null,
     availableFromDate: null as moment.Moment | null,
     startDate: null as moment.Moment | null,
-    isFullTime: false,
+    contractHours: 0,
     carTravelAllowance: false,
     recruitmentEmploymentType: '',
     area: '',
@@ -152,7 +152,7 @@ export const useEditEmployee = () => {
             ? moment(data.availableFromDate)
             : null,
           startDate: data.startDate ? moment(data.startDate) : null,
-          isFullTime: data.isFullTime || false,
+          contractHours: data.contractHours || 0,
           carTravelAllowance: data.carTravelAllowance || false,
           recruitmentEmploymentType: data.recruitmentEmploymentType || '',
           area: data.area || '',
@@ -260,7 +260,9 @@ const updateField = useCallback(
   async (fieldName: string, value: any) => {
     try {
       setIsFieldSaving((prev) => ({ ...prev, [fieldName]: true }));
-
+if (fieldName === 'contractHours') {
+        value = Number(value);
+      }
       // Special handling for nested objects
       let updateData;
       if (fieldName.includes('.')) {

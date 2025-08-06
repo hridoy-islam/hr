@@ -148,7 +148,7 @@ export default function Vacancy() {
                   <TableCell>
                     {moment(vacancy.applicationDeadline).format('MMMM Do YYYY')}
                   </TableCell>
-                  <TableCell>{vacancy.postedBy.name}</TableCell>
+                  <TableCell>{vacancy?.postedBy?.name}</TableCell>
                   <TableCell>
                     <Switch
                       checked={vacancy.status == 'active'}

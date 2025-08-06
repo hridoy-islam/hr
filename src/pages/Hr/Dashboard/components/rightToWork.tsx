@@ -1,132 +1,176 @@
+import { useState, useEffect } from 'react';
+import {
+  ArrowLeft,
+  AlertTriangle,
+  Search,
+  Download
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { BlinkingDots } from '@/components/shared/blinking-dots';
+import { DynamicPagination } from '@/components/shared/DynamicPagination';
+import axiosInstance from '@/lib/axios';
+import { useNavigate } from 'react-router-dom';
 
-import { useState, useEffect } from "react"
-import { ArrowLeft, AlertTriangle, Search, Download } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
-import { BlinkingDots } from "@/components/shared/blinking-dots"
-import { DynamicPagination } from "@/components/shared/DynamicPagination"
-import axiosInstance from "@/lib/axios"
-import { useNavigate } from "react-router-dom"
-
+// Define types
 interface Employee {
-  _id: string
-  email: string
-  firstName: string
-  lastName: string
-  position: string
-  departmentId: { departmentName: string }
-  rightToWork?: {
-    hasExpiry: boolean
-    expiryDate: string
-  }
+  _id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  position: string;
+  departmentId: {
+    departmentName: string;
+  };
+}
+
+interface RightToWorkRecord {
+  _id: string;
+  employeeId: Employee;
+  expiryDate: string; // ISO date string
+  status: 'active' | 'closed' | 'expire';
 }
 
 const RightToWorkExpiryPage = () => {
-  const navigate = useNavigate()
-  const [searchTerm, setSearchTerm] = useState("")
-  const [entriesPerPage, setEntriesPerPage] = useState(10)
-  const [currentPage, setCurrentPage] = useState(1)
-  const [loading, setLoading] = useState(true)
-  const [employees, setEmployees] = useState<Employee[]>([])
-  const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([])
+  const navigate = useNavigate();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [entriesPerPage, setEntriesPerPage] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [records, setRecords] = useState<RightToWorkRecord[]>([]); // Store right-to-work records
+  const [filteredRecords, setFilteredRecords] = useState<RightToWorkRecord[]>([]);
 
+  // Fetch right-to-work records with populated employee data
   useEffect(() => {
-    const fetchEmployees = async () => {
-      setLoading(true)
+    const fetchRightToWork = async () => {
+      setLoading(true);
       try {
-        const response = await axiosInstance.get("/users", {
-          params: {
-            role: "employee",
-            limit: "all",
-          },
-        })
+        const response = await axiosInstance.get('/hr/right-to-work');
 
-        const fetchedEmployees: Employee[] = response.data.data.result || response.data.data
+        // Handle response structure (adjust if needed)
+        let data = response.data.data.result;
+        
 
-        // Filter employees with expiring right to work
-        const expiringRightToWork = fetchedEmployees.filter(
-          (emp) =>
-            emp.rightToWork?.hasExpiry &&
-            (isExpiringSoon(emp.rightToWork.expiryDate) || isExpired(emp.rightToWork.expiryDate)),
-        )
+        // Filter only active records with expiryDate
+        const validRecords = data
+          .map((record: any): RightToWorkRecord | null => {
+            if (!record.employeeId || !record.expiryDate) return null;
+            return {
+              _id: record._id,
+              employeeId: {
+                _id: record.employeeId._id,
+                firstName: record.employeeId.firstName || 'N/A',
+                lastName: record.employeeId.lastName || 'N/A',
+                email: record.employeeId.email || 'No email',
+                position: record.employeeId.position || 'N/A',
+                departmentId: {
+                  departmentName: record.employeeId.departmentId?.departmentName || 'Unassigned'
+                }
+              },
+              expiryDate: record.expiryDate,
+              status: record.status
+            };
+          })
+          .filter((record: RightToWorkRecord | null): record is RightToWorkRecord => {
+            return record !== null && record.status === 'active';
+          });
 
-        setEmployees(expiringRightToWork)
-        setFilteredEmployees(expiringRightToWork)
+        setRecords(validRecords);
+        setFilteredRecords(validRecords);
       } catch (error) {
-        console.error("Failed to fetch employees:", error)
-        setEmployees([])
-        setFilteredEmployees([])
+        console.error('Failed to fetch right-to-work data:', error);
+        setRecords([]);
+        setFilteredRecords([]);
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
-    fetchEmployees()
-  }, [])
+    };
 
+    fetchRightToWork();
+  }, []);
+
+  // Filter records when search term changes
   useEffect(() => {
-    const filtered = employees.filter(
-      (emp) =>
-        emp.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        emp.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        emp.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        emp.departmentId?.departmentName.toLowerCase().includes(searchTerm.toLowerCase()),
-    )
-    setFilteredEmployees(filtered)
-    setCurrentPage(1)
-  }, [searchTerm, employees])
+    const filtered = records.filter(
+      (record) =>
+        record.employeeId.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        record.employeeId.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        record.employeeId.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        record.employeeId.departmentId.departmentName.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    setFilteredRecords(filtered);
+    setCurrentPage(1);
+  }, [searchTerm, records]);
 
-  // Helper function to check if date is expiring within 30 days
+  // Helper: Is expiring within 30 days
   const isExpiringSoon = (dateString: string) => {
-    const expiryDate = new Date(dateString)
-    const today = new Date()
-    const thirtyDaysFromNow = new Date()
-    thirtyDaysFromNow.setDate(today.getDate() + 30)
-    return expiryDate <= thirtyDaysFromNow && expiryDate >= today
-  }
+    const expiryDate = new Date(dateString);
+    const today = new Date();
+    const thirtyDaysFromNow = new Date();
+    thirtyDaysFromNow.setDate(today.getDate() + 30);
+    return expiryDate <= thirtyDaysFromNow && expiryDate >= today;
+  };
 
-  // Helper function to check if date is expired
+  // Helper: Is already expired
   const isExpired = (dateString: string) => {
-    const expiryDate = new Date(dateString)
-    const today = new Date()
-    return expiryDate < today
-  }
+    const expiryDate = new Date(dateString);
+    const today = new Date();
+    return expiryDate < today;
+  };
 
+  // Format date as DD/MM/YYYY
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-GB")
-  }
+    return new Date(dateString).toLocaleDateString('en-GB'); // e.g. 01/03/2025
+  };
 
+  // Get status badge
   const getExpiryStatus = (dateString: string) => {
     if (isExpired(dateString)) {
-      return { status: "Expired", color: "bg-red-500" }
+      return { status: 'Expired', color: 'bg-red-500' };
     } else if (isExpiringSoon(dateString)) {
-      return { status: "Expiring Soon", color: "bg-yellow-500" }
+      return { status: 'Expiring Soon', color: 'bg-yellow-500' };
     }
-    return { status: "Valid", color: "bg-green-500" }
-  }
+    return { status: 'Valid', color: 'bg-green-500' };
+  };
 
+  // Navigate to employee detail page
   const handleEmployeeClick = (employeeId: string) => {
-    navigate(`/admin/hr/employee/${employeeId}`)
-  }
+    navigate(`/admin/hr/employee/${employeeId}`);
+  };
 
+  // Placeholder for export
   const handleExport = () => {
-    console.log("Exporting right to work expiry data...")
-    // Implement export functionality here
-  }
+    console.log('Exporting right to work expiry data...');
+    // Implement CSV/PDF export logic here
+  };
 
-  const totalPages = Math.ceil(filteredEmployees.length / entriesPerPage)
-  const startIndex = (currentPage - 1) * entriesPerPage
-  const endIndex = startIndex + entriesPerPage
-  const currentData = filteredEmployees.slice(startIndex, endIndex)
+  // Pagination
+  const totalPages = Math.ceil(filteredRecords.length / entriesPerPage);
+  const startIndex = (currentPage - 1) * entriesPerPage;
+  const endIndex = startIndex + entriesPerPage;
+  const currentData = filteredRecords.slice(startIndex, endIndex);
 
   return (
-    <div className="min-h-screen bg-gray-50 ">
-      <div className="space-y-6">
+    <div className="min-h-screen bg-gray-50">
+      <div className="space-y-6 p-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <Button variant="outline" size="sm" onClick={() =>navigate(-1)} className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate(-1)}
+              className="flex items-center space-x-2"
+            >
               <ArrowLeft className="h-4 w-4" />
               <span>Back</span>
             </Button>
@@ -135,13 +179,17 @@ const RightToWorkExpiryPage = () => {
                 <AlertTriangle className="h-6 w-6 text-purple-600" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">Right to Work Expiry Details</h1>
+                <h1 className="text-2xl font-bold text-gray-900">
+                  Right to Work Expiry Details
+                </h1>
                 <p className="text-sm text-gray-600">
-                  {filteredEmployees.length} employees with expiring right to work documents
+                  {filteredRecords.length} employees with expiring right to work documents
                 </p>
               </div>
             </div>
           </div>
+
+          {/* Export Button (Optional) */}
           {/* <Button onClick={handleExport} className="flex items-center space-x-2">
             <Download className="h-4 w-4" />
             <span>Export</span>
@@ -179,53 +227,58 @@ const RightToWorkExpiryPage = () => {
                   <TableHeader>
                     <TableRow className="bg-gray-50">
                       <TableHead className="font-semibold text-gray-700">Employee</TableHead>
-                      <TableHead className="font-semibold text-gray-700">Department</TableHead>
-                      <TableHead className="font-semibold text-gray-700">Position</TableHead>
                       <TableHead className="font-semibold text-gray-700">Right to Work Expiry</TableHead>
                       <TableHead className="font-semibold text-gray-700">Status</TableHead>
-                      <TableHead className="font-semibold text-gray-700">Action</TableHead>
+                      <TableHead className="font-semibold text-gray-700 text-right">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {currentData.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={6} className="py-8 text-center text-gray-500">
+                        <TableCell
+                          colSpan={6}
+                          className="py-8 text-center text-gray-500"
+                        >
                           No employees found with expiring right to work documents.
                         </TableCell>
                       </TableRow>
                     ) : (
-                      currentData.map((employee) => {
-                        const status = employee.rightToWork?.expiryDate
-                          ? getExpiryStatus(employee.rightToWork.expiryDate)
-                          : { status: "N/A", color: "bg-gray-500" }
+                      currentData.map((record) => {
+                        const status = getExpiryStatus(record.expiryDate);
+                        const emp = record.employeeId;
 
                         return (
-                          <TableRow key={employee._id} className="transition-colors hover:bg-gray-50">
+                          <TableRow
+                            key={record._id}
+                            className="transition-colors hover:bg-gray-50"
+                          >
                             <TableCell>
                               <div>
                                 <p className="font-medium text-gray-900">
-                                  {employee.firstName} {employee.lastName}
+                                  {emp.firstName} {emp.lastName}
                                 </p>
-                                <p className="text-sm text-gray-500">{employee.email}</p>
                               </div>
                             </TableCell>
-                            <TableCell className="text-gray-600">{employee?.departmentId?.departmentName}</TableCell>
-                            <TableCell className="text-gray-600">{employee?.position}</TableCell>
+                           
                             <TableCell className="font-medium">
-                              {employee.rightToWork?.expiryDate ? formatDate(employee.rightToWork.expiryDate) : "N/A"}
+                              {formatDate(record.expiryDate)}
                             </TableCell>
                             <TableCell>
-                              <Badge className={`${status.color} text-white`}>{status.status}</Badge>
+                              <Badge className={`${status.color} text-white`}>
+                                {status.status}
+                              </Badge>
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="text-right">
                               <Button
                                 size="sm"
-                                onClick={() => handleEmployeeClick(employee._id)}
+                                onClick={() => handleEmployeeClick(emp._id)}
                                 className="bg-blue-600 hover:bg-blue-700 text-white"
-                              >View</Button>
+                              >
+                                View
+                              </Button>
                             </TableCell>
                           </TableRow>
-                        )
+                        );
                       })
                     )}
                   </TableBody>
@@ -247,7 +300,7 @@ const RightToWorkExpiryPage = () => {
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default RightToWorkExpiryPage
+export default RightToWorkExpiryPage;

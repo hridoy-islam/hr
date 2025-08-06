@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { DollarSign, Eye, Pen, Plus } from 'lucide-react';
+import { DollarSign, Eye, FolderMinus, Pen, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import {
@@ -157,6 +157,18 @@ export default function Employee() {
                     />
                   </TableCell>
                   <TableCell className="flex flex-row items-end justify-end gap-2 text-right">
+                  <Button
+                      variant="ghost"
+                      className="border-none bg-supperagent text-sm text-white hover:bg-supperagent/90"
+                      size="icon"
+                      onClick={() => {
+                        navigate(
+                          `/admin/hr/employee/${employee._id}/rtw`,
+                        );
+                      }}
+                    >
+                      <FolderMinus  className='h-5 w-5'/>
+                    </Button>
                     <Button
                       variant="ghost"
                       className="border-none bg-supperagent text-sm text-white hover:bg-supperagent/90"
@@ -168,7 +180,7 @@ export default function Employee() {
                         );
                       }}
                     >
-                      <DollarSign size={24} />
+                      <DollarSign className='h-5 w-5' />
                     </Button>
 
                     <Button

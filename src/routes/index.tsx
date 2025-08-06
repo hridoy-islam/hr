@@ -52,6 +52,8 @@ import LeaveApprovalPage from '@/pages/Hr/LeaveManagement/LeaveApproval';
 import TrainingExpiryPage from '@/pages/Hr/Dashboard/components/trainingExprity';
 import RightToWorkExpiryPage from '@/pages/Hr/Dashboard/components/rightToWork';
 import PassportExpiryPage from '@/pages/Hr/Dashboard/components/passportExpiray';
+import RtwPage from '@/pages/Hr/Employee/rightToWorkEmployee';
+import RightToWorkStatusPage from '@/pages/Hr/Dashboard/components/rightToWorkStatus';
 
 
 
@@ -98,6 +100,10 @@ export default function AppRouter() {
               element: <RightToWorkExpiryPage />
             },
             {
+              path: 'expiry/rightToWorkStatus',
+              element: <RightToWorkStatusPage />
+            },
+            {
               path: 'profile',
               element: <Profile />
             },
@@ -121,6 +127,10 @@ export default function AppRouter() {
             {
               path: 'employee/:id/employee-rate',
               element: <EmployeeRate />
+            },
+            {
+              path: 'employee/:id/rtw',
+              element: <RtwPage />
             },
 
             {

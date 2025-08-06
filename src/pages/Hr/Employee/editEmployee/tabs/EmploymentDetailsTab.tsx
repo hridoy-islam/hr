@@ -59,21 +59,6 @@ const EmploymentDetailsTab: React.FC<EmploymentDetailsTabProps> = ({
     { value: 'intern', label: 'Intern' }
   ];
 
-  // Get designations, departments, and trainings
-  const designationOptions = designations.map((des: any) => ({
-    value: des._id,
-    label: des.title
-  }));
-
-  const departmentOptions = departments.map((dep: any) => ({
-    value: dep._id,
-    label: dep.departmentName
-  }));
-  const trainingOptions = trainings.map((dep: any) => ({
-    value: dep._id,
-    label: dep.name
-  }));
-
   return (
     <Card>
       <CardContent className="pt-6">
@@ -150,12 +135,11 @@ const EmploymentDetailsTab: React.FC<EmploymentDetailsTabProps> = ({
           />
 
           <EditableField
-            id="isFullTime"
-            label="Full Time Employee"
-            value={formData.isFullTime}
-            type="checkbox"
-            onUpdate={(checked) => onCheckboxChange('isFullTime', checked)}
-            isSaving={isFieldSaving['isFullTime']}
+            id="contractHours"
+            label="Contract Hours"
+            value={formData.contractHours}
+            onUpdate={(value) => onUpdate('contractHours', value)}
+            isSaving={isFieldSaving['contractHours']}
           />
 
           <EditableField

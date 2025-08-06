@@ -24,7 +24,7 @@ import { DynamicPagination } from '@/components/shared/DynamicPagination';
 import axiosInstance from '@/lib/axios';
 import { useNavigate } from 'react-router-dom';
 
-// Mock data for the dashboard
+// Mock dashboard stats
 const dashboardStats = {
   totalUsers: 35,
   accessToday: 11,
@@ -34,6 +34,7 @@ const dashboardStats = {
   shiftAbsent: 6
 };
 
+// Mock device data
 const deviceData = [
   {
     id: 'FCAYS11010107',
@@ -64,6 +65,7 @@ const deviceData = [
   }
 ];
 
+// Define types
 interface Employee {
   _id: string;
   email: string;
@@ -71,7 +73,7 @@ interface Employee {
   lastName: string;
   position: string;
   departmentId: { departmentName: string };
-  rightToWork?: {
+  passportExpiry: {
     hasExpiry: boolean;
     expiryDate: string;
   };
@@ -80,10 +82,19 @@ interface Employee {
     name: string;
     expiryDate?: string;
   }>;
-  passportExpiry: {
-    hasExpiry: boolean;
-    expiryDate: string;
+}
+
+interface RightToWorkRecord {
+  _id: string;
+  employeeId: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
   };
+  expiryDate: string; // ISO date string
+  status: 'active' | 'closed' | 'expire';
+  hasExpiry: boolean; // if not in schema, we can derive from expiryDate
 }
 
 const AdminDashboardPage = () => {
@@ -94,32 +105,45 @@ const AdminDashboardPage = () => {
   const [filteredData, setFilteredData] = useState(deviceData);
   const [loading, setLoading] = useState(true);
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [trainings, setTrainings] = useState([]);
+  const [rightToWorkRecords, setRightToWorkRecords] = useState<
+    RightToWorkRecord[]
+  >([]);
 
+  // Fetch employees
   useEffect(() => {
     const fetchEmployees = async () => {
-      setLoading(true);
       try {
         const response = await axiosInstance.get('/users', {
-          params: {
-            role: 'employee',
-            limit: 'all'
-          }
+          params: { role: 'employee', limit: 'all' }
         });
-
         const fetchedEmployees: Employee[] =
           response.data.data.result || response.data.data;
         setEmployees(fetchedEmployees);
       } catch (error) {
         console.error('Failed to fetch employees:', error);
         setEmployees([]);
-      } finally {
-        setLoading(false);
       }
     };
-    fetchEmployees();
+
+    // Fetch right-to-work records
+    const fetchRightToWork = async () => {
+      try {
+        const response = await axiosInstance.get('/hr/right-to-work?limit=all');
+        const records: RightToWorkRecord[] = response.data.data.result || [];
+        setRightToWorkRecords(records);
+      } catch (error) {
+        console.error('Failed to fetch right-to-work data:', error);
+        setRightToWorkRecords([]);
+      }
+    };
+
+    setLoading(true);
+    Promise.all([fetchEmployees(), fetchRightToWork()])
+      .catch(console.error)
+      .finally(() => setLoading(false));
   }, []);
 
+  // Filter device data based on search
   useEffect(() => {
     const filtered = deviceData.filter(
       (device) =>
@@ -131,68 +155,75 @@ const AdminDashboardPage = () => {
     setCurrentPage(1);
   }, [searchTerm]);
 
-  // Helper function to check if date is expiring within 30 days
+  // Helper: Is expiring within 30 days
   const isExpiringSoon = (dateString: string) => {
     const expiryDate = new Date(dateString);
     const today = new Date();
-    const thirtyDaysFromNow = new Date();
+    const thirtyDaysFromNow = new Date(today);
     thirtyDaysFromNow.setDate(today.getDate() + 30);
     return expiryDate <= thirtyDaysFromNow && expiryDate >= today;
   };
 
-  // Helper function to check if date is expired
+  // Helper: Is already expired
   const isExpired = (dateString: string) => {
     const expiryDate = new Date(dateString);
     const today = new Date();
     return expiryDate < today;
   };
 
-  const isTrainingExpiringSoon = (endDate: Date, reminderDays: number) => {
-    const today = new Date();
+  // Training helpers
+  const isTrainingExpiringSoon = (endDate: string, reminderDays: number) => {
     const expiryDate = new Date(endDate);
+    const today = new Date();
     const reminderDate = new Date(expiryDate);
     reminderDate.setDate(expiryDate.getDate() - reminderDays);
-
     return today >= reminderDate && today <= expiryDate;
   };
 
-  const isTrainingExpired = (endDate: Date) => {
+  const isTrainingExpired = (endDate: string) => {
     const today = new Date();
     const expiryDate = new Date(endDate);
     return today > expiryDate;
   };
 
-  // Get expiry statistics
+  // Calculate expiry statistics
   const getExpiryStats = () => {
-    const passportExpiring = employees.filter(
-      (emp) =>
-        emp?.passportExpiry &&
-        (isExpiringSoon(emp?.passportExpiry) || isExpired(emp?.passportExpiry))
-    );
+    // Passport expiry
+    const passportExpiring = employees.filter((emp) => {
+      const expiry = emp.passportExpiry?.expiryDate;
+      return (
+        emp.passportExpiry?.hasExpiry &&
+        expiry &&
+        (isExpiringSoon(expiry) || isExpired(expiry))
+      );
+    });
 
-    const rightToWorkExpiring = employees.filter(
-      (emp) =>
-        emp.rightToWork?.hasExpiry &&
-        (isExpiringSoon(emp.rightToWork.expiryDate) ||
-          isExpired(emp.rightToWork.expiryDate))
-    );
+    // Right to Work expiry — from /hr/right-to-work API
+    const rightToWorkExpiring = rightToWorkRecords.filter((record) => {
+      // Only active records with expiry date
+      // if (record.status !== 'active') return false;
+      const expiry = record.expiryDate;
+      return expiry && (isExpiringSoon(expiry) || isExpired(expiry));
+    });
+
+    const rightToWorkStatusExpired = rightToWorkRecords.filter((record) => {
+      // if (record.status !== 'active') return false;
+      const nextDate = record.nextCheckDate;
+      return nextDate && isExpired(nextDate);
+    });
+
+    // Training expiry
     let expiredTrainingCount = 0;
     let expiringSoonTrainingCount = 0;
 
     employees.forEach((emp) => {
-      emp.training?.forEach((training) => {
-        if (training.endDate) {
-          const expiryDate = new Date(training.endDate);
-          const today = new Date();
-
-          if (expiryDate < today) {
+      emp.trainingId?.forEach((training) => {
+        if (training.expiryDate) {
+          const expiryDate = training.expiryDate;
+          const reminderDays = 7; // default, or fetch from trainingId if available
+          if (isTrainingExpired(expiryDate)) {
             expiredTrainingCount++;
-          } else if (
-            isTrainingExpiringSoon(
-              expiryDate,
-              training.trainingId?.reminderBeforeDays || 0
-            )
-          ) {
+          } else if (isTrainingExpiringSoon(expiryDate, reminderDays)) {
             expiringSoonTrainingCount++;
           }
         }
@@ -203,7 +234,8 @@ const AdminDashboardPage = () => {
       passport: passportExpiring.length,
       trainingExpired: expiredTrainingCount,
       trainingExpiringSoon: expiringSoonTrainingCount,
-      rightToWork: rightToWorkExpiring.length
+      rightToWork: rightToWorkExpiring.length,
+      rightToWorkStatus: rightToWorkStatusExpired.length
     };
   };
 
@@ -215,11 +247,10 @@ const AdminDashboardPage = () => {
   const startIndex = (currentPage - 1) * entriesPerPage;
   const endIndex = startIndex + entriesPerPage;
   const currentData = filteredData.slice(startIndex, endIndex);
-
   const expiryStats = getExpiryStats();
 
   return (
-    <div className="min-h-screen bg-gray-50 ">
+    <div className="min-h-screen bg-gray-50">
       <div className="space-y-4">
         {/* Dashboard Cards */}
         <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5">
@@ -310,6 +341,7 @@ const AdminDashboardPage = () => {
             </div>
           </div>
 
+          {/* Training Expiry Card */}
           <div
             className="transform cursor-pointer rounded-lg bg-gradient-to-br from-orange-600 to-orange-800 p-4 text-white shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-lg"
             onClick={() => handleExpiryCardClick('training')}
@@ -332,7 +364,7 @@ const AdminDashboardPage = () => {
             </div>
           </div>
 
-          {/* Training Expiry Card */}
+          {/* Right to Work Expiry Card */}
           <div
             className="transform cursor-pointer rounded-lg bg-gradient-to-br from-purple-600 to-purple-800 p-4 text-white shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-lg"
             onClick={() => handleExpiryCardClick('rightToWork')}
@@ -349,6 +381,30 @@ const AdminDashboardPage = () => {
                   Expiring: {expiryStats.rightToWork}
                 </p>
                 <p className="text-sm">Verify soon</p>
+              </div>
+            </div>
+            <div className="mt-3 flex items-center justify-between">
+              <span className="text-xs opacity-80">view details</span>
+              <ChevronRight className="h-3 w-3 opacity-80" />
+            </div>
+          </div>
+          {/* Right to Work Status check */}
+          <div
+            className="transform cursor-pointer rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-800 p-4 text-white shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-lg"
+            onClick={() => handleExpiryCardClick('rightToWorkStatus')}
+          >
+            <div className="flex items-center space-x-3">
+              <div className="rounded-lg bg-white/20 p-2">
+                <IdCard className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold opacity-90">
+                  STATUS CHECK
+                </h3>
+                <p className="text-lg font-bold">
+                  Due: {expiryStats.rightToWorkStatus}
+                </p>
+                <p className="text-sm">Verifications needed</p>
               </div>
             </div>
             <div className="mt-3 flex items-center justify-between">
@@ -392,7 +448,7 @@ const AdminDashboardPage = () => {
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow className="">
+                    <TableRow>
                       <TableHead className="font-semibold text-gray-700">
                         Device ID
                       </TableHead>
