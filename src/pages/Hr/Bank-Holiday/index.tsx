@@ -1,26 +1,36 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Calendar,
-  Plus,
-  Trash2,
-  Save,
-  AlertCircle,
-  CheckCircle,
-} from 'lucide-react';
-import DatePicker from 'react-datepicker';
-import 'react-datepicker/dist/react-datepicker.css';
+import { Plus, Trash2, Edit, Calendar as CalendarIcon } from 'lucide-react';
 import axiosInstance from '@/lib/axios';
 import { useToast } from '@/components/ui/use-toast';
+import {
+  Table,
+  TableBody,
+  TableHeader,
+  TableCell,
+  TableHead,
+  TableRow
+} from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
+import { BlinkingDots } from '@/components/shared/blinking-dots';
 
-// Updated interface to match your API response
 interface BankHoliday {
-  _id: string; // API uses _id, not id
+  _id: string;
   date: string;
   title: string;
   year: number;
 }
 
-// Interface for the API response structure
 interface ApiResponse {
   data: {
     result: BankHoliday[];
@@ -29,124 +39,114 @@ interface ApiResponse {
 
 function BankHolidayPage() {
   const [holidays, setHolidays] = useState<BankHoliday[]>([]);
-  const [selectedDate, setSelectedDate] = useState('');
+  const [date, setDate] = useState<Date | undefined>(undefined); // Selected date as Date object
   const [title, setTitle] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [message, setMessage] = useState<{
-    type: 'success' | 'error';
-    text: string;
-  } | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingHoliday, setEditingHoliday] = useState<BankHoliday | null>(
+    null
+  );
+  const { toast } = useToast();
+const [isLoadingHolidays, setIsLoadingHolidays] = useState(true);
 
 
-  const {toast}= useToast()
-
-  // Load holidays from API on component mount
+  // Fetch holidays on mount
   const fetchHolidays = async () => {
+    setIsLoadingHolidays(true);
     try {
       const response = await axiosInstance.get<ApiResponse>('/hr/bank-holiday');
-      // Handle the nested response structure properly
       const holidaysData = response.data?.data?.result || [];
       setHolidays(holidaysData);
     } catch (error: any) {
-      setMessage({
-        type: 'error',
-        text: 'Failed to load holidays. Please try again later.',
+      toast({
+        title: 'Error',
+        description: 'Failed to load holidays. Please try again later.',
+        variant: 'destructive'
       });
       console.error('Error fetching holidays:', error);
-    }
+    }finally {
+    setIsLoadingHolidays(false); 
+  }
   };
-  useEffect(() => {
 
+  useEffect(() => {
     fetchHolidays();
   }, []);
 
+  // Reset form fields
+  const resetForm = () => {
+    setDate(undefined);
+    setTitle('');
+    setEditingHoliday(null);
+  };
+
+  // Save holiday (create or update)
   const handleSaveHoliday = async () => {
-    if (!selectedDate || !title.trim()) {
-      setMessage({
-        type: 'error',
-        text: 'Please fill in both date and title fields.',
+    if (!date || !title.trim()) {
+      toast({
+        title: 'Validation Error',
+        description: 'Please select a date and enter a title.',
+        variant: 'destructive'
       });
       return;
     }
 
     setIsLoading(true);
-    setMessage(null);
-
-    const newHoliday = {
-      date: selectedDate,
+    const formattedDate = date.toISOString().split('T')[0]; // YYYY-MM-DD
+    const holidayData = {
+      date: formattedDate,
       title: title.trim(),
-      year: new Date(selectedDate).getFullYear(),
+      year: date.getFullYear()
     };
 
     try {
-      const response = await axiosInstance.post<ApiResponse>('/hr/bank-holiday', newHoliday);
-      const addedHoliday = response.data?.data?.result;
-      
-      // Handle both single object and array responses
-      if (addedHoliday) {
-        setHolidays((prev) =>
-          [...prev, addedHoliday].sort(
-            (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-          )
+      if (editingHoliday) {
+        await axiosInstance.patch(
+          `/hr/bank-holiday/${editingHoliday._id}`,
+          holidayData
         );
+        toast({ title: 'Holiday updated successfully!' });
+      } else {
+        await axiosInstance.post('/hr/bank-holiday', holidayData);
+        toast({ title: 'Holiday added successfully!' });
       }
-       fetchHolidays();
-      setSelectedDate('');
-      setTitle('');
-      toast({ title: 'Bank holiday added successfully!' });
+
+      // Refresh list
+      await fetchHolidays();
+      resetForm();
+      setIsDialogOpen(false);
     } catch (error: any) {
       toast({
-        title: error.response?.data?.message || 'Failed to add holiday.',
-        className: 'bg-destructive text-white border-none'
+        title: error.response?.data?.message || 'Failed to save holiday.',
+        variant: 'destructive'
       });
-      console.error('Error adding holiday:', error);
+      console.error('Error saving holiday:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Delete holiday via API
+  // Delete holiday
   const handleDeleteHoliday = async (id: string) => {
     try {
       await axiosInstance.delete(`/hr/bank-holiday/${id}`);
-      setHolidays((prev) => prev.filter((holiday) => holiday._id !== id));
-      toast({ title:'Bank holiday deleted successfully!' });
+      setHolidays((prev) => prev.filter((h) => h._id !== id));
+      toast({ title: 'Holiday deleted successfully!' });
     } catch (error: any) {
       toast({
-       
-        title: error.response?.data?.message || 'Failed to delete holiday.', className: 'bg-destructive text-white border-none'
+        title: error.response?.data?.message || 'Failed to delete holiday.',
+        variant: 'destructive'
       });
       console.error('Error deleting holiday:', error);
     }
   };
 
-  // Fixed Group holidays by year - handles both year property and date fallback
-  const getHolidaysByYear = () => {
-    const groupedHolidays = holidays.reduce((acc, holiday) => {
-      // Safely get year - use the year property if available, otherwise extract from date
-      const year = holiday.year || new Date(holiday.date).getFullYear();
-
-      if (!acc[year]) {
-        acc[year] = [];
-      }
-
-      acc[year].push({
-        ...holiday,
-        year, // Ensure year is attached to each holiday
-      });
-
-      return acc;
-    }, {} as Record<number, BankHoliday[]>);
-
-    return Object.keys(groupedHolidays)
-      .map((year) => parseInt(year))
-      .sort((a, b) => b - a)
-      .map((year) => ({
-        year,
-        holidays: groupedHolidays[year].sort(
-          (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-        ),
-      }));
+  // Handle edit button click
+  const handleEditClick = (holiday: BankHoliday) => {
+    setEditingHoliday(holiday);
+    setDate(new Date(holiday.date)); // Convert string to Date object
+    setTitle(holiday.title);
+    setIsDialogOpen(true);
   };
 
   // Format date for display
@@ -155,142 +155,195 @@ function BankHolidayPage() {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
-      day: 'numeric',
+      day: 'numeric'
     });
   };
-
-  // Auto-hide message
-  useEffect(() => {
-    if (message) {
-      const timer = setTimeout(() => setMessage(null), 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [message]);
-
+if(isLoadingHolidays) {
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">Bank Holiday Management</h1>
-          <p className="text-gray-600">Manage bank holidays for different years</p>
-        </div>
-
-       
-        <div className="grid gap-8 lg:grid-cols-3">
-          {/* Add Holiday Form */}
-          <div className="lg:col-span-1">
-            <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl">
-              <div className="bg-supperagent px-6 py-4">
-                <h2 className="flex items-center gap-2 text-xl font-semibold text-white">
-                  <Plus className="h-5 w-5" />
-                  Add New Holiday
-                </h2>
+    <>
+    <div className="flex justify-center py-6">
+                <BlinkingDots size="large" color="bg-supperagent" />
               </div>
-              <div className="space-y-6 p-6">
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">
-                    Holiday Date
-                  </label>
+    </>
+  )
+}
+  return (
+    <div className="">
+      {/* Header */}
+      <div className="mb-8 flex items-center justify-between">
+        <h1 className="text-3xl font-bold text-gray-900">
+          Bank Holiday Management
+        </h1>
+
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogTrigger asChild>
+            <Button
+              onClick={resetForm}
+              className="bg-supperagent text-white hover:bg-supperagent/90"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Add Holiday
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>
+                {editingHoliday ? 'Edit Holiday' : 'Add New Holiday'}
+              </DialogTitle>
+            </DialogHeader>
+
+            <div className="grid gap-4 py-4">
+              {/* Date Field */}
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="date" className="text-right">
+                  Date
+                </Label>
+                <div className="col-span-3">
                   <DatePicker
-                    selected={selectedDate ? new Date(selectedDate) : null}
-                    onChange={(date: Date | null) => {
-                      if (date) {
-                        setSelectedDate(date.toISOString().split('T')[0]); // YYYY-MM-DD
-                      } else {
-                        setSelectedDate('');
-                      }
-                    }}
+                    selected={date || null}
+                    onChange={(newDate: Date | null) =>
+                      setDate(newDate || undefined)
+                    }
                     dateFormat="dd-MM-yyyy"
-                    className="w-full rounded-md border border-gray-300 px-4 py-2 bg-white hover:border-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                    customInput={
+                      <button
+                        type="button"
+                        className="flex w-full items-center justify-start rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-supperagent"
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {date ? (
+                          date.toLocaleDateString('en-GB', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric'
+                          })
+                        ) : (
+                          <span>Pick a date</span>
+                        )}
+                      </button>
+                    }
                     wrapperClassName="w-full"
-                    placeholderText="Select a date"
-                    todayButton="Today"
                     showYearDropdown
                     scrollableYearDropdown
                     yearDropdownItemNumber={15}
                     popperPlacement="bottom-start"
+                    todayButton="Today"
+                    placeholderText="Pick a date"
+                    preventOpenOnFocus
+                    minDate={new Date(new Date().getFullYear(), 0, 1)} // Jan 1 of current year
+                    maxDate={new Date(new Date().getFullYear(), 11, 31)}
                   />
                 </div>
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">
-                    Holiday Title
-                  </label>
-                  <input
-                    type="text"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    placeholder="e.g., Christmas Day"
-                    className="w-full rounded-md border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <button
-                  onClick={handleSaveHoliday}
-                  disabled={isLoading || !selectedDate || !title.trim()}
-                  className="flex w-full items-center justify-center gap-2 rounded-md bg-supperagent px-6 py-2 font-semibold text-white shadow-lg hover:bg-opacity-90 disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  {isLoading ? (
-                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                  ) : (
-                    <Save className="h-5 w-5" />
-                  )}
-                  {isLoading ? 'Saving...' : 'Save Holiday'}
-                </button>
               </div>
-            </div>
-          </div>
 
-          {/* Holidays List */}
-          <div className="lg:col-span-2">
-            <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl">
-              <div className="bg-supperagent px-6 py-4">
-                <h2 className="text-xl font-semibold text-white">Scheduled Bank Holidays</h2>
-              </div>
-              <div className="max-h-[600px] overflow-y-auto">
-                {getHolidaysByYear().length === 0 ? (
-                  <div className="p-12 text-center">
-                    <Calendar className="mx-auto mb-4 h-16 w-16 text-gray-300" />
-                    <h3 className="mb-2 text-lg font-medium text-gray-900">No holidays scheduled</h3>
-                    <p className="text-gray-500">Add your first bank holiday to get started.</p>
-                  </div>
-                ) : (
-                  <div className="divide-y divide-gray-100">
-                    {getHolidaysByYear().map(({ year, holidays: yearHolidays }) => (
-                      <div key={year} className="p-6">
-                        <h3 className="mb-4 flex items-center gap-2 text-lg font-bold text-gray-900">
-                          {year}
-                          <span className="ml-2 text-sm text-gray-500">
-                            ({yearHolidays.length} holiday{yearHolidays.length !== 1 ? 's' : ''})
-                          </span>
-                        </h3>
-                        <div className="space-y-3">
-                          {yearHolidays.map((holiday) => (
-                            <div
-                              key={holiday._id}
-                              className="group flex items-center justify-between rounded-xl bg-gray-50 p-4 transition-all hover:bg-gray-100"
-                            >
-                              <div className='flex flex-row items-center  gap-4'>
-                                <h4 className="mb-1 font-semibold text-gray-900">{holiday.title}</h4>
-                                <p className="text-sm text-gray-600">{formatDate(holiday.date)}</p>
-                              </div>
-                              <button
-                                onClick={() => handleDeleteHoliday(holiday._id)}
-                                className="rounded-lg p-2 text-red-500 opacity-0 hover:bg-red-50 group-hover:opacity-100 transition-all"
-                                title="Delete holiday"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="title" className="text-right">
+                  Title
+                </Label>
+                <Input
+                  id="title"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="col-span-3"
+                  placeholder="e.g., Christmas Day"
+                />
               </div>
             </div>
-          </div>
-        </div>
+
+            {/* Actions */}
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  resetForm();
+                  setIsDialogOpen(false);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSaveHoliday}
+                disabled={isLoading || !date || !title.trim()}
+                className='bg-supperagent text-white hover:bg-supperagen'
+              >
+                {isLoading ? (
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent bg-supperagent text-white hover:bg-supperagent" />
+                ) : editingHoliday ? (
+                  'Update Holiday'
+                ) : (
+                  'Save Holiday'
+                )}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {/* Holidays Table */}
+      <div className="rounded-lg bg-white p-4 shadow-md">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Title</TableHead>
+              <TableHead>Date</TableHead>
+              <TableHead>Year</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {holidays.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={4}
+                  className="h-24 text-center text-gray-500"
+                >
+                  No holidays found. Add one using the button above.
+                </TableCell>
+              </TableRow>
+            ) : (
+              holidays
+                .filter((holiday) => {
+                  const currentYear = new Date().getFullYear();
+                  return holiday.year === currentYear;
+                })
+                .sort(
+                  (a, b) =>
+                    new Date(a.date).getTime() - new Date(b.date).getTime()
+                )
+                .map((holiday) => (
+                  <TableRow key={holiday._id}>
+                    <TableCell className="font-medium">
+                      {holiday.title}
+                    </TableCell>
+                    <TableCell>{formatDate(holiday.date)}</TableCell>
+                    <TableCell>{holiday.year}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="default"
+                          size="icon"
+                          onClick={() => handleEditClick(holiday)}
+                          title="Edit holiday"
+                          className="bg-supperagent text-white hover:bg-supperagent/90"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="default"
+                          size="icon"
+                          onClick={() => handleDeleteHoliday(holiday._id)}
+                          title="Delete holiday"
+                          className="bg-destructive text-white hover:bg-destructive/90"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+            )}
+          </TableBody>
+        </Table>
       </div>
     </div>
   );
