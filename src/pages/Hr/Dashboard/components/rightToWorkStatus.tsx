@@ -232,11 +232,9 @@ const RightToWorkStatusPage = () => {
                         Employee
                       </TableHead>
                       <TableHead className="font-semibold text-gray-700">
-                        RTW Check Due Date
+                        RTW Status Check Date
                       </TableHead>
-                      <TableHead className="font-semibold text-gray-700">
-                        Status
-                      </TableHead>
+                      
                       <TableHead className="text-right font-semibold text-gray-700">
                         Action
                       </TableHead>
@@ -270,11 +268,7 @@ const RightToWorkStatusPage = () => {
                           <TableCell className="font-medium text-red-600 cursor-pointer" onClick={() => handleEmployeeClick(record.employeeId._id)} >
                             {formatDate(record.nextCheckDate)}
                           </TableCell>
-                          <TableCell onClick={() => handleEmployeeClick(record.employeeId._id)}>
-                            <Badge className="bg-red-500 hover:bg-red-500 text-white">
-                              Needs Check
-                            </Badge>
-                          </TableCell>
+                          
                           <TableCell className="text-right">
                             <Button
                               size="sm"

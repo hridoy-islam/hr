@@ -39,7 +39,7 @@ interface ApiResponse {
 
 function BankHolidayPage() {
   const [holidays, setHolidays] = useState<BankHoliday[]>([]);
-  const [date, setDate] = useState<Date | undefined>(undefined); // Selected date as Date object
+  const [date, setDate] = useState<Date | undefined>(undefined);
   const [title, setTitle] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -47,14 +47,18 @@ function BankHolidayPage() {
     null
   );
   const { toast } = useToast();
-const [isLoadingHolidays, setIsLoadingHolidays] = useState(true);
+  const [isLoadingHolidays, setIsLoadingHolidays] = useState(true);
+  const [selectedYear, setSelectedYear] = useState<number>(
+    new Date().getFullYear()
+  );
 
-
-  // Fetch holidays on mount
-  const fetchHolidays = async () => {
+  // Fetch holidays filtered by selected year
+  const fetchHolidays = async (year: number) => {
     setIsLoadingHolidays(true);
     try {
-      const response = await axiosInstance.get<ApiResponse>('/hr/bank-holiday');
+      const response = await axiosInstance.get<ApiResponse>(
+        `/hr/bank-holiday?year=${year}`
+      );
       const holidaysData = response.data?.data?.result || [];
       setHolidays(holidaysData);
     } catch (error: any) {
@@ -64,14 +68,15 @@ const [isLoadingHolidays, setIsLoadingHolidays] = useState(true);
         variant: 'destructive'
       });
       console.error('Error fetching holidays:', error);
-    }finally {
-    setIsLoadingHolidays(false); 
-  }
+      setHolidays([]); // Ensure empty state on error
+    } finally {
+      setIsLoadingHolidays(false);
+    }
   };
 
   useEffect(() => {
-    fetchHolidays();
-  }, []);
+    fetchHolidays(selectedYear);
+  }, [selectedYear]);
 
   // Reset form fields
   const resetForm = () => {
@@ -90,7 +95,6 @@ const [isLoadingHolidays, setIsLoadingHolidays] = useState(true);
       });
       return;
     }
-
     setIsLoading(true);
     const formattedDate = date.toISOString().split('T')[0]; // YYYY-MM-DD
     const holidayData = {
@@ -110,9 +114,8 @@ const [isLoadingHolidays, setIsLoadingHolidays] = useState(true);
         await axiosInstance.post('/hr/bank-holiday', holidayData);
         toast({ title: 'Holiday added successfully!' });
       }
-
-      // Refresh list
-      await fetchHolidays();
+      // Refresh list with current year filter
+      await fetchHolidays(selectedYear);
       resetForm();
       setIsDialogOpen(false);
     } catch (error: any) {
@@ -144,7 +147,7 @@ const [isLoadingHolidays, setIsLoadingHolidays] = useState(true);
   // Handle edit button click
   const handleEditClick = (holiday: BankHoliday) => {
     setEditingHoliday(holiday);
-    setDate(new Date(holiday.date)); // Convert string to Date object
+    setDate(new Date(holiday.date));
     setTitle(holiday.title);
     setIsDialogOpen(true);
   };
@@ -158,125 +161,154 @@ const [isLoadingHolidays, setIsLoadingHolidays] = useState(true);
       day: 'numeric'
     });
   };
-if(isLoadingHolidays) {
-  return (
-    <>
-    <div className="flex justify-center py-6">
-                <BlinkingDots size="large" color="bg-supperagent" />
-              </div>
-    </>
-  )
-}
+
+  if (isLoadingHolidays) {
+    return (
+      <div className="flex justify-center py-6">
+        <BlinkingDots size="large" color="bg-supperagent" />
+      </div>
+    );
+  }
+
   return (
     <div className="">
       {/* Header */}
       <div className="mb-8 flex items-center justify-between">
+        <div className='flex items-center gap-8'>
+
         <h1 className="text-3xl font-bold text-gray-900">
           Bank Holiday Management
         </h1>
-
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button
-              onClick={resetForm}
-              className="bg-supperagent text-white hover:bg-supperagent/90"
+        {/* Year Filter */}
+        <div className="flex items-center gap-2">
+          <Label
+            htmlFor="yearFilter"
+            className="text-sm font-medium text-gray-700"
             >
-              <Plus className="mr-2 h-4 w-4" />
-              Add Holiday
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>
-                {editingHoliday ? 'Edit Holiday' : 'Add New Holiday'}
-              </DialogTitle>
-            </DialogHeader>
+            Year
+          </Label>
+          <select
+            id="yearFilter"
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(Number(e.target.value))}
+            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-supperagent"
+            >
+            {Array.from({ length: 15 }, (_, i) => {
+              const year = new Date().getFullYear() - 7 + i; // Range: 7 years back to 7 years forward
+              return (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              );
+            })}
+          </select>
+        </div>
+            </div>
+        <div className="flex items-center gap-4">
+          {/* Add Holiday Button */}
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button
+                onClick={resetForm}
+                className="bg-supperagent text-white hover:bg-supperagent/90"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Add Holiday
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>
+                  {editingHoliday ? 'Edit Holiday' : 'Add New Holiday'}
+                </DialogTitle>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                {/* Date Field */}
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="date" className="text-right">
+                    Date
+                  </Label>
+                  <div className="col-span-3">
+                    <DatePicker
+                      selected={date || null}
+                      onChange={(newDate: Date | null) =>
+                        setDate(newDate || undefined)
+                      }
+                      dateFormat="dd-MM-yyyy"
+                      customInput={
+                        <button
+                          type="button"
+                          className="flex w-full items-center justify-start rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-supperagent"
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {date ? (
+                            date.toLocaleDateString('en-GB', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              year: 'numeric'
+                            })
+                          ) : (
+                            <span>Pick a date</span>
+                          )}
+                        </button>
+                      }
+                      wrapperClassName="w-full"
+                      showYearDropdown
+                      scrollableYearDropdown
+                      yearDropdownItemNumber={15}
+                      popperPlacement="bottom-start"
+                      todayButton="Today"
+                      placeholderText="Pick a date"
+                      preventOpenOnFocus
+                      minDate={new Date(selectedYear, 0, 1)} // Jan 1 of selected year
+                      maxDate={new Date(selectedYear, 11, 31)} // Dec 31 of selected year
+                    />
+                  </div>
+                </div>
 
-            <div className="grid gap-4 py-4">
-              {/* Date Field */}
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="date" className="text-right">
-                  Date
-                </Label>
-                <div className="col-span-3">
-                  <DatePicker
-                    selected={date || null}
-                    onChange={(newDate: Date | null) =>
-                      setDate(newDate || undefined)
-                    }
-                    dateFormat="dd-MM-yyyy"
-                    customInput={
-                      <button
-                        type="button"
-                        className="flex w-full items-center justify-start rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-supperagent"
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {date ? (
-                          date.toLocaleDateString('en-GB', {
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: 'numeric'
-                          })
-                        ) : (
-                          <span>Pick a date</span>
-                        )}
-                      </button>
-                    }
-                    wrapperClassName="w-full"
-                    showYearDropdown
-                    scrollableYearDropdown
-                    yearDropdownItemNumber={15}
-                    popperPlacement="bottom-start"
-                    todayButton="Today"
-                    placeholderText="Pick a date"
-                    preventOpenOnFocus
-                    minDate={new Date(new Date().getFullYear(), 0, 1)} // Jan 1 of current year
-                    maxDate={new Date(new Date().getFullYear(), 11, 31)}
+                {/* Title Field */}
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="title" className="text-right">
+                    Title
+                  </Label>
+                  <Input
+                    id="title"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    className="col-span-3"
+                    placeholder="e.g., Christmas Day"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="title" className="text-right">
-                  Title
-                </Label>
-                <Input
-                  id="title"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="col-span-3"
-                  placeholder="e.g., Christmas Day"
-                />
+              {/* Actions */}
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    resetForm();
+                    setIsDialogOpen(false);
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleSaveHoliday}
+                  disabled={isLoading || !date || !title.trim()}
+                  className="bg-supperagent text-white hover:bg-supperagent/90"
+                >
+                  {isLoading ? (
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  ) : editingHoliday ? (
+                    'Update Holiday'
+                  ) : (
+                    'Save Holiday'
+                  )}
+                </Button>
               </div>
-            </div>
-
-            {/* Actions */}
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  resetForm();
-                  setIsDialogOpen(false);
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleSaveHoliday}
-                disabled={isLoading || !date || !title.trim()}
-                className='bg-supperagent text-white hover:bg-supperagen'
-              >
-                {isLoading ? (
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent bg-supperagent text-white hover:bg-supperagent" />
-                ) : editingHoliday ? (
-                  'Update Holiday'
-                ) : (
-                  'Save Holiday'
-                )}
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {/* Holidays Table */}
@@ -297,15 +329,12 @@ if(isLoadingHolidays) {
                   colSpan={4}
                   className="h-24 text-center text-gray-500"
                 >
-                  No holidays found. Add one using the button above.
+                  No holidays found for {selectedYear}. Add one using the button
+                  above.
                 </TableCell>
               </TableRow>
             ) : (
               holidays
-                .filter((holiday) => {
-                  const currentYear = new Date().getFullYear();
-                  return holiday.year === currentYear;
-                })
                 .sort(
                   (a, b) =>
                     new Date(a.date).getTime() - new Date(b.date).getTime()
