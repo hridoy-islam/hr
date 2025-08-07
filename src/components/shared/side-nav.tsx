@@ -95,7 +95,8 @@ const navItems = [
     href: 'settings',
     subItems: [
       { icon: ReceiptText, label: 'Company Details', href: 'company-details' },
-      { icon: Mails, label: 'Email Setup', href: 'email-setup' }
+      { icon: Mails, label: 'Email Setup', href: 'email-setup' },
+      { icon: Calendar , label: 'Bank Holiday', href: 'bank-holiday' }
     ]
   }
 ];

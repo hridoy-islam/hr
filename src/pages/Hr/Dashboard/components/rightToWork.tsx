@@ -161,19 +161,11 @@ const RightToWorkExpiryPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="space-y-6 p-6">
+      <div className="space-y-6 ">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate(-1)}
-              className="flex items-center space-x-2"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              <span>Back</span>
-            </Button>
+          <div className="flex items-center justify-between w-full space-x-4">
+            
             <div className="flex items-center space-x-3">
               <div className="rounded-lg bg-purple-100 p-2">
                 <AlertTriangle className="h-6 w-6 text-purple-600" />
@@ -187,6 +179,10 @@ const RightToWorkExpiryPage = () => {
                 </p>
               </div>
             </div>
+             <Button variant="outline" size="sm" onClick={() => navigate(-1)} className="flex items-center space-x-2 bg-supperagent hover:bg-supperagent/90 border-none">
+              <ArrowLeft className="h-4 w-4" />
+              <span>Back</span>
+            </Button>
           </div>
 
           {/* Export Button (Optional) */}

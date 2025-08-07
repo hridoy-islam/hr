@@ -54,6 +54,7 @@ import RightToWorkExpiryPage from '@/pages/Hr/Dashboard/components/rightToWork';
 import PassportExpiryPage from '@/pages/Hr/Dashboard/components/passportExpiray';
 import RtwPage from '@/pages/Hr/Employee/rightToWorkEmployee';
 import RightToWorkStatusPage from '@/pages/Hr/Dashboard/components/rightToWorkStatus';
+import BankHolidayPage from '@/pages/Hr/Bank-Holiday';
 
 
 
@@ -262,6 +263,10 @@ export default function AppRouter() {
             {
               path: 'email-setup',
               element: <EmailSetup />
+            },
+            {
+              path: 'bank-holiday',
+              element: <BankHolidayPage />
             }
           ]
         },

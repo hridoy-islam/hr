@@ -121,15 +121,12 @@ const PassportExpiryPage = () => {
   const currentData = filteredEmployees.slice(startIndex, endIndex)
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-gray-50 ">
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <Button variant="outline" size="sm" onClick={() => navigate(-1)} className="flex items-center space-x-2">
-              <ArrowLeft className="h-4 w-4" />
-              <span>Back</span>
-            </Button>
+          <div className="flex items-center justify-between  w-full">
+            
             <div className="flex items-center space-x-3">
               <div className="rounded-lg bg-red-100 p-2">
                 <IdCard className="h-6 w-6 text-red-600" />
@@ -139,6 +136,11 @@ const PassportExpiryPage = () => {
                 <p className="text-sm text-gray-600">{filteredEmployees.length} employees with expiring passports</p>
               </div>
             </div>
+
+            <Button variant="outline" size="sm" onClick={() => navigate(-1)} className="flex items-center space-x-2 bg-supperagent hover:bg-supperagent/90 border-none">
+              <ArrowLeft className="h-4 w-4" />
+              <span>Back</span>
+            </Button>
           </div>
           {/* <Button onClick={handleExport} className="flex items-center space-x-2">
             <Download className="h-4 w-4" />

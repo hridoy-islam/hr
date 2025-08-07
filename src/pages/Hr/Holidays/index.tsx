@@ -159,7 +159,7 @@ const Holiday: React.FC = () => {
       if (holidayRecord) {
         setLeaveAllowance({
           openingThisYear: holidayRecord.holidayAllowance || 0,
-          holidayAccured:holidayRecord.totalHours || 0,
+          holidayAccured:holidayRecord.holidayAccured || 0,
           bankHolidayAutoBooked: 0,
           taken: holidayRecord.usedHours || 0,
           booked: holidayRecord.usedHours || 0,
