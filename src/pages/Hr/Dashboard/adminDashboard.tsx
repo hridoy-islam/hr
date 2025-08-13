@@ -199,12 +199,16 @@ const AdminDashboardPage = () => {
     });
 
     // Right to Work expiry — from /hr/right-to-work API
-    const rightToWorkExpiring = rightToWorkRecords.filter((record) => {
-      // Only active records with expiry date
-      // if (record.status !== 'active') return false;
-      const expiry = record.expiryDate;
-      return expiry && (isExpiringSoon(expiry) || isExpired(expiry));
-    });
+const rightToWorkExpiring = Array.from(
+  new Map(
+    rightToWorkRecords
+      .filter((record) => {
+        const expiry = record.expiryDate;
+        return !expiry || isExpiringSoon(expiry) || isExpired(expiry);
+      })
+      .map((record) => [record.employeeId._id, record]) // map by employeeId
+  ).values()
+);
 
     const rightToWorkStatusExpired = rightToWorkRecords.filter((record) => {
       // if (record.status !== 'active') return false;

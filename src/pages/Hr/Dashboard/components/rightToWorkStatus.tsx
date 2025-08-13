@@ -46,12 +46,12 @@ const RightToWorkStatusPage = () => {
   const [loading, setLoading] = useState(true);
   const [records, setRecords] = useState<RightToWorkRecord[]>([]);
   const { user } = useSelector((state: any) => state.auth);
+const [uploadFile, setUploadFile] = useState<File | null>(null);
 
   // Modal state
   const [selectedRecord, setSelectedRecord] =
     useState<RightToWorkRecord | null>(null);
-  const [newNextCheckDate, setNewNextCheckDate] = useState('');
-  const [isModalOpen, setIsModalOpen] = useState(false);
+const [newNextCheckDate, setNewNextCheckDate] = useState<Date | null>(null);  const [isModalOpen, setIsModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   // Fetch data
@@ -129,12 +129,14 @@ const RightToWorkStatusPage = () => {
     return new Date(dateString).toLocaleDateString('en-GB'); // DD/MM/YYYY
   };
 
-  const handleUpdateClick = (record: RightToWorkRecord) => {
-    setSelectedRecord(record);
-    setNewNextCheckDate(record.nextCheckDate); // prefill with current date
-    setIsModalOpen(true);
-  };
-
+ // In handleUpdateClick:
+const handleUpdateClick = (record: RightToWorkRecord) => {
+  setSelectedRecord(record);
+  const defaultNewDate = new Date();
+  defaultNewDate.setDate(defaultNewDate.getDate() + 90); // 90 days from now
+  setNewNextCheckDate(defaultNewDate);
+  setIsModalOpen(true);
+};
   const handleSubmitUpdate = async () => {
     if (!selectedRecord || !newNextCheckDate) return;
 
@@ -156,9 +158,9 @@ const RightToWorkStatusPage = () => {
 
       setIsModalOpen(false);
       setSelectedRecord(null);
+        setUploadFile(null);
     } catch (error) {
       console.error('Failed to update nextCheckDate:', error);
-      alert('Failed to update. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -300,74 +302,101 @@ const RightToWorkStatusPage = () => {
         </div>
 
         {/* Update Modal */}
-        {isModalOpen && selectedRecord && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-            <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
-              <div className="mb-4 flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Update RTW Check Date
-                </h3>
-              </div>
+      {isModalOpen && selectedRecord && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+    <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+      <div className="mb-4 flex items-center justify-between">
+        <h3 className="text-lg font-semibold text-gray-900">
+          Renew RTW Check
+        </h3>
+        <button onClick={() => setIsModalOpen(false)}>
+          <X className="h-5 w-5 text-gray-500" />
+        </button>
+      </div>
 
-              <div className="space-y-4">
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    Employee
-                  </label>
-                  <p className="font-medium text-gray-900">
-                    {selectedRecord.employeeId.firstName}{' '}
-                    {selectedRecord.employeeId.lastName}
-                  </p>
-                </div>
+      <div className="space-y-4">
+        {/* Employee Info */}
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">
+            Employee
+          </label>
+          <p className="font-medium text-gray-900">
+            {selectedRecord.employeeId.firstName}{' '}
+            {selectedRecord.employeeId.lastName}
+          </p>
+        </div>
 
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    New Check Date
-                  </label>
-                  <div className="relative">
-                    <Calendar className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                    <DatePicker
-                      selected={
-                        newNextCheckDate
-                          ? moment(newNextCheckDate, 'YYYY-MM-DD').toDate()
-                          : null
-                      }
-                      onChange={(date: Date | null) => {
-                        if (date) {
-                          setNewNextCheckDate(
-                            moment(date).format('YYYY-MM-DD')
-                          ); // Save as YYYY-MM-DD
-                        }
-                      }}
-                      dateFormat="dd/MM/yyyy"
-                      placeholderText="Select a date"
-                      className="w-full rounded-md border border-gray-300 py-2 pl-10 pr-4 shadow-sm focus:border-supperagent focus:ring-supperagent"
-                      wrapperClassName="w-full"
-                      popperPlacement="bottom-start"
-                    />
-                  </div>
-                </div>
+        {/* Current Expiry Date */}
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">
+            Current Expiry Date
+          </label>
+          <p className="text-red-600">
+            {formatDate(selectedRecord.nextCheckDate)} (Expired)
+          </p>
+        </div>
 
-                <div className="flex justify-end space-x-2 pt-4">
-                  <Button
-                    variant="outline"
-                    onClick={() => setIsModalOpen(false)}
-                    disabled={submitting}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    className="bg-supperagent text-white hover:bg-supperagent/90"
-                    onClick={handleSubmitUpdate}
-                    disabled={submitting}
-                  >
-                    {submitting ? 'Updating...' : 'Save Changes'}
-                  </Button>
-                </div>
-              </div>
-            </div>
+        {/* Next Check Date */}
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">
+            New Check Date
+          </label>
+          <div className="relative">
+            <Calendar className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <DatePicker
+              selected={newNextCheckDate}
+              onChange={(date: Date) => setNewNextCheckDate(date)}
+              minDate={new Date()} // Can't select dates in the past
+              dateFormat="dd/MM/yyyy"
+              className="w-full rounded-md border border-gray-300 py-2 pl-10 pr-4 shadow-sm focus:border-supperagent focus:ring-supperagent"
+              wrapperClassName="w-full"
+            />
           </div>
-        )}
+        </div>
+
+        {/* Upload PDF (Optional) */}
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">
+            Upload Document (PDF - Optional)
+          </label>
+          <Input
+            type="file"
+            accept=".pdf"
+            onChange={(e) => {
+              if (e.target.files && e.target.files[0]) {
+                setUploadFile(e.target.files[0]);
+              }
+            }}
+          />
+          {uploadFile && (
+            <p className="mt-2 text-sm text-green-600 truncate">
+              📄 {uploadFile.name}
+            </p>
+          )}
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex justify-end space-x-2 pt-4">
+          <Button
+            variant="outline"
+            onClick={() => setIsModalOpen(false)}
+            disabled={submitting}
+          >
+            Cancel
+          </Button>
+          <Button
+            className="bg-supperagent text-white hover:bg-supperagent/90"
+            onClick={handleSubmitUpdate}
+            disabled={submitting || !newNextCheckDate}
+          >
+            {submitting ? 'Updating...' : 'Update'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
+
       </div>
     </div>
   );

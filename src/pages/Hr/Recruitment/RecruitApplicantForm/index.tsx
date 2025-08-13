@@ -105,6 +105,13 @@ const RecruitApplicantForm = () => {
 
       // console.log(cleanApplicant)
       const res = await axiosInstance.post(`/auth/signup`, data);
+      const newUser = res.data.data;
+
+      // Create Right-to-Work record for the employee
+      await axiosInstance.post(`/hr/right-to-work`, {
+        nextCheckDate: moment().add(90, 'days').format('YYYY-MM-DD'), // today in YYYY-MM-DD
+        employeeId: newUser._id
+      });
 
       toast({
         title: 'Application Submitted',
@@ -201,93 +208,104 @@ const RecruitApplicantForm = () => {
     );
   }
 
- return (
-  <div className="mx-auto w-full">
-    {/* Bounded container */}
-    <div className="mx-auto ">
-      {currentStep !== 3 && (
-        <Card className="mb-6 overflow-hidden rounded-lg bg-white p-4 shadow-md">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7">
-            {/* Name */}
-            <div className="flex flex-col gap-1">
-              <span className="font-semibold text-gray-700">Name:</span>
-              <span className="truncate font-medium text-gray-800">
-                {applicant.title} {applicant.firstName} {applicant.initial} {applicant.lastName}
-              </span>
+  return (
+    <div className="mx-auto w-full">
+      {/* Bounded container */}
+      <div className="mx-auto ">
+        {currentStep !== 3 && (
+          <Card className="mb-6 overflow-hidden rounded-lg bg-white p-4 shadow-md">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7">
+              {/* Name */}
+              <div className="flex flex-col gap-1">
+                <span className="font-semibold text-gray-700">Name:</span>
+                <span className="truncate font-medium text-gray-800">
+                  {applicant.title} {applicant.firstName} {applicant.initial}{' '}
+                  {applicant.lastName}
+                </span>
+              </div>
+
+              {/* Email */}
+              <div className="flex flex-col gap-1">
+                <span className="font-semibold text-gray-700">Email:</span>
+                <span className="truncate text-sm text-gray-600">
+                  {applicant.email}
+                </span>
+              </div>
+
+              {/* Location */}
+              <div className="flex flex-col gap-1">
+                <span className="font-semibold text-gray-700">Location:</span>
+                <span className="text-sm text-gray-600">
+                  {applicant.address || 'N/A'}
+                </span>
+              </div>
+
+              {/* DOB */}
+              <div className="flex flex-col gap-1">
+                <span className="font-semibold text-gray-700">DOB:</span>
+                <span className="text-sm text-gray-600">
+                  {moment(applicant.dateOfBirth).format('MMM D, YYYY')}
+                </span>
+              </div>
+
+              {/* Phone */}
+              <div className="flex flex-col gap-1">
+                <span className="font-semibold text-gray-700">Phone:</span>
+                <span className="text-sm text-gray-600">
+                  {applicant.mobilePhone || 'N/A'}
+                </span>
+              </div>
+
+              {/* Employment Type */}
+              <div className="flex flex-col gap-1">
+                <span className="font-semibold text-gray-700">
+                  Employment Type:
+                </span>
+                <span className="text-sm text-gray-600">
+                  {applicant.employmentType || 'N/A'}
+                </span>
+              </div>
+
+              {/* Gender */}
+              <div className="flex flex-col gap-1">
+                <span className="font-semibold text-gray-700">Gender:</span>
+                <span className="text-sm text-gray-600">
+                  {applicant.gender || 'N/A'}
+                </span>
+              </div>
             </div>
+          </Card>
+        )}
 
-            {/* Email */}
-            <div className="flex flex-col gap-1">
-              <span className="font-semibold text-gray-700">Email:</span>
-              <span className="truncate text-sm text-gray-600">{applicant.email}</span>
-            </div>
+        {/* Header */}
+        <div className="mb-6 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+          <h1 className="text-2xl font-semibold text-gray-800">
+            {currentStep !== 3 ? 'Recruit Applicant' : 'Review Application'}
+          </h1>
+          <Button
+            className="flex h-9 items-center gap-2 bg-supperagent text-white hover:bg-supperagent/90"
+            onClick={() => navigate(-1)}
+          >
+            <MoveLeft className="h-4 w-4" />
+            Back
+          </Button>
+        </div>
 
-            {/* Location */}
-            <div className="flex flex-col gap-1">
-              <span className="font-semibold text-gray-700">Location:</span>
-              <span className="text-sm text-gray-600">{applicant.address || 'N/A'}</span>
-            </div>
-
-            {/* DOB */}
-            <div className="flex flex-col gap-1">
-              <span className="font-semibold text-gray-700">DOB:</span>
-              <span className="text-sm text-gray-600">
-                {moment(applicant.dateOfBirth).format('MMM D, YYYY')}
-              </span>
-            </div>
-
-            {/* Phone */}
-            <div className="flex flex-col gap-1">
-              <span className="font-semibold text-gray-700">Phone:</span>
-              <span className="text-sm text-gray-600">{applicant.mobilePhone || 'N/A'}</span>
-            </div>
-
-            {/* Employment Type */}
-            <div className="flex flex-col gap-1">
-              <span className="font-semibold text-gray-700">Employment Type:</span>
-              <span className="text-sm text-gray-600">{applicant.employmentType || 'N/A'}</span>
-            </div>
-
-            {/* Gender */}
-            <div className="flex flex-col gap-1">
-              <span className="font-semibold text-gray-700">Gender:</span>
-              <span className="text-sm text-gray-600">{applicant.gender || 'N/A'}</span>
-            </div>
-          </div>
-        </Card>
-      )}
-
-      {/* Header */}
-      <div className="mb-6 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
-        <h1 className="text-2xl font-semibold text-gray-800">
-          {currentStep !== 3 ? 'Recruit Applicant' : 'Review Application'}
-        </h1>
-        <Button
-          className="flex h-9 items-center gap-2 bg-supperagent text-white hover:bg-supperagent/90"
-          onClick={() => navigate(-1)}
-        >
-          <MoveLeft className="h-4 w-4" />
-          Back
-        </Button>
-      </div>
-
-      {/* Step Indicator & Form */}
-      <Card className="overflow-hidden  bg-white shadow-lg">
-        {/* Uncomment if you want step indicator */}
-        {/* <StepsIndicator
+        {/* Step Indicator & Form */}
+        <Card className="overflow-hidden  bg-white shadow-lg">
+          {/* Uncomment if you want step indicator */}
+          {/* <StepsIndicator
           currentStep={currentStep}
           completedSteps={completedSteps}
           steps={formSteps}
           onStepClick={handleStepClick}
         /> */}
 
-        <div className="p-6">
-          {renderStep()}
-        </div>
-      </Card>
+          <div className="p-6">{renderStep()}</div>
+        </Card>
+      </div>
     </div>
-  </div>
-);
+  );
 };
 
 export default RecruitApplicantForm;

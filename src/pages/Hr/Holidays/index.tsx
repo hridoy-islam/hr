@@ -81,30 +81,35 @@ const Holiday: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
   const { user } = useSelector((state: any) => state.auth);
-  
+
   const [holidays, setHolidays] = useState<HolidayAPI[]>([]);
   const [leaveAllowance, setLeaveAllowance] = useState({
     openingThisYear: 0,
-    holidayAccured:0,
+    holidayAccured: 0,
     bankHolidayAutoBooked: 0,
     taken: 0,
     booked: 0,
     requested: 0,
     leftThisYear: 0,
     requestedHours: 0,
-    remainingHours: 0
+    remainingHours: 0,
+    unpaidLeaveRequest: 0,
+    unpaidLeaveTaken: 0
   });
 
   const fetchLeaveRequests = async () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       const response = await axiosInstance.get(`/hr/leave?userId=${user._id}`);
-      let data = response.data.data?.result || response.data.data || response.data || [];
-      
-      const filteredData = data.filter((item: any) => item.holidayYear === selectedYear);
-      
+      let data =
+        response.data.data?.result || response.data.data || response.data || [];
+
+      const filteredData = data.filter(
+        (item: any) => item.holidayYear === selectedYear
+      );
+
       const mappedHolidays = filteredData.map((item: any, idx: number) => ({
         id: idx + 1,
         status: mapStatus(item.status),
@@ -115,9 +120,9 @@ const Holiday: React.FC = () => {
         hours: formatHours(item.totalHours || 0),
         holidayYear: item.holidayYear
       }));
-      
+
       setHolidays(mappedHolidays);
-      
+
       const totalTaken = mappedHolidays
         .filter((h) => h.status === 'Approved')
         .reduce((sum, h) => sum + parseHours(h.hours), 0);
@@ -127,8 +132,8 @@ const Holiday: React.FC = () => {
       const totalBooked = mappedHolidays
         .filter((h) => h.status === 'Approved')
         .reduce((sum, h) => sum + parseHours(h.hours), 0);
-      
-      setLeaveAllowance(prev => ({
+
+      setLeaveAllowance((prev) => ({
         ...prev,
         taken: totalTaken,
         requested: totalRequested,
@@ -144,10 +149,13 @@ const Holiday: React.FC = () => {
   const fetchHolidayAllowance = async () => {
     try {
       const year = selectedYear;
-      const response = await axiosInstance.get(`/hr/holidays?userId=${user._id}&year=${year}`);
-      
+      const response = await axiosInstance.get(
+        `/hr/holidays?userId=${user._id}&year=${year}`
+      );
+
       // Handle nested array response
-      const responseData = response.data?.data?.result || response.data?.data || response.data;
+      const responseData =
+        response.data?.data?.result || response.data?.data || response.data;
       let holidayRecord = null;
 
       if (Array.isArray(responseData)) {
@@ -159,50 +167,57 @@ const Holiday: React.FC = () => {
       if (holidayRecord) {
         setLeaveAllowance({
           openingThisYear: holidayRecord.holidayAllowance || 0,
-          holidayAccured:holidayRecord.holidayAccured || 0,
+          holidayAccured: holidayRecord.holidayAccured || 0,
           bankHolidayAutoBooked: 0,
           taken: holidayRecord.usedHours || 0,
           booked: holidayRecord.usedHours || 0,
           remainingHours: holidayRecord.remainingHours || 0,
-          requestedHours:holidayRecord.requestedHours|| 0,
-          leftThisYear: (holidayRecord.holidayAllowance - holidayRecord.usedHours) || 0
+          requestedHours: holidayRecord.requestedHours || 0,
+          unpaidLeaveRequest: holidayRecord.unpaidLeaveRequest || 0,
+          unpaidLeaveTaken: holidayRecord.unpaidLeaveTaken || 0,
+          leftThisYear:
+            holidayRecord.holidayAllowance - holidayRecord.usedHours || 0
         });
       } else {
         setLeaveAllowance({
           openingThisYear: 0,
           bankHolidayAutoBooked: 0,
-          holidayAccured:0,
-          remainingHours:0,
+          holidayAccured: 0,
+          remainingHours: 0,
           taken: 0,
           booked: 0,
           requested: 0,
-          leftThisYear: 0
+          leftThisYear: 0,
+          unpaidLeaveRequest: 0,
+          unpaidLeaveTaken: 0
         });
       }
     } catch (err: any) {
       console.error('Error fetching holiday allowance:', err);
-      
     }
   };
 
   useEffect(() => {
     if (user._id) {
       setLoading(true);
-      Promise.all([
-        fetchLeaveRequests(),
-        fetchHolidayAllowance()
-      ]).finally(() => {
-        setLoading(false);
-      });
+      Promise.all([fetchLeaveRequests(), fetchHolidayAllowance()]).finally(
+        () => {
+          setLoading(false);
+        }
+      );
     }
   }, [user._id, selectedYear]);
 
   const mapStatus = (status: string): string => {
     switch (status) {
-      case 'approved': return 'Approved';
-      case 'pending': return 'Pending';
-      case 'rejected': return 'Rejected';
-      default: return 'Pending';
+      case 'approved':
+        return 'Approved';
+      case 'pending':
+        return 'Pending';
+      case 'rejected':
+        return 'Rejected';
+      default:
+        return 'Pending';
     }
   };
 
@@ -267,11 +282,14 @@ const Holiday: React.FC = () => {
   };
 
   const handleSubmitRequest = async () => {
-    if (!selectedType || !startDate || !endDate  || !reason) return;
-     setLoading(true);
-    const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    if (!selectedType || !startDate || !endDate || !reason) return;
+    setLoading(true);
+    const totalDays =
+      Math.ceil(
+        (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
+      ) + 1;
     const totalHours = totalDays * 8;
-    
+
     try {
       await axiosInstance.post(`/hr/leave`, {
         holidayYear: selectedYear,
@@ -285,14 +303,14 @@ const Holiday: React.FC = () => {
         status: 'pending',
         title: title
       });
-      
+
       toast({ title: 'Leave request submitted successfully!' });
       setStartDate(undefined);
       setEndDate(undefined);
       setTitle('');
       setReason('');
       setSelectedType('');
-      
+
       fetchLeaveRequests();
       fetchHolidayAllowance();
     } catch (err: any) {
@@ -301,10 +319,10 @@ const Holiday: React.FC = () => {
         className: 'bg-destructive text-white border-none'
       });
       console.error('Error submitting leave:', err);
-    }finally {
-    // Always stop loading
-    setLoading(false);
-  }
+    } finally {
+      // Always stop loading
+      setLoading(false);
+    }
   };
 
   if (loading)
@@ -318,10 +336,14 @@ const Holiday: React.FC = () => {
     return (
       <div className="p-8 text-center">
         <div className="mb-4 text-red-600">Error: {error}</div>
-        <Button onClick={() => {
-          fetchLeaveRequests();
-          fetchHolidayAllowance();
-        }}>Retry</Button>
+        <Button
+          onClick={() => {
+            fetchLeaveRequests();
+            fetchHolidayAllowance();
+          }}
+        >
+          Retry
+        </Button>
       </div>
     );
   }
@@ -479,6 +501,18 @@ const Holiday: React.FC = () => {
                     </span>
                   </div>
                   <div className="flex items-center justify-between border-b border-gray-300 py-2">
+                    <span className="text-gray-600">Unpaid leave Taken</span>
+                    <span className="font-semibold text-cyan-600">
+                      {leaveAllowance?.unpaidLeaveTaken?.toFixed(1) || 0} h
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between border-b border-gray-300 py-2">
+                    <span className="text-gray-600">Unpaid leave Request</span>
+                    <span className="font-semibold text-blue-600">
+                      {leaveAllowance?.unpaidLeaveRequest?.toFixed(1) || 0} h
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between border-b border-gray-300 py-2">
                     <span className="text-gray-600">Requested</span>
                     <span className="font-semibold text-yellow-600">
                       {leaveAllowance.requestedHours.toFixed(1)} h
@@ -521,7 +555,7 @@ const Holiday: React.FC = () => {
                       </SelectContent>
                     </Select>
                   </div>
-                 
+
                   <div>
                     <Label htmlFor="reason">Reason</Label>
                     <Textarea
@@ -572,10 +606,7 @@ const Holiday: React.FC = () => {
                     onClick={handleSubmitRequest}
                     className="w-full bg-supperagent text-white hover:bg-supperagent/90"
                     disabled={
-                      !selectedType ||
-                      !startDate ||
-                      !endDate ||
-                      !reason
+                      !selectedType || !startDate || !endDate || !reason
                     }
                   >
                     <Calendar className="mr-2 h-4 w-4" />

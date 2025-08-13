@@ -49,103 +49,112 @@ const RightToWorkExpiryPage = () => {
   const [records, setRecords] = useState<RightToWorkRecord[]>([]); // Store right-to-work records
   const [filteredRecords, setFilteredRecords] = useState<RightToWorkRecord[]>([]);
 
-  // Fetch right-to-work records with populated employee data
-  useEffect(() => {
-    const fetchRightToWork = async () => {
-      setLoading(true);
-      try {
-        const response = await axiosInstance.get('/hr/right-to-work');
+// Fetch right-to-work records with populated employee data
+useEffect(() => {
+  const fetchRightToWork = async () => {
+    setLoading(true);
+    try {
+      const response = await axiosInstance.get('/hr/right-to-work');
+      let data = response.data.data.result || [];
 
-        // Handle response structure (adjust if needed)
-        let data = response.data.data.result;
-        
+      // Map and filter active records with employeeId
+      const mappedRecords: RightToWorkRecord[] = data
+        .map((record: any): RightToWorkRecord | null => {
+          if (!record.employeeId) return null;
+          return {
+            _id: record._id,
+            employeeId: {
+              _id: record.employeeId._id,
+              firstName: record.employeeId.firstName || 'N/A',
+              lastName: record.employeeId.lastName || 'N/A',
+              email: record.employeeId.email || 'No email',
+              position: record.employeeId.position || 'N/A',
+              departmentId: {
+                departmentName: record.employeeId.departmentId?.departmentName || 'Unassigned'
+              }
+            },
+            expiryDate: record.expiryDate || null,
+            status: record.status
+          };
+        })
+        .filter((record: RightToWorkRecord | null): record is RightToWorkRecord => {
+          return record !== null && record.status === 'active';
+        });
 
-        // Filter only active records with expiryDate
-        const validRecords = data
-          .map((record: any): RightToWorkRecord | null => {
-            if (!record.employeeId || !record.expiryDate) return null;
-            return {
-              _id: record._id,
-              employeeId: {
-                _id: record.employeeId._id,
-                firstName: record.employeeId.firstName || 'N/A',
-                lastName: record.employeeId.lastName || 'N/A',
-                email: record.employeeId.email || 'No email',
-                position: record.employeeId.position || 'N/A',
-                departmentId: {
-                  departmentName: record.employeeId.departmentId?.departmentName || 'Unassigned'
-                }
-              },
-              expiryDate: record.expiryDate,
-              status: record.status
-            };
-          })
-          .filter((record: RightToWorkRecord | null): record is RightToWorkRecord => {
-            return record !== null && record.status === 'active';
-          });
+      // Deduplicate by employeeId, keep record with latest expiryDate
+      const deduplicatedRecords = mappedRecords.reduce((acc: RightToWorkRecord[], record) => {
+        const existingIndex = acc.findIndex(r => r.employeeId._id === record.employeeId._id);
 
-        setRecords(validRecords);
-        setFilteredRecords(validRecords);
-      } catch (error) {
-        console.error('Failed to fetch right-to-work data:', error);
-        setRecords([]);
-        setFilteredRecords([]);
-      } finally {
-        setLoading(false);
-      }
-    };
+        if (existingIndex === -1) {
+          acc.push(record); // first record for this employee
+        } else {
+          const existing = acc[existingIndex];
+          if (!existing.expiryDate) {
+            acc[existingIndex] = record;
+          } else if (record.expiryDate && new Date(record.expiryDate) > new Date(existing.expiryDate)) {
+            acc[existingIndex] = record;
+          }
+        }
 
-    fetchRightToWork();
-  }, []);
+        return acc;
+      }, []);
 
-  // Filter records when search term changes
-  useEffect(() => {
-    const filtered = records.filter(
-      (record) =>
-        record.employeeId.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        record.employeeId.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        record.employeeId.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        record.employeeId.departmentId.departmentName.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-    setFilteredRecords(filtered);
-    setCurrentPage(1);
-  }, [searchTerm, records]);
-
-  // Helper: Is expiring within 30 days
-  const isExpiringSoon = (dateString: string) => {
-    const expiryDate = new Date(dateString);
-    const today = new Date();
-    const thirtyDaysFromNow = new Date();
-    thirtyDaysFromNow.setDate(today.getDate() + 30);
-    return expiryDate <= thirtyDaysFromNow && expiryDate >= today;
-  };
-
-  // Helper: Is already expired
-  const isExpired = (dateString: string) => {
-    const expiryDate = new Date(dateString);
-    const today = new Date();
-    return expiryDate < today;
-  };
-
-  // Format date as DD/MM/YYYY
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-GB'); // e.g. 01/03/2025
-  };
-
-  // Get status badge
-  const getExpiryStatus = (dateString: string) => {
-    if (isExpired(dateString)) {
-      return { status: 'Expired', color: 'bg-red-500' };
-    } else if (isExpiringSoon(dateString)) {
-      return { status: 'Expiring Soon', color: 'bg-yellow-500' };
+      setRecords(deduplicatedRecords);
+      setFilteredRecords(deduplicatedRecords);
+    } catch (error) {
+      console.error('Failed to fetch right-to-work data:', error);
+      setRecords([]);
+      setFilteredRecords([]);
+    } finally {
+      setLoading(false);
     }
-    return { status: 'Valid', color: 'bg-green-500' };
   };
 
-  // Navigate to employee detail page
-  const handleEmployeeClick = (employeeId: string) => {
-    navigate(`/admin/hr/employee/${employeeId}`);
-  };
+  fetchRightToWork();
+}, []);
+
+
+// Helper: Is expiring within 30 days
+const isExpiringSoon = (dateString?: string | null) => {
+  if (!dateString) return false;
+  const expiryDate = new Date(dateString);
+  const today = new Date();
+  const thirtyDaysFromNow = new Date();
+  thirtyDaysFromNow.setDate(today.getDate() + 30);
+  return expiryDate <= thirtyDaysFromNow && expiryDate >= today;
+};
+
+// Helper: Is already expired
+const isExpired = (dateString?: string | null) => {
+  if (!dateString) return false;
+  const expiryDate = new Date(dateString);
+  const today = new Date();
+  return expiryDate < today;
+};
+
+// Format date as DD/MM/YYYY or show 'No expiry'
+const formatDate = (dateString?: string | null) => {
+  if (!dateString) return 'No expiry';
+  return new Date(dateString).toLocaleDateString('en-GB');
+};
+
+// Get status badge
+const getExpiryStatus = (dateString?: string | null) => {
+  if (!dateString) {
+    return { status: 'No Expiry', color: 'bg-gray-500' };
+  } else if (isExpired(dateString)) {
+    return { status: 'Expired', color: 'bg-red-500' };
+  } else if (isExpiringSoon(dateString)) {
+    return { status: 'Expiring Soon', color: 'bg-yellow-500' };
+  }
+  return { status: 'Valid', color: 'bg-green-500' };
+};
+
+// Navigate to employee detail page
+const handleEmployeeClick = (employeeId: string) => {
+  navigate(`/admin/hr/employee/${employeeId}`);
+};
+
 
   // Placeholder for export
   const handleExport = () => {
