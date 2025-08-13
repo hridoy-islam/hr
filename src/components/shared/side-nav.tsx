@@ -153,7 +153,7 @@ const navItems = [
     icon: FileSpreadsheet  , 
     label: 'Report', 
     href: 'report',
-    roles: ['employee', ] 
+    roles: ['employee','admin' ] 
   },
  
 
