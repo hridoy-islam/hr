@@ -25,6 +25,7 @@ import {
   BetweenVerticalStart,
   Menu,
   X,
+  FileSpreadsheet,
 
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -146,6 +147,13 @@ const navItems = [
     label: 'Leave', 
     href: 'leave-approve',
     roles: ['admin', ] 
+  },
+ 
+  { 
+    icon: FileSpreadsheet  , 
+    label: 'Report', 
+    href: 'report',
+    roles: ['employee', ] 
   },
  
 

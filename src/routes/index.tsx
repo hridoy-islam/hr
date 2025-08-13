@@ -55,6 +55,7 @@ import PassportExpiryPage from '@/pages/Hr/Dashboard/components/passportExpiray'
 import RtwPage from '@/pages/Hr/Employee/rightToWorkEmployee';
 import RightToWorkStatusPage from '@/pages/Hr/Dashboard/components/rightToWorkStatus';
 import BankHolidayPage from '@/pages/Hr/Bank-Holiday';
+import { ReportPage } from '@/pages/Hr/reports';
 
 
 
@@ -259,6 +260,10 @@ export default function AppRouter() {
             {
               path: 'company-details',
               element: <CompanyDetails />
+            },
+            {
+              path: 'report',
+              element: <ReportPage />
             },
             {
               path: 'email-setup',
