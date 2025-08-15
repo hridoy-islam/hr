@@ -295,7 +295,7 @@ const RequestDocumentPage = () => {
             <Button
               onClick={handleApproveWithPdf}
               disabled={!pdfFile || loading}
-              className="bg-green-600 hover:bg-green-700"
+              className="bg-supperagent hover:bg-supperagent/90 text-white"
             >
               {loading ? (
                 <>
