@@ -140,7 +140,7 @@ const navItems = [
     icon: CircleDollarSign, 
     label: 'Payroll', 
     href: 'payroll',
-    roles: ['admin', ] 
+    roles: ['admin', 'employee'] 
   },
   { 
     icon: CircleGauge, 
@@ -153,7 +153,14 @@ const navItems = [
     icon: FileSpreadsheet  , 
     label: 'Report', 
     href: 'report',
-    roles: ['employee','admin' ] 
+    roles: ['employee', ] 
+  },
+ 
+  { 
+    icon: FileSpreadsheet  , 
+    label: 'Document Requests', 
+    href: 'document-request',
+    roles: ['admin', ] 
   },
  
 

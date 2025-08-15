@@ -189,15 +189,13 @@ export const ReportPage = () => {
     <div className="min-h-screen bg-gray-50">
       <div>
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-4">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">
                 Reports & Documents
               </h1>
-              <p className="mt-1 text-gray-600">
-                Manage your reports, payroll, and document requests
-              </p>
+              
             </div>
             <div className="flex gap-3">
               <Button
@@ -355,9 +353,7 @@ export const ReportPage = () => {
                       <TableRow>
                         <TableHead>Pay Period</TableHead>
                         <TableHead>Hours</TableHead>
-                        <TableHead>Rate</TableHead>
-                        <TableHead>Gross</TableHead>
-                        <TableHead>Tax</TableHead>
+                      
                         <TableHead>Net Pay</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Actions</TableHead>
@@ -370,9 +366,7 @@ export const ReportPage = () => {
                             {pay.period}
                           </TableCell>
                           <TableCell>{pay.hours}</TableCell>
-                          <TableCell>{pay.rate}</TableCell>
-                          <TableCell>{pay.gross}</TableCell>
-                          <TableCell>{pay.tax}</TableCell>
+                          
                           <TableCell className="font-semibold text-green-700">
                             {pay.net}
                           </TableCell>

@@ -56,6 +56,7 @@ import RtwPage from '@/pages/Hr/Employee/rightToWorkEmployee';
 import RightToWorkStatusPage from '@/pages/Hr/Dashboard/components/rightToWorkStatus';
 import BankHolidayPage from '@/pages/Hr/Bank-Holiday';
 import { ReportPage } from '@/pages/Hr/reports';
+import RequestDocumentPage from '@/pages/Hr/Request-Documents';
 
 
 
@@ -264,6 +265,10 @@ export default function AppRouter() {
             {
               path: 'report',
               element: <ReportPage />
+            },
+            {
+              path: 'document-request',
+              element: <RequestDocumentPage />
             },
             {
               path: 'email-setup',

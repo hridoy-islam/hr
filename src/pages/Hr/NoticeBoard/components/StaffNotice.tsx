@@ -1,17 +1,11 @@
 import { useEffect, useState } from 'react';
 import moment from 'moment';
-import { Calendar, Clock, AlertCircle, User, Plus } from 'lucide-react';
+import { Calendar, AlertCircle, User } from 'lucide-react';
 import axiosInstance from '@/lib/axios';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import {
-  Card,
-  CardHeader,
-  CardContent,
-  CardFooter
-} from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
+import { DynamicPagination } from '@/components/shared/DynamicPagination';
 
 interface Notice {
   _id: string;
@@ -27,13 +21,25 @@ export default function StaffNoticeBoard() {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
+  // ✅ Added pagination state
+  const [entriesPerPage, setEntriesPerPage] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+
   const fetchNotices = async () => {
     try {
       setLoading(true);
       const res = await axiosInstance.get('/hr/notice', {
-        params: { status: 'active', sort: '-noticeDate' }
+        params: {
+          status: 'active',
+          sort: '-noticeDate',
+          page: currentPage,
+          limit: entriesPerPage
+        }
       });
+
       setNotices(res.data.data.result || []);
+      setTotalPages(res.data.data.totalPages || 1);
     } catch (error) {
       toast({
         title: 'Error',
@@ -47,24 +53,17 @@ export default function StaffNoticeBoard() {
 
   useEffect(() => {
     fetchNotices();
-  }, []);
+  }, [currentPage, entriesPerPage]);
 
   return (
-    <div className="">
+    <div>
       <div className="mb-8 flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">
-            Staff Notice Board
-          </h1>
-          <p className="mt-2 text-gray-500">
-            Important announcements and updates for staff members
-          </p>
-        </div>
+        <h1 className="text-3xl font-bold text-gray-900">Staff Notice Board</h1>
       </div>
 
       {loading ? (
         <div className="flex justify-center py-16">
-          <BlinkingDots size="large" color="bg-primary" />
+          <BlinkingDots size="large" color="bg-supperagent" />
         </div>
       ) : notices.length === 0 ? (
         <Card className="py-12 text-center">
@@ -105,6 +104,17 @@ export default function StaffNoticeBoard() {
               </div>
             </div>
           ))}
+
+          {/* ✅ Pagination */}
+          <div className="mt-6">
+            <DynamicPagination
+              pageSize={entriesPerPage}
+              setPageSize={setEntriesPerPage}
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+            />
+          </div>
         </div>
       )}
     </div>
