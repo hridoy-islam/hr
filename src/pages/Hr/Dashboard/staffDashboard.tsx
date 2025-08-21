@@ -2,152 +2,106 @@ import React, { useState, useEffect } from 'react';
 import {
   Calendar,
   Clock,
-  Users,
   Bell,
   CheckCircle,
   XCircle,
   AlertCircle,
   Coffee,
-  Briefcase,
-  TrendingUp
 } from 'lucide-react';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
+import axiosInstance from '@/lib/axios';
+import { useSelector } from 'react-redux';
 
-// Mock data for staff dashboard
-const mockAttendanceData = {
-  thisMonth: {
-    totalWorkingDays: 22,
-    daysPresent: 18,
-    daysAbsent: 2,
-    pendingDays: 2,
-    totalHours: 144,
-    averageHours: 8,
-    punctualityScore: 85
-  }
-};
+// === Interfaces ===
+interface HolidayAllowance {
+  openingThisYear: number;
+  holidayAccured: number;
+  taken: number;
+  booked: number;
+  requested: number;
+  leftThisYear: number;
+  remainingHours: number;
+  requestedHours: number;
+  unpaidLeaveRequest: number;
+  unpaidLeaveTaken: number;
+}
 
-const mockHolidayData = {
-  requests: [
-    {
-      id: 1,
-      startDate: '2025-02-15',
-      endDate: '2025-02-17',
-      days: 3,
-      reason: 'Family vacation',
-      status: 'pending',
-      requestDate: '2025-01-10'
-    },
-    {
-      id: 2,
-      startDate: '2025-01-28',
-      endDate: '2025-01-28',
-      days: 1,
-      reason: 'Medical appointment',
-      status: 'approved',
-      requestDate: '2025-01-05'
-    }
-  ],
-  taken: [
-    {
-      id: 1,
-      startDate: '2025-01-03',
-      endDate: '2025-01-05',
-      days: 3,
-      reason: 'Personal leave',
-      status: 'completed'
-    },
-    {
-      id: 2,
-      startDate: '2024-12-23',
-      endDate: '2024-12-30',
-      days: 6,
-      reason: 'Christmas holiday',
-      status: 'completed'
-    }
-  ],
-  balance: {
-    totalEntitlement: 25,
-    used: 9,
-    pending: 3,
-    remaining: 13
-  }
-};
+interface LeaveRequest {
+  _id: string;
+  holidayYear: string;
+  startDate: string;
+  endDate: string;
+  reason: string;
+  status: 'pending' | 'approved' | 'rejected';
+  totalHours: number;
+  createdAt: string;
+}
 
-const mockNotices = [
-  {
-    id: 1,
-    title: 'New Health & Safety Guidelines',
-    content:
-      'Please review the updated health and safety protocols effective from February 1st, 2025. All staff must complete the online training module by February 15th.',
-    date: '2025-01-22',
-    priority: 'high',
-    category: 'Safety',
-    isRead: false
-  },
-  {
-    id: 2,
-    title: 'Annual Performance Reviews',
-    content:
-      'Annual performance review meetings will be scheduled for all employees during March 2025. Please prepare your self-assessment forms and submit them to HR by February 28th.',
-    date: '2025-01-20',
-    priority: 'medium',
-    category: 'HR',
-    isRead: false
-  },
-  {
-    id: 3,
-    title: 'Office Maintenance Schedule',
-    content:
-      'The office building will undergo routine maintenance on Saturday, February 8th, 2025. The building will be closed, and no access will be available during this time.',
-    date: '2025-01-18',
-    priority: 'low',
-    category: 'Facilities',
-    isRead: true
-  },
-  {
-    id: 4,
-    title: 'Team Building Event - Save the Date',
-    content:
-      'Join us for our quarterly team building event on March 15th, 2025, at the Riverside Conference Center. More details and RSVP information will follow soon.',
-    date: '2025-01-15',
-    priority: 'low',
-    category: 'Events',
-    isRead: true
-  }
-];
+interface HolidayRequest {
+  id: string;
+  startDate: string;
+  endDate: string;
+  reason: string;
+  status: 'pending' | 'approved' | 'completed';
+  days: number;
+  requestDate: string;
+}
+
+interface HolidayBalance {
+  totalEntitlement: number;
+  used: number;
+  pending: number;
+  remaining: number;
+}
+
+interface HolidayData {
+  requests: HolidayRequest[];
+  taken: HolidayRequest[];
+  balance: HolidayBalance;
+}
+
+interface Notice {
+  _id: string;
+  title: string;
+  content: string;
+  date: string;
+}
 
 const StaffDashboardPage = () => {
-  const [notices, setNotices] = useState(mockNotices);
-  const [loading, setLoading] = useState(true);
+  const [notices, setNotices] = useState<Notice[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [daysPresent, setDaysPresent] = useState<number>(0);
+  const [holidayData, setHolidayData] = useState<HolidayData>({
+    requests: [],
+    taken: [],
+    balance: {
+      totalEntitlement: 0,
+      used: 0,
+      pending: 0,
+      remaining: 0,
+    },
+  });
+  const [holidayAllowance, setHolidayAllowance] = useState<HolidayAllowance | null>(null);
 
-  useEffect(() => {
-    // Simulate loading time
-    const timer = setTimeout(() => {
-      setLoading(false);
-    }, 1000);
+  const { user } = useSelector((state: any) => state.auth);
 
-    return () => clearTimeout(timer);
-  }, []);
-
-  const markNoticeAsRead = (noticeId: number) => {
-    setNotices((prev) =>
-      prev.map((notice) =>
-        notice.id === noticeId ? { ...notice, isRead: true } : notice
-      )
-    );
-  };
-
+  // Format date safely
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
-    });
+    const date = new Date(dateString);
+    return isNaN(date.getTime())
+      ? 'Invalid Date'
+      : date.toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+        });
   };
 
+  // Get status icon
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'approved':
+      case 'completed':
         return <CheckCircle className="h-4 w-4 text-green-600" />;
       case 'pending':
         return <Clock className="h-4 w-4 text-yellow-600" />;
@@ -158,7 +112,178 @@ const StaffDashboardPage = () => {
     }
   };
 
-  
+  // === Fetch: Days Present (from /hr/attendance) ===
+  const fetchDaysPresent = async () => {
+    try {
+      const response = await axiosInstance.get('/hr/attendance', {
+        params: { userId: user._id },
+      });
+
+      const logs = response.data?.data?.result || response.data?.data || response.data || [];
+      const today = new Date();
+      const currentMonth = today.getMonth();
+      const currentYear = today.getFullYear();
+
+      const presentDays = new Set<string>();
+
+      logs.forEach((log: any) => {
+        if (!log.clockIn) return;
+
+        const clockInDate = new Date(log.clockIn);
+        const logMonth = clockInDate.getMonth();
+        const logYear = clockInDate.getFullYear();
+
+        if (logYear === currentYear && logMonth === currentMonth) {
+          const dateKey = clockInDate.toISOString().split('T')[0];
+          presentDays.add(dateKey);
+        }
+      });
+
+      setDaysPresent(presentDays.size);
+    } catch (error) {
+      console.error('Failed to fetch attendance:', error);
+      setDaysPresent(0); // Default to 0 on error
+    }
+  };
+
+  // === Fetch: Holiday Allowance (from /hr/holidays) ===
+  const fetchHolidayAllowance = async () => {
+    try {
+      const year = new Date().getFullYear().toString();
+      const response = await axiosInstance.get(`/hr/holidays`, {
+        params: { userId: user._id, year },
+      });
+
+      const data = response.data?.data?.result || response.data?.data || response.data || [];
+      let record = null;
+
+      if (Array.isArray(data)) {
+        record = data.find((item: any) => item.year === year);
+      } else if (data?.year === year) {
+        record = data;
+      }
+
+      if (record) {
+        const allowance = record.holidayAllowance || 0;
+        const used = record.usedHours || 0;
+        const requested = record.requestedHours || 0;
+        const leftThisYear = allowance - used;
+
+        setHolidayAllowance({
+          openingThisYear: allowance,
+          holidayAccured: record.holidayAccured || 0,
+          taken: used,
+          booked: used,
+          requested,
+          leftThisYear,
+          remainingHours: leftThisYear,
+          requestedHours: requested,
+          unpaidLeaveRequest: record.unpaidLeaveRequest || 0,
+          unpaidLeaveTaken: record.unpaidLeaveTaken || 0,
+        });
+
+        // Update holiday balance in holidayData
+        const hoursPerDay = record.hoursPerDay || 8;
+        setHolidayData((prev) => ({
+          ...prev,
+          balance: {
+            totalEntitlement: allowance / hoursPerDay,
+            used: used / hoursPerDay,
+            pending: requested / hoursPerDay,
+            remaining: leftThisYear / hoursPerDay,
+          },
+        }));
+      }
+    } catch (error) {
+      console.error('Error fetching holiday allowance:', error);
+    }
+  };
+
+  // === Fetch: Leave Requests (from /hr/leave) ===
+  const fetchLeaveRequests = async () => {
+    try {
+      const response = await axiosInstance.get('/hr/leave', {
+        params: { userId: user._id, limit: 'all' },
+      });
+
+      const rawData = response.data?.data?.result || response.data?.data || response.data || [];
+      const currentYear = new Date().getFullYear().toString();
+
+      const filtered = rawData.filter((item: any) =>
+        item.holidayYear?.includes(currentYear)
+      );
+
+      const hoursPerDay = 8; // fallback
+
+      const mapped = filtered.map((item: any) => ({
+        id: item._id,
+        startDate: item.startDate,
+        endDate: item.endDate,
+        reason: item.reason || 'Leave',
+        status: item.status,
+        days: Math.ceil((item.totalHours || 0) / hoursPerDay),
+        requestDate: item.createdAt,
+      }));
+
+      const pendingRequests = mapped
+        .filter((r) => r.status === 'pending')
+        .map((r) => ({ ...r, status: 'pending' as const }));
+
+      const approvedRequests = mapped
+        .filter((r) => r.status === 'approved')
+        .map((r) => ({ ...r, status: 'completed' as const }));
+
+      setHolidayData((prev) => ({
+        ...prev,
+        requests: pendingRequests,
+        taken: approvedRequests,
+      }));
+    } catch (error) {
+      console.error('Error fetching leave requests:', error);
+    }
+  };
+
+  // === Fetch: Notices (from /hr/notice) ===
+  const fetchNotices = async () => {
+    try {
+      const res = await axiosInstance.get('/hr/notice', {
+        params: {
+          status: 'active',
+          sort: '-noticeDate',
+          limit:5
+        },
+      });
+
+      const fetched = res.data?.data?.result || res.data?.data || res.data || [];
+
+      const mappedNotices = fetched.map((n: any) => ({
+        _id: n._id,
+        title: n.noticeType,
+        content: n.noticeDescription,
+        date: n.noticeDate,
+      }));
+
+      setNotices(mappedNotices);
+    } catch (error) {
+      console.error('Failed to fetch notices:', error);
+      setNotices([]); // Ensure empty array on error
+    }
+  };
+
+  // === Load All Data ===
+  useEffect(() => {
+    if (!user?._id) return;
+
+    setLoading(true);
+    Promise.all([
+      fetchDaysPresent(),
+      fetchHolidayAllowance(),
+      fetchLeaveRequests(),
+      fetchNotices(),
+    ])
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, [user?._id]);
 
   if (loading) {
     return (
@@ -171,16 +296,18 @@ const StaffDashboardPage = () => {
   }
 
   return (
-    <div className="min-h-screen ">
+    <div className="min-h-screen bg-gray-50 ">
       <div className="">
         {/* Header */}
-        <div className="mb-4">
-          <h1 className="text-3xl font-bold text-gray-900">Welcome back!</h1>
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">
+            Welcome back, {user?.name || 'Staff'}!
+          </h1>
         </div>
 
         {/* Overview Cards */}
-        <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-          {/* Attendance Overview */}
+        <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {/* Attendance */}
           <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-lg">
             <div className="mb-4 flex items-center justify-between">
               <div className="rounded-lg bg-blue-100 p-3">
@@ -188,21 +315,11 @@ const StaffDashboardPage = () => {
               </div>
               <span className="text-sm text-gray-500">This Month</span>
             </div>
-            <h3 className="mb-2 text-lg font-semibold text-gray-900">
-              Attendance
-            </h3>
+            <h3 className="mb-2 text-lg font-semibold text-gray-900">Attendance</h3>
             <div className="space-y-2">
               <div className="flex justify-between">
                 <span className="text-sm text-gray-600">Days Present</span>
-                <span className="font-medium text-green-600">
-                  {mockAttendanceData.thisMonth.daysPresent}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-600">Days Absent</span>
-                <span className="font-medium text-red-600">
-                  {mockAttendanceData.thisMonth.daysAbsent}
-                </span>
+                <span className="font-medium text-green-600">{daysPresent}</span>
               </div>
             </div>
           </div>
@@ -215,29 +332,15 @@ const StaffDashboardPage = () => {
               </div>
               <span className="text-sm text-gray-500">Pending</span>
             </div>
-            <h3 className="mb-2 text-lg font-semibold text-gray-900">
-              Holiday Requests
-            </h3>
+            <h3 className="mb-2 text-lg font-semibold text-gray-900">Holiday Requests</h3>
             <div className="space-y-2">
               <div className="flex justify-between">
                 <span className="text-sm text-gray-600">Pending</span>
-                <span className="font-medium text-yellow-600">
-                  {
-                    mockHolidayData.requests.filter(
-                      (r) => r.status === 'pending'
-                    ).length
-                  }
-                </span>
+                <span className="font-medium text-yellow-600">{holidayData.requests.length}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-sm text-gray-600">Approved</span>
-                <span className="font-medium text-green-600">
-                  {
-                    mockHolidayData.requests.filter(
-                      (r) => r.status === 'approved'
-                    ).length
-                  }
-                </span>
+                <span className="font-medium text-green-600">{holidayData.taken.length}</span>
               </div>
             </div>
           </div>
@@ -250,57 +353,27 @@ const StaffDashboardPage = () => {
               </div>
               <span className="text-sm text-gray-500">Balance</span>
             </div>
-            <h3 className="mb-2 text-lg font-semibold text-gray-900">
-              Holiday Balance
-            </h3>
+            <h3 className="mb-2 text-lg font-semibold text-gray-900">Holiday Balance</h3>
             <div className="space-y-2">
               <div className="flex justify-between">
                 <span className="text-sm text-gray-600">Total Entitlement</span>
                 <span className="font-medium text-gray-900">
-                  {mockHolidayData.balance.totalEntitlement}
+                  {holidayData.balance.totalEntitlement.toFixed(1)} days
                 </span>
               </div>
-
               <div className="flex justify-between">
                 <span className="text-sm text-gray-600">Remaining</span>
                 <span className="font-medium text-green-600">
-                  {mockHolidayData.balance.remaining}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Total Hours */}
-          <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-lg">
-            <div className="mb-4 flex items-center justify-between">
-              <div className="rounded-lg bg-purple-100 p-3">
-                <TrendingUp className="h-6 w-6 text-purple-600" />
-              </div>
-              <span className="text-sm text-gray-500">This Month</span>
-            </div>
-            <h3 className="mb-2 text-lg font-semibold text-gray-900">
-              Work Hours
-            </h3>
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-600">Total Hours</span>
-                <span className="font-medium text-gray-900">
-                  {mockAttendanceData.thisMonth.totalHours}h
-                </span>
-              </div>
-
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-600">Working Days</span>
-                <span className="font-medium text-green-600">
-                  {mockAttendanceData.thisMonth.totalWorkingDays}
+                  {holidayData.balance.remaining.toFixed(1)} days
                 </span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Recent Holiday Requests */}
+        {/* Recent Requests & Taken */}
         <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
+          {/* Recent Holiday Requests */}
           <div className="rounded-xl border border-gray-200 bg-white shadow-lg">
             <div className="border-b border-gray-200 p-6">
               <h3 className="flex items-center text-lg font-semibold text-gray-900">
@@ -309,133 +382,132 @@ const StaffDashboardPage = () => {
               </h3>
             </div>
             <div className="p-6">
-              <div className="space-y-4">
-                {mockHolidayData.requests.map((request) => (
-                  <div
-                    key={request.id}
-                    className="flex items-center justify-between rounded-lg bg-gray-50 p-4"
-                  >
-                    <div>
-                      <div className="mb-1 flex items-center space-x-2">
-                        {getStatusIcon(request.status)}
-                        <span className="font-medium text-gray-900">
-                          {formatDate(request.startDate)} -{' '}
-                          {formatDate(request.endDate)}
-                        </span>
-                      </div>
-                      <p className="text-sm text-gray-600">{request.reason}</p>
-                      <p className="text-xs text-gray-500">
-                        Requested on {formatDate(request.requestDate)}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-sm font-medium text-gray-900">
-                        {request.days} day{request.days > 1 ? 's' : ''}
-                      </span>
-                      <p
-                        className={`rounded-full px-2 py-1 text-xs capitalize ${
-                          request.status === 'approved'
-                            ? 'bg-green-100 text-green-800'
-                            : request.status === 'pending'
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : 'bg-red-100 text-red-800'
-                        }`}
+              {holidayData.requests.length === 0 ? (
+                <p className="text-sm text-gray-500">No pending requests.</p>
+              ) : (
+                <div className="space-y-4">
+                  {holidayData.requests
+                    .sort((a, b) => new Date(b.requestDate).getTime() - new Date(a.requestDate).getTime())
+                    .slice(0, 4)
+                    .map((req) => (
+                      <div
+                        key={req.id}
+                        className="flex items-center justify-between rounded-lg bg-gray-50 p-4"
                       >
-                        {request.status}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                        <div>
+                          <div className="mb-1 flex items-center space-x-2">
+                            {getStatusIcon(req.status)}
+                            <span className="font-medium text-gray-900">
+                              {formatDate(req.startDate)} - {formatDate(req.endDate)}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-600">{req.reason}</p>
+                          <p className="text-xs text-gray-500">
+                            Requested on {formatDate(req.requestDate)}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-sm font-medium text-gray-900">
+                            {req.days} day{req.days > 1 ? 's' : ''}
+                          </span>
+                          <p
+                            className={`mt-1 rounded-full px-2 py-1 text-xs font-medium capitalize ${
+                              req.status === 'pending'
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : 'bg-gray-100 text-gray-800'
+                            }`}
+                          >
+                            {req.status}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
             </div>
           </div>
 
+          {/* Holidays Taken */}
           <div className="rounded-xl border border-gray-200 bg-white shadow-lg">
             <div className="border-b border-gray-200 p-6">
               <h3 className="flex items-center text-lg font-semibold text-gray-900">
                 <CheckCircle className="mr-2 h-5 w-5 text-green-600" />
-                Recent Holidays Taken
+                Holidays Taken
               </h3>
             </div>
             <div className="p-6">
-              <div className="space-y-4">
-                {mockHolidayData.taken.map((holiday) => (
-                  <div
-                    key={holiday.id}
-                    className="flex items-center justify-between rounded-lg bg-gray-50 p-4"
-                  >
-                    <div>
-                      <div className="mb-1 flex items-center space-x-2">
-                        <CheckCircle className="h-4 w-4 text-green-600" />
-                        <span className="font-medium text-gray-900">
-                          {formatDate(holiday.startDate)} -{' '}
-                          {formatDate(holiday.endDate)}
-                        </span>
+              {holidayData.taken.length === 0 ? (
+                <p className="text-sm text-gray-500">No holidays taken yet.</p>
+              ) : (
+                <div className="space-y-4">
+                  {holidayData.taken
+                    .sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime())
+                    .slice(0, 4)
+                    .map((holiday) => (
+                      <div
+                        key={holiday.id}
+                        className="flex items-center justify-between rounded-lg bg-gray-50 p-4"
+                      >
+                        <div>
+                          <div className="mb-1 flex items-center space-x-2">
+                            <CheckCircle className="h-4 w-4 text-green-600" />
+                            <span className="font-medium text-gray-900">
+                              {formatDate(holiday.startDate)} - {formatDate(holiday.endDate)}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-600">{holiday.reason}</p>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-sm font-medium text-gray-900">
+                            {holiday.days} day{holiday.days > 1 ? 's' : ''}
+                          </span>
+                          <p className="mt-1 rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-800">
+                            Completed
+                          </p>
+                        </div>
                       </div>
-                      <p className="text-sm text-gray-600">{holiday.reason}</p>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-sm font-medium text-gray-900">
-                        {holiday.days} day{holiday.days > 1 ? 's' : ''}
-                      </span>
-                      <p className="rounded-full bg-green-100 px-2 py-1 text-xs text-green-800">
-                        Completed
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                    ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Latest Notices */}
+        {/* Notices */}
         <div className="rounded-xl border border-gray-200 bg-white shadow-lg">
           <div className="border-b border-gray-200 p-6">
             <h3 className="flex items-center text-lg font-semibold text-gray-900">
               <Bell className="mr-2 h-5 w-5 text-blue-600" />
               Latest Notices
-              <span className="ml-2 rounded-full bg-red-100 px-2 py-1 text-xs text-red-800">
-                {notices.filter((n) => !n.isRead).length} New
-              </span>
+              
             </h3>
           </div>
           <div className="p-6">
-            <div className="space-y-4">
-              {notices.map((notice) => (
-                <div
-                  key={notice.id}
-                  className={`rounded-r-lg border-l-4 py-4 pl-4 pr-4 transition-all duration-200  ${
-                    !notice.isRead ? 'border-l-4' : 'opacity-75'
-                  }`}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="mb-2 flex items-center space-x-2">
-                        <h4
-                          className={`font-semibold ${!notice.isRead ? 'text-gray-900' : 'text-gray-700'}`}
-                        >
-                          {notice.title}
-                        </h4>
-                        
-                      </div>
-                      <p className="mb-3 text-sm leading-relaxed text-gray-600">
-                        {notice.content}
-                      </p>
-                      <div className="flex items-center space-x-4 text-xs text-gray-500">
-                        <span className="flex items-center">
-                          <Calendar className="mr-1 h-3 w-3" />
-                          {formatDate(notice.date)}
-                        </span>
-                       
-                        
+            {notices.length === 0 ? (
+              <p className="text-sm text-gray-500">No notices available.</p>
+            ) : (
+              <div className="space-y-4">
+                {notices.map((notice) => (
+                  <div
+                    key={notice._id}
+                    className="rounded-r-lg border-l-4 border-l-blue-500 bg-blue-50 py-4 pl-4 pr-4"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-gray-900">{notice.title}</h4>
+                        <p className="mb-3 mt-1 text-sm text-gray-600">{notice.content}</p>
+                        <div className="flex items-center space-x-4 text-xs text-gray-500">
+                          <span className="flex items-center">
+                            <Calendar className="mr-1 h-3 w-3" />
+                            {formatDate(notice.date)}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                    
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>

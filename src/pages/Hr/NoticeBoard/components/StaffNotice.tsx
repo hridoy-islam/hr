@@ -105,16 +105,17 @@ export default function StaffNoticeBoard() {
             </div>
           ))}
 
-          {/* ✅ Pagination */}
-          <div className="mt-6">
-            <DynamicPagination
-              pageSize={entriesPerPage}
-              setPageSize={setEntriesPerPage}
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={setCurrentPage}
-            />
-          </div>
+          {notices.length > 6 && (
+            <div className="mt-6">
+              <DynamicPagination
+                pageSize={entriesPerPage}
+                setPageSize={setEntriesPerPage}
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+              />
+            </div>
+          )}
         </div>
       )}
     </div>

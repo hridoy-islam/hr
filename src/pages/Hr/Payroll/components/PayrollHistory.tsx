@@ -1,5 +1,5 @@
 import React from 'react';
-import { format } from 'date-fns';
+import moment from 'moment';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,7 +11,7 @@ import {
   TableCell,
   TableHead,
   TableHeader,
-  TableRow,
+  TableRow
 } from '@/components/ui/table';
 
 interface PayrollHistoryProps {
@@ -23,14 +23,12 @@ interface PayrollHistoryProps {
 export const PayrollHistory: React.FC<PayrollHistoryProps> = ({
   records,
   onViewPayslip,
-  onDownloadPayslip,
+  onDownloadPayslip
 }) => {
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
       case 'paid':
-        return 'default';
       case 'pending':
-        return 'default';
       case 'processing':
         return 'default';
       default:
@@ -44,24 +42,33 @@ export const PayrollHistory: React.FC<PayrollHistoryProps> = ({
         <CardHeader>
           <CardTitle>
             <div className="flex items-center">
-              <Eye className="h-5 w-5 mr-2" />
+              <Eye className="mr-2 h-5 w-5" />
               Payroll History
             </div>
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-gray-500 text-center py-4">No payroll records found.</p>
+          <p className="py-4 text-center text-gray-500">
+            No payroll records found.
+          </p>
         </CardContent>
       </Card>
     );
   }
+
+  const formatDateSafe = (date: Date | string | null | undefined) =>
+    date
+      ? moment(date).isValid()
+        ? moment(date).format('MMM DD, YYYY')
+        : 'Invalid Date'
+      : 'N/A';
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>
           <div className="flex items-center">
-            <Eye className="h-5 w-5 mr-2" />
+            <Eye className="mr-2 h-5 w-5" />
             Payroll History
           </div>
         </CardTitle>
@@ -70,7 +77,7 @@ export const PayrollHistory: React.FC<PayrollHistoryProps> = ({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[20%]">Pay Period</TableHead>
+              <TableHead className="w-[40%]">Pay Period</TableHead>
               <TableHead className="w-[20%]">Net Pay</TableHead>
               <TableHead className="w-[20%]">Status</TableHead>
               <TableHead className="w-[20%] text-right">Actions</TableHead>
@@ -78,26 +85,36 @@ export const PayrollHistory: React.FC<PayrollHistoryProps> = ({
           </TableHeader>
           <TableBody>
             {records.map((record) => (
-              <TableRow key={record.id} className="hover:bg-gray-50 transition-colors">
+              <TableRow
+                key={record?._id}
+                className="transition-colors hover:bg-gray-50"
+              >
                 <TableCell className="font-medium">
-                  { `${format(record.startDate, 'MMM dd, yyyy')} - ${format(record.endDate, 'MMM dd, yyyy')}`
-                    }
+                  {`${formatDateSafe(record.fromDate)} - ${formatDateSafe(record?.toDate)}`}
                 </TableCell>
-                <TableCell>£{record.netPay.toLocaleString()}</TableCell>
+                <TableCell className="font-semibold">
+                  £
+                  {typeof record.netAmount === 'number'
+                    ? record.netAmount.toLocaleString()
+                    : '0'}
+                </TableCell>{' '}
                 <TableCell>
                   <Badge variant={getStatusBadgeVariant(record.status)}>
-                    {record.status.charAt(0).toUpperCase() + record.status.slice(1)}
+                    {record.status
+                      ? record.status.charAt(0).toUpperCase() +
+                        record.status.slice(1)
+                      : 'Unknown'}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-right space-x-2">
-                  <Button
+                <TableCell className="space-x-2 text-right">
+                  {/* <Button
                     size="sm"
                     variant="default"
                     onClick={() => onViewPayslip(record)}
                     className="bg-supperagent text-white hover:bg-supperagent"
                   >
                     <Eye className="h-4 w-4" />
-                  </Button>
+                  </Button> */}
                   {record.status === 'paid' && (
                     <Button
                       size="sm"

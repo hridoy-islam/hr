@@ -55,8 +55,9 @@ import PassportExpiryPage from '@/pages/Hr/Dashboard/components/passportExpiray'
 import RtwPage from '@/pages/Hr/Employee/rightToWorkEmployee';
 import RightToWorkStatusPage from '@/pages/Hr/Dashboard/components/rightToWorkStatus';
 import BankHolidayPage from '@/pages/Hr/Bank-Holiday';
-import { ReportPage } from '@/pages/Hr/reports';
 import RequestDocumentPage from '@/pages/Hr/Request-Documents';
+import StaffAttendancePage from '@/pages/Hr/StaffAttendance';
+import ReportPage from '@/pages/Hr/reports';
 
 
 
@@ -195,6 +196,10 @@ export default function AppRouter() {
             {
               path: 'attendance-approve/attendance-list',
               element: <AttendanceApproveList />
+            },
+            {
+              path: 'staff-attendance',
+              element: <StaffAttendancePage />
             },
             {
               path: 'attendance-report',

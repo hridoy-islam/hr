@@ -26,7 +26,7 @@ import {
   Menu,
   X,
   FileSpreadsheet,
-
+  Clock4
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
@@ -38,155 +38,158 @@ import { AppDispatch } from '@/redux/store';
 
 // Define navigation items with role-based access
 const navItems = [
-  { 
-    icon: LayoutDashboard, 
-    label: 'Dashboard', 
+  {
+    icon: LayoutDashboard,
+    label: 'Dashboard',
     href: '',
-    roles: ['admin','employee' ] 
+    roles: ['admin', 'employee']
   },
   {
     icon: Box,
     label: 'Holidays',
     href: 'holiday',
-    roles: ['admin','employee' ]
+    roles: ['admin', 'employee']
   },
   {
     icon: PencilRuler,
     label: 'MyStuff',
     href: 'my-stuff',
-    roles: ['admin',]
+    roles: ['admin']
   },
-  { 
-    icon: FileTextIcon, 
-    label: 'Notice', 
+  {
+    icon: FileTextIcon,
+    label: 'Notice',
     href: 'notice',
-    roles: ['admin',  'employee'] 
+    roles: ['admin', 'employee']
   },
-  { 
-    icon: DoorOpen, 
-    label: 'Vacancy', 
+  {
+    icon: DoorOpen,
+    label: 'Vacancy',
     href: 'vacancy',
-    roles: ['admin', ] 
+    roles: ['admin']
   },
   {
     icon: UsersIcon,
     label: 'Employee',
-    roles: ['admin', ],
+    roles: ['admin'],
     subItems: [
-      { 
-        icon: Users, 
-        label: 'Employee List', 
+      {
+        icon: Users,
+        label: 'Employee List',
         href: 'employee',
-        roles: ['admin', ] 
+        roles: ['admin']
       },
-      { 
-        icon: LayoutPanelTop, 
-        label: 'Department', 
+      {
+        icon: LayoutPanelTop,
+        label: 'Department',
         href: 'department',
-        roles: ['admin', ] 
+        roles: ['admin']
       },
-      { 
-        icon: ArrowBigUp, 
-        label: 'Shift', 
+      {
+        icon: ArrowBigUp,
+        label: 'Shift',
         href: 'shift',
-        roles: ['admin', ] 
+        roles: ['admin']
       },
-      { 
-        icon: Award, 
-        label: 'Designation', 
+      {
+        icon: Award,
+        label: 'Designation',
         href: 'designation',
-        roles: ['admin', ] 
+        roles: ['admin']
       },
-      { 
-        icon: BookText, 
-        label: 'Training', 
+      {
+        icon: BookText,
+        label: 'Training',
         href: 'training',
-        roles: ['admin', ] 
+        roles: ['admin']
       }
     ]
   },
   {
     icon: FileCheck2,
     label: 'Attendance',
-    roles: ['admin', ],
+    roles: ['admin'],
     subItems: [
-      { 
-        icon: FileCheck2, 
-        label: 'Attendance List', 
+      {
+        icon: FileCheck2,
+        label: 'Attendance List',
         href: 'attendance',
-        roles: ['admin', ] 
+        roles: ['admin']
       },
       {
         icon: CircleCheckBig,
         label: 'Attendance Approve',
         href: 'attendance-approve',
-        roles: ['admin', ]
+        roles: ['admin']
       },
       {
         icon: BetweenVerticalStart,
         label: 'Attendance Entry',
         href: 'attendance/attendance-entry',
-        roles: ['admin', ]
+        roles: ['admin']
       },
-      { 
-        icon: Calendar, 
-        label: 'Attendance Report', 
+      {
+        icon: Calendar,
+        label: 'Attendance Report',
         href: 'attendance-report',
-        roles: ['admin', ] 
+        roles: ['admin']
       }
     ]
   },
-  { 
-    icon: CircleDollarSign, 
-    label: 'Payroll', 
+  {
+    icon: Clock4,
+    label: 'Attendance',
+    href: 'staff-attendance',
+    roles: ['employee']
+  },
+  {
+    icon: CircleDollarSign,
+    label: 'Payroll',
     href: 'payroll',
-    roles: ['admin', 'employee'] 
+    roles: ['admin', 'employee']
   },
-  { 
-    icon: CircleGauge, 
-    label: 'Leave', 
+  {
+    icon: CircleGauge,
+    label: 'Leave',
     href: 'leave-approve',
-    roles: ['admin', ] 
+    roles: ['admin']
   },
- 
-  { 
-    icon: FileSpreadsheet  , 
-    label: 'Report', 
+  {
+    icon: FileSpreadsheet,
+    label: 'Report',
     href: 'report',
-    roles: ['employee', ] 
+    roles: ['employee']
   },
- 
-  { 
-    icon: FileSpreadsheet  , 
-    label: 'Document Requests', 
-    href: 'document-request',
-    roles: ['admin', ] 
-  },
- 
 
+  {
+    icon: FileSpreadsheet,
+    label: 'Document Requests',
+    href: 'document-request',
+    roles: ['admin']
+  },
 
   {
     icon: Settings,
     label: 'Settings',
-    roles: ['admin', ],
+    roles: ['admin'],
     subItems: [
-      { 
-        icon: ReceiptText, 
-        label: 'Company Details', 
+      {
+        icon: ReceiptText,
+        label: 'Company Details',
         href: 'company-details',
-        roles: ['admin'] 
+        roles: ['admin']
       },
-      { 
-        icon: Mails, 
-        label: 'Email Setup', 
+      {
+        icon: Mails,
+        label: 'Email Setup',
         href: 'email-setup',
-        roles: ['admin', ] 
+        roles: ['admin']
       },
-      { 
-        icon: Calendar, 
-        label: 'Bank Holiday', 
+      {
+        icon: Calendar,
+        label: 'Bank Holiday',
         href: 'bank-holiday',
-        roles: ['admin', ] 
+        roles: ['admin']
       }
     ]
   }
@@ -215,11 +218,11 @@ const filterNavItemsByRole = (items, userRole) => {
 
 const NavItem = ({ item, expandedItems, toggleExpanded, depth = 0 }) => {
   const location = useLocation();
-  const isActiveLeaf = !item.subItems &&
-  (item.href === ''
-    ? location.pathname === '/admin/hr/'
-    : location.pathname.startsWith('/admin/hr/' + item.href)
-  );
+  const isActiveLeaf =
+    !item.subItems &&
+    (item.href === ''
+      ? location.pathname === '/admin/hr/'
+      : location.pathname.startsWith('/admin/hr/' + item.href));
 
   const isExpanded = expandedItems[item.label];
 
@@ -235,7 +238,9 @@ const NavItem = ({ item, expandedItems, toggleExpanded, depth = 0 }) => {
         >
           <div className="flex items-center space-x-3">
             <item.icon className="h-4 w-4 text-supperagent group-hover:text-white" />
-            <span className="text-black group-hover:text-white">{item.label}</span>
+            <span className="text-black group-hover:text-white">
+              {item.label}
+            </span>
           </div>
           {isExpanded ? (
             <ChevronDown className="h-4 w-4 text-supperagent group-hover:text-white" />
@@ -328,7 +333,9 @@ export function SideNav() {
               (subItem) =>
                 location.pathname.includes(subItem.href) ||
                 (subItem.subItems &&
-                  subItem.subItems.some((s) => location.pathname.includes(s.href)))
+                  subItem.subItems.some((s) =>
+                    location.pathname.includes(s.href)
+                  ))
             )
           ) {
             setExpandedItems((prev) => ({ ...prev, [item.label]: true }));
@@ -380,7 +387,7 @@ export function SideNav() {
           <p className="text-xl font-semibold text-gray-900">Welcome!</p>
           <div
             onClick={() => navigate('/admin/hr/profile')}
-            className="cursor-pointer text-md font-medium text-gray-900 underline"
+            className="text-md cursor-pointer font-medium text-gray-900 underline"
           >
             {fetchedUser
               ? `${fetchedUser?.firstName} ${fetchedUser?.lastName}`
@@ -436,7 +443,9 @@ export function SideNav() {
       <aside
         className={cn(
           'fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-sm transition-transform duration-300 lg:translate-x-0',
-          isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+          isMobileMenuOpen
+            ? 'translate-x-0'
+            : '-translate-x-full lg:translate-x-0'
         )}
       >
         {sidebarContent}
