@@ -43,6 +43,7 @@ import Select from 'react-select';
 import moment from 'moment';
 import { useSelector } from 'react-redux';
 import axiosInstance from '@/lib/axios'; // ✅ Import axiosInstance
+import { BlinkingDots } from '@/components/shared/blinking-dots';
 
 // Types
 type DocumentType =
@@ -55,7 +56,7 @@ type DocumentType =
   | 'Promotion Letter'
   | 'Attendance Report';
 
-type RequestStatus = 'pending' | 'approved'| 'rejected';
+type RequestStatus = 'pending' | 'approved' | 'rejected';
 
 interface DocumentRequest {
   _id: string;
@@ -166,9 +167,7 @@ export default function ReportPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-10">
-        <p className="text-lg text-muted-foreground">
-          Loading your requests...
-        </p>
+        <BlinkingDots size="large" color="bg-supperagent" />
       </div>
     );
   }
