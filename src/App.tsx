@@ -4,6 +4,7 @@ import store from './redux/store';
 import AppRouter from './routes';
 import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
+import { TooltipProvider } from '@/components/ui/tooltip';
 
 const persistor = persistStore(store);
 
@@ -12,7 +13,10 @@ export default function App() {
     <Provider store={store}>
       <PersistGate loading={null} persistor={persistor}>
         <AppProvider>
+          <TooltipProvider>
+
           <AppRouter />
+          </TooltipProvider>
         </AppProvider>
       </PersistGate>
     </Provider>

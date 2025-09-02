@@ -94,7 +94,7 @@ const RecruitApplicantForm = () => {
         status: 'hired'
       };
       // await axiosInstance.post(`/hr/recruitment`, flatDataWithStatus);
-      // await axiosInstance.patch(`/hr/applicant/${id}`, {status:'hired'});
+      await axiosInstance.patch(`/hr/applicant/${id}`, {status:'hired'});
       const { status: _, ...flatData } = flatDataWithStatus;
       const { status: __, ...cleanApplicant } = applicant;
       const data = {

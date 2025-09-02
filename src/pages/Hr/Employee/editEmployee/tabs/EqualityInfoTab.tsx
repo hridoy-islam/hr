@@ -42,24 +42,7 @@ const EqualityInfoTab: React.FC<EqualityInfoTabProps> = ({
             isSaving={isFieldSaving['equalityInformation.religion']}
           />
 
-          <EditableField
-            id="equalityInformation.hasDisability"
-            label="Has Disability"
-            value={formData.equalityInformation.hasDisability}
-            type="checkbox"
-            onUpdate={(checked) => onUpdate('equalityInformation', 'hasDisability', checked)}
-            isSaving={isFieldSaving['equalityInformation.hasDisability']}
-          />
-
-          {formData.equalityInformation.hasDisability && (
-            <EditableField
-              id="equalityInformation.disabilityDetails"
-              label="Disability Details"
-              value={formData.equalityInformation.disabilityDetails}
-              onUpdate={(value) => onUpdate('equalityInformation', 'disabilityDetails', value)}
-              isSaving={isFieldSaving['equalityInformation.disabilityDetails']}
-            />
-          )}
+          
         </div>
       </CardContent>
     </Card>

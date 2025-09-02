@@ -111,7 +111,7 @@ export const useEditEmployee = () => {
     notes: ''
   });
 
-    const user = useSelector((state: any) => state.auth.user); // Get user from Redux state
+  const user = useSelector((state: any) => state.auth.user); // Get user from Redux state
 
   useEffect(() => {
     const fetchEmployee = async () => {
@@ -168,8 +168,8 @@ export const useEditEmployee = () => {
           rightToWork: {
             hasExpiry: data.rightToWork?.hasExpiry || false,
             expiryDate: data.rightToWork?.expiryDate
-    ? moment(data.rightToWork.expiryDate)
-    : null,
+              ? moment(data.rightToWork.expiryDate)
+              : null
           },
 
           // Payroll
@@ -218,7 +218,9 @@ export const useEditEmployee = () => {
           departmentId: data.departmentId || '',
           training: Array.isArray(data.training) ? data.training : [],
           passportNo: data.passportNo || '',
-          passportExpiry: data.passportExpiry ? moment(data.passportExpiry) : '',
+          passportExpiry: data.passportExpiry
+            ? moment(data.passportExpiry)
+            : '',
           // Notes
           notes: data.notes || ''
         });
@@ -236,83 +238,82 @@ export const useEditEmployee = () => {
     fetchEmployee();
   }, [id, toast]);
 
-const serializeMoments = (obj: any): any => {
-  if (moment.isMoment(obj)) {
-    return obj.toISOString();
-  }
-
-  if (Array.isArray(obj)) {
-    return obj.map(serializeMoments);
-  }
-
-  if (obj && typeof obj === 'object') {
-    const result: Record<string, any> = {};
-    for (const [key, val] of Object.entries(obj)) {
-      // Skip null or undefined values
-      if (val !== null && val !== undefined) {
-        result[key] = serializeMoments(val);
-      }
+  const serializeMoments = (obj: any): any => {
+    if (moment.isMoment(obj)) {
+      return obj.toISOString();
     }
-    return result;
-  }
 
-  return obj;
-};
+    if (Array.isArray(obj)) {
+      return obj.map(serializeMoments);
+    }
 
-const updateField = useCallback(
-  async (fieldName: string, value: any) => {
-    try {
-      setIsFieldSaving((prev) => ({ ...prev, [fieldName]: true }));
-if (fieldName === 'contractHours') {
-        value = Number(value);
+    if (obj && typeof obj === 'object') {
+      const result: Record<string, any> = {};
+      for (const [key, val] of Object.entries(obj)) {
+        // Skip null or undefined values
+        if (val !== null && val !== undefined) {
+          result[key] = serializeMoments(val);
+        }
       }
-      // Special handling for nested objects
-      let updateData;
-      if (fieldName.includes('.')) {
-        // Handle nested fields (e.g., 'rightToWork.expiryDate')
-        const [parentField, childField] = fieldName.split('.');
-        updateData = {
-          [parentField]: {
-            ...formData[parentField as keyof typeof formData],
-            [childField]: serializeMoments(value)
-          }
-        };
-      } else {
-        updateData = { [fieldName]: serializeMoments(value) };
-      }
+      return result;
+    }
 
-      await axiosInstance.patch(`/users/${id}`, updateData);
+    return obj;
+  };
 
-      setFormData((prev) => ({
-        ...prev,
-        ...(fieldName.includes('.')
-          ? {
-              [fieldName.split('.')[0]]: {
-                ...prev[fieldName.split('.')[0] as keyof typeof prev],
-                [fieldName.split('.')[1]]: value
-              }
+  const updateField = useCallback(
+    async (fieldName: string, value: any) => {
+      try {
+        setIsFieldSaving((prev) => ({ ...prev, [fieldName]: true }));
+        if (fieldName === 'contractHours') {
+          value = Number(value);
+        }
+        // Special handling for nested objects
+        let updateData;
+        if (fieldName.includes('.')) {
+          // Handle nested fields (e.g., 'rightToWork.expiryDate')
+          const [parentField, childField] = fieldName.split('.');
+          updateData = {
+            [parentField]: {
+              ...formData[parentField as keyof typeof formData],
+              [childField]: serializeMoments(value)
             }
-          : { [fieldName]: value })
-      }));
+          };
+        } else {
+          updateData = { [fieldName]: serializeMoments(value) };
+        }
 
-      toast({
-        title: 'Field updated',
-        description: 'Changes saved successfully',
-        duration: 1500
-      });
-    } catch (error) {
-      toast({
-        variant: 'destructive',
-        title: 'Update failed',
-        description: 'Could not save changes'
-      });
-    } finally {
-      setIsFieldSaving((prev) => ({ ...prev, [fieldName]: false }));
-    }
-  },
-  [id, toast, formData]
-);
+        await axiosInstance.patch(`/users/${id}`, updateData);
 
+        setFormData((prev) => ({
+          ...prev,
+          ...(fieldName.includes('.')
+            ? {
+                [fieldName.split('.')[0]]: {
+                  ...prev[fieldName.split('.')[0] as keyof typeof prev],
+                  [fieldName.split('.')[1]]: value
+                }
+              }
+            : { [fieldName]: value })
+        }));
+
+        toast({
+          title: 'Field updated',
+          description: 'Changes saved successfully',
+          duration: 1500
+        });
+      } catch (error) {
+        toast({
+          variant: 'destructive',
+          title: 'Update failed',
+          description: 'Could not save changes'
+        });
+      } finally {
+        setIsFieldSaving((prev) => ({ ...prev, [fieldName]: false }));
+      }
+    },
+    [id, toast, formData]
+  );
 
   const handleFieldUpdate = useCallback(
     (fieldName: string, value: any) => {

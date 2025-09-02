@@ -293,9 +293,8 @@ if (fieldName === 'contractHours') {
       }));
 
       toast({
-        title: 'Field updated',
-        description: 'Changes saved successfully',
-        duration: 1500
+        title: 'Data updated successfully',
+        
       });
     } catch (error) {
       toast({

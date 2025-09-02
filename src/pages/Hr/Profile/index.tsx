@@ -82,7 +82,7 @@ const Profile = () => {
     { id: 'equality', label: 'Equality', component: <EqualityInfoTab formData={formData} onUpdate={handleNestedFieldUpdate} onSelectChange={handleSelectChange} onCheckboxChange={handleCheckboxChange} isFieldSaving={isFieldSaving} /> },
     { id: 'disability', label: 'Disability', component: <DisabilityInfoTab formData={formData} onUpdate={handleFieldUpdate} onCheckboxChange={handleCheckboxChange} isFieldSaving={isFieldSaving} /> },
     { id: 'beneficiary', label: 'Beneficiary', component: <BeneficiaryTab formData={formData} onUpdate={handleNestedFieldUpdate} onSelectChange={handleSelectChange} onCheckboxChange={handleCheckboxChange} isFieldSaving={isFieldSaving} /> },
-    { id: 'notes', label: 'Notes', component: <NotesTab formData={formData} onUpdate={handleFieldUpdate} isFieldSaving={isFieldSaving} /> },
+    // { id: 'notes', label: 'Notes', component: <NotesTab formData={formData} onUpdate={handleFieldUpdate} isFieldSaving={isFieldSaving} /> },
     // { id: 'training', label: 'Training', component: <TrainingTab formData={formData} onUpdate={handleFieldUpdate} isFieldSaving={isFieldSaving} /> },
     // { id: 'holiday', label: 'Holiday', component: <HolidayTab  /> },
     // { id: 'settings', label: 'Settings', component: <SettingsTab formData={formData}  onDateChange={handleDateChange} onUpdate={handleNestedFieldUpdate} onSelectChange={handleSelectChange} onCheckboxChange={handleCheckboxChange} isFieldSaving={isFieldSaving} /> },

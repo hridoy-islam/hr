@@ -126,17 +126,22 @@ const AdminDashboardPage = () => {
     };
 
     // Fetch right-to-work records
-    const fetchRightToWork = async () => {
-      try {
-        const response = await axiosInstance.get('/hr/right-to-work?limit=all');
-        const records: RightToWorkRecord[] = response.data.data.result || [];
-        setRightToWorkRecords(records);
-      } catch (error) {
-        console.error('Failed to fetch right-to-work data:', error);
-        setRightToWorkRecords([]);
-      }
-    };
+  const fetchRightToWork = async () => {
+  try {
+    const response = await axiosInstance.get('/hr/right-to-work?limit=all');
+    const records: RightToWorkRecord[] = Array.isArray(response.data.data.result)
+      ? response.data.data.result
+      : [];
 
+    // Filter out any records with null/invalid employeeId
+    const validRecords = records.filter((record) => record.employeeId != null);
+
+    setRightToWorkRecords(validRecords);
+  } catch (error) {
+    console.error('Failed to fetch right-to-work data:', error);
+    setRightToWorkRecords([]);
+  }
+};
     setLoading(true);
     Promise.all([fetchEmployees(), fetchRightToWork()])
       .catch(console.error)
@@ -203,10 +208,16 @@ const rightToWorkExpiring = Array.from(
   new Map(
     rightToWorkRecords
       .filter((record) => {
+        // Skip if employeeId is null or missing
+        if (!record.employeeId) {
+          console.warn('Invalid record: employeeId is missing', record);
+          return false;
+        }
+
         const expiry = record.expiryDate;
         return !expiry || isExpiringSoon(expiry) || isExpired(expiry);
       })
-      .map((record) => [record.employeeId._id, record]) // map by employeeId
+      .map((record) => [record.employeeId._id, record]) // Now safe to access _id
   ).values()
 );
 
@@ -301,7 +312,7 @@ const rightToWorkExpiring = Array.from(
           </div>
 
           {/* Shift Report Card */}
-          <div className="transform rounded-lg bg-gradient-to-br from-gray-600 to-gray-800 p-4 text-white shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
+          {/* <div className="transform rounded-lg bg-gradient-to-br from-gray-600 to-gray-800 p-4 text-white shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
             <div className="flex items-center space-x-3">
               <div className="rounded-lg bg-white/20 p-2">
                 <UserX className="h-6 w-6" />
@@ -320,7 +331,7 @@ const rightToWorkExpiring = Array.from(
               <span className="text-xs opacity-80">view details</span>
               <ChevronRight className="h-3 w-3 opacity-80" />
             </div>
-          </div>
+          </div> */}
 
           {/* Passport Expiry Card */}
           <div

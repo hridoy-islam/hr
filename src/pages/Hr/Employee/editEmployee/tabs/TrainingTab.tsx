@@ -3,18 +3,23 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import moment from 'moment';
 import axiosInstance from '@/lib/axios';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
 
 const TrainingTab = ({ formData, onUpdate, isFieldSaving }) => {
   const [trainings, setTrainings] = useState([]);
-  const [localTrainings, setLocalTrainings] = useState<Array<{
-    _id?: string; // optional: if editing existing
-    trainingId: string;
-    startDate?: string;
-    endDate?: string;
-    status: 'pending' | 'completed';
-  }>>([]);
+  const [localTrainings, setLocalTrainings] = useState<
+    Array<{
+      _id?: string;
+      trainingId: string;
+      startDate?: string;
+      endDate?: string;
+      status: 'pending' | 'completed';
+      dirty?: boolean;
+    }>
+  >([]);
 
-  // Fetch available trainings
+  // Fetch trainings
   const fetchData = async () => {
     try {
       const res = await axiosInstance('/hr/training');
@@ -28,74 +33,92 @@ const TrainingTab = ({ formData, onUpdate, isFieldSaving }) => {
     fetchData();
   }, []);
 
-  // Map backend data to local state on load
+  // Map backend data
   useEffect(() => {
     if (formData.training && Array.isArray(formData.training)) {
-      const mapped = formData.training.map(t => ({
-        _id: t._id, // preserve ID if exists (for updates)
+      const mapped = formData.training.map((t) => ({
+        _id: t._id,
         trainingId: t.trainingId?._id || t.trainingId,
-        startDate: t.startDate ? moment(t.startDate).format('YYYY-MM-DD') : '',
-        endDate: t.endDate ? moment(t.endDate).format('YYYY-MM-DD') : '',
-        status: t.status || 'pending'
+        startDate: t.startDate ? moment(t.startDate).format('DD-MM-YYYY') : '',
+        endDate: t.endDate ? moment(t.endDate).format('DD-MM-YYYY') : '',
+        status: t.status || 'pending',
+        dirty: false
       }));
       setLocalTrainings(mapped);
     }
   }, [formData.training]);
 
-  const trainingOptions = trainings.map(dep => ({
+  const trainingOptions = trainings.map((dep) => ({
     value: dep._id,
     label: dep.name
   }));
 
-  // Add a new empty training entry
+  const getValidityDays = (trainingId: string) => {
+    const training = trainings.find((t) => t._id === trainingId);
+    return training?.validityDays || 0;
+  };
+
   const handleAddTraining = () => {
-    setLocalTrainings(prev => [
+    setLocalTrainings((prev) => [
       ...prev,
       {
-        trainingId: '', // user will select
+        trainingId: '',
         startDate: '',
         endDate: '',
-        status: 'pending'
+        status: 'pending',
+        dirty: true
       }
     ]);
   };
 
-  // Remove a training by index or by ID
   const handleRemoveTraining = (index: number) => {
     const updated = localTrainings.filter((_, i) => i !== index);
     setLocalTrainings(updated);
     onUpdate('training', updated);
   };
 
-  // Handle changes in any field
   const handleDetailChange = (
     index: number,
     field: 'trainingId' | 'startDate' | 'endDate' | 'status',
     value: string
   ) => {
-    const updated = localTrainings.map((t, i) =>
-      i === index
-        ? { ...t, [field]: value }
-        : t
-    );
+    const updated = [...localTrainings];
+    updated[index][field] = value;
+
+    // Recalculate endDate if needed
+    if (
+      (field === 'startDate' || field === 'trainingId') &&
+      updated[index].startDate &&
+      updated[index].trainingId
+    ) {
+      const validityDays = getValidityDays(updated[index].trainingId);
+      updated[index].endDate = moment(updated[index].startDate, 'DD-MM-YYYY')
+        .add(validityDays, 'days')
+        .format('DD-MM-YYYY');
+    }
+
+    updated[index].dirty = true;
     setLocalTrainings(updated);
-    onUpdate('training', updated);
   };
 
-  // Prevent selecting same training twice
   const getAvailableTrainings = (currentIdx: number) => {
     const used = localTrainings
-      .filter((_, index) => index !== currentIdx)
-      .map(t => t.trainingId);
+      .filter((_, i) => i !== currentIdx)
+      .map((t) => t.trainingId);
+    return trainingOptions.filter((opt) => !used.includes(opt.value));
+  };
 
-    return trainingOptions.filter(opt => !used.includes(opt.value));
+  const handleSaveRow = (index: number) => {
+    onUpdate('training', localTrainings);
+    const updated = [...localTrainings];
+    updated[index].dirty = false;
+    setLocalTrainings(updated);
   };
 
   return (
     <Card>
       <CardContent className="pt-6">
-        <div className="grid grid-cols-1 ">
-
+        <div className="grid grid-cols-1">
           {/* Add Training Button */}
           <div className="flex justify-end pb-4">
             <Button
@@ -112,95 +135,147 @@ const TrainingTab = ({ formData, onUpdate, isFieldSaving }) => {
           {/* Dynamic Training Entries */}
           {localTrainings.length > 0 ? (
             <div className="col-span-full space-y-2">
-              {/* <h4 className="text-sm font-semibold text-gray-700">Assigned Trainings</h4> */}
-
               {localTrainings.map((training, index) => {
-                const selectedTraining = trainings.find(t => t._id === training.trainingId);
-                const displayName = selectedTraining ? selectedTraining.name : 'Select a training';
+                const selectedTraining = trainings.find(
+                  (t) => t._id === training.trainingId
+                );
+                const validityDays = selectedTraining?.validityDays;
 
                 return (
                   <div
                     key={index}
-                    className="rounded-lg border border-gray-300 p-3 bg-white shadow-sm space-y-1"
+                    className="space-y-1 rounded-lg border border-gray-300 bg-white p-3 shadow-sm"
                   >
-                    
-
-                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 ">
-
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-5">
                       {/* Training Selection */}
                       <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                        <label className="mb-1 block text-xs font-medium text-gray-600">
                           Training
                         </label>
                         <select
                           value={training.trainingId}
-                          onChange={e =>
-                            handleDetailChange(index, 'trainingId', e.target.value)
+                          onChange={(e) =>
+                            handleDetailChange(
+                              index,
+                              'trainingId',
+                              e.target.value
+                            )
                           }
-                          className="w-full p-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-100"
+                          className="w-full rounded border border-gray-300 p-2 text-sm focus:ring-2 focus:ring-blue-100"
                         >
                           <option value="">Choose Training</option>
-                          {getAvailableTrainings(index).map(opt => (
+                          {getAvailableTrainings(index).map((opt) => (
                             <option key={opt.value} value={opt.value}>
                               {opt.label}
                             </option>
                           ))}
                         </select>
+                        {validityDays !== undefined && training.trainingId && (
+                          <p className="mt-1 text-xs text-gray-500">
+                            Valid for {validityDays} days
+                          </p>
+                        )}
                       </div>
 
                       {/* Start Date */}
                       <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">
-                          Start Date
+                        <label className="mb-1 block text-xs font-medium text-gray-600">
+                          Training Date
                         </label>
-                        <input
-                          type="date"
-                          value={training.startDate}
-                          onChange={e =>
-                            handleDetailChange(index, 'startDate', e.target.value)
+                        <DatePicker
+                          selected={
+                            training.startDate
+                              ? moment(
+                                  training.startDate,
+                                  'DD-MM-YYYY'
+                                ).toDate()
+                              : null
                           }
-                          className="w-full p-2 border border-gray-300 rounded text-sm"
+                          onChange={(date) => {
+                            const formatted = date
+                              ? moment(date).format('DD-MM-YYYY')
+                              : '';
+                            handleDetailChange(index, 'startDate', formatted);
+                          }}
+                          dateFormat="dd-MM-yyyy"
+                          className="w-full rounded border border-gray-300 p-2 text-sm"
+                          placeholderText="DD-MM-YYYY"
+                          wrapperClassName="w-full"
                         />
                       </div>
 
                       {/* End Date */}
                       <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">
-                          End Date
+                        <label className="mb-1 block text-xs font-medium text-gray-600">
+                          Validity Date
                         </label>
-                        <input
-                          type="date"
-                          value={training.endDate}
-                          onChange={e =>
-                            handleDetailChange(index, 'endDate', e.target.value)
+                        <DatePicker
+                          selected={
+                            training.endDate
+                              ? moment(training.endDate, 'DD-MM-YYYY').toDate()
+                              : null
                           }
-                          className="w-full p-2 border border-gray-300 rounded text-sm"
+                          dateFormat="dd-MM-yyyy"
+                          className="w-full cursor-not-allowed rounded border border-gray-300 bg-gray-50 p-2 text-sm text-gray-700"
+                          placeholderText="DD-MM-YYYY"
+                          readOnly
+                          wrapperClassName="w-full"
                         />
                       </div>
 
                       {/* Status */}
                       <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                        <label className="mb-1 block text-xs font-medium text-gray-600">
                           Status
                         </label>
                         <select
                           value={training.status}
-                          onChange={e =>
-                            handleDetailChange(index, 'status', e.target.value as any)
+                          onChange={(e) =>
+                            handleDetailChange(
+                              index,
+                              'status',
+                              e.target.value as any
+                            )
                           }
-                          className="w-full p-2 border border-gray-300 rounded text-sm"
+                          className="w-full rounded border border-gray-300 p-2 text-sm"
                         >
                           <option value="pending">Pending</option>
                           <option value="completed">Completed</option>
                         </select>
                       </div>
+
+                      {/* Remove */}
+                      <div className="flex flex-col items-center justify-center space-y-1">
+                        <Button
+                          type="button"
+                          variant="default"
+                          className="w-full text-xs text-red-500"
+                          onClick={() => handleRemoveTraining(index)}
+                        >
+                          Remove
+                        </Button>
+                      </div>
                     </div>
+                    {training.dirty && (
+                      <div className="flex w-full justify-end">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="default"
+                          onClick={() => handleSaveRow(index)}
+                          disabled={isFieldSaving['training']}
+                          className="w-[150px] bg-supperagent text-white hover:bg-supperagent/90"
+                        >
+                          Save
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 );
               })}
             </div>
           ) : (
-            <p className="col-span-full text-sm text-gray-500 italic">
+            <p className="col-span-full text-sm italic text-gray-500">
               No trainings assigned yet. Click "Add Training" to begin.
             </p>
           )}

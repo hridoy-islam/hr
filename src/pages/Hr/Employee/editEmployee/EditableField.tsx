@@ -6,13 +6,23 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2, Check, Pencil } from 'lucide-react';
 import Select from 'react-select';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
+import moment from 'moment';
 
 
 interface EditableFieldProps {
   id: string;
   label: string;
   value: string | number | boolean | string[];
-  type?: 'text' | 'number' | 'date' | 'email' | 'textarea' | 'select' | 'checkbox';
+  type?:
+    | 'text'
+    | 'number'
+    | 'date'
+    | 'email'
+    | 'textarea'
+    | 'select'
+    | 'checkbox';
   options?: { value: string; label: string }[];
   isSaving?: boolean;
   required?: boolean;
@@ -22,7 +32,7 @@ interface EditableFieldProps {
   maxLength?: number;
   max?: string;
   rows?: number;
-  multiple?:boolean
+  multiple?: boolean;
 }
 
 export const EditableField: React.FC<EditableFieldProps> = ({
@@ -75,7 +85,9 @@ export const EditableField: React.FC<EditableFieldProps> = ({
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
     setFieldValue(e.target.value);
   };
 
@@ -93,47 +105,78 @@ export const EditableField: React.FC<EditableFieldProps> = ({
   if (type === 'checkbox') {
     return (
       <div className={`flex items-center space-x-2 ${className}`}>
-        <Checkbox 
-          id={id} 
-          checked={fieldValue as boolean} 
+        <Checkbox
+          id={id}
+          checked={fieldValue as boolean}
           onCheckedChange={handleCheckboxChange}
           disabled={isSaving}
         />
-        <Label 
-          htmlFor={id}
-          className={`${isSaving ? 'opacity-70' : ''}`}
-        >
+        <Label htmlFor={id} className={`${isSaving ? 'opacity-70' : ''}`}>
           {label}
-          {isSaving && <Loader2 className="ml-2 h-3 w-3 inline animate-spin" />}
+          {isSaving && <Loader2 className="ml-2 inline h-3 w-3 animate-spin" />}
         </Label>
       </div>
     );
   }
 
+  if (type === 'date') {
+  return (
+    <div className={`space-y-2 ${className}`}>
+      <div className="flex items-center justify-between">
+        <Label htmlFor={id}>
+          {label}
+          {required && <span className="ml-1 text-red-500">*</span>}
+        </Label>
+        {isSaving && <Loader2 className="h-3 w-3 animate-spin text-gray-500" />}
+      </div>
+
+      <div className="relative">
+        <DatePicker
+          selected={fieldValue ? moment(fieldValue, 'DD-MM-YYYY').toDate() : null}
+          onChange={(date: Date | null) => {
+            const formatted = date ? moment(date).format('DD-MM-YYYY') : '';
+            setFieldValue(formatted);
+            onUpdate(formatted);
+          }}
+          dateFormat="dd-MM-yyyy"
+          placeholderText="DD-MM-YYYY"
+          className="w-full p-2  rounded text-sm"
+          wrapperClassName='w-full'
+          disabled={isSaving}
+        />
+      </div>
+    </div>
+  );
+}
+
   if (type === 'select') {
     const isMulti = !!multiple;
-  
+
     // Format options for react-select
     const formattedOptions = options.map((opt) => ({
       label: opt.label,
-      value: opt.value,
+      value: opt.value
     }));
-  
+
     // Format value for react-select
     const selectValue = isMulti
-      ? formattedOptions.filter((opt) => Array.isArray(fieldValue) && fieldValue.includes(opt.value))
+      ? formattedOptions.filter(
+          (opt) => Array.isArray(fieldValue) && fieldValue.includes(opt.value)
+        )
       : formattedOptions.find((opt) => opt.value === fieldValue) || null;
-  
+
     return (
       <div className={`space-y-2 ${className}`}>
         <div className="flex items-center justify-between">
           <Label htmlFor={id}>
             {label}
-            {required && <span className="text-red-500 ml-1">*</span>}
+            {required && <span className="ml-1 text-red-500">*</span>}
           </Label>
-          {isSaving && <Loader2 className="h-3 w-3 animate-spin text-gray-500" />}
+          {isSaving && (
+            <Loader2 className="h-3 w-3 animate-spin text-gray-500" />
+          )}
         </div>
-  
+
         {isEditing ? (
           <Select
             inputId={id}
@@ -155,33 +198,37 @@ export const EditableField: React.FC<EditableFieldProps> = ({
           />
         ) : (
           <div
-            className="p-2 border border-transparent rounded-md hover:bg-gray-50 hover:border-gray-200 cursor-pointer transition-all min-h-[38px] flex items-center"
+            className="flex min-h-[38px] cursor-pointer items-center rounded-md border border-transparent p-2 transition-all hover:border-gray-200 hover:bg-gray-50"
             onClick={() => setIsEditing(true)}
           >
-
-           <span className={`${!fieldValue || (Array.isArray(fieldValue) && fieldValue.length === 0) ? 'text-gray-400 italic' : ''}`}>
-  {Array.isArray(fieldValue)
-    ? fieldValue.length === 0
-      ? 'Click to select'
-      : fieldValue
-          .map((val) => options.find((opt) => opt.value === val)?.label || val)
-          .join(', ')
-    : options.find((opt) => opt.value === fieldValue)?.label || 'Click to select'}
-</span>
-
-
+            <span
+              className={`${!fieldValue || (Array.isArray(fieldValue) && fieldValue.length === 0) ? 'italic text-gray-400' : ''}`}
+            >
+              {Array.isArray(fieldValue)
+                ? fieldValue.length === 0
+                  ? 'Click to select'
+                  : fieldValue
+                      .map(
+                        (val) =>
+                          options.find((opt) => opt.value === val)?.label || val
+                      )
+                      .join(', ')
+                : options.find((opt) => opt.value === fieldValue)?.label ||
+                  'Click to select'}
+            </span>
           </div>
         )}
       </div>
     );
   }
 
-  
-
   return (
     <div className={`space-y-2 ${className}`}>
       <div className="flex items-center justify-between">
-        <Label htmlFor={id}>{label}{required && <span className="text-red-500 ml-1">*</span>}</Label>
+        <Label htmlFor={id}>
+          {label}
+          {required && <span className="ml-1 text-red-500">*</span>}
+        </Label>
         {/* {isEditing ? (
           isSaving ? (
             <Loader2 className="h-3 w-3 animate-spin text-gray-500" />
@@ -195,7 +242,7 @@ export const EditableField: React.FC<EditableFieldProps> = ({
           />
         )} */}
       </div>
-      
+
       {isEditing ? (
         type === 'textarea' ? (
           <Textarea
@@ -230,14 +277,14 @@ export const EditableField: React.FC<EditableFieldProps> = ({
           />
         )
       ) : (
-        <div 
-          className="p-2 border border-transparent rounded-md hover:bg-gray-50 hover:border-gray-200 cursor-pointer transition-all min-h-[38px] flex items-center"
+        <div
+          className="flex min-h-[38px] cursor-pointer items-center rounded-md border border-transparent p-2 transition-all hover:border-gray-200 hover:bg-gray-50"
           onClick={() => setIsEditing(true)}
         >
           {type === 'checkbox' ? (
             <span>{(fieldValue as boolean) ? 'Yes' : 'No'}</span>
           ) : (
-            <span className={`${!fieldValue ? 'text-gray-400 italic' : ''}`}>
+            <span className={`${!fieldValue ? 'italic text-gray-400' : ''}`}>
               {fieldValue || 'Click to edit'}
             </span>
           )}

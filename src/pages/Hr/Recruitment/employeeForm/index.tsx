@@ -31,7 +31,7 @@ function EmployeeForm() {
 
   const fetchData = async () => {
     try {
-      const [designationRes, trainingRes, departmentRes] = await Promise.all([
+      const [designationRes, departmentRes] = await Promise.all([
         axiosInstance('/hr/designation'),
         // axiosInstance('/hr/training'),
         axiosInstance('/hr/department')
@@ -86,7 +86,7 @@ function EmployeeForm() {
   };
 
 
-  console.log(trainings)
+  console.log(departments)
 
   const renderStep = () => {
     switch (step) {

@@ -153,18 +153,7 @@ const EmploymentDetailsTab: React.FC<EmploymentDetailsTabProps> = ({
             isSaving={isFieldSaving['carTravelAllowance']}
           />
 
-          <EditableField
-            id="recruitmentEmploymentType"
-            label="Recruitment Employment Type"
-            value={formData.recruitmentEmploymentType}
-            type="select"
-            options={recruitmentEmploymentTypeOptions}
-            onUpdate={(value) =>
-              onSelectChange('recruitmentEmploymentType', value)
-            }
-            isSaving={isFieldSaving['recruitmentEmploymentType']}
-          />
-
+        
           <EditableField
             id="area"
             label="Area"

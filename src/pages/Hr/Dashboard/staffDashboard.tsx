@@ -304,7 +304,43 @@ const StaffDashboardPage = () => {
             Welcome back, {user?.name || 'Staff'}!
           </h1>
         </div>
-
+{/* Notices */}
+        <div className="rounded-xl border border-gray-200 bg-white shadow-lg pb-4">
+          <div className="border-b border-gray-200 p-6">
+            <h3 className="flex items-center text-lg font-semibold text-gray-900">
+              <Bell className="mr-2 h-5 w-5 text-blue-600" />
+              Latest Notices
+              
+            </h3>
+          </div>
+          <div className="p-6">
+            {notices.length === 0 ? (
+              <p className="text-sm text-gray-500">No notices available.</p>
+            ) : (
+              <div className="space-y-4">
+                {notices.map((notice) => (
+                  <div
+                    key={notice._id}
+                    className="rounded-r-lg border-l-4 border-l-blue-500 bg-blue-50 py-4 pl-4 pr-4"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-gray-900">{notice.title}</h4>
+                        <p className="mb-3 mt-1 text-sm text-gray-600">{notice.content}</p>
+                        <div className="flex items-center space-x-4 text-xs text-gray-500">
+                          <span className="flex items-center">
+                            <Calendar className="mr-1 h-3 w-3" />
+                            {formatDate(notice.date)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
         {/* Overview Cards */}
         <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
           {/* Attendance */}
@@ -473,43 +509,7 @@ const StaffDashboardPage = () => {
           </div>
         </div>
 
-        {/* Notices */}
-        <div className="rounded-xl border border-gray-200 bg-white shadow-lg">
-          <div className="border-b border-gray-200 p-6">
-            <h3 className="flex items-center text-lg font-semibold text-gray-900">
-              <Bell className="mr-2 h-5 w-5 text-blue-600" />
-              Latest Notices
-              
-            </h3>
-          </div>
-          <div className="p-6">
-            {notices.length === 0 ? (
-              <p className="text-sm text-gray-500">No notices available.</p>
-            ) : (
-              <div className="space-y-4">
-                {notices.map((notice) => (
-                  <div
-                    key={notice._id}
-                    className="rounded-r-lg border-l-4 border-l-blue-500 bg-blue-50 py-4 pl-4 pr-4"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <h4 className="font-semibold text-gray-900">{notice.title}</h4>
-                        <p className="mb-3 mt-1 text-sm text-gray-600">{notice.content}</p>
-                        <div className="flex items-center space-x-4 text-xs text-gray-500">
-                          <span className="flex items-center">
-                            <Calendar className="mr-1 h-3 w-3" />
-                            {formatDate(notice.date)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
+        
       </div>
     </div>
   );
