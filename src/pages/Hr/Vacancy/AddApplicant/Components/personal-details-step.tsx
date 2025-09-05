@@ -20,10 +20,12 @@ import { CalendarIcon, Camera } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import { ImageUploader } from '@/components/shared/image-uploader';
 import { useParams } from 'react-router-dom';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
 import moment from 'moment';
 
 const personalDetailsSchema = z.object({
-  profilePictureUrl: z.string().url().optional(),
+  image: z.string().url().optional(),
   title: z.string().min(1, { message: 'Please select a title' }),
   firstName: z.string().min(1, { message: 'First name is required' }),
   initial: z.string().optional(),
@@ -34,7 +36,9 @@ const personalDetailsSchema = z.object({
   nhsNumber: z.string().optional(),
 
   passportNo: z.string().min(1, { message: 'Passport number is required' }),
-  passportExpiry: z.date({ required_error: 'Passport expiry date is required' }),
+  passportExpiry: z.date({
+    required_error: 'Passport expiry date is required'
+  }),
 
   applicationDate: z.date({ required_error: 'Application date is required' }),
   availableFromDate: z.date({
@@ -86,12 +90,15 @@ export function PersonalDetailsStep({
       employmentType: defaultValues?.employmentType || '',
       position: defaultValues?.position || '',
       source: defaultValues?.source || '',
-      branch: defaultValues?.branch || ''
+      branch: defaultValues?.branch || '',
+      passportNo: defaultValues?.passportNo || '',
+      passportExpiry: defaultValues?.passportExpiry || undefined,
+      image: defaultValues?.image || undefined
     }
   });
 
   function onSubmit(data: PersonalDetailsData) {
-    data.profilePictureUrl = photoFile
+    data.imgae = photoFile
       ? URL.createObjectURL(photoFile)
       : undefined;
     onSaveAndContinue(data);
@@ -100,7 +107,7 @@ export function PersonalDetailsStep({
 
   function handleSave() {
     const data = form.getValues() as PersonalDetailsData;
-    data.profilePictureUrl = photoFile
+    data.imgae = photoFile
       ? URL.createObjectURL(photoFile)
       : undefined;
     onSave(data);
@@ -147,8 +154,8 @@ export function PersonalDetailsStep({
               <div className="relative h-48 w-48 overflow-hidden">
                 <img
                   src={
-                    profileData?.imageUrl ||
-                    'https://kzmjkvje8tr2ra724fhh.lite.vusercontent.net/placeholder.svg'
+                    profileData?.image ||
+                    '/user.png'
                   }
                   alt={`${user?.name}`}
                   className="h-full w-full object-contain"
@@ -243,17 +250,17 @@ export function PersonalDetailsStep({
                   <FormItem>
                     <FormLabel>Date of Birth</FormLabel>
                     <FormControl>
-                      <Input
-                        {...field}
-                        type="date"
-                        value={
-                          field.value
-                            ? moment(field.value).format('YYYY-MM-DD')
-                            : ''
-                        }
-                        onChange={(e) =>
-                          field.onChange(new Date(e.target.value))
-                        }
+                      <DatePicker
+                        selected={field.value ? new Date(field.value) : null}
+                        onChange={(date: Date) => field.onChange(date)}
+                        dateFormat="dd-MM-yyyy" // Display format
+                        placeholderText="Select date of birth"
+                        className="mt-1 w-full rounded-md border border-gray-300 px-3 py-1 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                        showMonthDropdown
+                        showYearDropdown
+                        dropdownMode="select"
+                        isClearable
+                        wrapperClassName="w-full"
                       />
                     </FormControl>
                     <FormMessage />
@@ -294,40 +301,43 @@ export function PersonalDetailsStep({
               />
 
               <FormField
-  control={form.control}
-  name="passportNo"
-  render={({ field }) => (
-    <FormItem>
-      <FormLabel>Passport Number</FormLabel>
-      <FormControl>
-        <Input {...field} />
-      </FormControl>
-      <FormMessage />
-    </FormItem>
-  )}
-/>
+                control={form.control}
+                name="passportNo"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Passport Number</FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-<FormField
-  control={form.control}
-  name="passportExpiry"
-  render={({ field }) => (
-    <FormItem>
-      <FormLabel>Passport Expiry Date</FormLabel>
-      <FormControl>
-        <Input
-          {...field}
-          type="date"
-          value={
-            field.value ? moment(field.value).format('YYYY-MM-DD') : ''
-          }
-          onChange={(e) => field.onChange(new Date(e.target.value))}
-        />
-      </FormControl>
-      <FormMessage />
-    </FormItem>
-  )}
-/>
-
+              <FormField
+                control={form.control}
+                name="passportExpiry"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Passport Expiry Date</FormLabel>
+                    <FormControl>
+                      <DatePicker
+                        selected={field.value ? new Date(field.value) : null}
+                        onChange={(date: Date) => field.onChange(date)}
+                        dateFormat="dd-MM-yyyy"
+                        placeholderText="Select passport expiry"
+                        className="mt-1 w-full rounded-md border border-gray-300 px-3 py-1 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                        showMonthDropdown
+                        showYearDropdown
+                        dropdownMode="select"
+                        isClearable
+                        wrapperClassName="w-full"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
 
             {/* Application Details */}
@@ -340,17 +350,17 @@ export function PersonalDetailsStep({
                   <FormItem>
                     <FormLabel>Application Date</FormLabel>
                     <FormControl>
-                      <Input
-                        {...field}
-                        type="date"
-                        value={
-                          field.value
-                            ? moment(field.value).format('YYYY-MM-DD')
-                            : ''
-                        }
-                        onChange={(e) =>
-                          field.onChange(new Date(e.target.value))
-                        }
+                      <DatePicker
+                        selected={field.value ? new Date(field.value) : null}
+                        onChange={(date: Date) => field.onChange(date)}
+                        dateFormat="dd-MM-yyyy"
+                        placeholderText="Select application date"
+                        className="mt-1 w-full rounded-md border border-gray-300 px-3 py-1 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                        showMonthDropdown
+                        showYearDropdown
+                        dropdownMode="select"
+                        wrapperClassName="w-full"
+                        isClearable
                       />
                     </FormControl>
                     <FormMessage />
@@ -365,17 +375,17 @@ export function PersonalDetailsStep({
                   <FormItem>
                     <FormLabel>Available From Date</FormLabel>
                     <FormControl>
-                      <Input
-                        {...field}
-                        type="date"
-                        value={
-                          field.value
-                            ? moment(field.value).format('YYYY-MM-DD')
-                            : ''
-                        }
-                        onChange={(e) =>
-                          field.onChange(new Date(e.target.value))
-                        }
+                      <DatePicker
+                        selected={field.value ? new Date(field.value) : null}
+                        onChange={(date: Date) => field.onChange(date)}
+                        dateFormat="dd-MM-yyyy"
+                        placeholderText="Select available from date"
+                        className="mt-1 w-full rounded-md border border-gray-300 px-3 py-1 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                        showMonthDropdown
+                        showYearDropdown
+                        dropdownMode="select"
+                        isClearable
+                        wrapperClassName="w-full"
                       />
                     </FormControl>
                     <FormMessage />

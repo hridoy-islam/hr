@@ -14,7 +14,7 @@ import NoticeBoard from '@/pages/Hr/NoticeBoard';
 import Vacancy from '@/pages/Hr/Vacancy';
 import Profile from '@/pages/Hr/Profile';
 import Holiday from '@/pages/Hr/Holidays';
-import MyStuff from '@/pages/Hr/MyStuff';
+import MyStaff from '@/pages/Hr/MyStaff';
 import Employee from '@/pages/Hr/Employee';
 import Attendance from '@/pages/Hr/Attendance';
 import PayRoll from '@/pages/Hr/Payroll';
@@ -116,8 +116,8 @@ export default function AppRouter() {
               element: <Holiday />
             },
             {
-              path: 'my-stuff',
-              element: <MyStuff />
+              path: 'my-staff',
+              element: <MyStaff />
             },
             {
               path: 'employee',

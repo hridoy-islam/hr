@@ -10,7 +10,6 @@ import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import moment from 'moment';
 
-
 interface EditableFieldProps {
   id: string;
   label: string;
@@ -120,34 +119,40 @@ export const EditableField: React.FC<EditableFieldProps> = ({
   }
 
   if (type === 'date') {
-  return (
-    <div className={`space-y-2 ${className}`}>
-      <div className="flex items-center justify-between">
-        <Label htmlFor={id}>
-          {label}
-          {required && <span className="ml-1 text-red-500">*</span>}
-        </Label>
-        {isSaving && <Loader2 className="h-3 w-3 animate-spin text-gray-500" />}
-      </div>
+    return (
+      <div className={`space-y-2 ${className}`}>
+        <div className="flex items-center justify-between">
+          <Label htmlFor={id}>
+            {label}
+            {required && <span className="ml-1 text-red-500">*</span>}
+          </Label>
+          {isSaving && (
+            <Loader2 className="h-3 w-3 animate-spin text-gray-500" />
+          )}
+        </div>
 
-      <div className="relative">
-        <DatePicker
-          selected={fieldValue ? moment(fieldValue, 'DD-MM-YYYY').toDate() : null}
-          onChange={(date: Date | null) => {
-            const formatted = date ? moment(date).format('DD-MM-YYYY') : '';
-            setFieldValue(formatted);
-            onUpdate(formatted);
-          }}
-          dateFormat="dd-MM-yyyy"
-          placeholderText="DD-MM-YYYY"
-          className="w-full p-2  rounded text-sm"
-          wrapperClassName='w-full'
-          disabled={isSaving}
-        />
+        <div className="relative">
+          <DatePicker
+            selected={
+              fieldValue ? moment(fieldValue, 'YYYY-MM-DD').toDate() : null
+            } // ✅ consistent
+            onChange={(date: Date | null) => {
+              const formatted = date ? moment(date).format('YYYY-MM-DD') : null;
+              setFieldValue(formatted);
+              onUpdate(formatted);
+            }}
+            dateFormat="dd-MM-yyyy"
+            placeholderText="DD-MM-YYYY"
+            dropdownMode="select"
+            showYearDropdown
+            showMonthDropdown
+            className="w-full rounded p-2 text-sm"
+            wrapperClassName="w-full"
+          />
+        </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
 
   if (type === 'select') {
     const isMulti = !!multiple;

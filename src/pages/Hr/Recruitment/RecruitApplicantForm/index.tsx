@@ -144,6 +144,7 @@ const RecruitApplicantForm = () => {
             defaultValues={formData.GeneralInformation}
             onSaveAndContinue={handleGeneralInformationSaveAndContinue}
             onSave={handleGeneralInformationSave}
+                    applicantData={applicant}
           />
         );
       case 2:

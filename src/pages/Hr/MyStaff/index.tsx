@@ -42,7 +42,7 @@ interface Appraisal {
   lastReview: string;
 }
 
-const MyStuff = () => {
+const MyStaff = () => {
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
     type: 'approve' | 'reject';
@@ -207,7 +207,7 @@ const MyStuff = () => {
       <div className="">
         {/* Header */}
         
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">My Stuff</h1>
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">My Staff</h1>
     
 
         {/* Cards Grid */}
@@ -468,4 +468,4 @@ const MyStuff = () => {
   );
 };
 
-export default MyStuff;
+export default MyStaff;

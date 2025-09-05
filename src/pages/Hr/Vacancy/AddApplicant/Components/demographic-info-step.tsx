@@ -68,10 +68,9 @@ export function DemographicInfoStep({
       gender: defaultValues?.gender || '', // Default gender is 'Male'
       maritalStatus: defaultValues?.maritalStatus || '', // Default marital status is 'Single'
       ethnicOrigin: defaultValues?.ethnicOrigin || '', // Default ethnic origin is empty
-      hasDisability: defaultValues?.hasDisability || undefined, // Default for disability is false
+      hasDisability: defaultValues?.hasDisability ?? false, // Default for disability is false
       disabilityDetails: defaultValues?.disabilityDetails || '', // Default disability details are empty
-      needsReasonableAdjustment:
-        defaultValues?.needsReasonableAdjustment || undefined, // Default for adjustment is false
+      needsReasonableAdjustment: defaultValues?.needsReasonableAdjustment ?? false, // Default for adjustment is false
       reasonableAdjustmentDetails:
         defaultValues?.reasonableAdjustmentDetails || '' // Default adjustment details are empty
     }
@@ -172,17 +171,19 @@ export function DemographicInfoStep({
               control={form.control}
               name="ethnicOrigin"
               render={({ field }) => (
-                <FormItem className='-mt-2.5'>
+                <FormItem className="-mt-2.5">
                   <FormLabel>Ethnic Origin</FormLabel>
                   <FormControl>
-                    <Textarea className='border-gray-300' {...field} placeholder="Ethnic background" />
+                    <Textarea
+                      className="border-gray-300"
+                      {...field}
+                      placeholder="Ethnic background"
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-
-         
 
             {/* 1) Disability toggle */}
             <FormField
@@ -216,7 +217,11 @@ export function DemographicInfoStep({
                   <FormItem>
                     <FormLabel>Disability Details</FormLabel>
                     <FormControl>
-                      <Textarea className='border-gray-300'  {...field} placeholder="If yes, please specify" />
+                      <Textarea
+                        className="border-gray-300"
+                        {...field}
+                        placeholder="If yes, please specify"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -255,7 +260,11 @@ export function DemographicInfoStep({
                   <FormItem>
                     <FormLabel>Adjustment Details</FormLabel>
                     <FormControl>
-                      <Textarea className='border-gray-300' {...field} placeholder="If yes, please specify" />
+                      <Textarea
+                        className="border-gray-300"
+                        {...field}
+                        placeholder="If yes, please specify"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

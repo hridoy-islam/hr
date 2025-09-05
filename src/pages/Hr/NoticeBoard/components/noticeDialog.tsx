@@ -61,9 +61,9 @@ export function NoticeDialog({
     setIsLoading(true);
     try {
       const [deptRes, desigRes, usersRes] = await Promise.all([
-        axiosInstance.get('/hr/department'),
-        axiosInstance.get('/hr/designation'),
-        axiosInstance.get('/users')
+        axiosInstance.get('/hr/department?limit=all'),
+        axiosInstance.get('/hr/designation?limit=all'),
+        axiosInstance.get('/users?limit=all')
       ]);
 
       setDepartmentOptions(
@@ -91,44 +91,84 @@ export function NoticeDialog({
     }
   };
 
-useEffect(() => {
-  if (initialData && departmentOptions.length && designationOptions.length && userOptions.length) {
-    setNoticeType(
-      noticeTypeOptions.find((o) => o.value === initialData.noticeType) || null
-    );
-    setNoticeDescription(initialData.noticeDescription || '');
-    setNoticeSetting(
-      noticeSettingOptions.find((o) => o.value === initialData.noticeSetting) || null
-    );
+  // Helper function to extract ID from object or string
+  const extractId = (item: any) => {
+    return typeof item === 'object' && item !== null ? item._id || item.value : item;
+  };
 
-    setDepartment(
-      initialData.department?.map((id: string) => 
-        departmentOptions.find(d => d.value === id) || null
-      ) || []
-    );
+  useEffect(() => {
+    if (
+      initialData &&
+      open &&
+      departmentOptions.length > 0 &&
+      designationOptions.length > 0 &&
+      userOptions.length > 0
+    ) {
+      console.log('Initial Data:', initialData); // Debug log
 
-    setDesignation(
-      initialData.designation?.map((id: string) => 
-        designationOptions.find(d => d.value === id) || null
-      ) || []
-    );
+      // Notice Type
+      setNoticeType(
+        noticeTypeOptions.find((o) => o.value === initialData.noticeType) || null
+      );
 
-    setUsers(
-      initialData.users?.map((id: string) => 
-        userOptions.find(u => u.value === id) || null
-      ) || []
-    );
-  } else if (!open) {
-    // Reset form when closing
-    setNoticeType(null);
-    setNoticeDescription('');
-    setNoticeSetting(null);
-    setDepartment([]);
-    setDesignation([]);
-    setUsers([]);
-  }
-}, [initialData, open, departmentOptions, designationOptions, userOptions]);
+      // Notice Description
+      setNoticeDescription(initialData.noticeDescription || '');
 
+      // Notice Setting
+      setNoticeSetting(
+        noticeSettingOptions.find((o) => o.value === initialData.noticeSetting) || null
+      );
+
+      // Departments - handle both populated objects and IDs
+      if (initialData.department && Array.isArray(initialData.department)) {
+        const selectedDepartments = initialData.department
+          .map((item: any) => {
+            const id = extractId(item);
+            return departmentOptions.find((d) => d.value === id);
+          })
+          .filter(Boolean); // Remove undefined values
+        
+        console.log('Selected Departments:', selectedDepartments);
+        setDepartment(selectedDepartments);
+      }
+
+      // Designations - handle both populated objects and IDs
+      if (initialData.designation && Array.isArray(initialData.designation)) {
+        const selectedDesignations = initialData.designation
+          .map((item: any) => {
+            const id = extractId(item);
+            return designationOptions.find((d) => d.value === id);
+          })
+          .filter(Boolean); // Remove undefined values
+        
+        console.log('Selected Designations:', selectedDesignations);
+        setDesignation(selectedDesignations);
+      }
+
+      // Users - handle both populated objects and IDs
+      if (initialData.users && Array.isArray(initialData.users)) {
+        const selectedUsers = initialData.users
+          .map((item: any) => {
+            const id = extractId(item);
+            return userOptions.find((u) => u.value === id);
+          })
+          .filter(Boolean); // Remove undefined values
+        
+        console.log('Selected Users:', selectedUsers);
+        setUsers(selectedUsers);
+      }
+    }
+
+    // Reset on close
+    if (!open) {
+      setNoticeType(null);
+      setNoticeDescription('');
+      setNoticeSetting(null);
+      setDepartment([]);
+      setDesignation([]);
+      setUsers([]);
+    }
+  }, [initialData, open, departmentOptions, designationOptions, userOptions]);
 
   const handleNoticeSettingChange = (selectedOption: any) => {
     setNoticeSetting(selectedOption);

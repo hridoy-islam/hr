@@ -146,7 +146,7 @@ export default function Shift() {
       <div className="rounded-md bg-white p-4 shadow">
         {initialLoading ? (
           <div className="flex justify-center py-6">
-            <BlinkingDots size="large" color="bg-primary" />
+            <BlinkingDots size="large" color="bg-supperagent" />
           </div>
         ) : shifts.length === 0 ? (
           <div className="flex justify-center py-6 text-gray-500">

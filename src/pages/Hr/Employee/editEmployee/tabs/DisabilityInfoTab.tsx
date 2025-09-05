@@ -19,12 +19,22 @@ const DisabilityInfoTab: React.FC<DisabilityInfoTabProps> = ({
     <Card>
       <CardContent className="pt-6">
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          {/* Has Disability as Select */}
           <EditableField
             id="hasDisability"
             label="Has Disability"
+            type="select"
+            options={[
+              { label: 'Yes', value: true },
+              { label: 'No', value: false }
+            ]}
             value={formData.hasDisability}
-            type="checkbox"
-            onUpdate={(checked) => onCheckboxChange('hasDisability', checked)}
+            onUpdate={(value: string | boolean) =>
+              onCheckboxChange(
+                'hasDisability',
+                value === 'true' || value === true
+              )
+            }
             isSaving={isFieldSaving['hasDisability']}
           />
 
@@ -38,12 +48,22 @@ const DisabilityInfoTab: React.FC<DisabilityInfoTabProps> = ({
             />
           )}
 
+          {/* Needs Reasonable Adjustment as Select */}
           <EditableField
             id="needsReasonableAdjustment"
             label="Needs Reasonable Adjustment"
+            type="select"
+            options={[
+              { label: 'Yes', value: true },
+              { label: 'No', value: false }
+            ]}
             value={formData.needsReasonableAdjustment}
-            type="checkbox"
-            onUpdate={(checked) => onCheckboxChange('needsReasonableAdjustment', checked)}
+            onUpdate={(value: string | boolean) =>
+              onCheckboxChange(
+                'needsReasonableAdjustment',
+                value === 'true' || value === true
+              )
+            }
             isSaving={isFieldSaving['needsReasonableAdjustment']}
           />
 
@@ -52,7 +72,9 @@ const DisabilityInfoTab: React.FC<DisabilityInfoTabProps> = ({
               id="reasonableAdjustmentDetails"
               label="Adjustment Details"
               value={formData.reasonableAdjustmentDetails}
-              onUpdate={(value) => onUpdate('reasonableAdjustmentDetails', value)}
+              onUpdate={(value) =>
+                onUpdate('reasonableAdjustmentDetails', value)
+              }
               isSaving={isFieldSaving['reasonableAdjustmentDetails']}
             />
           )}

@@ -20,6 +20,10 @@ import { Button } from '@/components/ui/button';
 import { MoveLeft } from 'lucide-react';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
+
+
 
 type Inputs = {
   title: string;
@@ -160,15 +164,26 @@ export default function CreateVacancy() {
             </div>
 
             {/* Application Deadline */}
-            <div>
+             <div >
               <Label htmlFor="applicationDeadline">Application Deadline</Label>
-              <Input
-                type="date"
-                id="applicationDeadline"
-                {...register('applicationDeadline', {
-                  required: 'Application deadline is required'
-                })}
-                className="mt-1"
+              <Controller
+                control={control}
+                name="applicationDeadline"
+                rules={{ required: 'Application deadline is required' }}
+                render={({ field }) => (
+                  <DatePicker
+                    selected={field.value}
+                    onChange={(date: Date) => field.onChange(date)}
+                     dateFormat="dd-MM-yyyy"
+                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-1 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                    placeholderText="Select application deadline"
+                    wrapperClassName='w-full'
+                    showMonthDropdown
+                    showYearDropdown
+                    dropdownMode="select"
+                    isClearable
+                  />
+                )}
               />
               <ErrorMessage
                 message={errors.applicationDeadline?.message?.toString()}

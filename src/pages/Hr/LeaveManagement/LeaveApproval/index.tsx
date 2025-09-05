@@ -77,13 +77,13 @@ const LeaveApprovalPage: React.FC = () => {
     null
   );
 
-const radioRefs = useRef<{
-  paid: HTMLInputElement | null;
-  unpaid: HTMLInputElement | null;
-}>({
-  paid: null,
-  unpaid: null,
-});
+  const radioRefs = useRef<{
+    paid: HTMLInputElement | null;
+    unpaid: HTMLInputElement | null;
+  }>({
+    paid: null,
+    unpaid: null
+  });
   const { toast } = useToast();
 
   useEffect(() => {
@@ -103,31 +103,31 @@ const radioRefs = useRef<{
     fetchLeaveRequests();
   }, []);
 
- const handleIndividualAction = async (
-  id: string,
-  status: 'approved' | 'rejected',
-  leaveType?: 'paid' | 'unpaid'  // Optional, but used when approving
-) => {
-  try {
-    const payload: any = { status };
+  const handleIndividualAction = async (
+    id: string,
+    status: 'approved' | 'rejected',
+    leaveType?: 'paid' | 'unpaid' // Optional, but used when approving
+  ) => {
+    try {
+      const payload: any = { status };
 
-    // Only send leaveType if it's an approval
-    if (status === 'approved' && leaveType) {
-      payload.leaveType = leaveType; // e.g., "paid" or "unpaid"
+      // Only send leaveType if it's an approval
+      if (status === 'approved' && leaveType) {
+        payload.leaveType = leaveType; // e.g., "paid" or "unpaid"
+      }
+
+      const res = await axiosInstance.patch(`/hr/leave/${id}`, payload);
+      setLeaves((prev) => prev.filter((req) => req._id !== id));
+      toast({ title: 'Leave request updated successfully' });
+    } catch (err: any) {
+      console.error('Error updating leave status:', err);
+      toast({
+        title: 'Failed to update leave request',
+        description: err.response?.data?.message || 'Check console for details',
+        variant: 'destructive'
+      });
     }
-
-    const res = await axiosInstance.patch(`/hr/leave/${id}`, payload);
-    setLeaves((prev) => prev.filter((req) => req._id !== id));
-    toast({ title: 'Leave request updated successfully' });
-  } catch (err: any) {
-    console.error('Error updating leave status:', err);
-    toast({
-      title: 'Failed to update leave request',
-      description: err.response?.data?.message || 'Check console for details',
-      variant: 'destructive'
-    });
-  }
-};
+  };
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -151,111 +151,119 @@ const radioRefs = useRef<{
 
   // Tooltip  component
 
-// Enhanced LeaveTooltipContent with Leave Allowance
-const LeaveTooltipContent = ({ request }: { request: LeaveRequest }) => {
-  const [allowance, setAllowance] = useState<{
-    holidayAllowance: number;
-    usedHours: number;
-    remainingHours: number;
-    requestedHours: number;
-    holidayAccured: number;
-  } | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  // Enhanced LeaveTooltipContent with Leave Allowance
+  const LeaveTooltipContent = ({ request }: { request: LeaveRequest }) => {
+    const [allowance, setAllowance] = useState<{
+      holidayAllowance: number;
+      usedHours: number;
+      remainingHours: number;
+      requestedHours: number;
+      holidayAccured: number;
+    } | null>(null);
+    const [loading, setLoading] = useState<boolean>(true);
 
-  const currentYear = `${moment().format('YYYY')}-${moment().add(1, 'year').format('YYYY')}`; // Match your app's current year logic
+    const currentYear = `${moment().format('YYYY')}-${moment().add(1, 'year').format('YYYY')}`; // Match your app's current year logic
 
-  useEffect(() => {
-    const fetchAllowance = async () => {
-      if (!request.userId?._id) return;
-      try {
-        const res = await axiosInstance.get(
-          `/hr/holidays?userId=${request.userId._id}&year=${currentYear}`
-        );
-        const data = res.data.data?.result || res.data.data || res.data;
+    useEffect(() => {
+      const fetchAllowance = async () => {
+        if (!request.userId?._id) return;
+        try {
+          const res = await axiosInstance.get(
+            `/hr/holidays?userId=${request.userId._id}&year=${currentYear}`
+          );
+          const data = res.data.data?.result || res.data.data || res.data;
 
-        let record = null;
-        if (Array.isArray(data)) {
-          record = data.find((item: any) => item.year === currentYear);
-        } else if (data?.year === currentYear) {
-          record = data;
+          let record = null;
+          if (Array.isArray(data)) {
+            record = data.find((item: any) => item.year === currentYear);
+          } else if (data?.year === currentYear) {
+            record = data;
+          }
+
+          if (record) {
+            setAllowance({
+              holidayAllowance: record.holidayAllowance || 0,
+              usedHours: record.usedHours || 0,
+              remainingHours: record.remainingHours || 0,
+              requestedHours: record.requestedHours || 0,
+              holidayAccured: record.holidayAccured || 0
+            });
+          } else {
+            setAllowance({
+              holidayAllowance: 0,
+              usedHours: 0,
+              remainingHours: 0,
+              requestedHours: 0,
+              holidayAccured: 0
+            });
+          }
+        } catch (err) {
+          console.error('Failed to fetch leave allowance for tooltip:', err);
+        } finally {
+          setLoading(false);
         }
+      };
 
-        if (record) {
-          setAllowance({
-            holidayAllowance: record.holidayAllowance || 0,
-            usedHours: record.usedHours || 0,
-            remainingHours: record.remainingHours || 0,
-            requestedHours: record.requestedHours || 0,
-            holidayAccured: record.holidayAccured || 0
-          });
-        } else {
-          setAllowance({
-            holidayAllowance: 0,
-            usedHours: 0,
-            remainingHours: 0,
-            requestedHours: 0,
-            holidayAccured: 0
-          });
-        }
-      } catch (err) {
-        console.error('Failed to fetch leave allowance for tooltip:', err);
-       
-      } finally {
-        setLoading(false);
-      }
-    };
+      fetchAllowance();
+    }, [request.userId?._id]);
 
-    fetchAllowance();
-  }, [request.userId?._id]);
+    return (
+      <div className="max-w-xs space-y-3 rounded-lg bg-white p-3 shadow-lg">
+        {/* Employee Info */}
+        <div className="flex items-center space-x-2">
+          <User className="h-4 w-4 text-gray-500" />
+          <span className="font-semibold">
+            {request.userId?.firstName} {request.userId?.lastName}
+          </span>
+        </div>
 
-  return (
-    <div className="max-w-xs space-y-3 rounded-lg bg-white p-3 shadow-lg">
-      {/* Employee Info */}
-      <div className="flex items-center space-x-2">
-        <User className="h-4 w-4 text-gray-500" />
-        <span className="font-semibold">
-          {request.userId?.firstName} {request.userId?.lastName}
-        </span>
+        {/* Leave Allowance Section */}
+        <div className="space-y-2 rounded-md bg-blue-50 p-3 text-sm">
+          <h4 className="font-semibold text-blue-900">
+            Leave Allowance ({currentYear})
+          </h4>
+          {loading ? (
+            <div className="flex justify-center py-2">
+              <BlinkingDots size="small" color="bg-blue-600" />
+            </div>
+          ) : allowance ? (
+            <div className="space-y-1">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Opening:</span>
+                <span className="font-medium">
+                  {allowance.holidayAllowance.toFixed(1)} h
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Holiday Accured:</span>
+                <span className="font-medium">
+                  {allowance.holidayAccured.toFixed(1)} h
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Taken:</span>
+                <span className="font-medium text-green-600">
+                  {allowance.usedHours.toFixed(1)} h
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Requested:</span>
+                <span className="font-medium text-yellow-600">
+                  {allowance.requestedHours.toFixed(1)} h
+                </span>
+              </div>
+              <div className="flex justify-between border-t border-gray-300 pt-1 font-bold text-blue-600">
+                <span>Remaining:</span>
+                <span>{allowance.remainingHours.toFixed(1)} h</span>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center text-gray-500">No data</div>
+          )}
+        </div>
       </div>
-
-     
-      {/* Leave Allowance Section */}
-      <div className="space-y-2 rounded-md bg-blue-50 p-3 text-sm">
-        <h4 className="font-semibold text-blue-900">Leave Allowance ({currentYear})</h4>
-        {loading ? (
-          <div className="flex justify-center py-2">
-            <BlinkingDots size="small" color="bg-blue-600" />
-          </div>
-        ) : allowance ? (
-          <div className="space-y-1">
-            <div className="flex justify-between">
-              <span className="text-gray-600">Opening:</span>
-              <span className="font-medium">{allowance.holidayAllowance.toFixed(1)} h</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Holiday Accured:</span>
-              <span className="font-medium">{allowance.holidayAccured.toFixed(1)} h</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Taken:</span>
-              <span className="font-medium text-green-600">{allowance.usedHours.toFixed(1)} h</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Requested:</span>
-              <span className="font-medium text-yellow-600">{allowance.requestedHours.toFixed(1)} h</span>
-            </div>
-            <div className="flex justify-between border-t border-gray-300 pt-1 font-bold text-blue-600">
-              <span>Remaining:</span>
-              <span>{allowance.remainingHours.toFixed(1)} h</span>
-            </div>
-          </div>
-        ) : (
-          <div className="text-center text-gray-500">No data</div>
-        )}
-      </div>
-    </div>
-  );
-};
+    );
+  };
   const navigate = useNavigate();
   return (
     <TooltipProvider>
@@ -377,7 +385,6 @@ const LeaveTooltipContent = ({ request }: { request: LeaveRequest }) => {
                                 <TooltipTrigger asChild>
                                   <div className="cursor-pointer">
                                     {formatDate(request.startDate)}
-                                    
                                   </div>
                                 </TooltipTrigger>
                                 <TooltipContent
@@ -410,7 +417,7 @@ const LeaveTooltipContent = ({ request }: { request: LeaveRequest }) => {
                                 </TooltipContent>
                               </Tooltip>
                             </TableCell>
-                             <TableCell
+                            <TableCell
                               onClick={() =>
                                 navigate(
                                   `/admin/hr/employee/${request.userId._id}`
@@ -444,7 +451,6 @@ const LeaveTooltipContent = ({ request }: { request: LeaveRequest }) => {
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <div className="cursor-pointer">
-                                    
                                     <div className="text-sm text-gray-500">
                                       {request.reason}
                                     </div>
@@ -460,7 +466,6 @@ const LeaveTooltipContent = ({ request }: { request: LeaveRequest }) => {
                             </TableCell>
 
                             {/* Duration */}
-                           
 
                             {/* Status */}
                             <TableCell>
@@ -515,61 +520,70 @@ const LeaveTooltipContent = ({ request }: { request: LeaveRequest }) => {
             )}
 
             {/* Individual Approve Confirmation Modal */}
-           <Dialog open={showApproveConfirmModal} onOpenChange={setShowApproveConfirmModal}>
-  <DialogContent>
-    <DialogHeader>
-      <DialogTitle>Confirm Approval</DialogTitle>
-    </DialogHeader>
-    <p>How would you like to approve this leave request?</p>
+            <Dialog
+              open={showApproveConfirmModal}
+              onOpenChange={setShowApproveConfirmModal}
+            >
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Confirm Approval</DialogTitle>
+                </DialogHeader>
+                <p>How would you like to approve this leave request?</p>
 
-    {/* Radio Group for Paid vs Unpaid */}
-    <div className="mt-4 space-y-2">
-      <label className="flex items-center space-x-2">
-        <input
-          type="radio"
-          name="leaveType"
-          value="paid"
-          defaultChecked
-          className="w-4 h-4"
-          ref={(el) => (radioRefs.current.paid = el)}
-        />
-        <span>Authorized Paid Leave</span>
-      </label>
+                {/* Radio Group for Paid vs Unpaid */}
+                <div className="mt-4 space-y-2">
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      name="leaveType"
+                      value="paid"
+                      defaultChecked
+                      className="h-4 w-4"
+                      ref={(el) => (radioRefs.current.paid = el)}
+                    />
+                    <span>Authorized Paid Leave</span>
+                  </label>
 
-      <label className="flex items-center space-x-2">
-        <input
-          type="radio"
-          name="leaveType"
-          value="unpaid"
-          className="w-4 h-4"
-          ref={(el) => (radioRefs.current.unpaid = el)}
-        />
-        <span>Authorized Unpaid Leave</span>
-      </label>
-    </div>
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      name="leaveType"
+                      value="unpaid"
+                      className="h-4 w-4"
+                      ref={(el) => (radioRefs.current.unpaid = el)}
+                    />
+                    <span>Authorized Unpaid Leave</span>
+                  </label>
+                </div>
 
-    <DialogFooter className="mt-6">
-      <DialogClose asChild>
-        <Button variant="outline">Cancel</Button>
-      </DialogClose>
-      <Button
-        onClick={() => {
-          if (selectedRequestId) {
-            const leaveType =
-              radioRefs.current.unpaid?.checked === true ? 'unpaid' : 'paid';
+                <DialogFooter className="mt-6">
+                  <DialogClose asChild>
+                    <Button variant="outline">Cancel</Button>
+                  </DialogClose>
+                  <Button
+                    onClick={() => {
+                      if (selectedRequestId) {
+                        const leaveType =
+                          radioRefs.current.unpaid?.checked === true
+                            ? 'unpaid'
+                            : 'paid';
 
-            // Pass action with type
-            handleIndividualAction(selectedRequestId, 'approved', leaveType);
-          }
-          setShowApproveConfirmModal(false);
-        }}
-        className="bg-green-600 text-white hover:bg-green-700"
-      >
-        Confirm
-      </Button>
-    </DialogFooter>
-  </DialogContent>
-</Dialog>
+                        // Pass action with type
+                        handleIndividualAction(
+                          selectedRequestId,
+                          'approved',
+                          leaveType
+                        );
+                      }
+                      setShowApproveConfirmModal(false);
+                    }}
+                    className="bg-green-600 text-white hover:bg-green-700"
+                  >
+                    Confirm
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
 
             {/* Individual Reject Confirmation Modal */}
             <Dialog

@@ -261,9 +261,9 @@ const handleDownloadPDF = async (payroll: TPayroll) => {
 
   // Data for PDF
   const dataToPDF = {
-    firstName: user.firstName,
-    lastName: user.lastName,
-    name: user.name || `${user.firstName} ${user.lastName}`,
+    firstName: user?.firstName,
+    lastName: user?.lastName,
+    name: user?.name || `${user?.firstName} ${user?.lastName}`,
     employeeId: user.employeeId,
     department: user.departmentId?.departmentName || 'N/A',
     designation: user.designationId?.title || 'N/A',
@@ -445,7 +445,7 @@ const handleDownloadPDF = async (payroll: TPayroll) => {
               {error}
             </div>
           ) : payrollList.length === 0 ? (
-            <div className="rounded-lg bg-yellow-50 p-6 text-center text-gray-600">
+            <div className="rounded-lg p-6 text-center text-gray-600">
               No pending payroll requests found.
             </div>
           ) : (
@@ -469,19 +469,21 @@ const handleDownloadPDF = async (payroll: TPayroll) => {
                       className="hover:bg-gray-50"
                     >
                       <TableCell className="font-medium">
-                        {payroll.userId.name ||
-                          `${payroll.userId.firstName} ${payroll.userId.lastName}`}
+                        {payroll.userId
+    ? payroll.userId.name || `${payroll.userId.firstName} ${payroll.userId.lastName}`
+    : '—'}
                       </TableCell>
-                      <TableCell>
-                        {payroll.userId.departmentId?.departmentName ||
-                          payroll.userId.department ||
-                          '—'}
-                      </TableCell>
-                      <TableCell>
-                        {payroll.userId.designationId?.title ||
-                          payroll.userId.designation ||
-                          '—'}
-                      </TableCell>
+                     <TableCell>
+  {payroll.userId
+    ? payroll.userId.departmentId?.departmentName || payroll.userId.department || '—'
+    : '—'}
+</TableCell>
+
+<TableCell>
+  {payroll.userId
+    ? payroll.userId.designationId?.title || payroll.userId.designation || '—'
+    : '—'}
+</TableCell>
                       <TableCell>
                         {moment(payroll.fromDate).format('MMM DD')} -{' '}
                         {moment(payroll.toDate).format('MMM DD, YYYY')}

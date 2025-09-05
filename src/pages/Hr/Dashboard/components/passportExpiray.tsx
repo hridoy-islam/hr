@@ -1,69 +1,77 @@
-
-import { useState, useEffect } from "react"
-import { ArrowLeft, BadgeIcon as IdCard, Search, Download } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
-import { BlinkingDots } from "@/components/shared/blinking-dots"
-import { DynamicPagination } from "@/components/shared/DynamicPagination"
-import axiosInstance from "@/lib/axios"
-import { useNavigate } from "react-router-dom"
+import { useState, useEffect } from "react";
+import { ArrowLeft, BadgeIcon as IdCard, Search } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { BlinkingDots } from "@/components/shared/blinking-dots";
+import { DynamicPagination } from "@/components/shared/DynamicPagination";
+import axiosInstance from "@/lib/axios";
+import { useNavigate } from "react-router-dom";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 
 interface Employee {
-  _id: string
-  email: string
-  firstName: string
-  lastName: string
-  position: string
-  departmentId: { departmentName: string }
-  passportExpiry: {
-    hasExpiry: boolean
-    expiryDate: string
-  }
+  _id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  position: string;
+  departmentId: { departmentName: string };
+  passportExpiry: string;
 }
 
 const PassportExpiryPage = () => {
-  const navigate = useNavigate()
-  const [searchTerm, setSearchTerm] = useState("")
-  const [entriesPerPage, setEntriesPerPage] = useState(10)
-  const [currentPage, setCurrentPage] = useState(1)
-  const [loading, setLoading] = useState(true)
-  const [employees, setEmployees] = useState<Employee[]>([])
-  const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([])
+  const navigate = useNavigate();
+  const [searchTerm, setSearchTerm] = useState("");
+  const [entriesPerPage, setEntriesPerPage] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
+  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+  const [newExpiryDate, setNewExpiryDate] = useState<Date | null>(null);
+  const [updating, setUpdating] = useState(false);
 
   useEffect(() => {
     const fetchEmployees = async () => {
-      setLoading(true)
+      setLoading(true);
       try {
         const response = await axiosInstance.get("/users", {
-          params: {
-            role: "employee",
-            limit: "all",
-          },
-        })
+          params: { role: "employee", limit: "all", fields:"firstName lastName email passportExpiry departmentId designationId" },
+        });
+        const fetchedEmployees: Employee[] = response.data.data.result || response.data.data;
 
-        const fetchedEmployees: Employee[] = response.data.data.result || response.data.data
-
-        // Filter employees with expiring passports
         const expiringPassports = fetchedEmployees.filter(
-          (emp) =>
-            emp?.passportExpiry &&
-            (isExpiringSoon(emp.passportExpiry) || isExpired(emp.passportExpiry)),
-        )
+          (emp) => emp.passportExpiry && (isExpiringSoon(emp.passportExpiry) || isExpired(emp.passportExpiry))
+        );
 
-        setEmployees(expiringPassports)
-        setFilteredEmployees(expiringPassports)
+        setEmployees(expiringPassports);
+        setFilteredEmployees(expiringPassports);
       } catch (error) {
-        console.error("Failed to fetch employees:", error)
-        setEmployees([])
-        setFilteredEmployees([])
+        console.error("Failed to fetch employees:", error);
+        setEmployees([]);
+        setFilteredEmployees([]);
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
-    fetchEmployees()
-  }, [])
+    };
+    fetchEmployees();
+  }, []);
 
   useEffect(() => {
     const filtered = employees.filter(
@@ -71,86 +79,108 @@ const PassportExpiryPage = () => {
         emp.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         emp.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         emp.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        emp.departmentId?.departmentName.toLowerCase().includes(searchTerm.toLowerCase()),
-    )
-    setFilteredEmployees(filtered)
-    setCurrentPage(1)
-  }, [searchTerm, employees])
+        emp.departmentId?.departmentName.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    setFilteredEmployees(filtered);
+    setCurrentPage(1);
+  }, [searchTerm, employees]);
 
-  // Helper function to check if date is expiring within 30 days
   const isExpiringSoon = (dateString: string) => {
-    const expiryDate = new Date(dateString)
-    const today = new Date()
-    const thirtyDaysFromNow = new Date()
-    thirtyDaysFromNow.setDate(today.getDate() + 30)
-    return expiryDate <= thirtyDaysFromNow && expiryDate >= today
-  }
+    const expiryDate = new Date(dateString);
+    const today = new Date();
+    const ninetyDaysFromNow = new Date();
+    ninetyDaysFromNow.setDate(today.getDate() + 90);
+    return expiryDate <= ninetyDaysFromNow && expiryDate >= today;
+  };
 
-  // Helper function to check if date is expired
   const isExpired = (dateString: string) => {
-    const expiryDate = new Date(dateString)
-    const today = new Date()
-    return expiryDate < today
-  }
+    const expiryDate = new Date(dateString);
+    const today = new Date();
+    return expiryDate < today;
+  };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-GB")
-  }
+    return new Date(dateString).toLocaleDateString("en-GB");
+  };
 
   const getExpiryStatus = (dateString: string) => {
-    if (isExpired(dateString)) {
-      return { status: "Expired", color: "bg-red-500" }
-    } else if (isExpiringSoon(dateString)) {
-      return { status: "Expiring Soon", color: "bg-yellow-500" }
-    }
-    return { status: "Valid", color: "bg-green-500" }
-  }
+    if (isExpired(dateString)) return { status: "Expired", color: "bg-red-500" };
+    if (isExpiringSoon(dateString)) return { status: "Expiring Soon", color: "bg-yellow-500" };
+    return { status: "Valid", color: "bg-green-500" };
+  };
 
-  const handleEmployeeClick = (employeeId: string) => {
+  const handleUpdateClick = (employee: Employee) => {
+    setSelectedEmployee(employee);
+    setNewExpiryDate(employee.passportExpiry ? new Date(employee.passportExpiry) : null);
+  };
+
+  const handleSaveUpdate = async () => {
+    if (!selectedEmployee || !newExpiryDate) return;
+
+    setUpdating(true);
+    try {
+      await axiosInstance.patch(`/users/${selectedEmployee._id}`, {
+        passportExpiry: newExpiryDate.toISOString(),
+      });
+
+      setEmployees(prev =>
+        prev.map(emp =>
+          emp._id === selectedEmployee._id ? { ...emp, passportExpiry: newExpiryDate.toISOString() } : emp
+        )
+      );
+      setFilteredEmployees(prev =>
+        prev.map(emp =>
+          emp._id === selectedEmployee._id ? { ...emp, passportExpiry: newExpiryDate.toISOString() } : emp
+        )
+      );
+
+      setSelectedEmployee(null);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const totalPages = Math.ceil(filteredEmployees.length / entriesPerPage);
+  const startIndex = (currentPage - 1) * entriesPerPage;
+  const endIndex = startIndex + entriesPerPage;
+  const currentData = filteredEmployees.slice(startIndex, endIndex);
+
+    const handleEmployeeClick = (employeeId: string) => {
     navigate(`/admin/hr/employee/${employeeId}`)
   }
 
-  const handleExport = () => {
-    console.log("Exporting passport expiry data...")
-    // Implement export functionality here
-  }
-
-  const totalPages = Math.ceil(filteredEmployees.length / entriesPerPage)
-  const startIndex = (currentPage - 1) * entriesPerPage
-  const endIndex = startIndex + entriesPerPage
-  const currentData = filteredEmployees.slice(startIndex, endIndex)
 
   return (
-    <div className="min-h-screen bg-gray-50 ">
+    <div className="min-h-screen bg-gray-50">
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center justify-between  w-full">
-            
-            <div className="flex items-center space-x-3">
-              <div className="rounded-lg bg-red-100 p-2">
-                <IdCard className="h-6 w-6 text-red-600" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Passport Expiry Details</h1>
-                <p className="text-sm text-gray-600">{filteredEmployees.length} employees with expiring passports</p>
-              </div>
+          <div className="flex items-center space-x-3">
+            <div className="rounded-lg bg-red-100 p-2">
+              <IdCard className="h-6 w-6 text-red-600" />
             </div>
-
-            <Button variant="outline" size="sm" onClick={() => navigate(-1)} className="flex items-center space-x-2 bg-supperagent hover:bg-supperagent/90 border-none">
-              <ArrowLeft className="h-4 w-4" />
-              <span>Back</span>
-            </Button>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Passport Expiry Details</h1>
+              <p className="text-sm text-gray-600">
+                {filteredEmployees.length} employees with expiring passports
+              </p>
+            </div>
           </div>
-          {/* <Button onClick={handleExport} className="flex items-center space-x-2">
-            <Download className="h-4 w-4" />
-            <span>Export</span>
-          </Button> */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate(-1)}
+            className="flex items-center space-x-2 bg-supperagent hover:bg-supperagent/90 border-none"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span>Back</span>
+          </Button>
         </div>
 
-        {/* Content */}
+        {/* Table */}
         <div className="rounded-xl bg-white p-6 shadow-lg">
-          {/* Controls */}
           <div className="mb-6 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
             <div className="flex items-center space-x-2">
               <span className="text-sm text-gray-600">Search:</span>
@@ -167,23 +197,22 @@ const PassportExpiryPage = () => {
             </div>
           </div>
 
-          {/* Table */}
           {loading ? (
             <div className="flex justify-center py-12">
-              <BlinkingDots size="large" color="bg-red-600" />
+              <BlinkingDots size="large" color="bg-supperagent" />
             </div>
           ) : (
             <>
-              <div className="overflow-x-auto ">
+              <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-gray-50">
-                      <TableHead className="font-semibold text-gray-700">Employee</TableHead>
-                      <TableHead className="font-semibold text-gray-700">Department</TableHead>
-                      <TableHead className="font-semibold text-gray-700">Position</TableHead>
-                      <TableHead className="font-semibold text-gray-700">Passport Expiry Date</TableHead>
-                      <TableHead className="font-semibold text-gray-700">Status</TableHead>
-                      <TableHead className="font-semibold text-gray-700">Action</TableHead>
+                      <TableHead>Employee</TableHead>
+                      <TableHead>Department</TableHead>
+                      <TableHead>Position</TableHead>
+                      <TableHead>Passport Expiry Date</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -194,37 +223,38 @@ const PassportExpiryPage = () => {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      currentData.map((employee) => {
-                        const status = getExpiryStatus(employee?.passportExpiry)
+                      currentData.map((emp) => {
+                        const status = getExpiryStatus(emp.passportExpiry);
                         return (
-                          <TableRow key={employee._id} className="transition-colors hover:bg-gray-50">
-                            <TableCell>
-                              <div>
-                                <p className="font-medium text-gray-900">
-                                  {employee.firstName} {employee.lastName}
-                                </p>
-                                <p className="text-sm text-gray-500">{employee.email}</p>
-                              </div>
+                          <TableRow key={emp._id} className="transition-colors hover:bg-gray-50">
+                            <TableCell  onClick={() => handleEmployeeClick(emp._id)}>
+                              <p className="font-medium text-gray-900">{emp.firstName} {emp.lastName}</p>
+                              <p className="text-sm text-gray-500">{emp.email}</p>
                             </TableCell>
-                            <TableCell className="text-gray-600">{employee.departmentId?.departmentName}</TableCell>
-                            <TableCell className="text-gray-600">{employee.position}</TableCell>
-                            <TableCell className="font-medium">
-                              {formatDate(employee?.passportExpiry)}
-                            </TableCell>
-                            <TableCell>
+                            <TableCell  onClick={() => handleEmployeeClick(emp._id)} className="text-gray-600">{emp.departmentId?.departmentName}</TableCell>
+                            <TableCell  onClick={() => handleEmployeeClick(emp._id)} className="text-gray-600">{emp.position}</TableCell>
+                            <TableCell  onClick={() => handleEmployeeClick(emp._id)} className="font-medium">{formatDate(emp.passportExpiry)}</TableCell>
+                            <TableCell  onClick={() => handleEmployeeClick(emp._id)}>
                               <Badge className={`${status.color} text-white`}>{status.status}</Badge>
                             </TableCell>
-                            <TableCell>
-                              <Button
+                            <TableCell className="flex justify-end">
+                                {/* <Button
                                 size="sm"
                                 onClick={() => handleEmployeeClick(employee._id)}
                                 className="bg-blue-600 hover:bg-blue-700 text-white"
                               >
                                 View Details
+                              </Button> */}
+                              <Button
+                                size="sm"
+                                onClick={() => handleUpdateClick(emp)}
+                                className="bg-supperagent hover:bg-suppreagent/90 text-white"
+                              >
+                                Update
                               </Button>
                             </TableCell>
                           </TableRow>
-                        )
+                        );
                       })
                     )}
                   </TableBody>
@@ -245,8 +275,47 @@ const PassportExpiryPage = () => {
           )}
         </div>
       </div>
-    </div>
-  )
-}
 
-export default PassportExpiryPage
+      {/* Update Dialog */}
+      <Dialog open={!!selectedEmployee} onOpenChange={() => setSelectedEmployee(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              Update Passport Expiry for{" "}
+              <span className="font-semibold">{selectedEmployee?.firstName} {selectedEmployee?.lastName}</span>
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <label className="block text-sm font-medium text-gray-700">Passport Expiry Date</label>
+            <DatePicker
+              selected={newExpiryDate}
+              onChange={(date) => setNewExpiryDate(date)}
+              dateFormat="dd-MM-yyyy"
+              placeholderText="DD-MM-YYYY"
+              wrapperClassName="w-full"
+              showYearDropdown
+              showMonthDropdown
+              dropdownMode="select"
+              className="w-full p-2 border rounded-md"
+              preventOpenOnFocus
+            />
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSelectedEmployee(null)}>Cancel</Button>
+            <Button
+              onClick={handleSaveUpdate}
+              disabled={updating || !newExpiryDate}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              {updating ? "Updating..." : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
+
+export default PassportExpiryPage;

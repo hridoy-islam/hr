@@ -1,81 +1,101 @@
-import { useState } from 'react';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
-import * as z from 'zod';
-import { Button } from '@/components/ui/button';
-import { CardContent } from '@/components/ui/card';
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
+import { Button } from "@/components/ui/button";
+import { CardContent } from "@/components/ui/card";
 import {
   Form,
   FormControl,
   FormField,
   FormItem,
   FormLabel,
-  FormMessage
-} from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from '@/components/ui/select';
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
 
-import { useSelector } from 'react-redux';
+import { useSelector } from "react-redux";
+import { useParams } from "react-router-dom";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
-import { useParams } from 'react-router-dom';
-import moment from 'moment';
-import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
-import { countries, nationalities, relationships } from '@/types';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { countries, nationalities, relationships } from "@/types";
+
+import ReactSelect from "react-select";
+
+const addressSchema = z.object({
+  line1: z.string().min(1, "Address Line 1 is required"),
+  line2: z.string().optional(),
+  city: z.string().min(1, "City is required"),
+  state: z.string().optional(),
+  postCode: z.string().min(1, "Postcode is required"),
+  country: z.string().min(1, "Country is required"),
+});
 
 const equalityInfoSchema = z.object({
   equalityInformation: z.object({
-    nationality: z.string().min(1, { message: 'Nationality is required' }),
-    religion: z.string().min(1, { message: 'Religion is required' }),
-    hasDisability: z.boolean({
-      required_error: 'Disability status is required'
-    }),
-    disabilityDetails: z
-      .string()
-      .optional()
-      .refine(
-        (val, ctx) => {
-          if (ctx?.parent?.hasDisability && (!val || val.trim() === '')) {
-            return false;
-          }
-          return true;
-        },
-        { message: 'Disability details are required' }
-      )
+    nationality: z.string().min(1, "Nationality is required"),
+    religion: z.string().min(1, "Religion is required"),
   }),
   beneficiary: z.object({
-    fullName: z.string().min(1, { message: 'Full name is required' }),
-    relationship: z.string().min(1, { message: 'Relationship is required' }),
-    email: z.string().email({ message: 'Valid email is required' }),
-    mobile: z.string().min(1, { message: 'Mobile number is required' }),
-    sameAddress: z.boolean().optional(),
-    address: z
-      .object({
-        line1: z.string().min(1, { message: 'Address Line 1 is required' }),
-        line2: z.string().optional(),
-        city: z.string().min(1, { message: 'City is required' }),
-        state: z.string().optional(),
-        postCode: z.string().min(1, { message: 'Postcode is required' }),
-        country: z.string().min(1, { message: 'Country is required' })
-      })
-      .optional()
-      .refine(
-        (val, ctx) => {
-          if (!ctx?.parent?.sameAddress && !val) {
-            return false;
-          }
-          return true;
-        },
-        { message: 'Address is required unless sameAddress is checked' }
-      )
-  })
+    fullName: z.string().min(1, "Full name is required"),
+    relationship: z.string().min(1, "Relationship is required"),
+    email: z.string().email("Valid email is required"),
+    mobile: z.string().min(1, "Mobile number is required"),
+    sameAddress: z.boolean().default(false),
+    address: z.object({
+      line1: z.string().optional(),
+      line2: z.string().optional(),
+      city: z.string().optional(),
+      state: z.string().optional(),
+      postCode: z.string().optional(),
+      country: z.string().optional(),
+    }).optional(),
+  }).superRefine((data, ctx) => {
+    // Only validate address when sameAddress is false
+    if (!data.sameAddress) {
+      if (!data.address) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Address is required when 'Same Address' is No",
+          path: ["address"],
+        });
+        return;
+      }
+      
+      // Check required address fields when sameAddress is false
+      if (!data.address.line1 || data.address.line1.trim() === '') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Address Line 1 is required",
+          path: ["address", "line1"],
+        });
+      }
+      
+      if (!data.address.city || data.address.city.trim() === '') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "City is required",
+          path: ["address", "city"],
+        });
+      }
+      
+      if (!data.address.postCode || data.address.postCode.trim() === '') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Postcode is required",
+          path: ["address", "postCode"],
+        });
+      }
+      
+      if (!data.address.country || data.address.country.trim() === '') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Country is required",
+          path: ["address", "country"],
+        });
+      }
+    }
+    // When sameAddress is true, we completely skip address validation
+  }),
 });
 
 type EqualityInfoData = z.infer<typeof equalityInfoSchema>;
@@ -91,39 +111,34 @@ export function EqualityInfomation({
   defaultValues,
   onSaveAndContinue,
   onSave,
-  onBack
+  onBack,
 }: EqualityInfoStepProps) {
   const { user } = useSelector((state: any) => state.auth);
-
   const { id } = useParams();
 
   const form = useForm<EqualityInfoData>({
     resolver: zodResolver(equalityInfoSchema),
     defaultValues: {
       equalityInformation: {
-        nationality: defaultValues?.equalityInformation?.nationality || '', // Default as empty string, populated from country list
-        religion: defaultValues?.equalityInformation?.religion || '', // Default as empty string
-        hasDisability:
-          defaultValues?.equalityInformation?.hasDisability ?? false, // Default to false
-        disabilityDetails:
-          defaultValues?.equalityInformation?.disabilityDetails || '' // Empty string, optional if hasDisability is false
+        nationality: defaultValues?.equalityInformation?.nationality || "",
+        religion: defaultValues?.equalityInformation?.religion || "",
       },
       beneficiary: {
-        fullName: defaultValues?.beneficiary?.fullName || '', // Default empty string
-        relationship: defaultValues?.beneficiary?.relationship || '', // Default empty string
-        email: defaultValues?.beneficiary?.email || '', // Default empty string
-        mobile: defaultValues?.beneficiary?.mobile || '', // Default empty string
-        sameAddress: defaultValues?.beneficiary?.sameAddress ?? false, // Default to false, if true hide address fields
+        fullName: defaultValues?.beneficiary?.fullName || "",
+        relationship: defaultValues?.beneficiary?.relationship || "",
+        email: defaultValues?.beneficiary?.email || "",
+        mobile: defaultValues?.beneficiary?.mobile || "",
+        sameAddress: defaultValues?.beneficiary?.sameAddress ?? false,
         address: {
-          line1: defaultValues?.beneficiary?.address?.line1 || '', // Required field, default empty string
-          line2: defaultValues?.beneficiary?.address?.line2 || '', // Optional field, default empty string
-          city: defaultValues?.beneficiary?.address?.city || '', // Required field, default empty string
-          state: defaultValues?.beneficiary?.address?.state || '', // Optional field, default empty string
-          postCode: defaultValues?.beneficiary?.address?.postCode || '', // Required field, default empty string
-          country: defaultValues?.beneficiary?.address?.country || '' // Country dropdown, default empty string
-        }
-      }
-    }
+          line1: defaultValues?.beneficiary?.address?.line1 || "",
+          line2: defaultValues?.beneficiary?.address?.line2 || "",
+          city: defaultValues?.beneficiary?.address?.city || "",
+          state: defaultValues?.beneficiary?.address?.state || "",
+          postCode: defaultValues?.beneficiary?.address?.postCode || "",
+          country: defaultValues?.beneficiary?.address?.country || "",
+        },
+      },
+    },
   });
 
   function onSubmit(data: EqualityInfoData) {
@@ -131,23 +146,7 @@ export function EqualityInfomation({
     console.log(data);
   }
 
-  function handleSave() {
-    const data = form.getValues() as EqualityInfoData;
-    onSave(data);
-  }
-
-  const countryList = [
-    { code: 'US', name: 'United States' },
-    { code: 'GB', name: 'United Kingdom' },
-    { code: 'BD', name: 'Bangladesh' },
-    { code: 'IN', name: 'India' },
-    { code: 'CA', name: 'Canada' },
-    { code: 'AU', name: 'Australia' }
-    // Add more as needed
-  ];
-
-  const hasDisability = form.watch('equalityInformation.hasDisability');
-  const sameAddress = form.watch('beneficiary.sameAddress');
+  const sameAddress = form.watch("beneficiary.sameAddress");
 
   return (
     <>
@@ -156,6 +155,7 @@ export function EqualityInfomation({
           <CardContent className="space-y-4 pt-6">
             {/* Equality Information */}
             <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+              {/* Nationality */}
               <FormField
                 control={form.control}
                 name="equalityInformation.nationality"
@@ -163,27 +163,29 @@ export function EqualityInfomation({
                   <FormItem>
                     <FormLabel>Nationality</FormLabel>
                     <FormControl>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select country" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {countries.map((c) => (
-                            <SelectItem key={c} value={c}>
-                              {c}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <ReactSelect
+                        options={nationalities.map((c) => ({
+                          label: c,
+                          value: c,
+                        }))}
+                        value={
+                          field.value
+                            ? { label: field.value, value: field.value }
+                            : null
+                        }
+                        onChange={(selected) =>
+                          field.onChange(selected?.value || "")
+                        }
+                        placeholder="Select nationality"
+                        isClearable
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
+              {/* Religion */}
               <FormField
                 control={form.control}
                 name="equalityInformation.religion"
@@ -191,62 +193,36 @@ export function EqualityInfomation({
                   <FormItem>
                     <FormLabel>Religion</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="Enter religion" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="equalityInformation.hasDisability"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Do you have a disability?</FormLabel>
-                    <FormControl>
-                      <Select
-                        onValueChange={(value) =>
-                          field.onChange(value === 'true')
+                      <ReactSelect
+                        options={[
+                          { label: "Islam", value: "Islam" },
+                          { label: "Hinduism", value: "Hinduism" },
+                          { label: "Christianity", value: "Christianity" },
+                          { label: "Buddhism", value: "Buddhism" },
+                          { label: "Other", value: "Other" },
+                        ]}
+                        value={
+                          field.value
+                            ? { label: field.value, value: field.value }
+                            : null
                         }
-                        defaultValue={field.value?.toString()}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select an option" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="true">Yes</SelectItem>
-                          <SelectItem value="false">No</SelectItem>
-                        </SelectContent>
-                      </Select>
+                        onChange={(selected) =>
+                          field.onChange(selected?.value || "")
+                        }
+                        placeholder="Select religion"
+                        isClearable
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-
-              {hasDisability === true && (
-                <FormField
-                  control={form.control}
-                  name="equalityInformation.disabilityDetails"
-                  render={({ field }) => (
-                    <FormItem className="md:col-span-3">
-                      <FormLabel>Disability Details</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          {...field}
-                          placeholder="Please describe your disability"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
             </div>
 
             {/* Beneficiary Information */}
-            <h1 className='font-semibold text-xl '>Beneficiary Information</h1>
+            <h1 className="font-semibold text-xl">
+              Beneficiary Information
+            </h1>
             <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
               <FormField
                 control={form.control}
@@ -262,6 +238,7 @@ export function EqualityInfomation({
                 )}
               />
 
+              {/* Relationship */}
               <FormField
                 control={form.control}
                 name="beneficiary.relationship"
@@ -269,21 +246,22 @@ export function EqualityInfomation({
                   <FormItem>
                     <FormLabel>Relationship</FormLabel>
                     <FormControl>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select relationship" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {relationships.map((c) => (
-                            <SelectItem key={c} value={c}>
-                              {c}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <ReactSelect
+                        options={relationships.map((c) => ({
+                          label: c,
+                          value: c,
+                        }))}
+                        value={
+                          field.value
+                            ? { label: field.value, value: field.value }
+                            : null
+                        }
+                        onChange={(selected) =>
+                          field.onChange(selected?.value || "")
+                        }
+                        placeholder="Select relationship"
+                        isClearable
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -326,6 +304,7 @@ export function EqualityInfomation({
                 )}
               />
             </div>
+
             <FormField
               control={form.control}
               name="beneficiary.sameAddress"
@@ -335,7 +314,7 @@ export function EqualityInfomation({
                   <FormControl>
                     <RadioGroup
                       onValueChange={(value) =>
-                        field.onChange(value === 'true')
+                        field.onChange(value === "true")
                       }
                       defaultValue={field.value?.toString()}
                       className="flex gap-4"
@@ -414,10 +393,7 @@ export function EqualityInfomation({
                     <FormItem>
                       <FormLabel>State</FormLabel>
                       <FormControl>
-                        <Input
-                          {...field}
-                          placeholder="Enter state (optional)"
-                        />
+                        <Input {...field} placeholder="Enter state (optional)" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -438,6 +414,7 @@ export function EqualityInfomation({
                   )}
                 />
 
+                {/* Country with ReactSelect */}
                 <FormField
                   control={form.control}
                   name="beneficiary.address.country"
@@ -445,21 +422,22 @@ export function EqualityInfomation({
                     <FormItem>
                       <FormLabel>Country</FormLabel>
                       <FormControl>
-                        <Select
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select country" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {nationalities.map((c) => (
-                              <SelectItem key={c} value={c}>
-                                {c}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <ReactSelect
+                          options={nationalities.map((c) => ({
+                            label: c,
+                            value: c,
+                          }))}
+                          value={
+                            field.value
+                              ? { label: field.value, value: field.value }
+                              : null
+                          }
+                          onChange={(selected) =>
+                            field.onChange(selected?.value || "")
+                          }
+                          placeholder="Select country"
+                          isClearable
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -471,10 +449,10 @@ export function EqualityInfomation({
             {/* Action Buttons */}
             <div className="flex justify-between">
               <Button
-                type="button" // ✅ Prevents form submission
+                type="button"
                 className="border-none bg-black text-white hover:bg-black/90"
                 onClick={(e) => {
-                  e.preventDefault(); // ✅ Prevent default form behavior
+                  e.preventDefault();
                   onBack();
                 }}
               >
@@ -483,7 +461,7 @@ export function EqualityInfomation({
 
               <Button
                 type="submit"
-                className=" bg-supperagent text-white hover:bg-supperagent/90"
+                className="bg-supperagent text-white hover:bg-supperagent/90"
               >
                 Save
               </Button>

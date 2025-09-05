@@ -46,14 +46,14 @@ const navItems = [
   },
   {
     icon: Box,
-    label: 'Holidays',
+    label: 'My Holiday',
     href: 'holiday',
     roles: ['admin', 'employee']
   },
   {
     icon: PencilRuler,
-    label: 'MyStuff',
-    href: 'my-stuff',
+    label: 'My Staff',
+    href: 'my-staff',
     roles: ['admin']
   },
   {
@@ -68,6 +68,12 @@ const navItems = [
     href: 'vacancy',
     roles: ['admin']
   },
+  {
+        icon: BookText,
+        label: 'Training',
+        href: 'training',
+        roles: ['employee']
+      },
   {
     icon: UsersIcon,
     label: 'Employee',
@@ -101,7 +107,7 @@ const navItems = [
         icon: BookText,
         label: 'Training',
         href: 'training',
-        roles: ['admin']
+        roles: ['admin','employee']
       }
     ]
   },

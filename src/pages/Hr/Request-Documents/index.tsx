@@ -74,7 +74,7 @@ const documentTypes = [
 const RequestDocumentPage = () => {
   const [requests, setRequests] = useState<DocumentRequest[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [entriesPerPage, setEntriesPerPage] = useState(5);
+  const [entriesPerPage, setEntriesPerPage] = useState(100);
   const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<DocumentRequest | null>(null);
@@ -106,16 +106,22 @@ const RequestDocumentPage = () => {
   const pendingRequests = requests.filter((req) => req.status === 'pending');
 
   // Search filter
-  const filteredRequests = pendingRequests.filter(
-    (req) =>
-      req.userId.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      req.userId.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      req.userId._id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      req.documentType.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      req.userId.departmentId.departmentName
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase())
+const filteredRequests = pendingRequests.filter((req) => {
+  const firstName = req.userId?.firstName ?? '';
+  const lastName = req.userId?.lastName ?? '';
+  const userId = req.userId?._id ?? '';
+  const departmentName = req.userId?.departmentId?.departmentName ?? '';
+  const documentType = req.documentType ?? '';
+
+  return (
+    firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    userId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    departmentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    documentType.toLowerCase().includes(searchTerm.toLowerCase())
   );
+});
+
 
   const totalPages = Math.ceil(filteredRequests.length / entriesPerPage);
   const startIndex = (currentPage - 1) * entriesPerPage;
@@ -216,16 +222,19 @@ const RequestDocumentPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="space-y-6 p-4 md:p-6">
+      <div className="space-y-6">
         {/* Page Header */}
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Document Requests</h1>
-            <p className="text-gray-600">Manage employee document approval workflow.</p>
-          </div>
+        
 
-          {/* Search Bar */}
-          <div className="relative w-full max-w-md">
+        {/* Requests Table */}
+        <div className="rounded-xl bg-white p-6 shadow-lg">
+          <div className='flex  justify-between items-center mb-4'>
+
+          <h2 className="mb-6 flex items-center gap-2 text-2xl font-bold text-gray-900">
+            <FileText className="h-6 w-6" />
+            Pending Requests
+          </h2>
+ <div className="relative w-full max-w-md">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
             <Input
               placeholder="Search by name, ID, department, or document..."
@@ -234,15 +243,7 @@ const RequestDocumentPage = () => {
               className="pl-10"
             />
           </div>
-        </div>
-
-        {/* Requests Table */}
-        <div className="rounded-xl bg-white p-6 shadow-lg">
-          <h2 className="mb-6 flex items-center gap-2 text-2xl font-bold text-gray-900">
-            <FileText className="h-6 w-6" />
-            Pending Requests
-          </h2>
-
+          </div>
           {currentRequests.length === 0 ? (
             <div className="py-12 text-center">
               <FileText className="mx-auto mb-4 h-12 w-12 text-gray-300" />
@@ -268,15 +269,15 @@ const RequestDocumentPage = () => {
                       <TableCell>
                         <div>
                           <p className="font-medium text-gray-900">
-                            {req.userId.firstName} {req.userId.lastName}
+                            {req?.userId?.firstName} {req?.userId?.lastName}
                           </p>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <span className="font-medium">{req.documentType}</span>
+                        <span className="font-medium">{req?.documentType}</span>
                       </TableCell>
                       <TableCell className="text-gray-600">
-                        {req.userId.departmentId.departmentName}
+                        {req.userId?.departmentId.departmentName??'-'}
                       </TableCell>
                       <TableCell className="text-gray-600">
                         {new Date(req.requestDate).toLocaleDateString()}
@@ -386,7 +387,7 @@ const RequestDocumentPage = () => {
             >
               {loading ? (
                 <>
-                  <BlinkingDots size="small" color="bg-white" /> Processing...
+                  <BlinkingDots size="small" color="bg-supperagent" /> 
                 </>
               ) : (
                 'Approve & Upload'

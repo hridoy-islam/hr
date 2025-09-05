@@ -6,7 +6,7 @@ import {
   CheckCircle,
   XCircle,
   AlertCircle,
-  Coffee,
+  Coffee
 } from 'lucide-react';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 import axiosInstance from '@/lib/axios';
@@ -78,10 +78,11 @@ const StaffDashboardPage = () => {
       totalEntitlement: 0,
       used: 0,
       pending: 0,
-      remaining: 0,
-    },
+      remaining: 0
+    }
   });
-  const [holidayAllowance, setHolidayAllowance] = useState<HolidayAllowance | null>(null);
+  const [holidayAllowance, setHolidayAllowance] =
+    useState<HolidayAllowance | null>(null);
 
   const { user } = useSelector((state: any) => state.auth);
 
@@ -93,7 +94,7 @@ const StaffDashboardPage = () => {
       : date.toLocaleDateString('en-US', {
           month: 'short',
           day: 'numeric',
-          year: 'numeric',
+          year: 'numeric'
         });
   };
 
@@ -116,10 +117,14 @@ const StaffDashboardPage = () => {
   const fetchDaysPresent = async () => {
     try {
       const response = await axiosInstance.get('/hr/attendance', {
-        params: { userId: user._id },
+        params: { userId: user._id }
       });
 
-      const logs = response.data?.data?.result || response.data?.data || response.data || [];
+      const logs =
+        response.data?.data?.result ||
+        response.data?.data ||
+        response.data ||
+        [];
       const today = new Date();
       const currentMonth = today.getMonth();
       const currentYear = today.getFullYear();
@@ -151,10 +156,14 @@ const StaffDashboardPage = () => {
     try {
       const year = new Date().getFullYear().toString();
       const response = await axiosInstance.get(`/hr/holidays`, {
-        params: { userId: user._id, year },
+        params: { userId: user._id, year }
       });
 
-      const data = response.data?.data?.result || response.data?.data || response.data || [];
+      const data =
+        response.data?.data?.result ||
+        response.data?.data ||
+        response.data ||
+        [];
       let record = null;
 
       if (Array.isArray(data)) {
@@ -179,7 +188,7 @@ const StaffDashboardPage = () => {
           remainingHours: leftThisYear,
           requestedHours: requested,
           unpaidLeaveRequest: record.unpaidLeaveRequest || 0,
-          unpaidLeaveTaken: record.unpaidLeaveTaken || 0,
+          unpaidLeaveTaken: record.unpaidLeaveTaken || 0
         });
 
         // Update holiday balance in holidayData
@@ -190,8 +199,8 @@ const StaffDashboardPage = () => {
             totalEntitlement: allowance / hoursPerDay,
             used: used / hoursPerDay,
             pending: requested / hoursPerDay,
-            remaining: leftThisYear / hoursPerDay,
-          },
+            remaining: leftThisYear / hoursPerDay
+          }
         }));
       }
     } catch (error) {
@@ -203,10 +212,14 @@ const StaffDashboardPage = () => {
   const fetchLeaveRequests = async () => {
     try {
       const response = await axiosInstance.get('/hr/leave', {
-        params: { userId: user._id, limit: 'all' },
+        params: { userId: user._id, limit: 'all' }
       });
 
-      const rawData = response.data?.data?.result || response.data?.data || response.data || [];
+      const rawData =
+        response.data?.data?.result ||
+        response.data?.data ||
+        response.data ||
+        [];
       const currentYear = new Date().getFullYear().toString();
 
       const filtered = rawData.filter((item: any) =>
@@ -222,7 +235,7 @@ const StaffDashboardPage = () => {
         reason: item.reason || 'Leave',
         status: item.status,
         days: Math.ceil((item.totalHours || 0) / hoursPerDay),
-        requestDate: item.createdAt,
+        requestDate: item.createdAt
       }));
 
       const pendingRequests = mapped
@@ -236,7 +249,7 @@ const StaffDashboardPage = () => {
       setHolidayData((prev) => ({
         ...prev,
         requests: pendingRequests,
-        taken: approvedRequests,
+        taken: approvedRequests
       }));
     } catch (error) {
       console.error('Error fetching leave requests:', error);
@@ -250,17 +263,18 @@ const StaffDashboardPage = () => {
         params: {
           status: 'active',
           sort: '-noticeDate',
-          limit:5
-        },
+          limit: 5
+        }
       });
 
-      const fetched = res.data?.data?.result || res.data?.data || res.data || [];
+      const fetched =
+        res.data?.data?.result || res.data?.data || res.data || [];
 
       const mappedNotices = fetched.map((n: any) => ({
         _id: n._id,
         title: n.noticeType,
         content: n.noticeDescription,
-        date: n.noticeDate,
+        date: n.noticeDate
       }));
 
       setNotices(mappedNotices);
@@ -279,7 +293,7 @@ const StaffDashboardPage = () => {
       fetchDaysPresent(),
       fetchHolidayAllowance(),
       fetchLeaveRequests(),
-      fetchNotices(),
+      fetchNotices()
     ])
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -299,18 +313,17 @@ const StaffDashboardPage = () => {
     <div className="min-h-screen bg-gray-50 ">
       <div className="">
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-4">
           <h1 className="text-3xl font-bold text-gray-900">
             Welcome back, {user?.name || 'Staff'}!
           </h1>
         </div>
-{/* Notices */}
-        <div className="rounded-xl border border-gray-200 bg-white shadow-lg pb-4">
+        {/* Notices */}
+        <div className="rounded-xl border border-gray-200 bg-white mb-4 shadow-lg">
           <div className="border-b border-gray-200 p-6">
             <h3 className="flex items-center text-lg font-semibold text-gray-900">
               <Bell className="mr-2 h-5 w-5 text-blue-600" />
               Latest Notices
-              
             </h3>
           </div>
           <div className="p-6">
@@ -325,8 +338,12 @@ const StaffDashboardPage = () => {
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        <h4 className="font-semibold text-gray-900">{notice.title}</h4>
-                        <p className="mb-3 mt-1 text-sm text-gray-600">{notice.content}</p>
+                        <h4 className="font-semibold text-gray-900">
+                          {notice.title}
+                        </h4>
+                        <p className="mb-3 mt-1 text-sm text-gray-600">
+                          {notice.content}
+                        </p>
                         <div className="flex items-center space-x-4 text-xs text-gray-500">
                           <span className="flex items-center">
                             <Calendar className="mr-1 h-3 w-3" />
@@ -351,11 +368,15 @@ const StaffDashboardPage = () => {
               </div>
               <span className="text-sm text-gray-500">This Month</span>
             </div>
-            <h3 className="mb-2 text-lg font-semibold text-gray-900">Attendance</h3>
+            <h3 className="mb-2 text-lg font-semibold text-gray-900">
+              Attendance
+            </h3>
             <div className="space-y-2">
               <div className="flex justify-between">
                 <span className="text-sm text-gray-600">Days Present</span>
-                <span className="font-medium text-green-600">{daysPresent}</span>
+                <span className="font-medium text-green-600">
+                  {daysPresent}
+                </span>
               </div>
             </div>
           </div>
@@ -368,15 +389,21 @@ const StaffDashboardPage = () => {
               </div>
               <span className="text-sm text-gray-500">Pending</span>
             </div>
-            <h3 className="mb-2 text-lg font-semibold text-gray-900">Holiday Requests</h3>
+            <h3 className="mb-2 text-lg font-semibold text-gray-900">
+              Holiday Requests
+            </h3>
             <div className="space-y-2">
               <div className="flex justify-between">
                 <span className="text-sm text-gray-600">Pending</span>
-                <span className="font-medium text-yellow-600">{holidayData.requests.length}</span>
+                <span className="font-medium text-yellow-600">
+                  {holidayData.requests.length}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-sm text-gray-600">Approved</span>
-                <span className="font-medium text-green-600">{holidayData.taken.length}</span>
+                <span className="font-medium text-green-600">
+                  {holidayData.taken.length}
+                </span>
               </div>
             </div>
           </div>
@@ -389,7 +416,9 @@ const StaffDashboardPage = () => {
               </div>
               <span className="text-sm text-gray-500">Balance</span>
             </div>
-            <h3 className="mb-2 text-lg font-semibold text-gray-900">Holiday Balance</h3>
+            <h3 className="mb-2 text-lg font-semibold text-gray-900">
+              Holiday Balance
+            </h3>
             <div className="space-y-2">
               <div className="flex justify-between">
                 <span className="text-sm text-gray-600">Total Entitlement</span>
@@ -423,7 +452,11 @@ const StaffDashboardPage = () => {
               ) : (
                 <div className="space-y-4">
                   {holidayData.requests
-                    .sort((a, b) => new Date(b.requestDate).getTime() - new Date(a.requestDate).getTime())
+                    .sort(
+                      (a, b) =>
+                        new Date(b.requestDate).getTime() -
+                        new Date(a.requestDate).getTime()
+                    )
                     .slice(0, 4)
                     .map((req) => (
                       <div
@@ -434,7 +467,8 @@ const StaffDashboardPage = () => {
                           <div className="mb-1 flex items-center space-x-2">
                             {getStatusIcon(req.status)}
                             <span className="font-medium text-gray-900">
-                              {formatDate(req.startDate)} - {formatDate(req.endDate)}
+                              {formatDate(req.startDate)} -{' '}
+                              {formatDate(req.endDate)}
                             </span>
                           </div>
                           <p className="text-sm text-gray-600">{req.reason}</p>
@@ -477,7 +511,11 @@ const StaffDashboardPage = () => {
               ) : (
                 <div className="space-y-4">
                   {holidayData.taken
-                    .sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime())
+                    .sort(
+                      (a, b) =>
+                        new Date(b.startDate).getTime() -
+                        new Date(a.startDate).getTime()
+                    )
                     .slice(0, 4)
                     .map((holiday) => (
                       <div
@@ -488,10 +526,13 @@ const StaffDashboardPage = () => {
                           <div className="mb-1 flex items-center space-x-2">
                             <CheckCircle className="h-4 w-4 text-green-600" />
                             <span className="font-medium text-gray-900">
-                              {formatDate(holiday.startDate)} - {formatDate(holiday.endDate)}
+                              {formatDate(holiday.startDate)} -{' '}
+                              {formatDate(holiday.endDate)}
                             </span>
                           </div>
-                          <p className="text-sm text-gray-600">{holiday.reason}</p>
+                          <p className="text-sm text-gray-600">
+                            {holiday.reason}
+                          </p>
                         </div>
                         <div className="text-right">
                           <span className="text-sm font-medium text-gray-900">
@@ -508,8 +549,6 @@ const StaffDashboardPage = () => {
             </div>
           </div>
         </div>
-
-        
       </div>
     </div>
   );

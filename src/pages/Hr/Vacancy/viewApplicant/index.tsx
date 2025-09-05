@@ -5,7 +5,6 @@ import { Tabs } from './components/Tabs';
 import PersonalInfoTab from './tabs/PersonalInfoTab';
 import AddressTab from './tabs/AddressTab';
 import MiscellaneousTab from './tabs/MiscellaneousTab';
-import NotesTab from './tabs/NotesTab';
 import { useEditApplicant } from './hooks/useEditApplicant';
 
 const ApplicantDetailPage = () => {
@@ -72,17 +71,7 @@ const ApplicantDetailPage = () => {
         />
       )
     },
-    { 
-      id: 'notes', 
-      label: 'Notes', 
-      component: (
-        <NotesTab 
-          formData={formData} 
-          onUpdate={handleFieldUpdate} 
-          isFieldSaving={isFieldSaving} 
-        />
-      )
-    },
+   
   ];
 
   return (

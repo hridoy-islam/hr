@@ -28,6 +28,7 @@ import axiosInstance from '@/lib/axios';
 import { useNavigate, useParams } from 'react-router-dom';
 import { MoveLeft } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
+import { BlinkingDots } from '@/components/shared/blinking-dots';
 
 const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
@@ -136,7 +137,9 @@ export default function EditShift() {
   };
 
   if (isLoading) {
-    return <div className="flex justify-center items-center h-screen">Loading...</div>;
+    return  <div className="flex justify-center py-6">
+                <BlinkingDots size="large" color="bg-supperagent" />
+              </div>;
   }
 
   return (

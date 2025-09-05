@@ -59,6 +59,11 @@ const EmploymentDetailsTab: React.FC<EmploymentDetailsTabProps> = ({
     { value: 'intern', label: 'Intern' }
   ];
 
+  const carTravelAllowanceOptions = [
+    { value: true, label: 'Yes' },
+    { value: false, label: 'No' }
+  ];
+
   return (
     <Card>
       <CardContent className="pt-6">
@@ -146,14 +151,12 @@ const EmploymentDetailsTab: React.FC<EmploymentDetailsTabProps> = ({
             id="carTravelAllowance"
             label="Car Travel Allowance"
             value={formData.carTravelAllowance}
-            type="checkbox"
-            onUpdate={(checked) =>
-              onCheckboxChange('carTravelAllowance', checked)
-            }
+            type="select"
+            options={carTravelAllowanceOptions}
+            onUpdate={(value) => onSelectChange('carTravelAllowance', value)}
             isSaving={isFieldSaving['carTravelAllowance']}
           />
 
-        
           <EditableField
             id="area"
             label="Area"

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { MoveLeft } from 'lucide-react';
 import { Tabs } from './Tabs';
@@ -33,6 +33,10 @@ const EditEmployee = () => {
     isFieldSaving
   } = useEditEmployee();
 
+  const location = useLocation();
+
+
+
   const{id} = useParams()
  
 const [user, setUser] = useState(null);
@@ -46,7 +50,15 @@ const [user, setUser] = useState(null);
       throw error;
     }
   }
-    
+  
+  
+  useEffect(() => {
+  if (location.state?.activeTab) {
+    setActiveTab(location.state.activeTab);
+  }
+}, [location.state, setActiveTab]);
+
+
   useEffect(() => {
     fetchEmployee();
   }, [id]);

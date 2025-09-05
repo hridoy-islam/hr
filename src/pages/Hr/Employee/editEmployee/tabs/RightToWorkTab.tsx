@@ -63,7 +63,9 @@ function RightToWorkTab() {
   const { toast } = useToast();
 
   const [visaStatus, setVisaStatus] = useState<'active' | 'expired'>('active');
-  const [complianceStatus, setComplianceStatus] = useState<'active' | 'expired'>('active');
+  const [complianceStatus, setComplianceStatus] = useState<
+    'active' | 'expired'
+  >('active');
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [expiryDate, setExpiryDate] = useState<Date | null>(null);
   const [nextCheckDate, setNextCheckDate] = useState<Date | null>(null);
@@ -75,6 +77,9 @@ function RightToWorkTab() {
 
   // Modal states
   const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const [updateType, setUpdateType] = useState<'visa' | 'compliance' | null>(
+    null
+  );
 
   // Track original values for dirty checking
   const [originalData, setOriginalData] = useState<{
@@ -83,17 +88,29 @@ function RightToWorkTab() {
     nextCheckDate: string | null;
   } | null>(null);
 
+  // Track form changes
+  const [visaFormChanged, setVisaFormChanged] = useState(false);
+  const [complianceFormChanged, setComplianceFormChanged] = useState(false);
+
   // === Fetch Data ===
   const fetchData = async () => {
     if (!id) return;
     try {
-      const rtwRes = await axiosInstance.get(`/hr/right-to-work?employeeId=${id}`);
+      const rtwRes = await axiosInstance.get(
+        `/hr/right-to-work?employeeId=${id}`
+      );
       const rtwData: RTWData = rtwRes.data.data.result[0];
 
       if (rtwData) {
-        const startDateObj = rtwData.startDate ? new Date(rtwData.startDate) : null;
-        const expiryDateObj = rtwData.expiryDate ? new Date(rtwData.expiryDate) : null;
-        const nextCheckDateObj = rtwData.nextCheckDate ? new Date(rtwData.nextCheckDate) : null;
+        const startDateObj = rtwData.startDate
+          ? new Date(rtwData.startDate)
+          : null;
+        const expiryDateObj = rtwData.expiryDate
+          ? new Date(rtwData.expiryDate)
+          : null;
+        const nextCheckDateObj = rtwData.nextCheckDate
+          ? new Date(rtwData.nextCheckDate)
+          : null;
 
         setRtwId(rtwData._id);
         setStartDate(startDateObj);
@@ -133,7 +150,10 @@ function RightToWorkTab() {
   };
 
   // === Auto Status Calculation ===
-  const recalculateStatus = (expiryStr: string | null, nextCheckStr: string | null) => {
+  const recalculateStatus = (
+    expiryStr: string | null,
+    nextCheckStr: string | null
+  ) => {
     const now = new Date();
 
     // Visa Status (based on visa expiry)
@@ -167,20 +187,27 @@ function RightToWorkTab() {
     }
   }, [expiryDate, nextCheckDate]);
 
-  // === Track if form has changes (dirty) ===
-  const isFormDirty = () => {
-    if (!originalData) return false;
+  // Check if visa form has changes
+  useEffect(() => {
+    if (!originalData) return;
 
-    const current = {
-      startDate: startDate?.toISOString().split('T')[0] || null,
-      expiryDate: expiryDate?.toISOString().split('T')[0] || null
-    };
+    const currentStart = startDate?.toISOString().split('T')[0] || null;
+    const currentExpiry = expiryDate?.toISOString().split('T')[0] || null;
 
-    return (
-      current.startDate !== originalData.startDate ||
-      current.expiryDate !== originalData.expiryDate
+    setVisaFormChanged(
+      currentStart !== originalData.startDate ||
+        currentExpiry !== originalData.expiryDate
     );
-  };
+  }, [startDate, expiryDate, originalData]);
+
+  // Check if compliance form has changes
+  useEffect(() => {
+    if (!originalData) return;
+
+    const currentNextCheck = nextCheckDate?.toISOString().split('T')[0] || null;
+
+    setComplianceFormChanged(currentNextCheck !== originalData.nextCheckDate);
+  }, [nextCheckDate, originalData]);
 
   // === Handle file input ===
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -197,41 +224,34 @@ function RightToWorkTab() {
     }
   };
 
-  // === Open modal for renewal (when compliance is expired) ===
-  const handleRenewClick = () => {
+  // === Open modal for update ===
+  const handleUpdateClick = (type: 'visa' | 'compliance') => {
     setUploadFile(null);
+    setUpdateType(type);
     setShowUpdateModal(true);
   };
 
   const handleSubmitUpdate = async () => {
-    if (complianceStatus === 'expired' && !uploadFile) {
-      toast({
-        title: 'Please upload a document to renew the RTW check.',
-        className: 'bg-destructive text-white'
-      });
-      return;
-    }
-
     setIsSubmitting(true);
     const formData = new FormData();
 
-    if (startDate) {
-      formData.append('startDate', moment(startDate).toISOString());
-    }
-    if (expiryDate) {
-      formData.append('expiryDate', moment(expiryDate).toISOString());
-    }
-    if (nextCheckDate) {
-      formData.append('nextCheckDate', moment(nextCheckDate).toISOString());
-    }
-
-    if (complianceStatus === 'expired') {
-      const newNextCheck = moment().add(90, 'days').toISOString();
-      formData.set('nextCheckDate', newNextCheck);
-      if (uploadFile) {
-        formData.append('document', uploadFile);
+    if (updateType === 'visa') {
+      if (startDate) {
+        formData.append('startDate', moment(startDate).toISOString());
+      }
+      if (expiryDate) {
+        formData.append('expiryDate', moment(expiryDate).toISOString());
+      }
+    } else if (updateType === 'compliance') {
+      if (nextCheckDate) {
+        formData.append('nextCheckDate', moment(nextCheckDate).toISOString());
       }
     }
+
+    if (uploadFile) {
+      formData.append('document', uploadFile);
+    }
+
     formData.append('updatedBy', user._id);
 
     try {
@@ -242,6 +262,7 @@ function RightToWorkTab() {
         className: 'bg-supperagent text-white'
       });
       setShowUpdateModal(false);
+      setUpdateType(null);
     } catch (err: any) {
       console.error('Error updating RTW:', err);
       toast({
@@ -254,8 +275,8 @@ function RightToWorkTab() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="space-y-6 p-6">
+    <div className="min-h-screen bg-gray-50 ">
+      <div className="space-y-6">
         {/* Combined Visa Info & Documents */}
         <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
           <h2 className="mb-6 flex items-center gap-3 text-xl font-semibold text-gray-900">
@@ -263,18 +284,24 @@ function RightToWorkTab() {
             Right to Work Verification
           </h2>
 
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
             {/* Visa Information (Left Side) */}
-            <div className="md:col-span-2 space-y-6">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="space-y-6">
+              <h3 className="text-lg font-medium text-gray-800">
+                Visa Information
+              </h3>
+
+              <div className="grid grid-cols-1 gap-4">
                 {/* Start Date */}
-                <div>
-                  <Label className="text-sm font-medium text-gray-700">Visa Start Date</Label>
+                <div className="flex flex-row items-center gap-4 ">
+                  <Label className="text-sm font-medium text-gray-700">
+                    Visa Start Date
+                  </Label>
                   <DatePicker
                     selected={startDate}
                     onChange={(date: Date | null) => setStartDate(date)}
                     dateFormat="dd-MM-yyyy"
-                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-1 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
                     placeholderText="Select start date"
                     showMonthDropdown
                     showYearDropdown
@@ -283,13 +310,15 @@ function RightToWorkTab() {
                 </div>
 
                 {/* Expiry Date */}
-                <div>
-                  <Label className="text-sm font-medium text-gray-700">Visa Expiry Date</Label>
+                <div className="flex flex-row items-center gap-4">
+                  <Label className="text-sm font-medium text-gray-700">
+                    Visa Expiry Date
+                  </Label>
                   <DatePicker
                     selected={expiryDate}
                     onChange={(date: Date | null) => setExpiryDate(date)}
                     dateFormat="dd-MM-yyyy"
-                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-1 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
                     placeholderText="Select expiry date"
                     showMonthDropdown
                     showYearDropdown
@@ -298,103 +327,142 @@ function RightToWorkTab() {
                 </div>
 
                 {/* Visa Status */}
-               <div className="flex flex-col space-y-2">
-  <Label className="text-sm font-medium text-gray-700">Visa Status</Label>
-  <div
-    className={`self-start inline-block rounded px-2 py-1 text-xs font-medium ${
-      visaStatus === 'active'
-        ? 'bg-gray-200 text-gray-800'
-        : 'bg-red-100 text-red-700'
-    }`}
-  >
-    {visaStatus === 'active' ? 'Active' : 'Expired'}
-  </div>
-</div>
+                <div className="flex flex-row items-center gap-4 space-y-2">
+                  <Label className="text-sm font-medium text-gray-700">
+                    Visa Status
+                  </Label>
+                  <Badge
+                    variant={
+                      visaStatus === 'active' ? 'default' : 'destructive'
+                    }
+                    className="self-start"
+                  >
+                    {visaStatus === 'active' ? 'Active' : 'Expired'}
+                  </Badge>
+                </div>
 
+                {/* Update Button */}
+                {visaFormChanged && (
+                  <div className="mt-2">
+                    <Button
+                      onClick={() => handleUpdateClick('visa')}
+                      className="bg-supperagent text-white hover:bg-supperagent/90"
+                    >
+                      Update Visa Information
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
 
+            {/* Compliance Information (Right Side) */}
+            <div className="space-y-6">
+              <h3 className="text-lg font-medium text-gray-800">
+                Compliance Information
+              </h3>
 
+              <div className="grid grid-cols-1 gap-4">
                 {/* RTW Check Date */}
-                <div>
-                  <Label className="text-sm font-medium text-gray-700">RTW Check Date</Label>
+                <div className="flex flex-row items-center gap-4">
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700">
+                      RTW Check Date
+                    </Label>
+                    <p className="mt-1 text-xs text-gray-500">
+                      (Every 3 months)
+                    </p>
+                  </div>
                   <div className="flex items-center gap-2">
                     <DatePicker
                       selected={nextCheckDate}
                       onChange={(date: Date | null) => setNextCheckDate(date)}
                       dateFormat="dd-MM-yyyy"
-                      className="w-full rounded-md border border-gray-300 px-3 py-1 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                      className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
                       placeholderText="Next check date"
-                      // disabled
+                      showMonthDropdown
+                      showYearDropdown
+                      dropdownMode="select"
                     />
-                    {complianceStatus === 'expired' && (
-                      <Badge variant="destructive" className="text-xs px-2">
-                        Expired
-                      </Badge>
-                    )}
                   </div>
-                  <p className="mt-1 text-xs text-gray-500">(Every 3 months)</p>
                 </div>
-              </div>
 
-              {/* Action Button */}
-              {(isFormDirty() || complianceStatus === 'expired') && (
-                <div className="mt-6 flex justify-end">
-                  <Button
-                    onClick={
-                      complianceStatus === 'expired' ? handleRenewClick : handleSubmitUpdate
+                {/* Compliance Status */}
+                <div className="flex flex-row items-center gap-4 space-y-2">
+                  <Label className="text-sm font-medium text-gray-700">
+                    Compliance Status
+                  </Label>
+                  <Badge
+                    variant={
+                      complianceStatus === 'active' ? 'default' : 'destructive'
                     }
-                    className="bg-supperagent hover:bg-supperagent/90 text-white"
                   >
-                    {complianceStatus === 'expired' ? 'Renew Check' : 'Save Changes'}
-                  </Button>
+                    {complianceStatus === 'active' ? 'Active' : 'Expired'}
+                  </Badge>
                 </div>
-              )}
-            </div>
 
-            {/* Scrollable Documents Section (Right Side) */}
-            <div className="flex flex-col">
-              <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-800">
-                <FileText className="h-5 w-5 text-supperagent" />
-                Uploaded Documents
-              </h3>
-
-              <div className="flex-1 overflow-y-auto rounded-md border border-gray-200 bg-gray-50 p-3 max-h-96">
-                {documents.length > 0 ? (
-                  <ul className="space-y-3">
-                    {documents.map((doc) => (
-                      <li
-                        key={doc.id}
-                        className="flex items-center justify-between rounded border border-gray-100 bg-white p-3 shadow-sm hover:bg-gray-50"
-                      >
-                        <div className="flex items-center gap-2 truncate">
-                          <FileText className="h-4 w-4 text-gray-600" />
-                          <div className="truncate text-xs">
-                            <p className="font-medium text-gray-900">{doc.name}</p>
-                            <p className="text-gray-500">
-                              {doc.uploadDate} • {doc.size}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <button className="rounded p-1 text-gray-600 hover:bg-blue-50 hover:text-supperagent">
-                            <Eye className="h-3 w-3" />
-                          </button>
-                          <button className="rounded p-1 text-gray-600 hover:bg-green-50 hover:text-green-600">
-                            <Download className="h-3 w-3" />
-                          </button>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-center text-sm text-gray-500 italic">No documents uploaded</p>
+                {/* Update Button */}
+                {complianceFormChanged && (
+                  <div className="mt-2">
+                    <Button
+                      onClick={() => handleUpdateClick('compliance')}
+                      className="bg-supperagent text-white hover:bg-supperagent/90"
+                    >
+                      Update Compliance
+                    </Button>
+                  </div>
                 )}
               </div>
+            </div>
+          </div>
+
+          {/* Documents Section */}
+          <div className="mt-8 border-t border-gray-200 pt-6">
+            <h3 className="mb-4 flex items-center gap-2 text-lg font-medium text-gray-800">
+              <FileText className="h-5 w-5 text-supperagent" />
+              Uploaded Documents
+            </h3>
+
+            <div className="rounded-md border border-gray-200 bg-gray-50 p-4">
+              {documents.length > 0 ? (
+                <ul className="space-y-3">
+                  {documents.map((doc) => (
+                    <li
+                      key={doc.id}
+                      className="flex items-center justify-between rounded border border-gray-100 bg-white p-3 shadow-sm hover:bg-gray-50"
+                    >
+                      <div className="flex items-center gap-2 truncate">
+                        <FileText className="h-4 w-4 text-gray-600" />
+                        <div className="truncate text-sm">
+                          <p className="font-medium text-gray-900">
+                            {doc.name}
+                          </p>
+                          <p className="text-gray-500">
+                            {doc.uploadDate} • {doc.size}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button className="rounded p-1 text-gray-600 hover:bg-blue-50 hover:text-supperagent">
+                          <Eye className="h-4 w-4" />
+                        </button>
+                        <button className="rounded p-1 text-gray-600 hover:bg-green-50 hover:text-green-600">
+                          <Download className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-center text-sm italic text-gray-500">
+                  No documents uploaded
+                </p>
+              )}
             </div>
           </div>
         </div>
 
         {/* History Section */}
-        <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+        <div className="max-h-96 overflow-auto rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
           <h2 className="mb-4 text-xl font-semibold text-gray-900">History</h2>
           <div className="overflow-x-auto">
             <Table>
@@ -407,10 +475,15 @@ function RightToWorkTab() {
               <TableBody>
                 {history
                   .slice()
-                  .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                  .sort(
+                    (a, b) =>
+                      new Date(b.date).getTime() - new Date(a.date).getTime()
+                  )
                   .map((entry) => (
                     <TableRow key={entry._id} className="hover:bg-gray-50">
-                      <TableCell className="text-gray-900">{entry.title}</TableCell>
+                      <TableCell className="text-gray-900">
+                        {entry.title}
+                      </TableCell>
                       <TableCell className="text-right text-gray-600">
                         {typeof entry.updatedBy === 'object'
                           ? `${entry.updatedBy.firstName} ${entry.updatedBy.lastName}`
@@ -425,18 +498,26 @@ function RightToWorkTab() {
         </div>
       </div>
 
-      {/* Renew Modal */}
-      {showUpdateModal && complianceStatus === 'expired' && (
+      {/* Update Modal */}
+      {showUpdateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-lg">
-            <h2 className="mb-4 text-lg font-semibold text-gray-900">Renew RTW Check</h2>
+            <h2 className="mb-4 text-lg font-semibold text-gray-900">
+              {updateType === 'visa'
+                ? 'Update Visa Information'
+                : 'Update Compliance Check'}
+            </h2>
             <p className="mb-4 text-sm text-gray-700">
-              Your RTW compliance check is expired. Please upload a valid document (PDF) to renew. The next check date will be set to 90 days from now.
+              {updateType === 'visa'
+                ? 'You are updating visa information. You may optionally upload a supporting document.'
+                : 'You are updating the compliance check date. You may optionally upload a supporting document.'}
             </p>
 
             <div className="space-y-4">
               <div>
-                <Label htmlFor="rtw-upload">Upload Document (PDF)</Label>
+                <Label htmlFor="rtw-upload">
+                  Upload Document (PDF - Optional)
+                </Label>
                 <Input
                   id="rtw-upload"
                   type="file"
@@ -445,7 +526,10 @@ function RightToWorkTab() {
                   className="mt-1"
                 />
                 {uploadFile && (
-                  <p className="mt-2 truncate text-sm text-green-600" title={uploadFile.name}>
+                  <p
+                    className="mt-2 truncate text-sm text-green-600"
+                    title={uploadFile.name}
+                  >
                     📄 {uploadFile.name}
                   </p>
                 )}
@@ -453,15 +537,22 @@ function RightToWorkTab() {
             </div>
 
             <div className="mt-6 flex justify-end gap-3">
-              <Button variant="ghost" onClick={() => setShowUpdateModal(false)} disabled={isSubmitting}>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowUpdateModal(false);
+                  setUpdateType(null);
+                }}
+                disabled={isSubmitting}
+              >
                 Cancel
               </Button>
               <Button
-                className="bg-supperagent hover:bg-supperagent/90 text-white"
+                className="bg-supperagent text-white hover:bg-supperagent/90"
                 onClick={handleSubmitUpdate}
-                disabled={!uploadFile || isSubmitting}
+                disabled={isSubmitting}
               >
-                {isSubmitting ? 'Uploading...' : 'Submit'}
+                {isSubmitting ? 'Updating...' : 'Update'}
               </Button>
             </div>
           </div>

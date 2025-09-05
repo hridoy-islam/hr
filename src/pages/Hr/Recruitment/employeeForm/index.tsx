@@ -78,7 +78,7 @@ function EmployeeForm() {
   
 
   const handleSkip = () => {
-    if (step < 3) {
+    if (step < 2) {
       setStep(step + 1);
     } else {
       navigate('/admin/hr/employee');

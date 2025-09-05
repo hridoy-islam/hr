@@ -1,285 +1,454 @@
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import moment from 'moment';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from '@/components/ui/table';
+import { Trash2, Pencil } from 'lucide-react';
 import axiosInstance from '@/lib/axios';
+import moment from 'moment';
+import ReactSelect from 'react-select';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 
+// Types
+type TrainingOption = {
+  value: string;
+  label: string;
+  validityDays?: number;
+};
+
+type LocalTraining = {
+  _id?: string;
+  trainingId: string;
+  trainingName: string;
+  assignedDate: string; // YYYY-MM-DD
+  expireDate?: string | null;
+  status: 'inProgress' | 'completed' | 'expired';
+  completedAt?: string; // optional date
+  certificate?: File | null;
+};
+
 const TrainingTab = ({ formData, onUpdate, isFieldSaving }) => {
-  const [trainings, setTrainings] = useState([]);
-  const [localTrainings, setLocalTrainings] = useState<
-    Array<{
-      _id?: string;
-      trainingId: string;
-      startDate?: string;
-      endDate?: string;
-      status: 'pending' | 'completed';
-      dirty?: boolean;
-    }>
+  const [trainings, setTrainings] = useState<
+    Array<{ _id: string; name: string; validityDays?: number }>
   >([]);
+  const [localTrainings, setLocalTrainings] = useState<LocalTraining[]>([]);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [dialogData, setDialogData] = useState<Partial<LocalTraining>>({
+    trainingId: '',
+    assignedDate: '',
+    status: 'inProgress',
+    certificate: null
+  });
 
-  // Fetch trainings
-  const fetchData = async () => {
-    try {
-      const res = await axiosInstance('/hr/training');
-      setTrainings(res.data.data.result);
-    } catch (error) {
-      console.error('Error fetching trainings:', error);
-    }
-  };
-
+  // Fetch available trainings
   useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const res = await axiosInstance('/hr/training');
+        setTrainings(res.data.data.result || []);
+      } catch (error) {
+        console.error('Error fetching trainings:', error);
+      }
+    };
     fetchData();
   }, []);
 
-  // Map backend data
+  // Map formData.training to localTrainings
   useEffect(() => {
     if (formData.training && Array.isArray(formData.training)) {
-      const mapped = formData.training.map((t) => ({
-        _id: t._id,
-        trainingId: t.trainingId?._id || t.trainingId,
-        startDate: t.startDate ? moment(t.startDate).format('DD-MM-YYYY') : '',
-        endDate: t.endDate ? moment(t.endDate).format('DD-MM-YYYY') : '',
-        status: t.status || 'pending',
-        dirty: false
-      }));
+      const mapped = formData.training.map((t) => {
+        const trainingInfo = trainings.find(
+          (tr) => tr._id === (t.trainingId?._id || t.trainingId)
+        );
+        const validityDays = trainingInfo?.validityDays || 90;
+
+        const assignedDate = t.assignedDate
+          ? moment(t.assignedDate).format('YYYY-MM-DD')
+          : '';
+        const expireDate = assignedDate
+          ? moment(assignedDate).add(validityDays, 'days').format('YYYY-MM-DD')
+          : '';
+
+        let status: 'inProgress' | 'completed' | 'expired' =
+          t.status || 'inProgress';
+        if (
+          expireDate &&
+          moment().isAfter(expireDate) &&
+          status !== 'completed'
+        ) {
+          status = 'expired';
+        }
+
+        return {
+          _id: t._id,
+          trainingId: t.trainingId?._id || t.trainingId,
+          trainingName: t.trainingId?.name || trainingInfo?.name || '-',
+          assignedDate,
+          expireDate,
+          status,
+          completedAt: t.completedAt
+            ? moment(t.completedAt).format('YYYY-MM-DD')
+            : undefined,
+          certificate: t.certificate || null
+        };
+      });
       setLocalTrainings(mapped);
     }
-  }, [formData.training]);
+  }, [formData.training, trainings]);
 
-  const trainingOptions = trainings.map((dep) => ({
-    value: dep._id,
-    label: dep.name
+  // React Select options
+  const trainingOptions: TrainingOption[] = trainings.map((t) => ({
+    value: t._id,
+    label: t.name,
+    validityDays: t.validityDays
   }));
 
-  const getValidityDays = (trainingId: string) => {
-    const training = trainings.find((t) => t._id === trainingId);
-    return training?.validityDays || 0;
-  };
+  const selectedTrainingOption = trainingOptions.find(
+    (t) => t.value === dialogData.trainingId
+  );
 
-  const handleAddTraining = () => {
-    setLocalTrainings((prev) => [
-      ...prev,
-      {
+  // Auto-calc expireDate
+  useEffect(() => {
+    if (dialogData.assignedDate && selectedTrainingOption?.validityDays) {
+      const expiry = moment(dialogData.assignedDate)
+        .add(selectedTrainingOption.validityDays, 'days')
+        .format('YYYY-MM-DD');
+      setDialogData((prev) => ({ ...prev, expireDate: expiry }));
+    }
+  }, [dialogData.assignedDate, selectedTrainingOption]);
+
+  // Open dialog
+  const openDialog = (index: number | null = null) => {
+    if (index !== null) {
+      const training = localTrainings[index];
+      setEditingIndex(index);
+      setDialogData({ ...training });
+    } else {
+      setEditingIndex(null);
+      setDialogData({
         trainingId: '',
-        startDate: '',
-        endDate: '',
-        status: 'pending',
-        dirty: true
-      }
-    ]);
+        assignedDate: '',
+        status: 'inProgress',
+        certificate: null,
+        expireDate: '',
+        completedAt: ''
+      });
+    }
+    setIsDialogOpen(true);
   };
 
-  const handleRemoveTraining = (index: number) => {
+  const handleDialogChange = (field: string, value: any) => {
+    setDialogData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  // Save training
+  const handleSave = () => {
+    if (!dialogData.trainingId || !dialogData.assignedDate) {
+      alert('Please select a training and assigned date.');
+      return;
+    }
+
+    const trainingInfo = trainings.find(
+      (t) => t._id === dialogData.trainingId
+    )!;
+
+    let status: 'inProgress' | 'completed' | 'expired' =
+      dialogData.status as any;
+
+    // Only auto-expire if status is not manually completed
+    if (
+      dialogData.expireDate &&
+      moment().isAfter(dialogData.expireDate) &&
+      status !== 'completed'
+    ) {
+      status = 'expired';
+    }
+
+    // Completed At logic
+    let completedAt = dialogData.completedAt;
+    if (status === 'completed' && !completedAt) {
+      completedAt = moment().format('YYYY-MM-DD');
+    }
+
+    const newTraining: LocalTraining = {
+      _id: dialogData._id,
+
+      trainingId: dialogData.trainingId,
+      assignedDate: dialogData.assignedDate,
+      expireDate: dialogData.expireDate || '',
+      status,
+      completedAt,
+      certificate: dialogData.certificate || null
+    };
+
+    if (editingIndex !== null) {
+      const updated = localTrainings.map((t, i) =>
+        i === editingIndex ? newTraining : t
+      );
+      setLocalTrainings(updated);
+      onUpdate('training', updated);
+    } else {
+      const updated = [...localTrainings, newTraining];
+      setLocalTrainings(updated);
+      onUpdate('training', updated);
+    }
+
+    setIsDialogOpen(false);
+    setEditingIndex(null);
+    setDialogData({});
+  };
+
+  const handleRemove = (index: number) => {
     const updated = localTrainings.filter((_, i) => i !== index);
     setLocalTrainings(updated);
     onUpdate('training', updated);
   };
 
-  const handleDetailChange = (
-    index: number,
-    field: 'trainingId' | 'startDate' | 'endDate' | 'status',
-    value: string
-  ) => {
-    const updated = [...localTrainings];
-    updated[index][field] = value;
-
-    // Recalculate endDate if needed
-    if (
-      (field === 'startDate' || field === 'trainingId') &&
-      updated[index].startDate &&
-      updated[index].trainingId
-    ) {
-      const validityDays = getValidityDays(updated[index].trainingId);
-      updated[index].endDate = moment(updated[index].startDate, 'DD-MM-YYYY')
-        .add(validityDays, 'days')
-        .format('DD-MM-YYYY');
-    }
-
-    updated[index].dirty = true;
-    setLocalTrainings(updated);
-  };
-
-  const getAvailableTrainings = (currentIdx: number) => {
-    const used = localTrainings
-      .filter((_, i) => i !== currentIdx)
-      .map((t) => t.trainingId);
-    return trainingOptions.filter((opt) => !used.includes(opt.value));
-  };
-
-  const handleSaveRow = (index: number) => {
-    onUpdate('training', localTrainings);
-    const updated = [...localTrainings];
-    updated[index].dirty = false;
-    setLocalTrainings(updated);
-  };
-
   return (
     <Card>
       <CardContent className="pt-6">
-        <div className="grid grid-cols-1">
-          {/* Add Training Button */}
-          <div className="flex justify-end pb-4">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleAddTraining}
-              disabled={isFieldSaving['training']}
-            >
-              + Add Training
-            </Button>
-          </div>
-
-          {/* Dynamic Training Entries */}
-          {localTrainings.length > 0 ? (
-            <div className="col-span-full space-y-2">
-              {localTrainings.map((training, index) => {
-                const selectedTraining = trainings.find(
-                  (t) => t._id === training.trainingId
-                );
-                const validityDays = selectedTraining?.validityDays;
-
-                return (
-                  <div
-                    key={index}
-                    className="space-y-1 rounded-lg border border-gray-300 bg-white p-3 shadow-sm"
-                  >
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-5">
-                      {/* Training Selection */}
-                      <div>
-                        <label className="mb-1 block text-xs font-medium text-gray-600">
-                          Training
-                        </label>
-                        <select
-                          value={training.trainingId}
-                          onChange={(e) =>
-                            handleDetailChange(
-                              index,
-                              'trainingId',
-                              e.target.value
-                            )
-                          }
-                          className="w-full rounded border border-gray-300 p-2 text-sm focus:ring-2 focus:ring-blue-100"
-                        >
-                          <option value="">Choose Training</option>
-                          {getAvailableTrainings(index).map((opt) => (
-                            <option key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </option>
-                          ))}
-                        </select>
-                        {validityDays !== undefined && training.trainingId && (
-                          <p className="mt-1 text-xs text-gray-500">
-                            Valid for {validityDays} days
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Start Date */}
-                      <div>
-                        <label className="mb-1 block text-xs font-medium text-gray-600">
-                          Training Date
-                        </label>
-                        <DatePicker
-                          selected={
-                            training.startDate
-                              ? moment(
-                                  training.startDate,
-                                  'DD-MM-YYYY'
-                                ).toDate()
-                              : null
-                          }
-                          onChange={(date) => {
-                            const formatted = date
-                              ? moment(date).format('DD-MM-YYYY')
-                              : '';
-                            handleDetailChange(index, 'startDate', formatted);
-                          }}
-                          dateFormat="dd-MM-yyyy"
-                          className="w-full rounded border border-gray-300 p-2 text-sm"
-                          placeholderText="DD-MM-YYYY"
-                          wrapperClassName="w-full"
-                        />
-                      </div>
-
-                      {/* End Date */}
-                      <div>
-                        <label className="mb-1 block text-xs font-medium text-gray-600">
-                          Validity Date
-                        </label>
-                        <DatePicker
-                          selected={
-                            training.endDate
-                              ? moment(training.endDate, 'DD-MM-YYYY').toDate()
-                              : null
-                          }
-                          dateFormat="dd-MM-yyyy"
-                          className="w-full cursor-not-allowed rounded border border-gray-300 bg-gray-50 p-2 text-sm text-gray-700"
-                          placeholderText="DD-MM-YYYY"
-                          readOnly
-                          wrapperClassName="w-full"
-                        />
-                      </div>
-
-                      {/* Status */}
-                      <div>
-                        <label className="mb-1 block text-xs font-medium text-gray-600">
-                          Status
-                        </label>
-                        <select
-                          value={training.status}
-                          onChange={(e) =>
-                            handleDetailChange(
-                              index,
-                              'status',
-                              e.target.value as any
-                            )
-                          }
-                          className="w-full rounded border border-gray-300 p-2 text-sm"
-                        >
-                          <option value="pending">Pending</option>
-                          <option value="completed">Completed</option>
-                        </select>
-                      </div>
-
-                      {/* Remove */}
-                      <div className="flex flex-col items-center justify-center space-y-1">
-                        <Button
-                          type="button"
-                          variant="default"
-                          className="w-full text-xs text-red-500"
-                          onClick={() => handleRemoveTraining(index)}
-                        >
-                          Remove
-                        </Button>
-                      </div>
-                    </div>
-                    {training.dirty && (
-                      <div className="flex w-full justify-end">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="default"
-                          onClick={() => handleSaveRow(index)}
-                          disabled={isFieldSaving['training']}
-                          className="w-[150px] bg-supperagent text-white hover:bg-supperagent/90"
-                        >
-                          Save
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <p className="col-span-full text-sm italic text-gray-500">
-              No trainings assigned yet. Click "Add Training" to begin.
-            </p>
-          )}
+        {/* Add Training */}
+        <div className="mb-4 flex justify-end">
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => openDialog(null)}
+            disabled={isFieldSaving['training']}
+            className="bg-supperagent text-white hover:bg-supperagent/90"
+          >
+            + Add Training
+          </Button>
         </div>
+
+        {/* Training Table */}
+        {localTrainings.length > 0 ? (
+          <div className="overflow-hidden  rounded-md">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Training</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Assigned Date</TableHead>
+                  <TableHead>Completed At</TableHead>
+                  <TableHead>Expiry Date</TableHead>
+                  <TableHead>Certificate</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {localTrainings.map((t, index) => (
+                  <TableRow key={index}>
+                    <TableCell className="font-medium">
+                      {t.trainingName}
+                    </TableCell>
+                    <TableCell>
+                      <span
+                        className={`rounded-full px-2 py-1 text-xs ${
+                          t.status === 'completed'
+                            ? 'bg-green-100 text-green-800'
+                            : t.status === 'expired'
+                              ? 'bg-red-100 text-red-800'
+                              : 'bg-yellow-100 text-yellow-800'
+                        }`}
+                      >
+                        {t.status.charAt(0).toUpperCase() + t.status.slice(1)}
+                      </span>
+                    </TableCell>
+                    <TableCell>{t.assignedDate}</TableCell>
+                    <TableCell>{t.completedAt || '-'}</TableCell>
+                    <TableCell>{t.expireDate}</TableCell>
+                    <TableCell>
+                      {t.certificate ? (
+                        <a
+                          href={URL.createObjectURL(t.certificate)}
+                          target="_blank"
+                          className="text-sm text-blue-600 underline"
+                        >
+                          View
+                        </a>
+                      ) : (
+                        '-'
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="default"
+                          size="icon"
+                          onClick={() => openDialog(index)}
+                          className="bg-supperagent text-white hover:bg-supperagent/90"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        ) : (
+          <p className="text-sm italic text-gray-500">
+            No trainings assigned yet.
+          </p>
+        )}
+
+        {/* Dialog */}
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>
+                {editingIndex !== null ? 'Edit Training' : 'Add Training'}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="training">Training</Label>
+                <ReactSelect
+                  id="training"
+                  options={trainingOptions}
+                  value={
+                    trainingOptions.find(
+                      (t) => t.value === dialogData.trainingId
+                    ) || null
+                  }
+                  onChange={(selected) =>
+                    handleDialogChange('trainingId', selected?.value)
+                  }
+                  placeholder="Select Training"
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label>Assigned Date</Label>
+                <Input
+                  type="date"
+                  value={dialogData.assignedDate || ''}
+                  onChange={(e) =>
+                    handleDialogChange('assignedDate', e.target.value)
+                  }
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label>Status</Label>
+                <Select
+                  value={dialogData.status}
+                  onValueChange={(value) => handleDialogChange('status', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="inProgress">In Progress</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value="expired">Expired</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {dialogData.status === 'completed' && (
+                <div className="grid gap-2">
+                  <Label>Completed At</Label>
+                  <DatePicker
+                    selected={
+                      dialogData.completedAt
+                        ? moment(dialogData.completedAt).toDate()
+                        : null
+                    }
+                    onChange={(date: Date | null) =>
+                      handleDialogChange(
+                        'completedAt',
+                        date ? moment(date).format('YYYY-MM-DD') : ''
+                      )
+                    }
+                    dateFormat="yyyy-MM-dd"
+                    className="w-full rounded-md border px-3 py-2 text-sm"
+                    placeholderText="Select completed date"
+                    maxDate={new Date()}
+                    isClearable
+                  />
+                </div>
+              )}
+
+              <div className="grid gap-2">
+                <Label>Expiry Date</Label>
+                <Input
+                  type="date"
+                  value={dialogData.expireDate || ''}
+                  disabled
+                  className="bg-gray-100"
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label>Certificate (Optional)</Label>
+                <Input
+                  type="file"
+                  accept=".pdf,.jpg,.png"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    handleDialogChange('certificate', file);
+                  }}
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsDialogOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={handleSave}
+                className="bg-supperagent text-white hover:bg-supperagent/90"
+              >
+                Save
+              </Button>
+              {/* {editingIndex !== null && (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={() => {
+                    handleRemove(editingIndex);
+                    setIsDialogOpen(false);
+                  }}
+                  className="ml-auto"
+                >
+                  Delete
+                </Button>
+              )} */}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>
   );
