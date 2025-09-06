@@ -69,11 +69,11 @@ const navItems = [
     roles: ['admin']
   },
   {
-        icon: BookText,
-        label: 'Training',
-        href: 'training',
-        roles: ['employee']
-      },
+    icon: BookText,
+    label: 'Training',
+    href: 'training',
+    roles: ['employee']
+  },
   {
     icon: UsersIcon,
     label: 'Employee',
@@ -107,7 +107,7 @@ const navItems = [
         icon: BookText,
         label: 'Training',
         href: 'training',
-        roles: ['admin','employee']
+        roles: ['admin']
       }
     ]
   },
@@ -224,11 +224,17 @@ const filterNavItemsByRole = (items, userRole) => {
 
 const NavItem = ({ item, expandedItems, toggleExpanded, depth = 0 }) => {
   const location = useLocation();
-  const isActiveLeaf =
-    !item.subItems &&
-    (item.href === ''
-      ? location.pathname === '/admin/hr/'
-      : location.pathname.startsWith('/admin/hr/' + item.href));
+const isActiveLeaf =
+  !item.subItems &&
+  (item.href === ''
+    ? location.pathname === '/admin/hr/'
+    : location.pathname === `/admin/hr/${item.href}`);
+
+const isActiveParent =
+  item.subItems &&
+  location.pathname.startsWith(`/admin/hr/${item.href}`);
+
+
 
   const isExpanded = expandedItems[item.label];
 

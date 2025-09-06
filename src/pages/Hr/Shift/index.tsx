@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Pen, Plus, Trash } from 'lucide-react';
+import { Clock, Pen, Plus, Trash } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -112,9 +112,12 @@ export default function Shift() {
   const navigate = useNavigate();
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 bg-white p-6 rounded-md shadow-sm">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">All Shifts</h1>
+        <h2 className="flex items-center gap-2 text-2xl font-bold text-gray-900">
+          <Clock className="h-6 w-6" />
+          Shifts
+        </h2>{' '}
         <Button
           className="bg-supperagent text-white hover:bg-supperagent/90"
           size={'sm'}

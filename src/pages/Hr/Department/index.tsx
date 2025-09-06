@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Pen, Plus } from 'lucide-react';
+import { Building, Pen, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import {
@@ -126,9 +126,12 @@ export default function Department() {
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 bg-white p-6 rounded-md shadow-sm">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">All Department</h1>
+         <h2 className="flex items-center gap-2 text-2xl font-bold text-gray-900">
+            <Building className="h-6 w-6" />
+            All Departments
+          </h2>{' '}
         <Button
           className="bg-supperagent text-white hover:bg-supperagent/90"
           size={'sm'}

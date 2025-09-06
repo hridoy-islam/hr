@@ -1,4 +1,3 @@
-'use client';
 import { Icons } from '@/components/ui/icons';
 import { cn } from '@/lib/utils';
 import { NavItem } from '@/types';

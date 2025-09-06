@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Eye, Pen } from 'lucide-react';
+import { CalendarFold, Eye, Pen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -153,9 +153,12 @@ export default function Attendance() {
   const currentYear = new Date().getFullYear();
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 bg-white p-6 rounded-md shadow-sm">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">All Attendances</h1>
+       <h2 className="flex items-center gap-2 text-2xl font-bold text-gray-900">
+          <CalendarFold  className="h-6 w-6" />
+          Attendance Records
+        </h2>{' '}
       </div>
 
       <div className="flex items-center space-x-4">

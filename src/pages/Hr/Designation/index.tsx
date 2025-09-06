@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Eye, Pen, Plus } from 'lucide-react';
+import { Award, Eye, Pen, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
@@ -79,9 +79,12 @@ export default function Designation() {
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 bg-white p-6 rounded-md shadow-sm">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">All Designations</h1>
+        <h2 className="flex items-center gap-2 text-2xl font-bold text-gray-900">
+          <Award className="h-6 w-6" />
+          All Designations
+        </h2>{' '}
         <Button
           className="bg-supperagent text-white hover:bg-supperagent/90"
           size="sm"
@@ -124,7 +127,7 @@ export default function Designation() {
               <TableRow>
                 <TableHead>Title</TableHead>
                 <TableHead>Description</TableHead>
-                
+
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -133,7 +136,7 @@ export default function Designation() {
                 <TableRow key={d._id}>
                   <TableCell>{d.title}</TableCell>
                   <TableCell>{d.description || '—'}</TableCell>
-                 
+
                   <TableCell className="text-right">
                     <Button
                       variant="ghost"

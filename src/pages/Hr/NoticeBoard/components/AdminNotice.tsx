@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Pen, Plus } from 'lucide-react';
+import { AlertCircle, PaperclipIcon, Pen, Plus, Users2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import {
@@ -186,9 +186,12 @@ export default function AdminNoticeBoard() {
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 bg-white p-6 rounded-md shadow-sm">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">All Notice</h1>
+       <h2 className=" flex items-center gap-2 text-2xl font-bold text-gray-900">
+            <AlertCircle className="h-6 w-6" />
+            All Notice
+          </h2>
         <Button
           className="bg-supperagent text-white hover:bg-supperagent/90"
           size={'sm'}
@@ -340,12 +343,12 @@ export default function AdminNoticeBoard() {
             <TableBody>
               {notice.map((n) => (
                 <TableRow key={n._id}>
-                  <TableCell>{n.noticeType}</TableCell>
+                  <TableCell>{n.noticeType.charAt(0).toUpperCase()+n.noticeType.slice(1)}</TableCell>
                   <TableCell>{n.noticeDescription}</TableCell>
                   <TableCell>
                     {moment(n.noticeDate).format('MMMM Do YYYY')}
                   </TableCell>
-                  <TableCell>{n.noticeBy}</TableCell>
+                  <TableCell>{n.noticeBy?.firstName} {n.noticeBy?.lastName}</TableCell>
                   <TableCell>
                     {n.department
                       ?.map((d: any) => d.departmentName)

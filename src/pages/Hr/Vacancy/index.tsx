@@ -90,10 +90,13 @@ export default function Vacancy() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 rounded-md bg-white p-6 shadow-sm">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">All Vacancy</h1>
+        <h2 className=" flex items-center gap-2 text-2xl font-bold text-gray-900">
+          <Users2 className="h-6 w-6" />
+          All Vacancies
+        </h2>
         <Button
           className="bg-supperagent text-white hover:bg-supperagent/90"
           size="sm"
@@ -141,9 +144,7 @@ export default function Vacancy() {
                 <TableHead>Application Deadline</TableHead>
                 <TableHead>Posted By</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="text-right" >
-                  Actions
-                </TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

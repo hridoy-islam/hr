@@ -376,7 +376,7 @@ const handleDownloadPDF = async (payroll: TPayroll) => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="space-y-4 p-4">
+      <div className="space-y-4">
         {/* Summary Cards */}
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           <div className="rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 p-6 text-white">

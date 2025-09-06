@@ -62,9 +62,15 @@ interface HolidayData {
 
 interface Notice {
   _id: string;
-  title: string;
-  content: string;
-  date: string;
+  noticeType: string;
+  noticeDescription: string;
+  noticeDate: string;
+  noticeBy?: string;
+  status: string;
+  noticeSetting: "all" | "department" | "designation" | "individual";
+  department: any[];
+  designation: any[];
+  users: any[];
 }
 
 const StaffDashboardPage = () => {
@@ -256,33 +262,55 @@ const StaffDashboardPage = () => {
     }
   };
 
-  // === Fetch: Notices (from /hr/notice) ===
-  const fetchNotices = async () => {
-    try {
-      const res = await axiosInstance.get('/hr/notice', {
-        params: {
-          status: 'active',
-          sort: '-noticeDate',
-          limit: 5
-        }
-      });
+const capitalize = (str: string) =>
+  str.charAt(0).toUpperCase() + str.slice(1);
 
-      const fetched =
-        res.data?.data?.result || res.data?.data || res.data || [];
+// === Fetch: Notices (with filtering like StaffNoticeBoard) ===
+const fetchNotices = async () => {
+  try {
+    const res = await axiosInstance.get("/hr/notice", {
+      params: {
+        status: "active",
+        sort: "-noticeDate",
+        limit: 3,
+      },
+    });
 
-      const mappedNotices = fetched.map((n: any) => ({
-        _id: n._id,
-        title: n.noticeType,
-        content: n.noticeDescription,
-        date: n.noticeDate
-      }));
+    const fetched: Notice[] =
+      res.data?.data?.result || res.data?.data || res.data || [];
 
-      setNotices(mappedNotices);
-    } catch (error) {
-      console.error('Failed to fetch notices:', error);
-      setNotices([]); // Ensure empty array on error
-    }
-  };
+    // --- Filter notices for current user ---
+    const filtered = fetched.filter((notice) => {
+      switch (notice.noticeSetting) {
+        case "all":
+          return true;
+        case "department":
+          return notice.department.some((d: any) => d._id === user.department);
+        case "designation":
+          return notice.designation.some((des: any) => des._id === user.designation);
+        case "individual":
+          return notice.users.some((u: any) =>
+            typeof u === "string" ? u === user._id : u._id === user._id
+          );
+        default:
+          return false;
+      }
+    });
+
+    // Map into display format
+    const mapped = filtered.map((n) => ({
+      _id: n._id,
+      title: capitalize(n.noticeType),
+      content: n.noticeDescription,
+      date: n.noticeDate,
+    }));
+
+    setNotices(mapped);
+  } catch (error) {
+    console.error("Failed to fetch notices:", error);
+    setNotices([]);
+  }
+};
 
   // === Load All Data ===
   useEffect(() => {

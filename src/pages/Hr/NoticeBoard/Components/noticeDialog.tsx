@@ -9,6 +9,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import axiosInstance from '@/lib/axios';
+import { useSelector } from 'react-redux';
 
 interface NoticeDialogProps {
   open: boolean;
@@ -45,6 +46,7 @@ export function NoticeDialog({
   const [department, setDepartment] = useState<any[]>([]);
   const [designation, setDesignation] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
+  const user = useSelector((state: any) => state.auth?.user) || null;
 
   const [departmentOptions, setDepartmentOptions] = useState<any[]>([]);
   const [designationOptions, setDesignationOptions] = useState<any[]>([]);
@@ -154,7 +156,6 @@ export function NoticeDialog({
           })
           .filter(Boolean); // Remove undefined values
         
-        console.log('Selected Users:', selectedUsers);
         setUsers(selectedUsers);
       }
     }
@@ -192,7 +193,8 @@ export function NoticeDialog({
       noticeSetting: noticeSetting.value,
       department: noticeSetting.value === 'department' ? department.map(d => d.value) : [],
       designation: noticeSetting.value === 'designation' ? designation.map(d => d.value) : [],
-      users: noticeSetting.value === 'individual' ? users.map(u => u.value) : []
+      users: noticeSetting.value === 'individual' ? users.map(u => u.value) : [],
+      noticeBy: user._id
     };
 
     onSubmit(formData);
@@ -308,7 +310,7 @@ export function NoticeDialog({
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
-              <Button type="submit" className="bg-supperagent text-white">
+              <Button type="submit" className="bg-supperagent text-white hover:bg-supperagent/90">
                 {initialData ? 'Update' : 'Submit'}
               </Button>
             </div>

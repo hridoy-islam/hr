@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
 import axiosInstance from '@/lib/axios';
 import Select from 'react-select';
-import DatePicker from 'react-datepicker';
-import 'react-datepicker/dist/react-datepicker.css';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -13,6 +11,11 @@ import {
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/components/ui/use-toast';
+import { Input } from '@/components/ui/input';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
+import moment from 'moment';
+import { CalendarFold } from 'lucide-react';
 
 interface Employee {
   _id: string;
@@ -30,23 +33,12 @@ interface Shift {
   __v?: number;
 }
 
-interface TimeState {
-  hour: number;
-  minute: number;
-}
-
 interface AttendanceData {
   userId: string;
   clockIn: Date | null;
   clockOut: Date | null;
   clockType: 'manual';
-}
-
-interface TimeScrollListProps {
-  title: string;
-  items: { value: number; label: string }[];
-  selectedValue: number;
-  onSelect: (val: number) => void;
+  createdAt?: Date;
 }
 
 export default function EntryAttendance() {
@@ -58,21 +50,24 @@ export default function EntryAttendance() {
     shifts: false,
     submitting: false
   });
-  const [openDialog, setOpenDialog] = useState<'clockIn' | 'clockOut' | null>(
-    null
-  );
-  const [tempTime, setTempTime] = useState<TimeState>({
-    hour: new Date().getHours(),
-    minute: Math.floor(new Date().getMinutes() / 5) * 5
-  });
+
+  // Main attendance data
   const [attendanceData, setAttendanceData] = useState<AttendanceData>({
     userId: '',
     clockIn: null,
     clockOut: null,
-    clockType: 'manual'
+    clockType: 'manual',
+    createdAt: undefined // Default to today
   });
 
-  // Fetch employees and shifts
+  // Replace inputTimes with modifiedAttendance-like structure (single entry)
+  const [modifiedAttendance, setModifiedAttendance] = useState<{
+    [id: string]: { clockIn: string; clockOut: string };
+  }>({
+    single: { clockIn: '', clockOut: '' }
+  });
+
+  // Fetch employees
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -95,40 +90,63 @@ export default function EntryAttendance() {
     fetchData();
   }, [toast]);
 
+  // Sync modifiedAttendance when clockIn/clockOut change externally (e.g. date change)
   useEffect(() => {
-    if (openDialog) {
-      setTempTime({ hour: 0, minute: 0 });
+    if (attendanceData.clockIn) {
+      setModifiedAttendance((prev) => ({
+        ...prev,
+        single: {
+          ...prev.single,
+          clockIn: moment(attendanceData.clockIn).format('HH:mm')
+        }
+      }));
     }
-  }, [openDialog]);
+    if (attendanceData.clockOut) {
+      setModifiedAttendance((prev) => ({
+        ...prev,
+        single: {
+          ...prev.single,
+          clockOut: moment(attendanceData.clockOut).format('HH:mm')
+        }
+      }));
+    }
+  }, [attendanceData.clockIn, attendanceData.clockOut]);
 
+  // Handle employee change
   const handleEmployeeChange = async (
     selectedOption: { value: string; label: string } | null
   ) => {
-    if (!selectedOption) return;
+    if (!selectedOption) {
+      setAttendanceData((prev) => ({ ...prev, userId: '' }));
+      setShifts([]);
+      setModifiedAttendance((prev) => ({
+        ...prev,
+        single: { clockIn: '', clockOut: '' }
+      }));
+      return;
+    }
 
     setAttendanceData((prev) => ({
       ...prev,
-      userId: selectedOption.value,
-      shiftId: '',
-      shiftDetails: null
+      userId: selectedOption.value
     }));
 
     try {
       const rateRes = await axiosInstance.get(
         `/hr/employeeRate?employeeId=${selectedOption.value}`
       );
-
       const shiftData = rateRes?.data?.data?.result?.[0]?.shiftId || [];
+      setShifts(
+        Array.isArray(shiftData) ? shiftData : [shiftData].filter(Boolean)
+      );
 
-      if (shiftData.length === 0) {
+      if (Array.isArray(shiftData) && shiftData.length === 0) {
         toast({
           variant: 'destructive',
           title: 'No Shift Found',
           description: 'This employee has no assigned shift.'
         });
       }
-
-      setShifts(shiftData);
     } catch (error: any) {
       toast({
         variant: 'destructive',
@@ -137,39 +155,162 @@ export default function EntryAttendance() {
           error.response?.data?.message ||
           'Failed to load shift from employee rate'
       });
+      setShifts([]);
     }
   };
 
-  const confirmTime = () => {
-    if (!openDialog) return;
-    const now = attendanceData.createdAt;
-    const selectedTime = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      now.getDate(),
-      tempTime.hour,
-      tempTime.minute
-    );
-    setAttendanceData((prev) => ({
+  // Enhanced time input handler (your provided logic)
+  const handleTimeChange = (
+    id: string,
+    type: 'clockIn' | 'clockOut',
+    value: string
+  ) => {
+    const previous = modifiedAttendance[id]?.[type] || '';
+
+    // Allow clearing the field
+    if (value === '') {
+      setModifiedAttendance((prev) => ({
+        ...prev,
+        [id]: {
+          ...prev[id],
+          [type]: ''
+        }
+      }));
+      return;
+    }
+
+    // Detect backspacing — allow free form typing
+    if (value.length < previous.length) {
+      setModifiedAttendance((prev) => ({
+        ...prev,
+        [id]: {
+          ...prev[id],
+          [type]: value
+        }
+      }));
+      return;
+    }
+
+    // Clean input (keep digits only for auto-format)
+    const sanitized = value.replace(/[^0-9]/g, '');
+
+    let formatted = value;
+
+    if (value.includes(':')) {
+      // Manual typing with colon
+      const [h, m] = value.split(':');
+      const hours = h?.slice(0, 2) ?? '';
+      const minutes = m?.slice(0, 2) ?? '';
+      formatted = minutes ? `${hours}:${minutes}` : hours;
+    } else {
+      // Auto-format from digits
+      if (sanitized.length <= 2) {
+        formatted = sanitized; // '2' or '19'
+      } else if (sanitized.length === 3) {
+        formatted = `${sanitized.slice(0, 2)}:${sanitized.slice(2)}`;
+      } else if (sanitized.length >= 4) {
+        formatted = `${sanitized.slice(0, 2)}:${sanitized.slice(2, 4)}`;
+      } else {
+        formatted = previous; // fallback
+      }
+    }
+
+    // Prevent invalid times like 25:00
+    const [hh, mm] = formatted.split(':').map(Number);
+    if (!isNaN(hh) && (hh < 0 || hh > 23)) {
+      toast({
+        variant: 'destructive',
+        title: 'Invalid Hour',
+        description: 'Hour must be between 00 and 23.'
+      });
+      return;
+    }
+    if (!isNaN(mm) && (mm < 0 || mm > 59)) {
+      toast({
+        variant: 'destructive',
+        title: 'Invalid Minute',
+        description: 'Minute must be between 00 and 59.'
+      });
+      return;
+    }
+
+    setModifiedAttendance((prev) => ({
       ...prev,
-      [openDialog === 'clockIn' ? 'clockIn' : 'clockOut']: selectedTime
+      [id]: {
+        ...prev[id],
+        [type]: formatted
+      }
     }));
-    setOpenDialog(null);
   };
 
+  // Convert HH:mm string + date to Date object
+  const parseTimeToDate = (timeStr: string, baseDate: Date): Date | null => {
+    if (!timeStr || !moment(timeStr, 'HH:mm', true).isValid()) return null;
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    const newDate = new Date(baseDate);
+    newDate.setHours(hours, minutes, 0, 0);
+    return newDate;
+  };
+
+  // On blur: validate and update attendanceData
+  const handleTimeBlur = (id: string, type: 'clockIn' | 'clockOut') => {
+    const timeStr = modifiedAttendance[id]?.[type];
+    const baseDate = attendanceData.createdAt || new Date();
+
+    if (!timeStr) {
+      setAttendanceData((prev) => ({ ...prev, [type]: null }));
+      return;
+    }
+
+    const parsedDate = parseTimeToDate(timeStr, baseDate);
+    if (parsedDate) {
+      setAttendanceData((prev) => ({ ...prev, [type]: parsedDate }));
+    } else {
+      toast({
+        variant: 'destructive',
+        title: 'Invalid Time',
+        description: `Please enter a valid time in HH:mm format (e.g. 09:30).`
+      });
+    }
+  };
+
+  // Handle date change via DatePicker
+  const handleDateChange = (date: Date | null) => {
+    if (!date) return;
+    setAttendanceData((prev) => ({ ...prev, createdAt: date }));
+
+    // Re-parse times with new date
+    if (modifiedAttendance.single.clockIn) {
+      const newClockIn = parseTimeToDate(
+        modifiedAttendance.single.clockIn,
+        date
+      );
+      setAttendanceData((prev) => ({ ...prev, clockIn: newClockIn }));
+    }
+    if (modifiedAttendance.single.clockOut) {
+      const newClockOut = parseTimeToDate(
+        modifiedAttendance.single.clockOut,
+        date
+      );
+      setAttendanceData((prev) => ({ ...prev, clockOut: newClockOut }));
+    }
+  };
+
+  // Submit attendance
   const handleSubmit = async () => {
     if (!attendanceData.userId || !attendanceData.clockIn) {
       toast({
         variant: 'destructive',
         title: 'Validation Error',
         description:
-          'Please select an employee and provide a valid clock in and clock out time.'
+          'Please select an employee and provide a valid clock-in time.'
       });
       return;
     }
 
     try {
       setLoading((prev) => ({ ...prev, submitting: true }));
+
       const payload = {
         userId: attendanceData.userId,
         clockIn: attendanceData.clockIn,
@@ -178,6 +319,7 @@ export default function EntryAttendance() {
         eventType: 'manual',
         timestamp: new Date().toISOString()
       };
+
       await axiosInstance.post('/hr/attendance/clock-event', payload);
 
       toast({
@@ -190,8 +332,11 @@ export default function EntryAttendance() {
         userId: '',
         clockIn: null,
         clockOut: null,
-        clockType: 'manual'
+        clockType: 'manual',
+        createdAt: undefined
       });
+      setModifiedAttendance({ single: { clockIn: '', clockOut: '' } });
+      setShifts([]);
     } catch (error: any) {
       toast({
         variant: 'destructive',
@@ -210,32 +355,28 @@ export default function EntryAttendance() {
       `${emp.title || ''} ${emp.firstName} ${emp.initial || ''} ${emp.lastName}`.trim()
   }));
 
-  const shiftOptions = shifts.map((shift) => ({
-    value: shift._id,
-    label: shift.name
-  }));
-
   return (
-    <div className=" space-y-3 rounded-lg bg-white px-6 py-4 shadow-md">
-      <h1 className="text-3xl font-bold text-gray-800">Attendance Entry</h1>
-
+    <div className="space-y-3 rounded-lg bg-white px-6 py-4 shadow-md">
+      <h2 className="flex items-center gap-2 text-2xl font-bold text-gray-900">
+        <CalendarFold className="h-6 w-6" />
+        Attendance Entry
+      </h2>{' '}
       {/* Employee Selection */}
-      <div className="">
-        <h2 className=" text-lg font-semibold text-gray-700">
-          Select Employee
-        </h2>
-        <div className="mb-6 grid gap-6 md:grid-cols-3">
+      <div>
+        <h2 className="text-lg font-semibold text-gray-700">Select Employee</h2>
+        <div className="flex flex-col gap-4">
           <div>
-            
             <Select
               options={employeeOptions}
               isLoading={loading.employees}
               onChange={handleEmployeeChange}
               placeholder="Search and select an employee..."
-              value={employeeOptions.find(
-                (opt) => opt.value === attendanceData.userId
-              )}
-              className="w-full"
+              value={
+                employeeOptions.find(
+                  (opt) => opt.value === attendanceData.userId
+                ) || null
+              }
+              className="w-[30vw]"
               styles={{
                 control: (base) => ({
                   ...base,
@@ -248,11 +389,13 @@ export default function EntryAttendance() {
               }}
             />
           </div>
-          <div className=" col-span-2 rounded-xl border border-gray-200 bg-gray-50 p-3 shadow-sm">
-            <h2 className="mb-4 text-lg font-semibold text-gray-700">
-              Assigned Shifts
-            </h2>
-            {shifts.length > 0 ? (
+
+          {/* Show Assigned Shifts only if employee is selected and has shifts */}
+          {attendanceData.userId && shifts.length > 0 && (
+            <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 shadow-sm">
+              <h2 className="mb-4 text-lg font-semibold text-gray-700">
+                Assigned Shifts
+              </h2>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {shifts.map((shift) => (
                   <div
@@ -266,18 +409,11 @@ export default function EntryAttendance() {
                   </div>
                 ))}
               </div>
-            ) : (
-              <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4 text-center text-sm text-gray-500">
-                No shift assigned to this employee
-              </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
-
-      {/* Shift Details */}
-
-      {/* Attendance Form */}
+      {/* Attendance Details */}
       <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 shadow-sm">
         <h2 className="mb-2 text-lg font-semibold text-gray-700">
           Attendance Details
@@ -285,78 +421,58 @@ export default function EntryAttendance() {
 
         <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
           {/* Date Picker */}
-          {/* Date Picker */}
-          <div className="w-full">
-            <label
-              htmlFor="date-picker"
-              className="mb-2 block text-sm font-medium text-gray-600"
-            >
+          <div>
+            <label className="mb-2 block text-sm font-medium text-gray-600">
               Date
             </label>
-            <div className="w-full">
-              <DatePicker
-                id="date-picker"
-                selected={attendanceData.createdAt}
-                onChange={(date: Date) =>
-                  setAttendanceData((prev) => ({ ...prev, createdAt: date }))
-                }
-                dateFormat="MMMM d, yyyy"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black"
-                calendarClassName="!w-full"
-                wrapperClassName="w-full"
-                placeholderText="Select date"
-                showMonthDropdown
-                showYearDropdown
-              />
-            </div>
+            <DatePicker
+              selected={attendanceData.createdAt}
+              onChange={handleDateChange}
+              dateFormat="yyyy-MM-dd"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black"
+              placeholderText="Select date"
+              maxDate={new Date()}
+              wrapperClassName="w-full"
+              showMonthDropdown
+              showYearDropdown
+              dropdownMode="select"
+            />
           </div>
 
-          {/* Clock In Button */}
+          {/* Clock In Input */}
           <div>
             <label className="mb-2 block text-sm font-medium text-gray-600">
               Clock In
             </label>
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full justify-start border-gray-300 bg-white text-sm font-normal text-gray-600 hover:bg-gray-100 hover:text-gray-800"
-              onClick={() => setOpenDialog('clockIn')}
-            >
-              {attendanceData.clockIn ? (
-                <span className="font-medium">
-                  {attendanceData.clockIn.toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  })}
-                </span>
-              ) : (
-                'Select clock-in time'
-              )}
-            </Button>
+            <Input
+              type="text"
+              placeholder="HH:mm"
+              value={modifiedAttendance.single.clockIn}
+              onChange={(e) =>
+                handleTimeChange('single', 'clockIn', e.target.value)
+              }
+              onBlur={() => handleTimeBlur('single', 'clockIn')}
+              maxLength={5}
+              className="text-center font-mono"
+            />
           </div>
 
-          {/* Clock Out Button */}
+          {/* Clock Out Input */}
           <div>
             <label className="mb-2 block text-sm font-medium text-gray-600">
               Clock Out
             </label>
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full justify-start border-gray-300 bg-white text-sm font-normal text-gray-600 hover:bg-gray-100 hover:text-gray-800"
-              onClick={() => setOpenDialog('clockOut')}
-            >
-              {attendanceData.clockOut ? (
-                <span className="font-medium">
-                  {attendanceData.clockOut.toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  })}
-                </span>
-              ) : (
-                'Select clock-out time'
-              )}
-            </Button>
+            <Input
+              type="text"
+              placeholder="HH:mm"
+              value={modifiedAttendance.single.clockOut}
+              onChange={(e) =>
+                handleTimeChange('single', 'clockOut', e.target.value)
+              }
+              onBlur={() => handleTimeBlur('single', 'clockOut')}
+              maxLength={5}
+              className="text-center font-mono"
+            />
           </div>
         </div>
 
@@ -365,124 +481,12 @@ export default function EntryAttendance() {
           <Button
             onClick={handleSubmit}
             disabled={loading.submitting || !attendanceData.clockIn}
-            className="bg-black bg-supperagent px-6 py-2 text-white hover:bg-supperagent/90 disabled:cursor-not-allowed disabled:bg-gray-400"
+            className="bg-supperagent px-6 py-2 text-white hover:bg-supperagent/90 disabled:cursor-not-allowed disabled:bg-gray-400"
           >
             {loading.submitting ? 'Submitting...' : 'Submit Attendance'}
           </Button>
         </div>
       </div>
-
-      {/* Time Picker Dialog */}
-      <Dialog open={!!openDialog} onOpenChange={() => setOpenDialog(null)}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>
-              Select {openDialog === 'clockIn' ? 'Clock In' : 'Clock Out'} Time
-            </DialogTitle>
-          </DialogHeader>
-
-          <div className="mb-4 flex justify-center gap-2 text-3xl font-bold">
-            <input
-              type="number"
-              value={String(tempTime.hour).padStart(2, '0')}
-              onChange={(e) => {
-                const value = Math.min(23, Math.max(0, Number(e.target.value)));
-                setTempTime((prev) => ({ ...prev, hour: value }));
-              }}
-              className="w-16 rounded border px-2 py-1 text-center text-xl"
-              min={0}
-              max={23}
-            />
-            <span className="text-xl">:</span>
-            <input
-              type="number"
-              value={String(tempTime.minute).padStart(2, '0')}
-              onChange={(e) => {
-                const value = Math.min(59, Math.max(0, Number(e.target.value)));
-                setTempTime((prev) => ({ ...prev, minute: value }));
-              }}
-              className="w-16 rounded border px-2 py-1 text-center text-xl"
-              min={0}
-              max={59}
-            />
-          </div>
-
-          <div className="flex gap-4">
-            <TimeScrollList
-              title="Hours"
-              items={Array.from({ length: 24 }, (_, i) => ({
-                value: i,
-                label: String(i).padStart(2, '0')
-              }))}
-              selectedValue={tempTime.hour}
-              onSelect={(val) =>
-                setTempTime((prev) => ({ ...prev, hour: val }))
-              }
-            />
-            <TimeScrollList
-              title="Minutes"
-              items={Array.from({ length: 60 }, (_, i) => i * 1).map((m) => ({
-                value: m,
-                label: String(m).padStart(2, '0')
-              }))}
-              selectedValue={tempTime.minute}
-              onSelect={(val) =>
-                setTempTime((prev) => ({ ...prev, minute: val }))
-              }
-            />
-          </div>
-
-          <div className="mt-6 flex justify-end gap-3">
-            <Button
-              variant="outline"
-              onClick={() => setOpenDialog(null)}
-              className="border-gray-300 text-white hover:bg-black/90"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={confirmTime}
-              className="bg-supperagent text-white hover:bg-supperagent/90"
-            >
-              Confirm
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-}
-
-function TimeScrollList({
-  title,
-  items,
-  selectedValue,
-  onSelect
-}: TimeScrollListProps) {
-  return (
-    <div className="flex-1">
-      <h3 className="mb-1 text-sm font-medium text-muted-foreground">
-        {title}
-      </h3>
-      <ScrollArea className="h-48 rounded-md border">
-        <div className="flex flex-col gap-1 p-1">
-          {items.map((item) => (
-            <Button
-              key={item.value}
-              variant="ghost"
-              className={cn(
-                'h-9 w-full justify-center px-2',
-                item.value === selectedValue &&
-                  'bg-black text-white hover:bg-black'
-              )}
-              onClick={() => onSelect(item.value)}
-            >
-              {item.label}
-            </Button>
-          ))}
-        </div>
-        <ScrollBar orientation="vertical" />
-      </ScrollArea>
     </div>
   );
 }

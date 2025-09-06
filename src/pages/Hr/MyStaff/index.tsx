@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Calendar, Clock, Users, TrendingUp, Check, X, Eye, User } from 'lucide-react';
+import { Calendar, Clock, Users, TrendingUp, Check, X, Eye, User, FileText, Users2 } from 'lucide-react';
 
 interface Employee {
   id: string;
@@ -204,10 +204,13 @@ const MyStaff = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-      <div className="">
+      <div className="bg-white p-6 rounded-xl shadow-md ">
         {/* Header */}
         
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">My Staff</h1>
+        <h2 className="mb-6 flex items-center gap-2 text-2xl font-bold text-gray-900">
+            <Users2 className="h-6 w-6" />
+            My Staff
+          </h2>
     
 
         {/* Cards Grid */}

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { DollarSign, Eye } from 'lucide-react';
+import { DollarSign, Eye, Users2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import {
@@ -8,7 +8,7 @@ import {
   TableCell,
   TableHead,
   TableHeader,
-  TableRow,
+  TableRow
 } from '@/components/ui/table';
 import axiosInstance from '@/lib/axios';
 import { useToast } from '@/components/ui/use-toast';
@@ -38,9 +38,13 @@ export default function Employee() {
   const [designations, setDesignations] = useState<OptionType[]>([]);
   const [trainings, setTrainings] = useState<OptionType[]>([]);
 
-  const [selectedDepartment, setSelectedDepartment] = useState<OptionType | null>(null);
-  const [selectedDesignation, setSelectedDesignation] = useState<OptionType | null>(null);
-  const [selectedTraining, setSelectedTraining] = useState<OptionType | null>(null);
+  const [selectedDepartment, setSelectedDepartment] =
+    useState<OptionType | null>(null);
+  const [selectedDesignation, setSelectedDesignation] =
+    useState<OptionType | null>(null);
+  const [selectedTraining, setSelectedTraining] = useState<OptionType | null>(
+    null
+  );
 
   const navigate = useNavigate();
 
@@ -50,7 +54,7 @@ export default function Employee() {
       const params: any = {
         page: currentPage,
         limit: entriesPerPage,
-        role: 'employee',
+        role: 'employee'
       };
 
       if (searchTerm) params.searchTerm = searchTerm;
@@ -66,8 +70,9 @@ export default function Employee() {
       console.error('Error fetching employees:', error);
       toast({
         title: 'Error',
-        description: error.response?.data?.message || 'Failed to load employees.',
-        variant: 'destructive',
+        description:
+          error.response?.data?.message || 'Failed to load employees.',
+        variant: 'destructive'
       });
     } finally {
       setInitialLoading(false);
@@ -81,24 +86,33 @@ export default function Employee() {
         const [deptRes, desigRes, trainingRes] = await Promise.all([
           axiosInstance.get('/hr/department?limit=all'),
           axiosInstance.get('/hr/designation?limit=all'),
-          axiosInstance.get('/hr/training?limit=all'),
+          axiosInstance.get('/hr/training?limit=all')
         ]);
 
         setDepartments(
-          deptRes.data.data.result.map((d: any) => ({ value: d._id, label: d.departmentName }))
+          deptRes.data.data.result.map((d: any) => ({
+            value: d._id,
+            label: d.departmentName
+          }))
         );
         setDesignations(
-          desigRes.data.data.result.map((d: any) => ({ value: d._id, label: d.title }))
+          desigRes.data.data.result.map((d: any) => ({
+            value: d._id,
+            label: d.title
+          }))
         );
         setTrainings(
-          trainingRes.data.data.result.map((t: any) => ({ value: t._id, label: t.name }))
+          trainingRes.data.data.result.map((t: any) => ({
+            value: t._id,
+            label: t.name
+          }))
         );
       } catch (error) {
         console.error('Error fetching filter options:', error);
         toast({
           title: 'Error',
           description: 'Failed to load filter options.',
-          variant: 'destructive',
+          variant: 'destructive'
         });
       }
     };
@@ -114,7 +128,7 @@ export default function Employee() {
     searchTerm,
     selectedDepartment,
     selectedDesignation,
-    selectedTraining,
+    selectedTraining
   ]);
 
   const handleSearch = () => {
@@ -138,7 +152,7 @@ export default function Employee() {
       toast({
         title: 'Success',
         description: 'Status updated successfully.',
-        className: 'bg-supperagent text-white',
+        className: 'bg-supperagent text-white'
       });
       fetchData();
     } catch (error: any) {
@@ -146,7 +160,7 @@ export default function Employee() {
       toast({
         title: 'Error',
         description: 'Failed to update status.',
-        variant: 'destructive',
+        variant: 'destructive'
       });
     }
   };
@@ -154,13 +168,16 @@ export default function Employee() {
   return (
     <div className="space-y-3 ">
       {/* Page Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">All Employees</h1>
-      </div>
 
       {/* Search & Filter Section */}
-      <div className="rounded-lg bg-white p-5 shadow-md space-y-5">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="space-y-5 rounded-lg bg-white p-5 shadow-md">
+        <div className="flex items-center justify-between">
+          <h2 className="flex items-center gap-2 text-2xl font-bold text-gray-900">
+            <Users2 className="h-6 w-6" />
+            All Employees
+          </h2>{' '}
+        </div>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
           <div>
             <Input
               type="text"
@@ -206,10 +223,10 @@ export default function Employee() {
               styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }) }}
             />
           </div> */}
-          <div className="flex flex-wrap items-center gap-3 w-full">
+          <div className="flex w-full flex-wrap items-center gap-3">
             <Button
               onClick={handleSearch}
-              className="bg-supperagent text-white hover:bg-supperagent/90 flex items-center gap-1 h-9 w-20"
+              className="flex h-9 w-20 items-center gap-1 bg-supperagent text-white hover:bg-supperagent/90"
               size="sm"
             >
               Search
@@ -218,7 +235,7 @@ export default function Employee() {
               variant="outline"
               onClick={handleResetFilters}
               size="sm"
-              className="flex items-center gap-1 h-9"
+              className="flex h-9 items-center gap-1"
             >
               Reset Filters
             </Button>
@@ -253,18 +270,49 @@ export default function Employee() {
               <TableBody>
                 {employees.map((employee) => (
                   <TableRow key={employee._id}>
-                    <TableCell  onClick={() => navigate(`/admin/hr/employee/${employee._id}`)}>
-                      {employee.title} {employee.firstName} {employee.initial} {employee.lastName}
+                    <TableCell
+                      onClick={() =>
+                        navigate(`/admin/hr/employee/${employee._id}`)
+                      }
+                    >
+                      {employee.title} {employee.firstName} {employee.initial}{' '}
+                      {employee.lastName}
                     </TableCell>
-                    <TableCell  onClick={() => navigate(`/admin/hr/employee/${employee._id}`)}>{employee.email}</TableCell>
-                    <TableCell  onClick={() => navigate(`/admin/hr/employee/${employee._id}`)}>{employee.mobilePhone || '–'}</TableCell>
-                    <TableCell  onClick={() => navigate(`/admin/hr/employee/${employee._id}`)}>{employee.departmentId?.departmentName || '–'}</TableCell>
-                    <TableCell  onClick={() => navigate(`/admin/hr/employee/${employee._id}`)}>{employee.designationId?.title || '–'}</TableCell>
-                   
+                    <TableCell
+                      onClick={() =>
+                        navigate(`/admin/hr/employee/${employee._id}`)
+                      }
+                    >
+                      {employee.email}
+                    </TableCell>
+                    <TableCell
+                      onClick={() =>
+                        navigate(`/admin/hr/employee/${employee._id}`)
+                      }
+                    >
+                      {employee.mobilePhone || '–'}
+                    </TableCell>
+                    <TableCell
+                      onClick={() =>
+                        navigate(`/admin/hr/employee/${employee._id}`)
+                      }
+                    >
+                      {employee.departmentId?.departmentName || '–'}
+                    </TableCell>
+                    <TableCell
+                      onClick={() =>
+                        navigate(`/admin/hr/employee/${employee._id}`)
+                      }
+                    >
+                      {employee.designationId?.title || '–'}
+                    </TableCell>
+
                     <TableCell>
                       <Switch
                         checked={employee.status === 'active'}
-                        onCheckedChange={(checked) => handleStatusChange(employee._id, checked)}
+                        onCheckedChange={(checked) =>
+                          handleStatusChange(employee._id, checked)
+                        }
                         className="mx-auto"
                       />
                     </TableCell>
@@ -274,9 +322,12 @@ export default function Employee() {
                         size="icon"
                         className="bg-supperagent text-white hover:bg-supperagent/90"
                         onClick={() =>
-                          navigate(`/admin/hr/employee/${employee._id}/employee-rate`, {
-                            state: employee,
-                          })
+                          navigate(
+                            `/admin/hr/employee/${employee._id}/employee-rate`,
+                            {
+                              state: employee
+                            }
+                          )
                         }
                       >
                         <DollarSign className="h-4 w-4" />
@@ -285,7 +336,9 @@ export default function Employee() {
                         variant="ghost"
                         size="icon"
                         className="bg-supperagent text-white hover:bg-supperagent/90"
-                        onClick={() => navigate(`/admin/hr/employee/${employee._id}`)}
+                        onClick={() =>
+                          navigate(`/admin/hr/employee/${employee._id}`)
+                        }
                       >
                         <Eye className="h-4 w-4" />
                       </Button>
