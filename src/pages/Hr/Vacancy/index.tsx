@@ -113,7 +113,7 @@ export default function Vacancy() {
           type="text"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="Search by Notice Type"
+          placeholder="Search by Notice"
           className="h-8 max-w-[400px]"
         />
         <Button
