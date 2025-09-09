@@ -9,6 +9,7 @@ import axiosInstance from '@/lib/axios';
 import { useSelector } from 'react-redux';
 import moment from 'moment';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
+import { useToast } from '@/components/ui/use-toast';
 
 const StaffPayroll: React.FC = () => {
   const user = useSelector((state: any) => state.auth.user);
@@ -19,7 +20,7 @@ const StaffPayroll: React.FC = () => {
   const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
   const [selectedPayslip, setSelectedPayslip] = useState<PayrollRecord | null>(null);
   const [showPayslip, setShowPayslip] = useState(false);
-
+  const {toast} = useToast();
   // Fetch payroll data on mount
   useEffect(() => {
     if (!userId) return;
@@ -84,8 +85,12 @@ const StaffPayroll: React.FC = () => {
   const handleDownloadPayslip = (record: PayrollRecord) => {
     const start = record.fromDate ? moment(record.fromDate).format('MMM DD, YYYY') : 'N/A';
     const end = record.toDate ? moment(record.toDate).format('MMM DD, YYYY') : 'N/A';
-    alert(`Downloading payslip for ${start} - ${end}`);
-    // TODO: trigger real PDF download
+    toast({
+      title: 'Payslip Download',
+      description: `Downloading payslip for ${start} - ${end}`,
+      className: 'bg-supperagent text-white border-none',
+    });
+
   };
 
   const handleSubmitRequest = async (requestData: any) => {
@@ -98,8 +103,8 @@ const StaffPayroll: React.FC = () => {
     try {
       const payload = {
         userId,
-        fromDate: requestData.fromDate,
-        toDate: requestData.toDate,
+         fromDate: requestData.fromDate ? moment(requestData.fromDate).toISOString() : null,
+      toDate: requestData.toDate ? moment(requestData.toDate).toISOString() : null,
         reason: requestData.reason,
       };
 
@@ -116,10 +121,17 @@ const StaffPayroll: React.FC = () => {
       };
 
       setRecords((prev) => [newRecord, ...prev]);
-      alert('Request submitted successfully! You will receive a notification once it’s processed.');
-    } catch (error: any) {
+toast({
+        title: 'Request submitted',
+        description: 'You will receive a notification once it’s processed.',
+        className: 'bg-supperagent text-white border-none',
+      });    } catch (error: any) {
       console.error('Failed to submit request:', error);
-      alert(error.response?.data?.message || 'Failed to submit request. Please try again.');
+     toast({
+        title: 'Submission failed',
+        description: error.response?.data?.message || 'Please try again later.',
+        variant: 'destructive',
+      });
     } finally {
       setIsSubmittingRequest(false);
     }

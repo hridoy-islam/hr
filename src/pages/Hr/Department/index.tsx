@@ -159,7 +159,7 @@ export default function Department() {
         </Button>
       </div>
 
-      <div className="rounded-md bg-white p-4 shadow-lg">
+      <div className="">
         {initialLoading ? (
           <div className="flex justify-center py-6">
             <BlinkingDots size="large" color="bg-supperagent" />

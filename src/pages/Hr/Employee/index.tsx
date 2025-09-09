@@ -170,7 +170,7 @@ export default function Employee() {
       {/* Page Header */}
 
       {/* Search & Filter Section */}
-      <div className="space-y-5 rounded-lg bg-white p-5 shadow-md">
+      <div className="space-y-5 rounded-lg bg-white p-5 shadow-sm">
         <div className="flex items-center justify-between">
           <h2 className="flex items-center gap-2 text-2xl font-bold text-gray-900">
             <Users2 className="h-6 w-6" />
@@ -183,7 +183,7 @@ export default function Employee() {
               type="text"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="Search by email"
+              placeholder="Search by name, email"
               className="h-10 text-sm"
             />
           </div>
@@ -211,7 +211,7 @@ export default function Employee() {
               styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }) }}
             />
           </div>
-          {/* <div>
+          <div>
             <Select
               options={trainings}
               value={selectedTraining}
@@ -222,7 +222,7 @@ export default function Employee() {
               menuPortalTarget={document.body}
               styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }) }}
             />
-          </div> */}
+          </div>
           <div className="flex w-full flex-wrap items-center gap-3">
             <Button
               onClick={handleSearch}
@@ -241,10 +241,10 @@ export default function Employee() {
             </Button>
           </div>
         </div>
-      </div>
+   
 
       {/* Employee Table */}
-      <div className="rounded-md bg-white p-4 shadow-lg">
+     
         {initialLoading ? (
           <div className="flex justify-center py-8">
             <BlinkingDots size="large" color="bg-supperagent" />

@@ -134,10 +134,9 @@ export default function Attendance() {
     }
   };
 
-  useEffect(() => {
-    fetchData(currentPage, entriesPerPage);
-  }, [currentPage, entriesPerPage]);
-
+useEffect(() => {
+  fetchData(currentPage, entriesPerPage, searchTerm, selectedMonth, selectedYear);
+}, [currentPage, entriesPerPage]);
   const handleSearch = () => {
     if (selectedMonth && selectedYear) {
       fetchData(
@@ -204,7 +203,7 @@ export default function Attendance() {
         </Button>
       </div>
 
-      <div className="rounded-md bg-white p-4 shadow-2xl">
+      <div className="">
         {initialLoading ? (
           <div className="flex justify-center py-6">
             <BlinkingDots size="large" color="bg-supperagent" />

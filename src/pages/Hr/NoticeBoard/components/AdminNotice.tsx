@@ -316,7 +316,7 @@ export default function AdminNoticeBoard() {
       </div>
 
       {/* Table */}
-      <div className="mt-4 rounded-md bg-white p-4 shadow-lg">
+      <div className="py-4 ">
         {initialLoading ? (
           <div className="flex justify-center py-6">
             <BlinkingDots size="large" color="bg-supperagent" />

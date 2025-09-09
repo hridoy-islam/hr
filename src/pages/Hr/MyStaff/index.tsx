@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Calendar, Clock, Users, TrendingUp, Check, X, Eye, User, FileText, Users2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface Employee {
   id: string;
@@ -204,7 +205,7 @@ const MyStaff = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-      <div className="bg-white p-6 rounded-xl shadow-md ">
+      <div className="bg-white p-6 rounded-xl shadow-sm ">
         {/* Header */}
         
         <h2 className="mb-6 flex items-center gap-2 text-2xl font-bold text-gray-900">
@@ -214,10 +215,10 @@ const MyStaff = () => {
     
 
         {/* Cards Grid */}
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 gap-6">
           {/* Card 1: Pending Holiday Requests */}
           <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden hover:shadow-xl transition-shadow duration-300">
-            <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4">
+            <div className="bg-gradient-to-r from-supperagent/70 to-supperagent px-6 py-4">
               <div className="flex items-center">
                 <Calendar className="h-6 w-6 text-white mr-3" />
                 <h2 className="text-xl font-semibold text-white">Pending Holiday Requests</h2>
@@ -234,7 +235,7 @@ const MyStaff = () => {
                       <th className="text-left py-3 px-2 font-semibold text-gray-700">Employee</th>
                       <th className="text-left py-3 px-2 font-semibold text-gray-700">Dates</th>
                       <th className="text-left py-3 px-2 font-semibold text-gray-700">Hours</th>
-                      <th className="text-left py-3 px-2 font-semibold text-gray-700">Actions</th>
+                      <th className=" py-3 px-2 font-semibold text-gray-700 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -263,21 +264,21 @@ const MyStaff = () => {
                           </span>
                         </td>
                         <td className="py-4 px-2">
-                          <div className="flex space-x-2">
-                            <button
+                          <div className="flex space-x-2 justify-end">
+                            <Button
                               onClick={() => handleApproveReject('approve', request)}
                               className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center"
                             >
                               <Check className="h-4 w-4 mr-1" />
                               {/* Approve */}
-                            </button>
-                            <button
+                            </Button>
+                            <Button
                               onClick={() => handleApproveReject('reject', request)}
                               className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center"
                             >
                               <X className="h-4 w-4 mr-1" />
                               {/* Reject */}
-                            </button>
+                            </Button>
                           </div>
                         </td>
                       </tr>
@@ -290,7 +291,7 @@ const MyStaff = () => {
 
           {/* Card 2: Absent Today */}
           <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden hover:shadow-xl transition-shadow duration-300">
-            <div className="bg-gradient-to-r from-orange-500 to-red-500 px-6 py-4">
+            <div className="bg-gradient-to-r from-orange-300 to-red-400 px-6 py-4">
               <div className="flex items-center">
                 <Users className="h-6 w-6 text-white mr-3" />
                 <h2 className="text-xl font-semibold text-white">Absent Today</h2>
@@ -378,7 +379,7 @@ const MyStaff = () => {
 
           {/* Card 4: Upcoming Appraisals */}
           <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden hover:shadow-xl transition-shadow duration-300">
-            <div className="bg-gradient-to-r from-purple-500 to-indigo-500 px-6 py-4">
+            <div className="bg-gradient-to-r from-purple-400 to-purple-500 px-6 py-4">
               <div className="flex items-center">
                 <TrendingUp className="h-6 w-6 text-white mr-3" />
                 <h2 className="text-xl font-semibold text-white">Upcoming Appraisals in 60 Days</h2>

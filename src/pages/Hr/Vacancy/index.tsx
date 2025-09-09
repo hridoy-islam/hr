@@ -126,7 +126,7 @@ export default function Vacancy() {
       </div>
 
       {/* Table */}
-      <div className="rounded-md bg-white p-4 shadow-2xl">
+      <div className="">
         {initialLoading ? (
           <div className="flex justify-center py-6">
             <BlinkingDots size="large" color="bg-supperagent" />
@@ -150,12 +150,20 @@ export default function Vacancy() {
             <TableBody>
               {vacancy.map((vac) => (
                 <TableRow key={vac._id}>
-                  <TableCell>{vac.title}</TableCell>
-                  <TableCell>{vac.employmentType}</TableCell>
-                  <TableCell>
+                  <TableCell  onClick={() =>
+                            navigate(`/admin/hr/view-applicants/${vac._id}`)
+                          }>{vac.title}</TableCell>
+                  <TableCell  onClick={() =>
+                            navigate(`/admin/hr/view-applicants/${vac._id}`)
+                          }>{vac.employmentType}</TableCell>
+                  <TableCell  onClick={() =>
+                            navigate(`/admin/hr/view-applicants/${vac._id}`)
+                          }>
                     {moment(vac.applicationDeadline).format('MMMM Do YYYY')}
                   </TableCell>
-                  <TableCell>{vac?.postedBy?.name}</TableCell>
+                  <TableCell  onClick={() =>
+                            navigate(`/admin/hr/view-applicants/${vac._id}`)
+                          }>{vac?.postedBy?.name}</TableCell>
                   <TableCell>
                     <Switch
                       checked={vac.status === 'active'}

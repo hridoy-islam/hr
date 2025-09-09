@@ -46,7 +46,7 @@ const navItems = [
   },
   {
     icon: Box,
-    label: 'My Holiday',
+    label: 'My Holidays',
     href: 'holiday',
     roles: ['admin', 'employee']
   },

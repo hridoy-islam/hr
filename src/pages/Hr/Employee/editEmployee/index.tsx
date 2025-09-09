@@ -18,6 +18,7 @@ import axiosInstance from "@/lib/axios"
 import SettingsTab from './tabs/settings';
 import TrainingTab from './tabs/TrainingTab';
 import HolidayTab from './tabs/HolidayTab';
+import { BlinkingDots } from '@/components/shared/blinking-dots';
 const EditEmployee = () => {
   const navigate = useNavigate();
   const { 
@@ -66,10 +67,9 @@ const [user, setUser] = useState(null);
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center">
-        <div className="text-center">
-          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]"></div>
-          <p className="mt-2 text-gray-600">Loading employee data...</p>
-        </div>
+        <div className="flex justify-center py-6">
+                <BlinkingDots size="large" color="bg-supperagent" />
+              </div>
       </div>
     );
   }

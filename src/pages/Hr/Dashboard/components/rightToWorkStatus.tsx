@@ -174,7 +174,7 @@ const RightToWorkStatusPage = () => {
     startIndex + entriesPerPage
   );
   const handleEmployeeClick = (employeeId: string) => {
-    navigate(`/admin/hr/employee/${employeeId}`);
+    navigate(`/admin/hr/employee/${employeeId}`,{state: { activeTab: "rightToWork" },});
   };
   return (
     <div className="min-h-screen bg-gray-50">

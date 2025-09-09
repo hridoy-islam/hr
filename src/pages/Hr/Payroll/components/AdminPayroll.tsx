@@ -518,7 +518,7 @@ const handleDownloadPDF = async (payroll: TPayroll) => {
                         </Button>
                         <Button
                           size="sm"
-                          variant="outline"
+                          variant="default"
                           onClick={() => handleApproveClick(payroll)}
                           className="bg-green-600 text-white hover:bg-green-700"
                         >
@@ -526,7 +526,7 @@ const handleDownloadPDF = async (payroll: TPayroll) => {
                         </Button>
                         <Button
                           size="sm"
-                          variant="outline"
+                          variant="default"
                           onClick={() => handleRejectClick(payroll._id)}
                           className="bg-red-600 text-white hover:bg-red-700"
                         >

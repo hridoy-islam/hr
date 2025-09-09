@@ -254,7 +254,7 @@ export default function ViewApplicant() {
       </div>
 
       {/* Applicant Table */}
-      <div className="rounded-md bg-white p-4 shadow-2xl">
+      <div className="rounded-md bg-white p-4 shadow-lg">
         {initialLoading ? (
           <div className="flex justify-center py-6">
             <BlinkingDots size="large" color="bg-supperagent" />
@@ -284,7 +284,7 @@ export default function ViewApplicant() {
                       app.status === 'shortlisted' ? 'bg-green-100' : ''
                     }
                   >
-                    <TableCell>
+                    <TableCell onClick={()=> navigate(`/admin/hr/view-applicant/${app._id}`)}>
                       {app.firstName} {app.lastName}
                       {(app.status === 'hired' ||
                         app.status === 'rejected') && (
@@ -295,12 +295,11 @@ export default function ViewApplicant() {
                         </Badge>
                       )}
                     </TableCell>
-                    <TableCell>{app.email}</TableCell>
-                    <TableCell>{app.position}</TableCell>
-                    <TableCell>{app.employmentType}</TableCell>
-                    <TableCell>{app.address}</TableCell>
+                    <TableCell onClick={()=> navigate(`/admin/hr/view-applicant/${app._id}`)}>{app.email}</TableCell>
+                    <TableCell onClick={()=> navigate(`/admin/hr/view-applicant/${app._id}`)}>{app.position}</TableCell>
+                    <TableCell onClick={()=> navigate(`/admin/hr/view-applicant/${app._id}`)}>{app.employmentType}</TableCell>
+                    <TableCell onClick={()=> navigate(`/admin/hr/view-applicant/${app._id}`)}>{app.address}</TableCell>
                     <TableCell className="text-right flex flex-row items-end gap-2 justify-end">
-                      <Button size='icon' className='bg-supperagent text-white  hover:bg-supperagent/90' onClick={()=> navigate(`/admin/hr/view-applicant/${app._id}`)}><Eye size={24}/></Button>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="icon">

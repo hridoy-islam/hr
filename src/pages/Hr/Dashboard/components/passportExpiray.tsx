@@ -148,7 +148,7 @@ const PassportExpiryPage = () => {
   const currentData = filteredEmployees.slice(startIndex, endIndex);
 
     const handleEmployeeClick = (employeeId: string) => {
-    navigate(`/admin/hr/employee/${employeeId}`)
+    navigate(`/admin/hr/employee/${employeeId}`,{state: { activeTab: "identification" },})
   }
 
 

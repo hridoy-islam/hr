@@ -9,7 +9,9 @@ import { PayrollRequest } from '@/types/payroll';
 import 'react-datepicker/dist/react-datepicker.css';
 
 interface PayrollRequestFormProps {
-  onSubmitRequest: (request: Omit<PayrollRequest, 'id' | 'requestDate' | 'status'>) => void;
+  onSubmitRequest: (
+    request: Omit<PayrollRequest, 'id' | 'requestDate' | 'status'>
+  ) => void;
   isSubmitting?: boolean;
 }
 
@@ -21,31 +23,29 @@ export const PayrollRequestForm: React.FC<PayrollRequestFormProps> = ({
   const [endDate, setEndDate] = useState<Date | null>(null);
   const [reason, setReason] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!startDate || !endDate || !reason.trim()) return;
+const handleSubmit = (e: React.FormEvent) => {
+  e.preventDefault();
+  if (!startDate || !endDate || !reason.trim()) return;
 
-    onSubmitRequest({
-      employeeId: 'EMP001', // This would come from auth context
-      requestedBy: 'John Doe', // This would come from auth context
-      startDate,
-      endDate,
-      reason: reason.trim()
-    });
+  onSubmitRequest({
+    fromDate: startDate,
+    toDate: endDate,
+    reason: reason.trim(),
+  });
 
-    // Reset form
-    setStartDate(null);
-    setEndDate(null);
-    setReason('');
-  };
+  setStartDate(null);
+  setEndDate(null);
+  setReason('');
+};
 
-  const isFormValid = startDate && endDate && reason.trim() && startDate <= endDate;
+  const isFormValid =
+    startDate && endDate && reason.trim() && startDate <= endDate;
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center">
-          <Calendar className="h-5 w-5 mr-2" />
+          <Calendar className="mr-2 h-5 w-5" />
           Request Payroll Data
         </CardTitle>
         <p className="text-sm text-gray-600">
@@ -54,9 +54,9 @@ export const PayrollRequestForm: React.FC<PayrollRequestFormProps> = ({
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="mb-2 block text-sm font-medium text-gray-700">
                 Start Date
               </label>
               <DatePicker
@@ -66,12 +66,15 @@ export const PayrollRequestForm: React.FC<PayrollRequestFormProps> = ({
                 startDate={startDate}
                 endDate={endDate}
                 placeholderText="Select start date"
-                className="w-full h-10 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="h-10 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
                 dateFormat="MMM dd, yyyy"
+                showMonthDropdown
+                showYearDropdown
+                dropdownMode='select'
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="mb-2 block text-sm font-medium text-gray-700">
                 End Date
               </label>
               <DatePicker
@@ -82,14 +85,20 @@ export const PayrollRequestForm: React.FC<PayrollRequestFormProps> = ({
                 endDate={endDate}
                 minDate={startDate}
                 placeholderText="Select end date"
-                className="w-full h-10 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="h-10 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
                 dateFormat="MMM dd, yyyy"
+                 showMonthDropdown
+                showYearDropdown
+                dropdownMode='select'
               />
             </div>
           </div>
 
           <div>
-            <label htmlFor="reason" className="block text-sm font-medium text-gray-700 mb-2">
+            <label
+              htmlFor="reason"
+              className="mb-2 block text-sm font-medium text-gray-700"
+            >
               Reason for Request
             </label>
             <textarea
@@ -97,20 +106,21 @@ export const PayrollRequestForm: React.FC<PayrollRequestFormProps> = ({
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder="Please explain why you need this payroll data..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+              className="w-full resize-none rounded-md border border-gray-300 px-3 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
               rows={4}
               maxLength={500}
             />
-            <div className="text-xs text-gray-500 mt-1">
+            <div className="mt-1 text-xs text-gray-500">
               {reason.length}/500 characters
             </div>
           </div>
 
           {startDate && endDate && (
-            <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+            <div className="rounded-md border border-blue-200 bg-blue-50 p-4">
               <p className="text-sm text-blue-800">
                 <strong>Request Summary:</strong> Payroll data from{' '}
-                {format(startDate, 'MMM dd, yyyy')} to {format(endDate, 'MMM dd, yyyy')}
+                {format(startDate, 'MMM dd, yyyy')} to{' '}
+                {format(endDate, 'MMM dd, yyyy')}
               </p>
             </div>
           )}
@@ -122,12 +132,12 @@ export const PayrollRequestForm: React.FC<PayrollRequestFormProps> = ({
           >
             {isSubmitting ? (
               <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                <div className="mr-2 h-4 w-4 animate-spin rounded-full border-b-2 border-white"></div>
                 Submitting...
               </>
             ) : (
               <>
-                <Send className="h-4 w-4 mr-2" />
+                <Send className="mr-2 h-4 w-4" />
                 Submit Request
               </>
             )}
