@@ -17,7 +17,6 @@ import DatePicker from 'react-datepicker';
 import Select from 'react-select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/Label';
 import {
   Table,
   TableBody,
@@ -47,6 +46,7 @@ import { useToast } from '@/components/ui/use-toast';
 
 // Axios
 import axiosInstance from '@/lib/axios';
+import { Label } from '@/components/ui/label';
 
 // Types
 export interface TUser {
