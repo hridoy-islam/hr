@@ -201,16 +201,26 @@ const Holiday: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    if (user._id) {
-      setLoading(true);
-      // ✅ Fetch allowance first to ensure holidayAccured is available
-      fetchHolidayAllowance()
-        .then(() => fetchLeaveRequests())
-        .catch(console.error)
-        .finally(() => setLoading(false));
+useEffect(() => {
+  if (!user._id) return;
+
+  const fetchData = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      await fetchHolidayAllowance(); // leaveAllowance
+      await fetchLeaveRequests();    // holidays
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to load data');
+      console.error(err);
+    } finally {
+      setLoading(false); // only once
     }
-  }, [user._id, selectedYear]);
+  };
+
+  fetchData();
+}, [user._id, selectedYear]);
 
   const mapStatus = (status: string): string => {
     switch (status) {
