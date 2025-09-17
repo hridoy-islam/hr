@@ -355,10 +355,12 @@ const RightToWorkStatusPage = () => {
                     <DatePicker
                       selected={newNextCheckDate}
                       onChange={(date: Date) => setNewNextCheckDate(date)}
-                      minDate={new Date()} // Can't select dates in the past
                       dateFormat="dd/MM/yyyy"
                       className="w-full rounded-md border border-gray-300 py-2 pl-10 pr-4 shadow-sm focus:border-supperagent focus:ring-supperagent"
                       wrapperClassName="w-full"
+                      showMonthDropdown
+                      showYearDropdown
+                      dropdownMode='select'
                     />
                   </div>
                 </div>

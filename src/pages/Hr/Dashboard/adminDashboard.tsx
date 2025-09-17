@@ -41,6 +41,8 @@ interface Employee {
     _id: string;
     name: string;
     expireDate?: string | null;
+    trainingId: any;
+    status:string
   }>;
 }
 
@@ -169,16 +171,19 @@ const AdminDashboardPage = () => {
       }
 
       // Training Expiry
-      emp.training?.forEach((t) => {
-        if (t.expireDate) {
-          if (isExpired(t.expireDate)) {
-            trainingExpired++;
-          } else if (isExpiringSoon(t.expireDate)) {
-            trainingExpiringSoon++;
-          }
-        }
-      });
+        emp.training?.forEach((t) => {
+      if (!t.expireDate) return;
+
+      // skip completed trainings unless recurring
+      if (t.status === "completed" && !(t.trainingId as any).isRecurring) return;
+
+      if (isExpired(t.expireDate)) {
+        trainingExpired++;
+      } else if (isExpiringSoon(t.expireDate)) {
+        trainingExpiringSoon++;
+      }
     });
+  });
 
     // Right to Work - expiryDate (expiring or no expiry)
     rightToWorkRecords.forEach((record) => {

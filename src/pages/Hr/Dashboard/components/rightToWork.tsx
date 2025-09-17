@@ -212,15 +212,16 @@ const RightToWorkExpiryPage = () => {
   };
 
   const handleEmployeeClick = (employeeId: string) => {
-    navigate(`/admin/hr/employee/${employeeId}`,{state: { activeTab: "rightToWork" },});
-    
+    navigate(`/admin/hr/employee/${employeeId}`, {
+      state: { activeTab: 'rightToWork' }
+    });
   };
 
   // Open modal for update
   const handleUpdateClick = (record: RightToWorkRecord) => {
     setSelectedRecord(record);
     // Set initial date - use existing expiry date or null for no expiry
-    setNewExpiryDate(record.expiryDate ? new Date(record.expiryDate) : null);
+    setNewExpiryDate(null);
     setUploadFile(null);
     setIsModalOpen(true);
   };
@@ -489,7 +490,7 @@ const RightToWorkExpiryPage = () => {
                     showYearDropdown
                     showMonthDropdown
                     dropdownMode="select"
-                    placeholderText="Select new expiry date (leave empty for no expiry)"
+                    placeholderText="Select new expiry date"
                     preventOpenOnFocus
                     disabled={submitting}
                     isClearable
@@ -549,7 +550,7 @@ const RightToWorkExpiryPage = () => {
                   Cancel
                 </Button>
                 <Button
-                  className="bg-blue-600 text-white hover:bg-blue-700"
+                  className="bg-supperagent text-white hover:bg-supperagent/90"
                   onClick={handleSubmitUpdate}
                   disabled={submitting}
                 >

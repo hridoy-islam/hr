@@ -94,3 +94,6 @@
   display: none; /* Chrome, Safari and Opera */
 }
 
+.react-datepicker-popper {
+  z-index: 9999 !important;
+}

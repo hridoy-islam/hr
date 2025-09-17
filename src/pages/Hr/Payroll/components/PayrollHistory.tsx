@@ -64,7 +64,7 @@ export const PayrollHistory: React.FC<PayrollHistoryProps> = ({
       : 'N/A';
 
   return (
-    <Card>
+    <Card className='border-none shadow-none'>
       <CardHeader>
         <CardTitle>
           <div className="flex items-center">

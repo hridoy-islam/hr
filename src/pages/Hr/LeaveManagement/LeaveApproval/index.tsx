@@ -152,118 +152,164 @@ const LeaveApprovalPage: React.FC = () => {
   // Tooltip  component
 
   // Enhanced LeaveTooltipContent with Leave Allowance
-  const LeaveTooltipContent = ({ request }: { request: LeaveRequest }) => {
-    const [allowance, setAllowance] = useState<{
-      holidayAllowance: number;
-      usedHours: number;
-      remainingHours: number;
-      requestedHours: number;
-      holidayAccured: number;
-    } | null>(null);
-    const [loading, setLoading] = useState<boolean>(true);
+// Enhanced LeaveTooltipContent with Correct Allowance Calculation
+const LeaveTooltipContent = ({ request }: { request: LeaveRequest }) => {
+  const [allowance, setAllowance] = useState<{
+    openingThisYear: number;
+    holidayAccured: number;
+    taken: number;
+    requested: number;
+    remainingHours: number;
+    unpaidLeaveRequest: number;
+    unpaidLeaveTaken: number;
+    leftThisYear: number;
+  } | null>(null);
 
-    const currentYear = `${moment().format('YYYY')}-${moment().add(1, 'year').format('YYYY')}`; // Match your app's current year logic
+  const [loading, setLoading] = useState<boolean>(true);
 
-    useEffect(() => {
-      const fetchAllowance = async () => {
-        if (!request.userId?._id) return;
-        try {
-          const res = await axiosInstance.get(
-            `/hr/holidays?userId=${request.userId._id}&year=${currentYear}`
-          );
-          const data = res.data.data?.result || res.data.data || res.data;
+  // Match your app's current year logic
+  const currentYear = `${moment().format('YYYY')}-${moment().add(1, 'year').format('YYYY')}`;
 
-          let record = null;
-          if (Array.isArray(data)) {
-            record = data.find((item: any) => item.year === currentYear);
-          } else if (data?.year === currentYear) {
-            record = data;
-          }
+  useEffect(() => {
+    const fetchAllowance = async () => {
+      if (!request.userId?._id) return;
 
-          if (record) {
-            setAllowance({
-              holidayAllowance: record.holidayAllowance || 0,
-              usedHours: record.usedHours || 0,
-              remainingHours: record.remainingHours || 0,
-              requestedHours: record.requestedHours || 0,
-              holidayAccured: record.holidayAccured || 0
-            });
-          } else {
-            setAllowance({
-              holidayAllowance: 0,
-              usedHours: 0,
-              remainingHours: 0,
-              requestedHours: 0,
-              holidayAccured: 0
-            });
-          }
-        } catch (err) {
-          console.error('Failed to fetch leave allowance for tooltip:', err);
-        } finally {
-          setLoading(false);
+      try {
+        // Fetch holiday allowance record for this user + year
+        const res = await axiosInstance.get(
+          `/hr/holidays?userId=${request.userId._id}&year=${currentYear}`
+        );
+
+        const data = res.data.data?.result || res.data.data || res.data;
+
+        let record = null;
+        if (Array.isArray(data)) {
+          record = data.find((item: any) => item.year === currentYear);
+        } else if (data?.year === currentYear) {
+          record = data;
         }
-      };
 
-      fetchAllowance();
-    }, [request.userId?._id]);
+        if (record) {
+          const taken = record.usedHours || 0;
+          const requested = record.requestedHours || 0;
+          const holidayAccured = record.holidayAccured || 0;
+          const remainingHours = record.remainingHours || 0;
+          const unpaidLeaveRequest = record.unpaidLeaveRequest || 0;
+          const unpaidLeaveTaken = record.unpaidLeaveTaken || 0;
+          const openingThisYear = record.holidayAllowance || 0;
+          const leftThisYear = holidayAccured - taken - requested;
 
-    return (
-      <div className="max-w-xs space-y-3 rounded-lg bg-white p-3 shadow-lg">
-        {/* Employee Info */}
-        <div className="flex items-center space-x-2">
-          <User className="h-4 w-4 text-gray-500" />
-          <span className="font-semibold">
-            {request.userId?.firstName} {request.userId?.lastName}
-          </span>
-        </div>
+          setAllowance({
+            openingThisYear,
+            holidayAccured,
+            taken,
+            requested,
+            remainingHours,
+            unpaidLeaveRequest,
+            unpaidLeaveTaken,
+            leftThisYear
+          });
+        } else {
+          setAllowance({
+            openingThisYear: 0,
+            holidayAccured: 0,
+            taken: 0,
+            requested: 0,
+            remainingHours: 0,
+            unpaidLeaveRequest: 0,
+            unpaidLeaveTaken: 0,
+            leftThisYear: 0
+          });
+        }
+      } catch (err) {
+        console.error('Failed to fetch leave allowance for tooltip:', err);
+        setAllowance({
+          openingThisYear: 0,
+          holidayAccured: 0,
+          taken: 0,
+          requested: 0,
+          remainingHours: 0,
+          unpaidLeaveRequest: 0,
+          unpaidLeaveTaken: 0,
+          leftThisYear: 0
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
 
-        {/* Leave Allowance Section */}
-        <div className="space-y-2 rounded-md bg-blue-50 p-3 text-sm">
-          <h4 className="font-semibold text-blue-900">
-            Leave Allowance ({currentYear})
-          </h4>
-          {loading ? (
-            <div className="flex justify-center py-2">
-              <BlinkingDots size="small" color="bg-blue-600" />
-            </div>
-          ) : allowance ? (
-            <div className="space-y-1">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Opening:</span>
-                <span className="font-medium">
-                  {allowance.holidayAllowance.toFixed(1)} h
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Holiday Accured:</span>
-                <span className="font-medium">
-                  {allowance.holidayAccured.toFixed(1)} h
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Taken:</span>
-                <span className="font-medium text-green-600">
-                  {allowance.usedHours.toFixed(1)} h
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Requested:</span>
-                <span className="font-medium text-yellow-600">
-                  {allowance.requestedHours.toFixed(1)} h
-                </span>
-              </div>
-              <div className="flex justify-between border-t border-gray-300 pt-1 font-bold text-blue-600">
-                <span>Remaining:</span>
-                <span>{allowance.remainingHours.toFixed(1)} h</span>
-              </div>
-            </div>
-          ) : (
-            <div className="text-center text-gray-500">No data</div>
-          )}
-        </div>
+    fetchAllowance();
+  }, [request.userId?._id]);
+
+  return (
+    <div className="max-w-xs space-y-3 rounded-lg bg-white p-3 shadow-lg">
+      {/* Employee Info */}
+      <div className="flex items-center space-x-2">
+        <User className="h-4 w-4 text-gray-500" />
+        <span className="font-semibold">
+          {request.userId?.firstName} {request.userId?.lastName}
+        </span>
       </div>
-    );
-  };
+
+      {/* Leave Allowance Section */}
+      <div className="space-y-2 rounded-md bg-blue-50 p-3 text-sm">
+        <h4 className="font-semibold text-blue-900">
+          Leave Allowance ({currentYear})
+        </h4>
+        {loading ? (
+          <div className="flex justify-center py-2">
+            <BlinkingDots size="small" color="bg-blue-600" />
+          </div>
+        ) : allowance ? (
+          <div className="space-y-1">
+            <div className="flex justify-between">
+              <span className="text-gray-600">Opening Allowance:</span>
+              <span className="font-medium">
+                {allowance.openingThisYear.toFixed(1)} h
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Holiday Accrued:</span>
+              <span className="font-medium">
+                {allowance.holidayAccured.toFixed(1)} h
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Taken (Paid):</span>
+              <span className="font-medium text-green-600">
+                {allowance.taken.toFixed(1)} h
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Requested (Pending):</span>
+              <span className="font-medium text-yellow-600">
+                {allowance.requested.toFixed(1)} h
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Unpaid Taken:</span>
+              <span className="font-medium text-red-600">
+                {allowance.unpaidLeaveTaken.toFixed(1)} h
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Unpaid Requested:</span>
+              <span className="font-medium text-red-600">
+                {allowance.unpaidLeaveRequest.toFixed(1)} h
+              </span>
+            </div>
+            <div className="flex justify-between border-t border-gray-300 pt-1 font-bold text-blue-600">
+              <span>Remaining This Year:</span>
+              <span>{allowance.leftThisYear.toFixed(1)} h</span>
+            </div>
+          </div>
+        ) : (
+          <div className="text-center text-gray-500">No data</div>
+        )}
+      </div>
+    </div>
+  );
+};
   const navigate = useNavigate();
   return (
     <TooltipProvider>

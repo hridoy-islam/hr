@@ -96,40 +96,10 @@ export default function AttendanceApprovalPage() {
     });
   };
 
-  const handleSubmit = async (data) => {
-    try {
-      let response;
-      if (editingAttendance) {
-        response = await axiosInstance.patch(
-          `/hr/attendance/${editingAttendance?._id}`,
-          data
-        );
-      } else {
-        response = await axiosInstance.post(`/hr/attendance/clock-in`, data);
-      }
-
-      if (response.data?.success) {
-        toast({
-          title: response.data.message || 'Record updated successfully',
-          className: 'bg-supperagent border-none text-white'
-        });
-      } else {
-        throw new Error('Unexpected response');
-      }
-
-      fetchData(currentPage, entriesPerPage);
-      setEditingAttendance(undefined);
-    } catch (error) {
-      toast({
-        title: 'An error occurred. Please try again.',
-        className: 'bg-red-500 border-none text-white'
-      });
-    }
-  };
+ 
 
   useEffect(() => {
-    fetchData(currentPage, entriesPerPage);
-  }, [currentPage, entriesPerPage]);
+fetchData(currentPage, entriesPerPage, searchTerm, selectedMonth, selectedYear);  }, [currentPage, entriesPerPage]);
 
   const handleSearch = () => {
     if (selectedMonth && selectedYear) {

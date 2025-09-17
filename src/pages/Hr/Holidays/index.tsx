@@ -34,6 +34,7 @@ import { useSelector } from 'react-redux';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
+import moment from 'moment';
 
 interface HolidayAPI {
   userId: string;
@@ -50,28 +51,14 @@ interface HolidayAPI {
   updatedAt?: Date;
 }
 
-interface HolidayAllowanceAPI {
-  userId: string;
-  year: string;
-  holidayAllowance: number;
-  totalHours: number;
-  usedHours: number;
-  remainingHours: number;
-  hoursPerDay: number;
-  holidaysTaken: Array<{
-    startDate: Date;
-    endDate: Date;
-    totalDays: number;
-    totalHours: number;
-    reason: string | null;
-    status: 'pending' | 'approved' | 'rejected';
-  }>;
-  createdAt?: Date;
-  updatedAt?: Date;
-}
-
 const Holiday: React.FC = () => {
-  const [selectedYear, setSelectedYear] = useState('2025-2026');
+  const getCurrentHolidayYear = () => {
+    const year = moment().year();
+    return `${year}-${year + 1}`;
+  };
+
+  // Initialize state
+  const [selectedYear, setSelectedYear] = useState(getCurrentHolidayYear());
   const [selectedType, setSelectedType] = useState('');
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
@@ -97,12 +84,77 @@ const Holiday: React.FC = () => {
     unpaidLeaveTaken: 0
   });
 
+  // ✅ FIXED: fetchHolidayAllowance — uses correct formula
+  const fetchHolidayAllowance = async () => {
+    try {
+      const year = selectedYear;
+      const response = await axiosInstance.get(
+        `/hr/holidays?userId=${user._id}&year=${year}&limit=all`
+      );
+
+      const responseData =
+        response.data?.data?.result || response.data?.data || response.data;
+      let holidayRecord = null;
+
+      if (Array.isArray(responseData)) {
+        holidayRecord = responseData.find((item: any) => item.year === year);
+      } else if (responseData?.year === year) {
+        holidayRecord = responseData;
+      }
+
+      if (holidayRecord) {
+        const openingThisYear = holidayRecord.holidayAllowance || 0;
+        const holidayAccured = holidayRecord.holidayAccured || 0;
+        const taken = holidayRecord.usedHours || 0;
+        const requested = holidayRecord.requestedHours || 0;
+        const unpaidLeaveTaken = holidayRecord.unpaidLeaveTaken || 0;
+        const unpaidLeaveRequest = holidayRecord.unpaidLeaveRequest || 0;
+
+        // ✅ CORRECT FORMULA: Accrued - Taken - Requested
+        const leftThisYear = holidayAccured - taken - requested;
+
+        setLeaveAllowance({
+          openingThisYear,
+          holidayAccured,
+          bankHolidayAutoBooked: 0,
+          taken,
+          booked: taken, // assuming booked = taken (approved)
+          requested,
+          requestedHours: requested,
+          remainingHours: leftThisYear,
+          leftThisYear,
+          unpaidLeaveTaken,
+          unpaidLeaveRequest
+        });
+      } else {
+        setLeaveAllowance({
+          openingThisYear: 0,
+          holidayAccured: 0,
+          bankHolidayAutoBooked: 0,
+          taken: 0,
+          booked: 0,
+          requested: 0,
+          requestedHours: 0,
+          remainingHours: 0,
+          leftThisYear: 0,
+          unpaidLeaveTaken: 0,
+          unpaidLeaveRequest: 0
+        });
+      }
+    } catch (err: any) {
+      console.error('Error fetching holiday allowance:', err);
+    }
+  };
+
+  // ✅ FIXED: fetchLeaveRequests — optional local recalc, but respects backend values
   const fetchLeaveRequests = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      const response = await axiosInstance.get(`/hr/leave?userId=${user._id}&limit=all`);
+      const response = await axiosInstance.get(
+        `/hr/leave?userId=${user._id}&limit=all`
+      );
       let data =
         response.data.data?.result || response.data.data || response.data || [];
 
@@ -123,88 +175,40 @@ const Holiday: React.FC = () => {
 
       setHolidays(mappedHolidays);
 
+      // Optional: Recalculate locally if you want to reflect unsaved/draft state
       const totalTaken = mappedHolidays
         .filter((h) => h.status === 'Approved')
         .reduce((sum, h) => sum + parseHours(h.hours), 0);
       const totalRequested = mappedHolidays
         .filter((h) => h.status === 'Pending')
         .reduce((sum, h) => sum + parseHours(h.hours), 0);
-      const totalBooked = mappedHolidays
-        .filter((h) => h.status === 'Approved')
-        .reduce((sum, h) => sum + parseHours(h.hours), 0);
 
+      // ✅ Use holidayAccured from current state (already set by fetchHolidayAllowance)
       setLeaveAllowance((prev) => ({
         ...prev,
         taken: totalTaken,
+        booked: totalTaken,
         requested: totalRequested,
-        booked: totalBooked,
-        leftThisYear: prev.openingThisYear - totalTaken - totalRequested
+        requestedHours: totalRequested,
+        leftThisYear: prev.holidayAccured - totalTaken - totalRequested, // ✅ Correct formula
+        remainingHours: prev.holidayAccured - totalTaken - totalRequested // ✅ Keep in sync
       }));
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to load leave requests');
       console.error('Error fetching leave requests:', err);
-    }
-  };
-
-  const fetchHolidayAllowance = async () => {
-    try {
-      const year = selectedYear;
-      const response = await axiosInstance.get(
-        `/hr/holidays?userId=${user._id}&year=${year}&limit=all`
-      );
-
-      // Handle nested array response
-      const responseData =
-        response.data?.data?.result || response.data?.data || response.data;
-      let holidayRecord = null;
-
-      if (Array.isArray(responseData)) {
-        holidayRecord = responseData.find((item: any) => item.year === year);
-      } else if (responseData?.year === year) {
-        holidayRecord = responseData;
-      }
-
-      if (holidayRecord) {
-        setLeaveAllowance({
-          openingThisYear: holidayRecord.holidayAllowance || 0,
-          holidayAccured: holidayRecord.holidayAccured || 0,
-          bankHolidayAutoBooked: 0,
-          taken: holidayRecord.usedHours || 0,
-          booked: holidayRecord.usedHours || 0,
-          remainingHours: holidayRecord.remainingHours || 0,
-          requestedHours: holidayRecord.requestedHours || 0,
-          unpaidLeaveRequest: holidayRecord.unpaidLeaveRequest || 0,
-          unpaidLeaveTaken: holidayRecord.unpaidLeaveTaken || 0,
-          leftThisYear:
-            holidayRecord.holidayAccured - holidayRecord.usedHours || 0
-        });
-      } else {
-        setLeaveAllowance({
-          openingThisYear: 0,
-          bankHolidayAutoBooked: 0,
-          holidayAccured: 0,
-          remainingHours: 0,
-          taken: 0,
-          booked: 0,
-          requested: 0,
-          leftThisYear: 0,
-          unpaidLeaveRequest: 0,
-          unpaidLeaveTaken: 0
-        });
-      }
-    } catch (err: any) {
-      console.error('Error fetching holiday allowance:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
     if (user._id) {
       setLoading(true);
-      Promise.all([fetchLeaveRequests(), fetchHolidayAllowance()]).finally(
-        () => {
-          setLoading(false);
-        }
-      );
+      // ✅ Fetch allowance first to ensure holidayAccured is available
+      fetchHolidayAllowance()
+        .then(() => fetchLeaveRequests())
+        .catch(console.error)
+        .finally(() => setLoading(false));
     }
   }, [user._id, selectedYear]);
 
@@ -311,8 +315,9 @@ const Holiday: React.FC = () => {
       setReason('');
       setSelectedType('');
 
-      fetchLeaveRequests();
-      fetchHolidayAllowance();
+      // Refresh data
+      await fetchHolidayAllowance();
+      await fetchLeaveRequests();
     } catch (err: any) {
       toast({
         title: err.response?.data?.message || 'Submission failed',
@@ -320,7 +325,6 @@ const Holiday: React.FC = () => {
       });
       console.error('Error submitting leave:', err);
     } finally {
-      // Always stop loading
       setLoading(false);
     }
   };
@@ -348,6 +352,32 @@ const Holiday: React.FC = () => {
     );
   }
 
+  const generateHolidayYears = (
+    backward: number = 20,
+    forward: number = 50
+  ) => {
+    const currentYear = moment().year();
+    const years: string[] = [];
+
+    for (let i = backward; i > 0; i--) {
+      const start = currentYear - i;
+      const end = start + 1;
+      years.push(`${start}-${end}`);
+    }
+
+    years.push(`${currentYear}-${currentYear + 1}`);
+
+    for (let i = 1; i <= forward; i++) {
+      const start = currentYear + i;
+      const end = start + 1;
+      years.push(`${start}-${end}`);
+    }
+
+    return years;
+  };
+
+  const holidayYears = generateHolidayYears(20, 50);
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="">
@@ -372,11 +402,11 @@ const Holiday: React.FC = () => {
                       <SelectValue placeholder="Select year" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="2027-2028">2027-2028</SelectItem>
-                      <SelectItem value="2026-2027">2026-2027</SelectItem>
-                      <SelectItem value="2025-2026">2025-2026</SelectItem>
-                      <SelectItem value="2024-2025">2024-2025</SelectItem>
-                      <SelectItem value="2023-2024">2023-2024</SelectItem>
+                      {holidayYears.map((year) => (
+                        <SelectItem key={year} value={year}>
+                          {year}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -403,7 +433,7 @@ const Holiday: React.FC = () => {
                     </div>
                     <div className="text-center">
                       <div className="text-2xl font-bold text-purple-600">
-                      {leaveAllowance.leftThisYear.toFixed(1)} h
+                        {leaveAllowance.leftThisYear.toFixed(1)} h
                       </div>
                       <div className="text-sm text-gray-600">Balance</div>
                     </div>
@@ -477,7 +507,7 @@ const Holiday: React.FC = () => {
                     </span>
                   </div>
                   <div className="flex items-center justify-between border-b border-gray-300 py-2">
-                    <span className="text-gray-600">Holiday Accured</span>
+                    <span className="text-gray-600">Holiday Accrued</span>
                     <span className="font-semibold">
                       {leaveAllowance.holidayAccured.toFixed(1)} h
                     </span>
@@ -503,15 +533,15 @@ const Holiday: React.FC = () => {
                     </span>
                   </div>
                   <div className="flex items-center justify-between border-b border-gray-300 py-2">
-                    <span className="text-gray-600">Unpaid leave Taken</span>
+                    <span className="text-gray-600">Unpaid Leave Taken</span>
                     <span className="font-semibold text-cyan-600">
-                      {leaveAllowance?.unpaidLeaveTaken?.toFixed(1) || 0} h
+                      {leaveAllowance.unpaidLeaveTaken.toFixed(1)} h
                     </span>
                   </div>
                   <div className="flex items-center justify-between border-b border-gray-300 py-2">
-                    <span className="text-gray-600">Unpaid leave Request</span>
+                    <span className="text-gray-600">Unpaid Leave Requested</span>
                     <span className="font-semibold text-blue-600">
-                      {leaveAllowance?.unpaidLeaveRequest?.toFixed(1) || 0} h
+                      {leaveAllowance.unpaidLeaveRequest.toFixed(1)} h
                     </span>
                   </div>
                   <div className="flex items-center justify-between border-b border-gray-300 py-2">
@@ -551,9 +581,11 @@ const Holiday: React.FC = () => {
                         <SelectValue placeholder="Select year" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="2025-2026">2025-2026</SelectItem>
-                        <SelectItem value="2024-2025">2024-2025</SelectItem>
-                        <SelectItem value="2023-2024">2023-2024</SelectItem>
+                        {holidayYears.map((year) => (
+                          <SelectItem key={year} value={year}>
+                            {year}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>

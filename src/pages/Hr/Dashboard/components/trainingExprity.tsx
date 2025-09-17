@@ -100,8 +100,17 @@ const TrainingExpiryPage = () => {
     return { status: "Valid", color: "bg-green-500" };
   };
 
-  const getExpiringTrainings = (employee: Employee) =>
-    employee.training?.filter((t) => t.expireDate && (isTrainingExpired(t.expireDate) || isTrainingExpiringSoon(t.expireDate)));
+const getExpiringTrainings = (employee: Employee) =>
+  employee.training?.filter((t) => {
+    // exclude completed unless recurring
+    if (t.status === "completed" && !(t.trainingId as any).isRecurring) return false;
+
+    return (
+      t.expireDate &&
+      (isTrainingExpired(t.expireDate) || isTrainingExpiringSoon(t.expireDate))
+    );
+  });
+
 
   const handleEmployeeClick = (employeeId: string) => {
     navigate(`/admin/hr/employee/${employeeId}`, { state: { activeTab: "training" } });

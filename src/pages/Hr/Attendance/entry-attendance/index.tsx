@@ -428,10 +428,9 @@ export default function EntryAttendance() {
             <DatePicker
               selected={attendanceData.createdAt}
               onChange={handleDateChange}
-              dateFormat="yyyy-MM-dd"
+              dateFormat="dd-MM-yyyy"
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black"
               placeholderText="Select date"
-              maxDate={new Date()}
               wrapperClassName="w-full"
               showMonthDropdown
               showYearDropdown
@@ -453,7 +452,7 @@ export default function EntryAttendance() {
               }
               onBlur={() => handleTimeBlur('single', 'clockIn')}
               maxLength={5}
-              className="text-center font-mono"
+              className="text-center font-mono bg-white"
             />
           </div>
 
@@ -471,7 +470,7 @@ export default function EntryAttendance() {
               }
               onBlur={() => handleTimeBlur('single', 'clockOut')}
               maxLength={5}
-              className="text-center font-mono"
+              className="text-center font-mono bg-white"
             />
           </div>
         </div>
