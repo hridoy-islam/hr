@@ -232,261 +232,236 @@ const StaffAttendancePage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="">
-        {/* Header */}
-        <h1 className="mb-4 text-3xl font-bold text-gray-800">My Attendance</h1>
+  <div className="min-h-screen bg-white">
+    {/* Main Container */}
+    <div className=" mx-auto space-y-2 p-4">
+      {/* Header */}
+      {/* <h1 className="text-3xl font-bold text-gray-800">My Attendance</h1> */}
 
-        {/* Overview Section */}
-        <section className="mb-8 rounded-lg bg-white p-6 shadow">
-          <h2 className="mb-6 text-2xl font-semibold text-gray-700">
-            {currentMonth} {currentYear} Overview
-          </h2>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="rounded-lg border border-blue-100 bg-blue-50 p-4 text-center">
-              <h3 className="text-sm font-medium text-blue-600">
-                Total Working Days
-              </h3>
-              <p className="text-2xl font-bold text-blue-800">
-                {totalWorkingDays}
-              </p>
-            </div>
-            <div className="rounded-lg border border-green-100 bg-green-50 p-4 text-center">
-              <h3 className="text-sm font-medium text-green-600">
-                Present Days
-              </h3>
-              <p className="text-2xl font-bold text-green-800">{presentDays}</p>
-            </div>
-            <div className="rounded-lg border border-red-100 bg-red-50 p-4 text-center">
-              <h3 className="text-sm font-medium text-red-600">Absent Days</h3>
-              <p className="text-2xl font-bold text-red-800">{absentDays}</p>
-            </div>
-            <div className="rounded-lg border border-yellow-100 bg-yellow-50 p-4 text-center">
-              <h3 className="text-sm font-medium text-yellow-600">Late Days</h3>
-              <p className="text-2xl font-bold text-yellow-800">{lateDays}</p>
-            </div>
+      {/* Overview Section */}
+      <section className="rounded-lg bg-white">
+        {/* <h2 className="mb-6 text-2xl font-semibold text-gray-700">
+          {currentMonth} {currentYear} Overview
+        </h2> */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-lg border border-blue-100 bg-blue-50 p-4 text-center">
+            <h3 className="text-sm font-medium text-blue-600">
+              Total Working Days
+            </h3>
+            <p className="text-2xl font-bold text-blue-800">{totalWorkingDays}</p>
           </div>
-        </section>
-
-        {/* Attendance List */}
-        <section className="rounded-lg bg-white p-6 shadow">
-          <div className="mb-4 flex w-full flex-row items-center justify-between">
-            <h2 className="text-2xl font-semibold text-gray-700">
-              Attendance Records
-            </h2>
-            <button
-              onClick={() => setIsModalOpen(true)}
-              className="rounded-md bg-supperagent px-5 py-2 font-medium text-white transition hover:bg-supperagent/90"
-            >
-              Download PDF
-            </button>
+          <div className="rounded-lg border border-green-100 bg-green-50 p-4 text-center">
+            <h3 className="text-sm font-medium text-green-600">Present Days</h3>
+            <p className="text-2xl font-bold text-green-800">{presentDays}</p>
           </div>
-
-          {/* Filters */}
-          <div className="flex flex-wrap items-end gap-4 pb-4">
-            <div className="flex flex-col">
-              <label className="mb-1 text-sm font-medium text-gray-600">
-                From:
-              </label>
-              <DatePicker
-                selected={startDate}
-                onChange={setStartDate}
-                selectsStart
-                startDate={startDate}
-                endDate={endDate}
-                maxDate={new Date()}
-                className="rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div className="flex flex-col">
-              <label className="mb-1 text-sm font-medium text-gray-600">
-                To:
-              </label>
-              <DatePicker
-                selected={endDate}
-                onChange={setEndDate}
-                selectsEnd
-                startDate={startDate}
-                endDate={endDate}
-                minDate={startDate}
-                maxDate={new Date()}
-                className="rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <button
-              onClick={handleFilter}
-              className="rounded-md bg-supperagent px-5 py-2 font-medium text-white transition hover:bg-supperagent/90"
-            >
-              Apply Filter
-            </button>
-            <button
-              onClick={handleReset}
-              className="rounded-md bg-gray-500 px-5 py-2 font-medium text-white transition hover:bg-gray-600"
-            >
-              Reset
-            </button>
+          <div className="rounded-lg border border-red-100 bg-red-50 p-4 text-center">
+            <h3 className="text-sm font-medium text-red-600">Absent Days</h3>
+            <p className="text-2xl font-bold text-red-800">{absentDays}</p>
           </div>
+          <div className="rounded-lg border border-yellow-100 bg-yellow-50 p-4 text-center">
+            <h3 className="text-sm font-medium text-yellow-600">Late Days</h3>
+            <p className="text-2xl font-bold text-yellow-800">{lateDays}</p>
+          </div>
+        </div>
+      </section>
 
-          {/* Error State */}
-          {error && (
-            <div className="py-10 text-center text-red-600">{error}</div>
-          )}
+      {/* Attendance List Section */}
+      <section className="rounded-lg bg-white">
+        <div className="mb-4 flex w-full flex-row items-center justify-between">
+          <h2 className="text-2xl font-semibold text-gray-700">Attendance Records</h2>
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="rounded-md bg-supperagent px-5 py-2 font-medium text-white transition hover:bg-supperagent/90"
+          >
+            Download PDF
+          </button>
+        </div>
 
-          {/* Loading State */}
-          {isLoading ? (
-            <div className="py-10 text-center text-gray-500">
-              Loading attendance data...
-            </div>
-          ) : filteredData.length === 0 ? (
-            <div className="py-10 text-center text-gray-500">
-              No records found for the selected period.
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full rounded-lg border border-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="border-b px-4 py-3 text-left text-sm font-semibold text-gray-700">
-                      Date
-                    </th>
-                    <th className="border-b px-4 py-3 text-left text-sm font-semibold text-gray-700">
-                      Status
-                    </th>
-                    <th className="border-b px-4 py-3 text-left text-sm font-semibold text-gray-700">
-                      Start Time
-                    </th>
-                    <th className="border-b px-4 py-3 text-left text-sm font-semibold text-gray-700">
-                      End Time
-                    </th>
-                    <th className="border-b px-4 py-3 text-left text-sm font-semibold text-gray-700">
-                      Duration (hours)
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredData.map((item, index) => {
-                    const duration = getDuration(item.clockIn, item.clockOut);
-                    const status = !item.clockIn
-                      ? 'Absent'
-                      : new Date(item.clockIn).getHours() > 9
-                        ? 'Late'
-                        : 'Present';
+        {/* Filters */}
+        <div className="flex flex-wrap items-end gap-4 pb-4">
+          <div className="flex flex-col">
+            <label className="mb-1 text-sm font-medium text-gray-600">From:</label>
+            <DatePicker
+              selected={startDate}
+              onChange={setStartDate}
+              selectsStart
+              startDate={startDate}
+              endDate={endDate}
+              maxDate={new Date()}
+              showMonthDropdown
+              showYearDropdown
+              dropdownMode='select'
+              className="rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div className="flex flex-col">
+            <label className="mb-1 text-sm font-medium text-gray-600">To:</label>
+            <DatePicker
+              selected={endDate}
+              onChange={setEndDate}
+              selectsEnd
+              startDate={startDate}
+              endDate={endDate}
+              minDate={startDate}
+              maxDate={new Date()}
+              showMonthDropdown
+              showYearDropdown
+              dropdownMode='select'
+              className="rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <button
+            onClick={handleFilter}
+            className="rounded-md bg-supperagent px-5 py-2 font-medium text-white transition hover:bg-supperagent/90"
+          >
+            Apply Filter
+          </button>
+          <button
+            onClick={handleReset}
+            className="rounded-md bg-gray-500 px-5 py-2 font-medium text-white transition hover:bg-gray-600"
+          >
+            Reset
+          </button>
+        </div>
 
-                    return (
-                      <tr
-                        key={item._id || index}
-                        className="border-b last:border-b-0 hover:bg-gray-50"
-                      >
-                        <td className="px-4 py-3 text-sm text-gray-800">
-                          {formatDate(item.timestamp || item.createdAt)}
-                        </td>
-                        <td
-                          className={`px-4 py-3 text-sm font-medium ${
-                            status === 'Present'
-                              ? 'text-green-700'
-                              : status === 'Absent'
-                                ? 'text-red-700'
-                                : 'text-yellow-700'
-                          }`}
-                        >
-                          {status}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-800">
-                          {formatTime(item.clockIn)}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-800">
-                          {formatTime(item.clockOut)}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-800">
-                          {duration}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
+        {/* Error / Loading / Table */}
+        {error ? (
+          <div className="py-10 text-center text-red-600">{error}</div>
+        ) : isLoading ? (
+          <div className="py-10 text-center text-gray-500">Loading attendance data...</div>
+        ) : filteredData.length === 0 ? (
+          <div className="py-10 text-center text-gray-500">
+            No records found for the selected period.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full rounded-lg border border-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="border-b px-4 py-3 text-left text-sm font-semibold text-gray-700">
+                    Date
+                  </th>
+                  <th className="border-b px-4 py-3 text-left text-sm font-semibold text-gray-700">
+                    Status
+                  </th>
+                  <th className="border-b px-4 py-3 text-left text-sm font-semibold text-gray-700">
+                    Start Time
+                  </th>
+                  <th className="border-b px-4 py-3 text-left text-sm font-semibold text-gray-700">
+                    End Time
+                  </th>
+                  <th className="border-b px-4 py-3 text-left text-sm font-semibold text-gray-700">
+                    Duration (hours)
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredData.map((item, index) => {
+                  const duration = getDuration(item.clockIn, item.clockOut);
+                  const status = !item.clockIn
+                    ? 'Absent'
+                    : new Date(item.clockIn).getHours() > 9
+                      ? 'Late'
+                      : 'Present';
 
-        {/* Download Modal */}
-        {isModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-            <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-lg">
-              <h3 className="mb-4 text-xl font-semibold">
-                Download Attendance Report
-              </h3>
-              <p className="mb-4 text-gray-600">
-                Select the date range for your PDF report.
-              </p>
-
-              <div className="mb-4 flex flex-col gap-4">
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-600">
-                    From:
-                  </label>
-                  <DatePicker
-                    selected={downloadStartDate}
-                    onChange={setDownloadStartDate}
-                    selectsStart
-                    startDate={downloadStartDate}
-                    endDate={downloadEndDate}
-                    maxDate={new Date()}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-600">
-                    To:
-                  </label>
-                  <DatePicker
-                    selected={downloadEndDate}
-                    onChange={setDownloadEndDate}
-                    selectsEnd
-                    startDate={downloadStartDate}
-                    endDate={downloadEndDate}
-                    minDate={downloadStartDate}
-                    maxDate={new Date()}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="rounded-md bg-gray-400 px-4 py-2 font-medium text-white hover:bg-gray-500"
-                >
-                  Cancel
-                </button>
-                <PDFDownloadLink
-                  document={
-                    <AttendancePDF data={getFilteredDataForDownload()} />
-                  }
-                  fileName={`attendance_${downloadStartDate.toISOString().split('T')[0]}_to_${downloadEndDate.toISOString().split('T')[0]}.pdf`}
-                >
-                  {({ loading }) => (
-                    <button
-                      type="button"
-                      disabled={loading}
-                      className={`rounded-md px-4 py-2 font-medium text-white ${
-                        loading
-                          ? 'bg-supperagent/80'
-                          : 'bg-supperagent hover:bg-supperagent/90'
-                      }`}
+                  return (
+                    <tr
+                      key={item._id || index}
+                      className="border-b last:border-b-0 hover:bg-gray-50"
                     >
-                      {loading ? 'Generating...' : 'Generate PDF'}
-                    </button>
-                  )}
-                </PDFDownloadLink>
-              </div>
-            </div>
+                      <td className="px-4 py-3 text-sm text-gray-800">
+                        {formatDate(item.timestamp || item.createdAt)}
+                      </td>
+                      <td
+                        className={`px-4 py-3 text-sm font-medium ${
+                          status === 'Present'
+                            ? 'text-green-700'
+                            : status === 'Absent'
+                              ? 'text-red-700'
+                              : 'text-yellow-700'
+                        }`}
+                      >
+                        {status}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-800">{formatTime(item.clockIn)}</td>
+                      <td className="px-4 py-3 text-sm text-gray-800">{formatTime(item.clockOut)}</td>
+                      <td className="px-4 py-3 text-sm text-gray-800">{duration}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
-      </div>
+      </section>
+
+      {/* Download Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-lg">
+            <h3 className="mb-4 text-xl font-semibold">Download Attendance Report</h3>
+            <p className="mb-4 text-gray-600">Select the date range for your PDF report.</p>
+
+            <div className="mb-4 flex flex-col gap-4">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-600">From:</label>
+                <DatePicker
+                  selected={downloadStartDate}
+                  onChange={setDownloadStartDate}
+                  selectsStart
+                  startDate={downloadStartDate}
+                  endDate={downloadEndDate}
+                  maxDate={new Date()}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-600">To:</label>
+                <DatePicker
+                  selected={downloadEndDate}
+                  onChange={setDownloadEndDate}
+                  selectsEnd
+                  startDate={downloadStartDate}
+                  endDate={downloadEndDate}
+                  minDate={downloadStartDate}
+                  maxDate={new Date()}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                className="rounded-md bg-gray-400 px-4 py-2 font-medium text-white hover:bg-gray-500"
+              >
+                Cancel
+              </button>
+              <PDFDownloadLink
+                document={<AttendancePDF data={getFilteredDataForDownload()} />}
+                fileName={`attendance_${downloadStartDate.toISOString().split('T')[0]}_to_${downloadEndDate.toISOString().split('T')[0]}.pdf`}
+              >
+                {({ loading }) => (
+                  <button
+                    type="button"
+                    disabled={loading}
+                    className={`rounded-md px-4 py-2 font-medium text-white ${
+                      loading ? 'bg-supperagent/80' : 'bg-supperagent hover:bg-supperagent/90'
+                    }`}
+                  >
+                    {loading ? 'Generating...' : 'Generate PDF'}
+                  </button>
+                )}
+              </PDFDownloadLink>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
-  );
+  </div>
+);
+
 };
 
 // PDF Styling
