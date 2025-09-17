@@ -149,7 +149,6 @@ const Holiday: React.FC = () => {
   // ✅ FIXED: fetchLeaveRequests — optional local recalc, but respects backend values
   const fetchLeaveRequests = async () => {
     try {
-      setLoading(true);
       setError(null);
 
       const response = await axiosInstance.get(
@@ -196,9 +195,7 @@ const Holiday: React.FC = () => {
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to load leave requests');
       console.error('Error fetching leave requests:', err);
-    } finally {
-      setLoading(false);
-    }
+    } 
   };
 
 useEffect(() => {
