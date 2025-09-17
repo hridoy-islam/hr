@@ -166,7 +166,7 @@ const getExpiringTrainings = (employee: Employee) =>
                       <TableHead>Department</TableHead>
                       <TableHead>Position</TableHead>
                       <TableHead>Training Course</TableHead>
-                      <TableHead>Expiry Date</TableHead>
+                      <TableHead>Expiry Date (dd/mm/yyyy)</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="text-right">Action</TableHead>
                     </TableRow>

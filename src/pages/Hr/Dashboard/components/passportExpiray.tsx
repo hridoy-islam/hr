@@ -210,7 +210,7 @@ const PassportExpiryPage = () => {
                       <TableHead>Employee</TableHead>
                       <TableHead>Department</TableHead>
                       <TableHead>Position</TableHead>
-                      <TableHead>Passport Expiry Date</TableHead>
+                      <TableHead>Passport Expiry Date (dd/mm/yyyy)</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="text-right">Action</TableHead>
                     </TableRow>

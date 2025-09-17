@@ -234,7 +234,7 @@ const RightToWorkStatusPage = () => {
                         Employee
                       </TableHead>
                       <TableHead className="font-semibold text-gray-700">
-                        RTW Status Check Date
+                        RTW Status Check Date (dd/mm/yyyy)
                       </TableHead>
 
                       <TableHead className="text-right font-semibold text-gray-700">

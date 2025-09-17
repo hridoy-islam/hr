@@ -228,6 +228,11 @@ const TrainingTab = ({ formData, onUpdate, isFieldSaving }) => {
     onUpdate('training', updated);
   };
 
+    const [isAssignedDateOpen, setIsAssignedDateOpen] = useState(false);
+  const [isCompletedAtOpen, setIsCompletedAtOpen] = useState(false);
+  const [isExpireDateOpen, setIsExpireDateOpen] = useState(false);
+
+
   return (
     <Card>
       <CardContent className="pt-6">
@@ -278,9 +283,15 @@ const TrainingTab = ({ formData, onUpdate, isFieldSaving }) => {
                         {t.status.charAt(0).toUpperCase() + t.status.slice(1)}
                       </span>
                     </TableCell>
-                    <TableCell>{t.assignedDate}</TableCell>
-                    <TableCell>{t.completedAt || '-'}</TableCell>
-                    <TableCell>{t.expireDate}</TableCell>
+                    <TableCell>
+  {t.assignedDate ? moment(t.assignedDate).format('DD/MM/YYYY') : '-'}
+</TableCell>
+<TableCell>
+  {t.completedAt ? moment(t.completedAt).format('DD/MM/YYYY') : '-'}
+</TableCell>
+<TableCell>
+  {t.expireDate ? moment(t.expireDate).format('DD/MM/YYYY') : '-'}
+</TableCell>
                     <TableCell>
                       {t.certificate ? (
                         <a
@@ -318,137 +329,165 @@ const TrainingTab = ({ formData, onUpdate, isFieldSaving }) => {
         )}
 
         {/* Dialog */}
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>
-                {editingIndex !== null ? 'Edit Training' : 'Add Training'}
-              </DialogTitle>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label htmlFor="training">Training</Label>
-                <ReactSelect
-                  id="training"
-                  options={trainingOptions}
-                  value={
-                    trainingOptions.find(
-                      (t) => t.value === dialogData.trainingId
-                    ) || null
-                  }
-                  onChange={(selected) =>
-                    handleDialogChange('trainingId', selected?.value)
-                  }
-                  placeholder="Select Training"
-                />
-              </div>
+ <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <DialogContent className="sm:max-w-md bg-white">
+        <DialogHeader>
+          <DialogTitle>
+            {editingIndex !== null ? 'Edit Training' : 'Add Training'}
+          </DialogTitle>
+        </DialogHeader>
 
-              <div className="grid gap-2">
-                <Label>Assigned Date</Label>
-                <Input
-                  type="date"
-                  value={dialogData.assignedDate || ''}
-                  onChange={(e) =>
-                    handleDialogChange('assignedDate', e.target.value)
-                  }
-                />
-              </div>
+        <div className="grid gap-4 py-4">
+          {/* Training Select */}
+          <div className="grid gap-2">
+            <Label htmlFor="training">Training</Label>
+            <ReactSelect
+              id="training"
+              options={trainingOptions}
+              value={
+                trainingOptions.find(
+                  (t) => t.value === dialogData.trainingId
+                ) || null
+              }
+              onChange={(selected) =>
+                handleDialogChange('trainingId', selected?.value)
+              }
+              placeholder="Select Training"
+            />
+          </div>
 
-              <div className="grid gap-2">
-                <Label>Status</Label>
-                <Select
-                  value={dialogData.status}
-                  onValueChange={(value) => handleDialogChange('status', value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="inProgress">In Progress</SelectItem>
-                    <SelectItem value="completed">Completed</SelectItem>
-                    <SelectItem value="expired">Expired</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+          {/* Assigned Date */}
+          <div className="grid gap-2">
+            <Label>Assigned Date (dd/mm/yyyy)</Label>
+            <DatePicker
+              selected={
+                dialogData.assignedDate
+                  ? moment(dialogData.assignedDate).toDate()
+                  : null
+              }
+              onChange={(date: Date | null) => {
+                handleDialogChange(
+                  'assignedDate',
+                  date ? moment(date).format('YYYY-MM-DD') : ''
+                );
+                setIsAssignedDateOpen(false); // 👈 Close on select
+              }}
+              dateFormat="dd/MM/yyyy" // 👈 Display: 25 Apr 2025
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              placeholderText="Select assigned date"
+              isClearable
+              shouldCloseOnSelect={true}
+              open={isAssignedDateOpen} // 👈 Controlled
+              onInputClick={() => setIsAssignedDateOpen(true)} // 👈 Open on click
+              onClickOutside={() => setIsAssignedDateOpen(false)} // 👈 Close on outside click
+            />
+          </div>
 
-              {dialogData.status === 'completed' && (
-                <div className="grid gap-2">
-                  <Label>Completed At</Label>
-                  <DatePicker
-                    selected={
-                      dialogData.completedAt
-                        ? moment(dialogData.completedAt).toDate()
-                        : null
-                    }
-                    onChange={(date: Date | null) =>
-                      handleDialogChange(
-                        'completedAt',
-                        date ? moment(date).format('YYYY-MM-DD') : ''
-                      )
-                    }
-                    dateFormat="yyyy-MM-dd"
-                    className="w-full rounded-md border px-3 py-2 text-sm"
-                    placeholderText="Select completed date"
-                    maxDate={new Date()}
-                    isClearable
-                  />
-                </div>
-              )}
+          {/* Status */}
+          <div className="grid gap-2">
+            <Label>Status</Label>
+            <Select
+              value={dialogData.status}
+              onValueChange={(value) => handleDialogChange('status', value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="inProgress">In Progress</SelectItem>
+                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="expired">Expired</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-              <div className="grid gap-2">
-                <Label>Expiry Date</Label>
-                <Input
-                  type="date"
-                  value={dialogData.expireDate || ''}
-                  disabled
-                  className="bg-gray-100"
-                />
-              </div>
+          {/* Completed At */}
+          <div className="grid gap-2">
+            <Label>Completed At (dd/mm/yyyy)</Label>
+            <DatePicker
+              selected={
+                dialogData.completedAt
+                  ? moment(dialogData.completedAt).toDate()
+                  : null
+              }
+              onChange={(date: Date | null) => {
+                handleDialogChange(
+                  'completedAt',
+                  date ? moment(date).format('YYYY-MM-DD') : ''
+                );
+                setIsCompletedAtOpen(false); // 👈 Close on select
+              }}
+              dateFormat="dd/MM/yyyy"
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              placeholderText="Select completed date"
+              isClearable
+              shouldCloseOnSelect={true}
+              open={isCompletedAtOpen}
+              onInputClick={() => setIsCompletedAtOpen(true)}
+              onClickOutside={() => setIsCompletedAtOpen(false)}
+            />
+          </div>
 
-              <div className="grid gap-2">
-                <Label>Certificate (Optional)</Label>
-                <Input
-                  type="file"
-                  accept=".pdf,.jpg,.png"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0] || null;
-                    handleDialogChange('certificate', file);
-                  }}
-                />
-              </div>
-            </div>
+          {/* Expiry Date */}
+          <div className="grid gap-2">
+            <Label>Expiry Date (dd/mm/yyyy)</Label>
+            <DatePicker
+              selected={
+                dialogData.expireDate
+                  ? moment(dialogData.expireDate).toDate()
+                  : null
+              }
+              onChange={(date: Date | null) => {
+                handleDialogChange(
+                  'expireDate',
+                  date ? moment(date).format('YYYY-MM-DD') : ''
+                );
+                setIsExpireDateOpen(false); // 👈 Close on select
+              }}
+              dateFormat="dd/MM/yyyy"
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              placeholderText="Select expiry date"
+              isClearable
+              shouldCloseOnSelect={true}
+              open={isExpireDateOpen}
+              onInputClick={() => setIsExpireDateOpen(true)}
+              onClickOutside={() => setIsExpireDateOpen(false)}
+            />
+          </div>
 
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setIsDialogOpen(false)}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                onClick={handleSave}
-                className="bg-supperagent text-white hover:bg-supperagent/90"
-              >
-                Save
-              </Button>
-              {/* {editingIndex !== null && (
-                <Button
-                  type="button"
-                  variant="destructive"
-                  onClick={() => {
-                    handleRemove(editingIndex);
-                    setIsDialogOpen(false);
-                  }}
-                  className="ml-auto"
-                >
-                  Delete
-                </Button>
-              )} */}
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+          {/* Certificate Upload */}
+          <div className="grid gap-2">
+            <Label>Certificate (Optional)</Label>
+            <Input
+              type="file"
+              accept=".pdf,.jpg,.png"
+              onChange={(e) => {
+                const file = e.target.files?.[0] || null;
+                handleDialogChange('certificate', file);
+              }}
+            />
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setIsDialogOpen(false)}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            onClick={handleSave}
+            className="bg-supperagent text-white hover:bg-supperagent/90"
+          >
+            Save
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
       </CardContent>
     </Card>
   );

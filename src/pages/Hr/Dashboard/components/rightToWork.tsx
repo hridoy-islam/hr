@@ -344,7 +344,7 @@ const RightToWorkExpiryPage = () => {
                   <TableHeader>
                     <TableRow className="bg-gray-50">
                       <TableHead>Employee</TableHead>
-                      <TableHead>Right to Work Expiry</TableHead>
+                      <TableHead>Right to Work Expiry (dd/mm/yyyy)</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="text-right">Action</TableHead>
                     </TableRow>
@@ -479,7 +479,7 @@ const RightToWorkExpiryPage = () => {
                 {/* New Expiry Date */}
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700">
-                    New Expiry Date
+                    New Expiry Date (dd/mm/yyyy)
                   </label>
                   <DatePicker
                     selected={newExpiryDate}
