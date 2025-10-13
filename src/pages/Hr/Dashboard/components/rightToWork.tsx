@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+
+import { useState, useEffect, useRef } from 'react';
 import {
   ArrowLeft,
   AlertTriangle,
@@ -6,6 +7,8 @@ import {
   Calendar,
   X,
   Paperclip,
+  Upload,
+  FileText,
   Trash2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -35,6 +38,7 @@ import {
   DialogDescription,
   DialogFooter
 } from '@/components/ui/dialog';
+import { cn } from '@/lib/utils';
 
 // === Types ===
 interface Employee {
@@ -49,7 +53,7 @@ interface Employee {
 interface RightToWorkRecord {
   _id: string;
   employeeId: Employee;
-  expiryDate: string | null; // ISO date string or null
+  expiryDate: string | null;
   status: 'active' | 'closed' | 'expire';
 }
 
@@ -63,12 +67,17 @@ const RightToWorkExpiryPage = () => {
   const { user } = useSelector((state: any) => state.auth);
 
   // Modal state
-  const [selectedRecord, setSelectedRecord] =
-    useState<RightToWorkRecord | null>(null);
+  const [selectedRecord, setSelectedRecord] = useState<RightToWorkRecord | null>(null);
   const [newExpiryDate, setNewExpiryDate] = useState<Date | null>(null);
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  // File upload state
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadedFileUrl, setUploadedFileUrl] = useState<string | null>(null);
+  const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   // Fetch data
   useEffect(() => {
@@ -95,18 +104,17 @@ const RightToWorkExpiryPage = () => {
                     email: emp.email || 'No email',
                     position: emp.position || 'N/A',
                     departmentId: {
-                      departmentName:
-                        emp.departmentId?.departmentName || 'Unassigned'
+                      departmentName: emp.departmentId?.departmentName || 'Unassigned'
                     }
                   },
-                  expiryDate: raw.expiryDate || null, // Allow null expiry dates
+                  expiryDate: raw.expiryDate || null,
                   status: raw.status || 'active'
                 };
               })
               .filter((r): r is RightToWorkRecord => r !== null)
           : [];
 
-        // Deduplicate by employeeId (keep latest expiry or no expiry)
+        // Deduplication logic (unchanged)
         const deduplicated = validRecords.reduce(
           (acc: RightToWorkRecord[], record) => {
             const existingIndex = acc.findIndex(
@@ -116,23 +124,14 @@ const RightToWorkExpiryPage = () => {
               acc.push(record);
             } else {
               const existing = acc[existingIndex];
-              // If current record has no expiry date, only replace if existing also has no expiry
               if (!record.expiryDate && !existing.expiryDate) {
                 acc[existingIndex] = record;
-              }
-              // If current record has expiry and existing doesn't, keep existing (no expiry)
-              else if (!record.expiryDate && existing.expiryDate) {
+              } else if (!record.expiryDate && existing.expiryDate) {
                 // Keep existing
-              }
-              // If existing has no expiry and current has expiry, keep existing (no expiry)
-              else if (record.expiryDate && !existing.expiryDate) {
+              } else if (record.expiryDate && !existing.expiryDate) {
                 // Keep existing
-              }
-              // Both have expiry dates, keep the latest
-              else if (record.expiryDate && existing.expiryDate) {
-                if (
-                  new Date(record.expiryDate) > new Date(existing.expiryDate)
-                ) {
+              } else if (record.expiryDate && existing.expiryDate) {
+                if (new Date(record.expiryDate) > new Date(existing.expiryDate)) {
                   acc[existingIndex] = record;
                 }
               }
@@ -142,19 +141,13 @@ const RightToWorkExpiryPage = () => {
           []
         );
 
-        // Filter: expired, expiring soon, or no expiry date
         const filtered = deduplicated.filter((record) => {
-          // Include records with no expiry date
-          if (!record.expiryDate) {
-            return true;
-          }
-
-          // Include expired or expiring soon records
+          if (!record.expiryDate) return true;
           const expiry = new Date(record.expiryDate);
           const today = new Date();
           const ninetyDaysFromNow = new Date();
           ninetyDaysFromNow.setDate(today.getDate() + 90);
-          return expiry < ninetyDaysFromNow; // Expired or within 90 days
+          return expiry < ninetyDaysFromNow;
         });
 
         setRecords(filtered);
@@ -169,28 +162,18 @@ const RightToWorkExpiryPage = () => {
     fetchRightToWork();
   }, []);
 
-  // Filter records based on search term
   const filteredRecords = records.filter((record) => {
-    const fullName =
-      `${record.employeeId.firstName} ${record.employeeId.lastName}`.toLowerCase();
+    const fullName = `${record.employeeId.firstName} ${record.employeeId.lastName}`.toLowerCase();
     const email = record.employeeId.email.toLowerCase();
-    const department =
-      record.employeeId.departmentId?.departmentName?.toLowerCase() || '';
+    const department = record.employeeId.departmentId?.departmentName?.toLowerCase() || '';
     const query = searchTerm.toLowerCase();
-
-    return (
-      fullName.includes(query) ||
-      email.includes(query) ||
-      department.includes(query)
-    );
+    return fullName.includes(query) || email.includes(query) || department.includes(query);
   });
 
-  // Reset pagination on search
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm]);
 
-  // === Helpers ===
   const formatDate = (dateString: string | null): string => {
     if (!dateString) return 'No expiry date';
     return moment(dateString).format('DD/MM/YYYY');
@@ -200,7 +183,6 @@ const RightToWorkExpiryPage = () => {
     if (!dateString) {
       return { status: 'No Expiry', color: 'bg-gray-500' };
     }
-
     const expiry = moment(dateString);
     const today = moment();
     if (expiry.isBefore(today, 'day')) {
@@ -217,57 +199,97 @@ const RightToWorkExpiryPage = () => {
     });
   };
 
-  // Open modal for update
   const handleUpdateClick = (record: RightToWorkRecord) => {
     setSelectedRecord(record);
-    // Set initial date - use existing expiry date or null for no expiry
     setNewExpiryDate(null);
-    setUploadFile(null);
+    // Reset upload state
+    setUploadedFileUrl(null);
+    setSelectedFileName(null);
+    setUploadError(null);
     setIsModalOpen(true);
   };
 
-  const handleSubmitUpdate = async () => {
-    if (!selectedRecord) return;
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !user?._id) return;
 
-    // Allow updating even if newExpiryDate is null (removing expiry date)
-    setSubmitting(true);
+  
+    if (file.size > 5 * 1024 * 1024) {
+      setUploadError('File must be less than 5MB.');
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadError(null);
+    setSelectedFileName(file.name);
+
     const formData = new FormData();
-
-    if (newExpiryDate) {
-      formData.append('expiryDate', moment(newExpiryDate).format('YYYY-MM-DD'));
-    } else {
-      // Send empty string or null to remove expiry date
-      formData.append('expiryDate', '');
-    }
-
-    formData.append('updatedBy', user?._id);
-    if (uploadFile) {
-      formData.append('document', uploadFile);
-    }
+    formData.append('entityId', user._id);
+    formData.append('file_type', 'document');
+    formData.append('file', file);
 
     try {
-      await axiosInstance.patch(
-        `/hr/right-to-work/${selectedRecord._id}`,
-        formData
-      );
+      const res = await axiosInstance.post('/documents', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      const fileUrl = res.data?.data?.fileUrl;
+      if (!fileUrl) throw new Error('No file URL returned');
+      setUploadedFileUrl(fileUrl);
+    } catch (err) {
+      console.error('Upload failed:', err);
+      setUploadError('Failed to upload document. Please try again.');
+      setUploadedFileUrl(null);
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
-      // Update local state
+  const handleRemoveFile = () => {
+    setUploadedFileUrl(null);
+    setSelectedFileName(null);
+    setUploadError(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const triggerFileInput = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleSubmitUpdate = async () => {
+    if (!selectedRecord || !uploadedFileUrl) {
+      if (!uploadedFileUrl) {
+        setUploadError('Please upload a PDF document.');
+      }
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const payload: any = {
+        updatedBy: user?._id,
+        document: uploadedFileUrl
+      };
+
+      if (newExpiryDate) {
+        payload.expiryDate = newExpiryDate.toISOString();
+      } else {
+        payload.expiryDate = null; // or omit, depending on backend
+      }
+
+      await axiosInstance.patch(`/hr/right-to-work/${selectedRecord._id}`, payload);
+
       setRecords((prev) =>
         prev.map((r) =>
           r._id === selectedRecord._id
-            ? {
-                ...r,
-                expiryDate: newExpiryDate
-                  ? moment(newExpiryDate).format('YYYY-MM-DD')
-                  : null
-              }
+            ? { ...r, expiryDate: newExpiryDate ? newExpiryDate.toISOString() : null }
             : r
         )
       );
 
       setIsModalOpen(false);
       setSelectedRecord(null);
-      setUploadFile(null);
+      setUploadedFileUrl(null);
+      setSelectedFileName(null);
       setNewExpiryDate(null);
     } catch (error) {
       console.error('Failed to update expiry date:', error);
@@ -277,17 +299,13 @@ const RightToWorkExpiryPage = () => {
     }
   };
 
-  // Pagination
   const totalPages = Math.ceil(filteredRecords.length / entriesPerPage);
   const startIndex = (currentPage - 1) * entriesPerPage;
-  const currentData = filteredRecords.slice(
-    startIndex,
-    startIndex + entriesPerPage
-  );
+  const currentData = filteredRecords.slice(startIndex, startIndex + entriesPerPage);
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="space-y-6 ">
+      <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center space-x-3">
@@ -295,12 +313,9 @@ const RightToWorkExpiryPage = () => {
               <AlertTriangle className="h-6 w-6 text-purple-600" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">
-                Right to Work Expiry Details
-              </h1>
+              <h1 className="text-2xl font-bold text-gray-900">Right to Work Expiry Details</h1>
               <p className="text-sm text-gray-600">
-                {filteredRecords.length} employees with expiring, expired, or no
-                expiry right to work documents
+                {filteredRecords.length} employees with expiring, expired, or no expiry right to work documents
               </p>
             </div>
           </div>
@@ -352,40 +367,24 @@ const RightToWorkExpiryPage = () => {
                   <TableBody>
                     {currentData.length === 0 ? (
                       <TableRow>
-                        <TableCell
-                          colSpan={4}
-                          className="py-8 text-center text-gray-500"
-                        >
-                          No employees with expiring, expired, or no expiry
-                          right to work documents.
+                        <TableCell colSpan={4} className="py-8 text-center text-gray-500">
+                          No employees with expiring, expired, or no expiry right to work documents.
                         </TableCell>
                       </TableRow>
                     ) : (
                       currentData.map((record) => {
                         const status = getExpiryStatus(record.expiryDate);
                         return (
-                          <TableRow
-                            key={record._id}
-                            className="hover:bg-gray-50"
-                          >
+                          <TableRow key={record._id} className="hover:bg-gray-50">
                             <TableCell
                               className="cursor-pointer font-medium"
-                              onClick={() =>
-                                handleEmployeeClick(record.employeeId._id)
-                              }
+                              onClick={() => handleEmployeeClick(record.employeeId._id)}
                             >
-                              {record.employeeId.firstName}{' '}
-                              {record.employeeId.lastName}
+                              {record.employeeId.firstName} {record.employeeId.lastName}
                             </TableCell>
                             <TableCell
-                              className={`cursor-pointer ${
-                                record.expiryDate
-                                  ? 'text-red-600'
-                                  : 'text-gray-500'
-                              }`}
-                              onClick={() =>
-                                handleEmployeeClick(record.employeeId._id)
-                              }
+                              className={`cursor-pointer ${record.expiryDate ? 'text-red-600' : 'text-gray-500'}`}
+                              onClick={() => handleEmployeeClick(record.employeeId._id)}
                             >
                               {formatDate(record.expiryDate)}
                             </TableCell>
@@ -398,9 +397,7 @@ const RightToWorkExpiryPage = () => {
                               {!record.expiryDate ? (
                                 <Button
                                   size="sm"
-                                  onClick={() =>
-                                    handleEmployeeClick(record.employeeId._id)
-                                  }
+                                  onClick={() => handleEmployeeClick(record.employeeId._id)}
                                   className="bg-supperagent text-white hover:bg-supperagent/90"
                                 >
                                   View Details
@@ -423,7 +420,6 @@ const RightToWorkExpiryPage = () => {
                 </Table>
               </div>
 
-              {/* Pagination */}
               <div className="mt-6">
                 <DynamicPagination
                   pageSize={entriesPerPage}
@@ -444,9 +440,8 @@ const RightToWorkExpiryPage = () => {
               <DialogHeader>
                 <DialogTitle>Update RTW Expiry</DialogTitle>
                 <DialogDescription>
-                  Update expiry date and optionally upload a document for{' '}
-                  {selectedRecord?.employeeId.firstName}{' '}
-                  {selectedRecord?.employeeId.lastName}.
+                  Update expiry date and upload a supporting document for{' '}
+                  {selectedRecord.employeeId.firstName} {selectedRecord.employeeId.lastName}.
                 </DialogDescription>
               </DialogHeader>
 
@@ -456,23 +451,9 @@ const RightToWorkExpiryPage = () => {
                   <label className="mb-1 block text-sm font-medium text-gray-700">
                     Current Expiry Date
                   </label>
-                  <p
-                    className={
-                      selectedRecord?.expiryDate
-                        ? getExpiryStatus(selectedRecord.expiryDate).status ===
-                          'No Expiry'
-                          ? 'text-gray-500'
-                          : 'text-red-600'
-                        : 'text-gray-500'
-                    }
-                  >
-                    {selectedRecord
-                      ? formatDate(selectedRecord.expiryDate)
-                      : ''}{' '}
-                    {selectedRecord?.expiryDate &&
-                      getExpiryStatus(selectedRecord.expiryDate).status !==
-                        'No Expiry' &&
-                      '(Expired or Expiring)'}
+                  <p className={selectedRecord.expiryDate ? 'text-red-600' : 'text-gray-500'}>
+                    {formatDate(selectedRecord.expiryDate)}{' '}
+                    {selectedRecord.expiryDate && '(Expired or Expiring)'}
                   </p>
                 </div>
 
@@ -500,51 +481,77 @@ const RightToWorkExpiryPage = () => {
                   </p>
                 </div>
 
-                {/* Upload Document */}
+                {/* === Styled Upload Area (REQUIRED) === */}
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700">
-                    Upload Document (PDF - Optional)
+                    Upload RTW Document (PDF - Required)
                   </label>
-                  {!uploadFile ? (
-                    <label className="flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-gray-300 p-3 hover:bg-gray-50">
-                      <Paperclip className="h-5 w-5 text-gray-400" />
-                      <span className="text-sm text-gray-600">
-                        Click to upload PDF
-                      </span>
-                      <Input
-                        type="file"
-                        accept=".pdf"
-                        onChange={(e) =>
-                          e.target.files?.[0] &&
-                          setUploadFile(e.target.files[0])
-                        }
-                        className="sr-only"
-                      />
-                    </label>
-                  ) : (
-                    <div className="flex items-center justify-between rounded-md border border-gray-200 bg-gray-50 p-3">
-                      <div className="flex items-center gap-2">
-                        <Paperclip className="h-5 w-5 text-blue-500" />
-                        <span className="max-w-xs truncate text-sm text-gray-800">
-                          {uploadFile.name}
-                        </span>
+                  <div
+                    className={cn(
+                      'relative flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-4 transition-colors',
+                      uploadedFileUrl
+                        ? 'border-green-500 bg-green-50'
+                        : isUploading
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-300 bg-gray-50'
+                    )}
+                    onClick={triggerFileInput}
+                  >
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".pdf,application/pdf"
+                      onChange={handleFileSelect}
+                      className="absolute inset-0 cursor-pointer opacity-0"
+                      disabled={isUploading}
+                    />
+
+                    {isUploading ? (
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent"></div>
+                        <p className="text-sm text-blue-600">Uploading...</p>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setUploadFile(null)}
-                        className="text-red-500 hover:text-red-700"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  )}
+                    ) : uploadedFileUrl ? (
+                      <div className="flex w-full items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <FileText className="h-4 w-4 text-green-600" />
+                          <div>
+                            <p className="text-sm font-medium text-green-600">Uploaded</p>
+                            {selectedFileName && <p className="text-xs text-gray-600">{selectedFileName}</p>}
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemoveFile();
+                          }}
+                          className="hover:bg-red-50 hover:text-red-600"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-2 text-center">
+                        <Upload className="h-6 w-6 text-gray-400" />
+                        <div className="text-sm font-medium text-gray-700">Click to Upload PDF</div>
+                        <div className="text-xs text-gray-500">PDF only (max. 5MB)</div>
+                      </div>
+                    )}
+
+                    {uploadError && <p className="mt-2 text-sm text-destructive">{uploadError}</p>}
+                  </div>
                 </div>
               </div>
 
               <DialogFooter className="mt-4 flex justify-end space-x-3">
                 <Button
                   variant="outline"
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={() => {
+                    setIsModalOpen(false);
+                    setUploadError(null);
+                  }}
                   disabled={submitting}
                 >
                   Cancel
@@ -552,7 +559,7 @@ const RightToWorkExpiryPage = () => {
                 <Button
                   className="bg-supperagent text-white hover:bg-supperagent/90"
                   onClick={handleSubmitUpdate}
-                  disabled={submitting}
+                  disabled={submitting || isUploading || !uploadedFileUrl}
                 >
                   {submitting ? 'Updating...' : 'Update'}
                 </Button>

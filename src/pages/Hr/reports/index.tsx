@@ -406,7 +406,7 @@ export default function ReportPage() {
       {/* Requests Table */}
       <Card>
         <CardHeader>
-          <CardTitle>My Document Requests</CardTitle>
+          <CardTitle className='text-2xl'>My Document Requests</CardTitle>
           <CardDescription>
             Track the status of your document requests
           </CardDescription>
@@ -473,8 +473,8 @@ export default function ReportPage() {
                       {request.document ? (
                         <Button
                           variant="ghost"
-                          size="icon"
-                          className="text-blue-600 hover:bg-blue-50 hover:text-blue-800"
+                          size="sm"
+                          className="bg-supperagent text-white hover:bg-supperagent"
                           onClick={() => {
                             const link = document.createElement('a');
                             link.href = request?.document;
@@ -486,7 +486,7 @@ export default function ReportPage() {
                           }}
                           aria-label="Download document"
                         >
-                          <Download className="h-4 w-4" />
+                          <Download className="h-4 w-4 mr-2" /> Download
                         </Button>
                       ) : (
                         <span className="text-sm text-muted-foreground">-</span>

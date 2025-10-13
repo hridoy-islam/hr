@@ -1,3 +1,5 @@
+
+
 import React, { useState, useRef, useEffect } from 'react';
 import {
   FileText,
@@ -32,6 +34,8 @@ import { BlinkingDots } from '@/components/shared/blinking-dots';
 import { DynamicPagination } from '@/components/shared/DynamicPagination';
 import axiosInstance from '@/lib/axios';
 import moment from 'moment';
+import { cn } from '@/lib/utils';
+import { useSelector } from 'react-redux';
 
 // Define Interfaces
 interface DocumentRequest {
@@ -72,6 +76,8 @@ const documentTypes = [
 ];
 
 const RequestDocumentPage = () => {
+  const { user } = useSelector((state: any) => state.auth);
+
   const [requests, setRequests] = useState<DocumentRequest[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [entriesPerPage, setEntriesPerPage] = useState(100);
@@ -81,8 +87,13 @@ const RequestDocumentPage = () => {
   const [showApproveDialog, setShowApproveDialog] = useState(false);
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [rejectId, setRejectId] = useState<string | null>(null);
-  const [pdfFile, setPdfFile] = useState<File | null>(null);
+
+  // File upload state
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadedFileUrl, setUploadedFileUrl] = useState<string | null>(null);
+  const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   // Fetch pending requests on mount
   useEffect(() => {
@@ -105,54 +116,53 @@ const RequestDocumentPage = () => {
 
   const pendingRequests = requests.filter((req) => req.status === 'pending');
 
-  // Search filter
-const filteredRequests = pendingRequests.filter((req) => {
-  const firstName = req.userId?.firstName ?? '';
-  const lastName = req.userId?.lastName ?? '';
-  const userId = req.userId?._id ?? '';
-  const departmentName = req.userId?.departmentId?.departmentName ?? '';
-  const documentType = req.documentType ?? '';
+  const filteredRequests = pendingRequests.filter((req) => {
+    const firstName = req.userId?.firstName ?? '';
+    const lastName = req.userId?.lastName ?? '';
+    const userId = req.userId?._id ?? '';
+    const departmentName = req.userId?.departmentId?.departmentName ?? '';
+    const documentType = req.documentType ?? '';
 
-  return (
-    firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    userId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    departmentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    documentType.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-});
-
+    return (
+      firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      userId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      departmentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      documentType.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  });
 
   const totalPages = Math.ceil(filteredRequests.length / entriesPerPage);
   const startIndex = (currentPage - 1) * entriesPerPage;
   const currentRequests = filteredRequests.slice(startIndex, startIndex + entriesPerPage);
 
-  // Handle approve click
   const handleApproveClick = (request: DocumentRequest) => {
     setSelectedRequest(request);
+    // Reset upload state
+    setUploadedFileUrl(null);
+    setSelectedFileName(null);
+    setUploadError(null);
     setShowApproveDialog(true);
   };
 
-  // Open reject confirmation dialog
   const handleRejectConfirm = (id: string) => {
     setRejectId(id);
     setShowRejectDialog(true);
   };
 
-  // Confirm rejection
   const handleRejectConfirmed = async () => {
     if (!rejectId) return;
 
     try {
       await axiosInstance.patch(`/hr/request-document/${rejectId}`, {
         status: 'rejected',
+        updatedBy: user?._id,
       });
 
       setRequests((prev) =>
         prev.map((req) => (req._id === rejectId ? { ...req, status: 'rejected' } : req))
       );
 
-      // Close dialog
       setShowRejectDialog(false);
       setRejectId(null);
     } catch (error) {
@@ -163,36 +173,76 @@ const filteredRequests = pendingRequests.filter((req) => {
     }
   };
 
-  // Handle file change for PDF upload
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setPdfFile(e.target.files[0]);
+  // === NEW: Upload to /documents ===
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user?._id) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      setUploadError('File must be less than 5MB.');
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadError(null);
+    setSelectedFileName(file.name);
+
+    const formData = new FormData();
+    formData.append('entityId', user._id);
+    formData.append('file_type', 'document');
+    formData.append('file', file);
+
+    try {
+      const res = await axiosInstance.post('/documents', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      const fileUrl = res.data?.data?.fileUrl;
+      if (!fileUrl) throw new Error('No file URL returned');
+      setUploadedFileUrl(fileUrl);
+    } catch (err) {
+      console.error('Upload failed:', err);
+      setUploadError('Failed to upload document. Please try again.');
+      setUploadedFileUrl(null);
+    } finally {
+      setIsUploading(false);
     }
   };
 
-  // Handle approve with PDF upload
+  const handleRemoveFile = () => {
+    setUploadedFileUrl(null);
+    setSelectedFileName(null);
+    setUploadError(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const triggerFileInput = () => {
+    fileInputRef.current?.click();
+  };
+
+  // === Approve with document URL ===
   const handleApproveWithPdf = async () => {
-    if (!selectedRequest || !pdfFile) return;
+    if (!selectedRequest || !uploadedFileUrl) {
+      if (!uploadedFileUrl) {
+        setUploadError('Please upload a PDF document.');
+      }
+      return;
+    }
 
     setLoading(true);
 
     try {
-      const formData = new FormData();
-      formData.append('status', 'approved');
-      formData.append('document', pdfFile);
+      const payload = {
+        status: 'approved',
+        document: uploadedFileUrl, 
+        updatedBy: user?._id,
+      };
 
       const response = await axiosInstance.patch(
         `/hr/request-document/${selectedRequest._id}`,
-        formData,
-        {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        }
+        payload
       );
 
-      const approvedPdfUrl =
-        response.data.data?.approvedPdfUrl || response.data.data?.documentUrl;
+      const approvedPdfUrl = response.data.data?.approvedPdfUrl || uploadedFileUrl;
 
       setRequests((prev) =>
         prev.map((req) =>
@@ -203,8 +253,8 @@ const filteredRequests = pendingRequests.filter((req) => {
       );
 
       setShowApproveDialog(false);
-      setPdfFile(null);
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      setUploadedFileUrl(null);
+      setSelectedFileName(null);
     } catch (error: any) {
       console.error('Failed to approve document request:', error);
       const message =
@@ -215,35 +265,27 @@ const filteredRequests = pendingRequests.filter((req) => {
     }
   };
 
-  // Handle download sample
-  const handleDownloadSample = (request: DocumentRequest) => {
-    alert(`Downloading draft ${request.documentType} for ${request.userId.firstName}...`);
-  };
-
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="space-y-6">
-        {/* Page Header */}
-        
-
         {/* Requests Table */}
         <div className="rounded-xl bg-white p-6 shadow-lg">
-          <div className='flex  justify-between items-center mb-4'>
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="flex items-center gap-2 text-2xl font-bold text-gray-900">
+              <FileText className="h-6 w-6" />
+              Pending Requests
+            </h2>
+            <div className="relative w-full max-w-md">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <Input
+                placeholder="Search by name, ID, department, or document..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+          </div>
 
-          <h2 className="mb-6 flex items-center gap-2 text-2xl font-bold text-gray-900">
-            <FileText className="h-6 w-6" />
-            Pending Requests
-          </h2>
- <div className="relative w-full max-w-md">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-            <Input
-              placeholder="Search by name, ID, department, or document..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-          </div>
           {currentRequests.length === 0 ? (
             <div className="py-12 text-center">
               <FileText className="mx-auto mb-4 h-12 w-12 text-gray-300" />
@@ -277,7 +319,7 @@ const filteredRequests = pendingRequests.filter((req) => {
                         <span className="font-medium">{req?.documentType}</span>
                       </TableCell>
                       <TableCell className="text-gray-600">
-                        {req.userId?.departmentId.departmentName??'-'}
+                        {req.userId?.departmentId.departmentName ?? '-'}
                       </TableCell>
                       <TableCell className="text-gray-600">
                         {new Date(req.requestDate).toLocaleDateString()}
@@ -346,26 +388,64 @@ const filteredRequests = pendingRequests.filter((req) => {
           </DialogHeader>
 
           <div className="space-y-4 py-4">
+            {/* Styled Upload Zone */}
             <div>
-              <Label>Reason</Label>
-              <p className="mt-1 text-sm text-gray-600">{selectedRequest?.reason}</p>
-            </div>
+              <Label htmlFor="pdfUpload">Upload Final Document (PDF - Required)</Label>
+              <div
+                className={cn(
+                  'relative mt-1 flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-4 transition-colors',
+                  uploadedFileUrl
+                    ? 'border-green-500 bg-green-50'
+                    : isUploading
+                    ? 'border-blue-500 bg-blue-50'
+                    : 'border-gray-300 bg-gray-50'
+                )}
+                onClick={triggerFileInput}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,application/pdf"
+                  onChange={handleFileSelect}
+                  className="absolute inset-0 cursor-pointer opacity-0"
+                  disabled={isUploading}
+                />
 
-            <div>
-              <Label htmlFor="pdfUpload">Upload Final Document (PDF)</Label>
-              <Input
-                id="pdfUpload"
-                type="file"
-                accept=".pdf"
-                onChange={handleFileChange}
-                ref={fileInputRef}
-              />
-              {pdfFile && (
-                <p className="mt-2 flex items-center text-sm text-green-600">
-                  <Upload className="mr-1 h-4 w-4" />
-                  {pdfFile.name}
-                </p>
-              )}
+                {isUploading ? (
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent"></div>
+                    <p className="text-sm text-blue-600">Uploading...</p>
+                  </div>
+                ) : uploadedFileUrl ? (
+                  <div className="flex w-full items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-green-600" />
+                      <div>
+                        <p className="text-sm font-medium text-green-600">Uploaded</p>
+                        {selectedFileName && <p className="text-xs text-gray-600">{selectedFileName}</p>}
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemoveFile();
+                      }}
+                      className="hover:bg-red-50 hover:text-red-600"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-2 text-center">
+                    <Upload className="h-6 w-6 text-gray-400" />
+                    <div className="text-sm font-medium text-gray-700">Click to Upload </div>
+                  </div>
+                )}
+
+                {uploadError && <p className="mt-2 text-sm text-destructive">{uploadError}</p>}
+              </div>
             </div>
           </div>
 
@@ -374,7 +454,9 @@ const filteredRequests = pendingRequests.filter((req) => {
               variant="outline"
               onClick={() => {
                 setShowApproveDialog(false);
-                setPdfFile(null);
+                setUploadedFileUrl(null);
+                setSelectedFileName(null);
+                setUploadError(null);
                 if (fileInputRef.current) fileInputRef.current.value = '';
               }}
             >
@@ -382,16 +464,10 @@ const filteredRequests = pendingRequests.filter((req) => {
             </Button>
             <Button
               onClick={handleApproveWithPdf}
-              disabled={!pdfFile || loading}
+              disabled={!uploadedFileUrl || loading || isUploading}
               className="bg-supperagent hover:bg-supperagent/90 text-white"
             >
-              {loading ? (
-                <>
-                  <BlinkingDots size="small" color="bg-supperagent" /> 
-                </>
-              ) : (
-                'Approve & Upload'
-              )}
+              {loading ? 'Approving...' : 'Approve'}
             </Button>
           </DialogFooter>
         </DialogContent>
