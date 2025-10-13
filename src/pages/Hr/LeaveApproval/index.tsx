@@ -68,9 +68,7 @@ const LeaveApprovalPage: React.FC = () => {
   const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedRequests, setSelectedRequests] = useState<string[]>([]);
-  const [showApproveModal, setShowApproveModal] = useState(false);
-  const [showRejectModal, setShowRejectModal] = useState(false);
+
   const [showApproveConfirmModal, setShowApproveConfirmModal] = useState(false);
   const [showRejectConfirmModal, setShowRejectConfirmModal] = useState(false);
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(
@@ -316,7 +314,7 @@ const LeaveTooltipContent = ({ request }: { request: LeaveRequest }) => {
       <div className="min-h-screen bg-gray-50">
         <Card className="shadow-sm">
           <CardHeader className="pb-4">
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-2xl" >
               <Users className="h-5 w-5 text-gray-700" />
               Leave Requests
             </CardTitle>

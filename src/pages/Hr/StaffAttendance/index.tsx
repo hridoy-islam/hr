@@ -239,10 +239,8 @@ const StaffAttendancePage = () => {
       {/* <h1 className="text-3xl font-bold text-gray-800">My Attendance</h1> */}
 
       {/* Overview Section */}
-      <section className="rounded-lg bg-white">
-        {/* <h2 className="mb-6 text-2xl font-semibold text-gray-700">
-          {currentMonth} {currentYear} Overview
-        </h2> */}
+      {/* <section className="rounded-lg bg-white">
+       
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-lg border border-blue-100 bg-blue-50 p-4 text-center">
             <h3 className="text-sm font-medium text-blue-600">
@@ -263,9 +261,8 @@ const StaffAttendancePage = () => {
             <p className="text-2xl font-bold text-yellow-800">{lateDays}</p>
           </div>
         </div>
-      </section>
+      </section> */}
 
-      {/* Attendance List Section */}
       <section className="rounded-lg bg-white">
         <div className="mb-4 flex w-full flex-row items-center justify-between">
           <h2 className="text-2xl font-semibold text-gray-700">Attendance Records</h2>

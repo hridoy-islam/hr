@@ -70,10 +70,14 @@ export function ContactStep({
     }
   });
 
-  function onSubmit(data: ContactData) {
-    onSaveAndContinue(data);
-    console.log(data);
-  }
+function onSubmit(data: ContactData) {
+  const formattedData = {
+    ...data,
+    email: data.email.toLowerCase().trim()
+  };
+  onSaveAndContinue(formattedData);
+}
+
 
   const countryOptions = countries.map((country) => ({
     value: country,

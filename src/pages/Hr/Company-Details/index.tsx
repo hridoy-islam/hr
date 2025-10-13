@@ -99,20 +99,24 @@ export default function CompanyDetails() {
   };
 
   return (
-    <div className="flex flex-col space-y-2 ">
-      <h1 className="mb-2 text-2xl font-semibold ">Company Details</h1>
-      <div className="flex flex-col  rounded-lg bg-white p-4 shadow-sm">
-        <div className="flex basis-1/6 items-center justify-start">
-          <div className="relative h-48 w-48 overflow-hidden ROUNDED">
+  <div >
+    <div className="rounded-lg bg-white p-6 shadow-lg space-y-4">
+      {/* Header */}
+      <h1 className=" font-bold text-2xl  text-gray-900">Company Details</h1>
+
+      {/* Form + Profile Image */}
+      <div className="flex flex-col md:flex-row gap-8">
+        {/* Profile Image */}
+        <div className="flex-shrink-0">
+          <div className="relative h-48 w-48 overflow-hidden rounded-lg border border-gray-200">
             <img
               src={
                 profileData?.imageUrl ||
                 'https://kzmjkvje8tr2ra724fhh.lite.vusercontent.net/placeholder.svg'
               }
-              alt={`${user?.name}`}
+              alt={user?.name || 'Profile'}
               className="h-full w-full object-contain"
             />
-
             <Button
               size="icon"
               variant="theme"
@@ -123,129 +127,141 @@ export default function CompanyDetails() {
             </Button>
           </div>
         </div>
-        <div className=" basis-5/6">
+
+        {/* Form */}
+        <div className="flex-1">
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-              <div className="">
-                <div className="grid grid-cols-3 gap-2 pb-2">
-                  <FormField
-                    control={form.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Enter Your Name..." {...field} />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Email</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="example@example.com"
-                            disabled
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="phone"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Phone</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Phone" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="address"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Address</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Enter Your Address" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="sortCode"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Sort Code</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Enter Your Address" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="accountNo"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Account Number</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Enter Your Address" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="beneficiary"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Beneficiary</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Enter Your Address" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                <div className="flex justify-end">
-                  <Button
-                    type="submit"
-                    className="border-none bg-supperagent text-white hover:bg-supperagent/90"
-                  >
-                    Update Details
-                  </Button>
-                  {/* <Button variant="theme" type="submit">
-                    Update Details
-                  </Button> */}
-                </div>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Name */}
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter Your Name..." {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Email */}
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl>
+                        <Input placeholder="example@example.com" disabled {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Phone */}
+                <FormField
+                  control={form.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Phone</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Phone" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Address */}
+                <FormField
+                  control={form.control}
+                  name="address"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Address</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter Your Address" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Sort Code */}
+                <FormField
+                  control={form.control}
+                  name="sortCode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Sort Code</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter Sort Code" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Account Number */}
+                <FormField
+                  control={form.control}
+                  name="accountNo"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Account Number</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter Account Number" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Beneficiary */}
+                <FormField
+                  control={form.control}
+                  name="beneficiary"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Beneficiary</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter Beneficiary" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Submit Button */}
+              <div className="flex justify-end">
+                <Button
+                  type="submit"
+                  className="border-none bg-supperagent text-white hover:bg-supperagent/90"
+                >
+                  Update Details
+                </Button>
               </div>
             </form>
           </Form>
         </div>
       </div>
-
-      <ImageUploader
-        open={uploadOpen}
-        onOpenChange={setUploadOpen}
-        onUploadComplete={handleUploadComplete}
-        entityId={id}
-      />
     </div>
-  );
+
+    {/* Image Uploader */}
+    <ImageUploader
+      open={uploadOpen}
+      onOpenChange={setUploadOpen}
+      onUploadComplete={handleUploadComplete}
+      entityId={id}
+    />
+  </div>
+);
+
 }

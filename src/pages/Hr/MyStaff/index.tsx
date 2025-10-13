@@ -1,11 +1,18 @@
-import React, { useState } from 'react';
-import { Calendar, Clock, Users, TrendingUp, Check, X, Eye, User, FileText, Users2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+// MyStaff.tsx
+import React, { useEffect, useState } from 'react';
+import { Users2 } from 'lucide-react';
+import UpcomingAppraisalsCard from './components/UpcomingAppraisalsCard';
+import AbsentTodayCard from './components/AbsentTodayCard';
+import HolidayRequestsCard from './components/HolidayRequestsCard';
+import HolidaysTodayCard from './components/HolidaysTodayCard';
+import axiosInstance from '@/lib/axios';
+import { useToast } from '@/components/ui/use-toast';
+import moment from 'moment';
 
+// ===== Interfaces =====
 interface Employee {
   id: string;
   name: string;
-  image?: string;
   email: string;
 }
 
@@ -27,11 +34,11 @@ interface AbsentEmployee {
   reason: string;
 }
 
-interface Holiday {
-  id: string;
+interface BankHoliday {
+  _id: string;
   title: string;
   date: string;
-  type: 'public' | 'company' | 'religious';
+  year: number;
 }
 
 interface Appraisal {
@@ -43,100 +50,80 @@ interface Appraisal {
   lastReview: string;
 }
 
+// ===== MyStaff Component =====
 const MyStaff = () => {
+  const { toast } = useToast();
+
+  const [holidayRequests, setHolidayRequests] = useState<HolidayRequest[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [holidays, setHolidays] = useState<BankHoliday[]>([]);
+
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
     type: 'approve' | 'reject';
     request?: HolidayRequest;
   }>({ isOpen: false, type: 'approve' });
 
-  // Mock data
-  const holidayRequests: HolidayRequest[] = [
-    {
-      id: '1',
-      employee: { id: '1', name: 'Sarah Johnson', email: 'sarah.johnson@company.com' },
-      startDate: '2025-01-15',
-      endDate: '2025-01-19',
-      hours: 40,
-      reason: 'Family vacation',
-      status: 'pending'
-    },
-    {
-      id: '2',
-      employee: { id: '2', name: 'Mike Chen', email: 'mike.chen@company.com' },
-      startDate: '2025-01-22',
-      endDate: '2025-01-24',
-      hours: 24,
-      reason: 'Personal time',
-      status: 'pending'
-    },
-    {
-      id: '3',
-      employee: { id: '3', name: 'Emma Davis', email: 'emma.davis@company.com' },
-      startDate: '2025-01-28',
-      endDate: '2025-01-30',
-      hours: 24,
-      reason: 'Medical appointment',
-      status: 'pending'
-    },
-    {
-      id: '4',
-      employee: { id: '1', name: 'Sarah Johnson', email: 'sarah.johnson@company.com' },
-      startDate: '2025-01-15',
-      endDate: '2025-01-19',
-      hours: 40,
-      reason: 'Family vacation',
-      status: 'pending'
-    },
-    {
-      id: '5',
-      employee: { id: '2', name: 'Mike Chen', email: 'mike.chen@company.com' },
-      startDate: '2025-01-22',
-      endDate: '2025-01-24',
-      hours: 24,
-      reason: 'Personal time',
-      status: 'pending'
-    },
-    {
-      id: '6',
-      employee: { id: '3', name: 'Emma Davis', email: 'emma.davis@company.com' },
-      startDate: '2025-01-28',
-      endDate: '2025-01-30',
-      hours: 24,
-      reason: 'Medical appointment',
-      status: 'pending'
+
+
+  const fetchAll = async () => {
+    setLoading(true); // shared loading for both
+    try {
+      const currentYear = moment().year();
+
+      // Run both requests in parallel
+      const [leaveRes, holidaysRes] = await Promise.all([
+        axiosInstance.get('/hr/leave?status=pending&limit=all'),
+        axiosInstance.get(`/hr/bank-holiday?year=${currentYear}&limit=all`)
+      ]);
+
+      // ---- Holiday Requests ----
+      const requestsData = leaveRes.data?.data?.result || [];
+      setHolidayRequests(requestsData);
+
+      // ---- Today's Holidays ----
+      const holidaysData = holidaysRes.data?.data?.result || [];
+      const todayFormatted = moment().format('YYYY-MM-DD');
+      const todayHolidays = holidaysData.filter((h: BankHoliday) =>
+        moment(h.date).format('YYYY-MM-DD') === todayFormatted
+      );
+      setHolidays(todayHolidays);
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: 'Failed to load data. Please try again later.',
+        variant: 'destructive'
+      });
+      console.error('Error fetching staff data:', error);
+      setHolidayRequests([]);
+      setHolidays([]);
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
+
+
+useEffect(() => {
+  
+
+  fetchAll();
+}, []);
+
 
   const absentToday: AbsentEmployee[] = [
     {
       id: '1',
       employee: { id: '4', name: 'Alex Rodriguez', email: 'alex.rodriguez@company.com' },
-      date: '2025-01-13',
+      date: '2025-10-13',
       hours: 8,
       reason: 'Sick leave'
     },
     {
       id: '2',
       employee: { id: '5', name: 'Lisa Park', email: 'lisa.park@company.com' },
-      date: '2025-01-13',
+      date: '2025-10-13',
       hours: 4,
       reason: 'Doctor appointment'
-    }
-  ];
-
-  const holidaysToday: Holiday[] = [
-    {
-      id: '1',
-      title: 'Martin Luther King Jr. Day',
-      date: '2025-01-20',
-      type: 'public'
-    },
-    {
-      id: '2',
-      title: 'Company Foundation Day',
-      date: '2025-01-25',
-      type: 'company'
     }
   ];
 
@@ -145,23 +132,23 @@ const MyStaff = () => {
       id: '1',
       employee: { id: '6', name: 'John Smith', email: 'john.smith@company.com' },
       status: 'pending',
-      dueDate: '2025-02-15',
-      lastReview: '2024-08-15'
+      dueDate: '2025-11-15',
+      lastReview: '2025-05-15'
     },
     {
       id: '2',
       employee: { id: '7', name: 'Maria Garcia', email: 'maria.garcia@company.com' },
       status: 'in-progress',
-      dueDate: '2025-02-20',
+      dueDate: '2025-11-20',
       approvedBy: 'HR Manager',
-      lastReview: '2024-08-20'
+      lastReview: '2025-05-20'
     },
     {
       id: '3',
       employee: { id: '8', name: 'David Wilson', email: 'david.wilson@company.com' },
       status: 'pending',
-      dueDate: '2025-03-01',
-      lastReview: '2024-09-01'
+      dueDate: '2025-12-01',
+      lastReview: '2025-06-01'
     }
   ];
 
@@ -170,268 +157,28 @@ const MyStaff = () => {
   };
 
   const confirmAction = () => {
-    // Handle the approve/reject action here
     console.log(`${confirmModal.type} request for ${confirmModal.request?.employee.name}`);
     setConfirmModal({ isOpen: false, type: 'approve' });
   };
 
-  const getInitials = (name: string) => {
-    return name.split(' ').map(n => n[0]).join('').toUpperCase();
-  };
-
-
-
-  
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
-      case 'approved': return 'bg-green-100 text-green-800';
-      case 'rejected': return 'bg-red-100 text-red-800';
-      case 'in-progress': return 'bg-blue-100 text-blue-800';
-      case 'completed': return 'bg-green-100 text-green-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getHolidayTypeColor = (type: string) => {
-    switch (type) {
-      case 'public': return 'bg-blue-100 text-blue-800';
-      case 'company': return 'bg-purple-100 text-purple-800';
-      case 'religious': return 'bg-orange-100 text-orange-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-      <div className="bg-white p-6 rounded-xl shadow-sm ">
-        {/* Header */}
-        
-        <h2 className="mb-6 flex items-center gap-2 text-2xl font-bold text-gray-900">
-            <Users2 className="h-6 w-6" />
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 ">
+      <div className="mx-auto">
+        <div className="bg-white p-6 rounded-xl shadow-sm mb-6">
+          <h2 className="mb-6 flex items-center gap-2 text-xl font-bold text-gray-900">
+            <Users2 className="h-5 w-5" />
             My Staff
           </h2>
-    
 
-        {/* Cards Grid */}
-        <div className="grid grid-cols-1 gap-6">
-          {/* Card 1: Pending Holiday Requests */}
-          <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden hover:shadow-xl transition-shadow duration-300">
-            <div className="bg-gradient-to-r from-supperagent/70 to-supperagent px-6 py-4">
-              <div className="flex items-center">
-                <Calendar className="h-6 w-6 text-white mr-3" />
-                <h2 className="text-xl font-semibold text-white">Pending Holiday Requests</h2>
-                <span className="ml-auto bg-white/20 text-white px-3 py-1 rounded-full text-sm font-medium">
-                  {holidayRequests.length}
-                </span>
-              </div>
-            </div>
-            <div className="p-6 max-h-96 overflow-y-auto">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-gray-200">
-                      <th className="text-left py-3 px-2 font-semibold text-gray-700">Employee</th>
-                      <th className="text-left py-3 px-2 font-semibold text-gray-700">Dates</th>
-                      <th className="text-left py-3 px-2 font-semibold text-gray-700">Hours</th>
-                      <th className=" py-3 px-2 font-semibold text-gray-700 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {holidayRequests.map((request) => (
-                      <tr key={request.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                        <td className="py-4 px-2">
-                          <div className="flex items-center">
-                            <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-medium mr-3">
-                              {getInitials(request.employee.name)}
-                            </div>
-                            <div>
-                              <div className="font-semibold text-gray-900 text-xs">{request.employee.name}</div>
-                              <div className=" text-gray-500 text-xs">{request.employee.email}</div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-4 px-2">
-                          <div className="text-xs">
-                            <div className="font-medium text-gray-900">{request.startDate}</div>
-                            <div className="text-gray-500">to {request.endDate}</div>
-                          </div>
-                        </td>
-                        <td className="py-4 px-2">
-                          <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded-full text-sm font-medium">
-                            {request.hours}h
-                          </span>
-                        </td>
-                        <td className="py-4 px-2">
-                          <div className="flex space-x-2 justify-end">
-                            <Button
-                              onClick={() => handleApproveReject('approve', request)}
-                              className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center"
-                            >
-                              <Check className="h-4 w-4 mr-1" />
-                              {/* Approve */}
-                            </Button>
-                            <Button
-                              onClick={() => handleApproveReject('reject', request)}
-                              className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center"
-                            >
-                              <X className="h-4 w-4 mr-1" />
-                              {/* Reject */}
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
-          {/* Card 2: Absent Today */}
-          <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden hover:shadow-xl transition-shadow duration-300">
-            <div className="bg-gradient-to-r from-orange-300 to-red-400 px-6 py-4">
-              <div className="flex items-center">
-                <Users className="h-6 w-6 text-white mr-3" />
-                <h2 className="text-xl font-semibold text-white">Absent Today</h2>
-                <span className="ml-auto bg-white/20 text-white px-3 py-1 rounded-full text-sm font-medium">
-                  {absentToday.length}
-                </span>
-              </div>
-            </div>
-            <div className="p-6 max-h-96 overflow-y-auto">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-gray-200">
-                      <th className="text-left py-3 px-2 font-semibold text-gray-700">Employee</th>
-                      <th className="text-left py-3 px-2 font-semibold text-gray-700">Date</th>
-                      <th className="text-left py-3 px-2 font-semibold text-gray-700">Hours</th>
-                      <th className="text-left py-3 px-2 font-semibold text-gray-700">Reason</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {absentToday.map((absent) => (
-                      <tr key={absent.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                        <td className="py-4 px-2">
-                          <div className="flex items-center">
-                            <div className="w-10 h-10 bg-gradient-to-r from-orange-500 to-red-500 rounded-full flex items-center justify-center text-white font-medium mr-3">
-                              {getInitials(absent.employee.name)}
-                            </div>
-                            <div>
-                              <div className="font-semibold text-gray-900">{absent.employee.name}</div>
-                              <div className="text-sm text-gray-500">{absent.employee.email}</div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-4 px-2">
-                          <div className="text-sm font-medium text-gray-900">{absent.date}</div>
-                        </td>
-                        <td className="py-4 px-2">
-                          <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded-full text-sm font-medium">
-                            {absent.hours}h
-                          </span>
-                        </td>
-                        <td className="py-4 px-2">
-                          <span className="text-sm text-gray-600">{absent.reason}</span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
-          {/* Card 3: Holidays Today */}
-          <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden hover:shadow-xl transition-shadow duration-300">
-            <div className="bg-gradient-to-r from-green-500 to-teal-500 px-6 py-4">
-              <div className="flex items-center">
-                <Calendar className="h-6 w-6 text-white mr-3" />
-                <h2 className="text-xl font-semibold text-white">Holidays Today</h2>
-                <span className="ml-auto bg-white/20 text-white px-3 py-1 rounded-full text-sm font-medium">
-                  {holidaysToday.length}
-                </span>
-              </div>
-            </div>
-            <div className="p-6 max-h-96 overflow-y-auto">
-              <div className="space-y-4">
-                {holidaysToday.map((holiday) => (
-                  <div key={holiday.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                    <div className="flex items-center">
-                      <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-teal-500 rounded-full flex items-center justify-center text-white mr-4">
-                        <Calendar className="h-6 w-6" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-gray-900">{holiday.title}</h3>
-                        <p className="text-sm text-gray-600">{holiday.date}</p>
-                      </div>
-                    </div>
-                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${getHolidayTypeColor(holiday.type)}`}>
-                      {holiday.type}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Card 4: Upcoming Appraisals */}
-          <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden hover:shadow-xl transition-shadow duration-300">
-            <div className="bg-gradient-to-r from-purple-400 to-purple-500 px-6 py-4">
-              <div className="flex items-center">
-                <TrendingUp className="h-6 w-6 text-white mr-3" />
-                <h2 className="text-xl font-semibold text-white">Upcoming Appraisals in 60 Days</h2>
-                <span className="ml-auto bg-white/20 text-white px-3 py-1 rounded-full text-sm font-medium">
-                  {upcomingAppraisals.length}
-                </span>
-              </div>
-            </div>
-            <div className="p-6 max-h-96 overflow-y-auto">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-gray-200">
-                      <th className="text-left py-3 px-2 font-semibold text-gray-700">Employee</th>
-                      <th className="text-left py-3 px-2 font-semibold text-gray-700">Status</th>
-                      <th className="text-left py-3 px-2 font-semibold text-gray-700">Due Date</th>
-                      <th className="text-left py-3 px-2 font-semibold text-gray-700">Approved By</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {upcomingAppraisals.map((appraisal) => (
-                      <tr key={appraisal.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                        <td className="py-4 px-2">
-                          <div className="flex items-center">
-                            <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full flex items-center justify-center text-white font-medium mr-3">
-                              {getInitials(appraisal.employee.name)}
-                            </div>
-                            <div>
-                              <div className="font-semibold text-gray-900">{appraisal.employee.name}</div>
-                              <div className="text-sm text-gray-500">{appraisal.employee.email}</div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-4 px-2">
-                          <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(appraisal.status)}`}>
-                            {appraisal.status}
-                          </span>
-                        </td>
-                        <td className="py-4 px-2">
-                          <div className="text-sm font-medium text-gray-900">{appraisal.dueDate}</div>
-                        </td>
-                        <td className="py-4 px-2">
-                          <span className="text-sm text-gray-600">
-                            {appraisal.approvedBy || 'Pending'}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+          <div className="grid grid-cols-1 gap-6">
+            <HolidayRequestsCard
+              requests={holidayRequests}
+              onRefresh={fetchAll}
+            />
+            {/* ✅ Pass holidays and loading as props */}
+            <HolidaysTodayCard holidays={holidays} loading={loading} />
+            <AbsentTodayCard absentees={absentToday} />
+            <UpcomingAppraisalsCard appraisals={upcomingAppraisals} />
           </div>
         </div>
       </div>
@@ -457,8 +204,8 @@ const MyStaff = () => {
               <button
                 onClick={confirmAction}
                 className={`px-4 py-2 rounded-lg text-white font-medium transition-colors ${
-                  confirmModal.type === 'approve' 
-                    ? 'bg-green-500 hover:bg-green-600' 
+                  confirmModal.type === 'approve'
+                    ? 'bg-green-500 hover:bg-green-600'
                     : 'bg-red-500 hover:bg-red-600'
                 }`}
               >

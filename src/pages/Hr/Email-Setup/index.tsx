@@ -142,82 +142,88 @@ export default function EmailSetup() {
   };
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">All Email Configurations</h1>
-        <Button
-          className="bg-supperagent text-white hover:bg-supperagent/90"
-          size={'sm'}
-          onClick={() => setDialogOpen(true)}
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          New Email Configuration
-        </Button>
-      </div>
-      <div className="flex items-center space-x-4">
-        <Input
-          type="text"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="Search by Email"
-          className="h-8 max-w-[400px]"
-        />
-        <Button
-          onClick={handleSearch}
-          size="sm"
-          className="min-w-[100px] border-none bg-supperagent text-white hover:bg-supperagent/90"
-        >
-          Search
-        </Button>
-      </div>
-      <div className="rounded-md bg-white p-4 shadow-lg">
-        {initialLoading ? (
-          <div className="flex justify-center py-6">
-            <BlinkingDots size="large" color="bg-supperagent" />
-          </div>
-        ) : emailConfigs.length === 0 ? (
-          <div className="flex justify-center py-6 text-gray-500">
-            No records found.
-          </div>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Email</TableHead>
-                <TableHead>Host</TableHead>
-                <TableHead>Port</TableHead>
-                <TableHead>Encryption</TableHead>
-                <TableHead>Authentication</TableHead>
+    <div >
+      <div className="rounded-md bg-white p-6 shadow-lg space-y-4">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <h1 className="font-bold text-2xl   text-gray-900">
+            All Email Configurations</h1>
+          <Button
+            className="bg-supperagent text-white hover:bg-supperagent/90"
+            size="sm"
+            onClick={() => setDialogOpen(true)}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            New Email Configuration
+          </Button>
+        </div>
 
-                <TableHead className="w-32 text-center">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {emailConfigs.map((config) => (
-                <TableRow key={config._id}>
-                  <TableCell>{config.email}</TableCell>
-                  <TableCell>{config.host}</TableCell>
-                  <TableCell>{config.port}</TableCell>
-                  <TableCell>{config.encryption}</TableCell>
-                  <TableCell>
-                    {config.authentication ? 'True' : 'False'}
-                  </TableCell>
+        {/* Search */}
+        <div className="flex items-center space-x-4" >
+          <Input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search by Email"
+            className="h-8 max-w-[400px]"
+          />
+          <Button
+            onClick={handleSearch}
+            size="sm"
+            className="min-w-[100px] border-none bg-supperagent text-white hover:bg-supperagent/90"
+          >
+            Search
+          </Button>
+        </div>
 
-                  <TableCell className="text-center">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="bg-supperagent text-white hover:bg-supperagent/90"
-                      onClick={() => handleEdit(config)}
-                    >
-                      <Pen className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
+        {/* Table */}
+        <div className="overflow-x-auto">
+          {initialLoading ? (
+            <div className="flex justify-center py-6">
+              <BlinkingDots size="large" color="bg-supperagent" />
+            </div>
+          ) : emailConfigs.length === 0 ? (
+            <div className="flex justify-center py-6 text-gray-500">
+              No records found.
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Host</TableHead>
+                  <TableHead>Port</TableHead>
+                  <TableHead>Encryption</TableHead>
+                  <TableHead>Authentication</TableHead>
+                  <TableHead className="w-32 text-center">Actions</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
+              </TableHeader>
+              <TableBody>
+                {emailConfigs.map((config) => (
+                  <TableRow key={config._id}>
+                    <TableCell>{config.email}</TableCell>
+                    <TableCell>{config.host}</TableCell>
+                    <TableCell>{config.port}</TableCell>
+                    <TableCell>{config.encryption}</TableCell>
+                    <TableCell>{config.authentication ? 'True' : 'False'}</TableCell>
+                    <TableCell className="text-center">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="bg-supperagent text-white hover:bg-supperagent/90"
+                        onClick={() => handleEdit(config)}
+                      >
+                        <Pen className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </div>
+
+        {/* Pagination */}
         <DynamicPagination
           pageSize={entriesPerPage}
           setPageSize={setEntriesPerPage}
@@ -226,6 +232,8 @@ export default function EmailSetup() {
           onPageChange={setCurrentPage}
         />
       </div>
+
+      {/* Dialog */}
       <EmailConfigDialog
         open={dialogOpen}
         onOpenChange={(open) => {
@@ -237,4 +245,5 @@ export default function EmailSetup() {
       />
     </div>
   );
+
 }

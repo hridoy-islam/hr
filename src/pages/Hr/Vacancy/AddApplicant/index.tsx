@@ -114,7 +114,6 @@ export default function AddApplicant() {
 
   
   const { vacancyTitle } = location.state || {};
-  console.log(vacancyTitle);
 
   // submit full application
   const handleSubmit = async () => {
@@ -154,11 +153,8 @@ export default function AddApplicant() {
 
     flatData.status = 'applied';
     const response = await axiosInstance.post(`/hr/applicant`, flatData);
-    console.log(response);
     navigate(`/admin/hr/view-applicants/${id}`);
 
-    // All steps are complete, proceed with submission
-    console.log('Submitting form data:', formData);
     setFormSubmitted(true);
   };
 

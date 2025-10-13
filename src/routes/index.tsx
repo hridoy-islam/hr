@@ -47,7 +47,7 @@ import AttendanceApprovalPage from '@/pages/Hr/Attendance/Attendance-Approve';
 import AttendanceApproveList from '@/pages/Hr/Attendance/Attendance-Approve/attendance-list';
 import EntryAttendance from '@/pages/Hr/Attendance/entry-attendance';
 import ApplicantDetailPage from '@/pages/Hr/Vacancy/viewApplicant';
-import LeaveApprovalPage from '@/pages/Hr/LeaveManagement/LeaveApproval';
+import LeaveApprovalPage from '@/pages/Hr/LeaveApproval';
 
 import TrainingExpiryPage from '@/pages/Hr/Dashboard/components/trainingExprity';
 import RightToWorkExpiryPage from '@/pages/Hr/Dashboard/components/rightToWork';

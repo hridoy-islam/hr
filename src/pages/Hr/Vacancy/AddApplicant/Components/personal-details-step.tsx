@@ -98,7 +98,7 @@ export function PersonalDetailsStep({
   });
 
   function onSubmit(data: PersonalDetailsData) {
-    data.imgae = photoFile
+    data.image = photoFile
       ? URL.createObjectURL(photoFile)
       : undefined;
     onSaveAndContinue(data);
@@ -107,7 +107,7 @@ export function PersonalDetailsStep({
 
   function handleSave() {
     const data = form.getValues() as PersonalDetailsData;
-    data.imgae = photoFile
+    data.image = photoFile
       ? URL.createObjectURL(photoFile)
       : undefined;
     onSave(data);
