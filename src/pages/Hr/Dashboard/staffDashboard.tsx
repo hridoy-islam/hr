@@ -362,22 +362,26 @@ const fetchNotices = async () => {
                 {notices.map((notice) => (
                   <div
                     key={notice._id}
-                    className="rounded-r-lg border-l-4 border-l-blue-500 bg-blue-50 py-4 pl-4 pr-4"
+                    className="rounded-r-lg bg-blue-50 rounded-xl p-4"
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
+                        <div className='flex justify-between'>
+
                         <h4 className="font-semibold text-gray-900">
                           {notice.title}
                         </h4>
-                        <p className="mb-3 mt-1 text-sm text-gray-600">
-                          {notice.content}
-                        </p>
                         <div className="flex items-center space-x-4 text-xs text-gray-500">
                           <span className="flex items-center">
                             <Calendar className="mr-1 h-3 w-3" />
                             {formatDate(notice.date)}
                           </span>
                         </div>
+                        </div>
+                        <p className="mb-3 mt-1 text-sm text-gray-600">
+                          {notice.content}
+                        </p>
+                        
                       </div>
                     </div>
                   </div>
