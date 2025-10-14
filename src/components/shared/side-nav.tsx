@@ -162,8 +162,8 @@ const navItems = [
   },
   {
     icon: FileSpreadsheet,
-    label: 'Report',
-    href: 'report',
+    label: 'Documents',
+    href: 'documents',
     roles: ['employee']
   },
 

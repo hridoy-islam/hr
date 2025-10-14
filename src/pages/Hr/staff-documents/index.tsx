@@ -44,6 +44,7 @@ import moment from 'moment';
 import { useSelector } from 'react-redux';
 import axiosInstance from '@/lib/axios'; // ✅ Import axiosInstance
 import { BlinkingDots } from '@/components/shared/blinking-dots';
+import { DynamicPagination } from '@/components/shared/DynamicPagination';
 
 // Types
 type DocumentType =
@@ -91,6 +92,9 @@ export default function ReportPage() {
   const [requests, setRequests] = useState<DocumentRequest[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [entriesPerPage, setEntriesPerPage] = useState(10)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
 
   const [selectedDocumentType, setSelectedDocumentType] =
     useState<DocumentType | null>(null);
@@ -106,8 +110,11 @@ export default function ReportPage() {
       try {
         setLoading(true);
         const response = await axiosInstance.get(`/hr/request-document`, {
-          params: { userId: user._id }
+          params: { userId: user._id, sort:'createdAt' , page: currentPage,
+          limit: entriesPerPage,}
         });
+              setTotalPages(response.data.data.totalPages || 1)
+
         setRequests(response?.data?.data?.result || []); // assuming response.data.data is the array
       } catch (err: any) {
         console.error('Failed to fetch document requests:', err);
@@ -118,7 +125,7 @@ export default function ReportPage() {
     };
 
     fetchRequests();
-  }, [user?._id]);
+  }, [user?._id,currentPage, entriesPerPage]);
 
   const pendingCount = requests.filter(
     (req) => req.status === 'pending'
@@ -187,7 +194,7 @@ export default function ReportPage() {
     <div className="flex flex-row justify-between items-center">
       <div className="flex items-center gap-2">
         <FileText className="h-6 w-6" />
-        <h1 className="text-2xl font-bold">Document Request</h1>
+        <h1 className="text-2xl font-bold">Documents</h1>
       </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -459,6 +466,17 @@ export default function ReportPage() {
         </TableBody>
       </Table>
     </div>
+  {requests.length > 2 && (
+                  <div className="mt-4">
+                    <DynamicPagination
+                      pageSize={entriesPerPage}
+                      setPageSize={setEntriesPerPage}
+                      currentPage={currentPage}
+                      totalPages={totalPages}
+                      onPageChange={setCurrentPage}
+                    />
+                  </div>
+                )}
   </CardContent>
 </Card>
   );

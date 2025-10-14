@@ -98,10 +98,10 @@ const StaffDashboardPage = () => {
     return isNaN(date.getTime())
       ? 'Invalid Date'
       : date.toLocaleDateString('en-US', {
-          month: 'short',
-          day: 'numeric',
-          year: 'numeric'
-        });
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
   };
 
   // Get status icon
@@ -262,55 +262,55 @@ const StaffDashboardPage = () => {
     }
   };
 
-const capitalize = (str: string) =>
-  str.charAt(0).toUpperCase() + str.slice(1);
+  const capitalize = (str: string) =>
+    str.charAt(0).toUpperCase() + str.slice(1);
 
-// === Fetch: Notices (with filtering like StaffNoticeBoard) ===
-const fetchNotices = async () => {
-  try {
-    const res = await axiosInstance.get("/hr/notice", {
-      params: {
-        status: "active",
-        sort: "-noticeDate",
-        limit: 3,
-      },
-    });
+  // === Fetch: Notices (with filtering like StaffNoticeBoard) ===
+  const fetchNotices = async () => {
+    try {
+      const res = await axiosInstance.get("/hr/notice", {
+        params: {
+          status: "active",
+          sort: "-noticeDate",
+          limit: 3,
+        },
+      });
 
-    const fetched: Notice[] =
-      res.data?.data?.result || res.data?.data || res.data || [];
+      const fetched: Notice[] =
+        res.data?.data?.result || res.data?.data || res.data || [];
 
-    // --- Filter notices for current user ---
-    const filtered = fetched.filter((notice) => {
-      switch (notice.noticeSetting) {
-        case "all":
-          return true;
-        case "department":
-          return notice.department.some((d: any) => d._id === user.department);
-        case "designation":
-          return notice.designation.some((des: any) => des._id === user.designation);
-        case "individual":
-          return notice.users.some((u: any) =>
-            typeof u === "string" ? u === user._id : u._id === user._id
-          );
-        default:
-          return false;
-      }
-    });
+      // --- Filter notices for current user ---
+      const filtered = fetched.filter((notice) => {
+        switch (notice.noticeSetting) {
+          case "all":
+            return true;
+          case "department":
+            return notice.department.some((d: any) => d._id === user.department);
+          case "designation":
+            return notice.designation.some((des: any) => des._id === user.designation);
+          case "individual":
+            return notice.users.some((u: any) =>
+              typeof u === "string" ? u === user._id : u._id === user._id
+            );
+          default:
+            return false;
+        }
+      });
 
-    // Map into display format
-    const mapped = filtered.map((n) => ({
-      _id: n._id,
-      title: capitalize(n.noticeType),
-      content: n.noticeDescription,
-      date: n.noticeDate,
-    }));
+      // Map into display format
+      const mapped = filtered.map((n) => ({
+        _id: n._id,
+        title: capitalize(n.noticeType),
+        content: n.noticeDescription,
+        date: n.noticeDate,
+      }));
 
-    setNotices(mapped);
-  } catch (error) {
-    console.error("Failed to fetch notices:", error);
-    setNotices([]);
-  }
-};
+      setNotices(mapped);
+    } catch (error) {
+      console.error("Failed to fetch notices:", error);
+      setNotices([]);
+    }
+  };
 
   // === Load All Data ===
   useEffect(() => {
@@ -358,31 +358,29 @@ const fetchNotices = async () => {
             {notices.length === 0 ? (
               <p className="text-sm text-gray-500">No notices available.</p>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-2">
                 {notices.map((notice) => (
                   <div
                     key={notice._id}
-                    className="rounded-r-lg bg-blue-50 rounded-xl p-4"
+                    className="flex items-start gap-4 p-4 bg-white border border-gray-200 rounded-lg hover:border-blue-200 hover:bg-blue-50 transition-all duration-200 cursor-pointer"
                   >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className='flex justify-between'>
-
-                        <h4 className="font-semibold text-gray-900">
+                    <div className="flex-shrink-0 mt-0.5">
+                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                        <Bell className="h-4 w-4 text-blue-600" />
+                      </div>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between mb-1">
+                        <h4 className="text-sm font-semibold text-gray-900">
                           {notice.title}
                         </h4>
-                        <div className="flex items-center space-x-4 text-xs text-gray-500">
-                          <span className="flex items-center">
-                            <Calendar className="mr-1 h-3 w-3" />
-                            {formatDate(notice.date)}
-                          </span>
-                        </div>
-                        </div>
-                        <p className="mb-3 mt-1 text-sm text-gray-600">
-                          {notice.content}
-                        </p>
-                        
+                        <span className="text-xs text-gray-500 ml-2 flex-shrink-0">
+                          {formatDate(notice.date)}
+                        </span>
                       </div>
+                      <p className="text-sm text-gray-600">
+                        {notice.content}
+                      </p>
                     </div>
                   </div>
                 ))}
@@ -513,11 +511,10 @@ const fetchNotices = async () => {
                             {req.days} day{req.days > 1 ? 's' : ''}
                           </span>
                           <p
-                            className={`mt-1 rounded-full px-2 py-1 text-xs font-medium capitalize ${
-                              req.status === 'pending'
+                            className={`mt-1 rounded-full px-2 py-1 text-xs font-medium capitalize ${req.status === 'pending'
                                 ? 'bg-yellow-100 text-yellow-800'
                                 : 'bg-gray-100 text-gray-800'
-                            }`}
+                              }`}
                           >
                             {req.status}
                           </p>

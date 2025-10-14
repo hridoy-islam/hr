@@ -57,7 +57,7 @@ export function ImageUploader({
       alert("File size exceeds the 2MB limit.");
       return;
     }
-    
+
     const reader = new FileReader();
     reader.onload = (e) => {
       setSelectedImage(e.target?.result as string);
@@ -87,6 +87,10 @@ export function ImageUploader({
         '/documents',
         formData,
         {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+
+          },
           onUploadProgress: (progressEvent) => {
             const percentCompleted = Math.round(
               (progressEvent.loaded * 100) / progressEvent.total

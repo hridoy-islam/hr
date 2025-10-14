@@ -28,7 +28,7 @@ const profileFormSchema = z.object({
   phone: z.string().optional(),
   sortCode: z.string().nonempty('Sort Code is required'),
   accountNo: z.string().nonempty('Account Number is required'),
-  beneficiary: z.string().nonempty('Beneficiary is required')
+  beneficiaryName: z.string().nonempty('Beneficiary is required')
 });
 
 type ProfileFormValues = z.infer<typeof profileFormSchema>;
@@ -40,7 +40,6 @@ export default function CompanyDetails() {
     null
   );
   const { toast } = useToast();
-  const { id } = useParams();
 
   const defaultValues: Partial<ProfileFormValues> = {
     name: profileData?.name || '',
@@ -49,7 +48,7 @@ export default function CompanyDetails() {
     phone: profileData?.phone || '',
     sortCode: profileData?.sortCode || '',
     accountNo: profileData?.accountNo || '',
-    beneficiary: profileData?.beneficiary || ''
+    beneficiaryName: profileData?.beneficiaryName || ''
   };
 
   const form = useForm<ProfileFormValues>({
@@ -111,7 +110,7 @@ export default function CompanyDetails() {
           <div className="relative h-48 w-48 overflow-hidden rounded-lg border border-gray-200">
             <img
               src={
-                profileData?.imageUrl ||
+                profileData?.image ||
                 'https://kzmjkvje8tr2ra724fhh.lite.vusercontent.net/placeholder.svg'
               }
               alt={user?.name || 'Profile'}
@@ -226,7 +225,7 @@ export default function CompanyDetails() {
                 {/* Beneficiary */}
                 <FormField
                   control={form.control}
-                  name="beneficiary"
+                  name="beneficiaryName"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Beneficiary</FormLabel>
@@ -259,7 +258,7 @@ export default function CompanyDetails() {
       open={uploadOpen}
       onOpenChange={setUploadOpen}
       onUploadComplete={handleUploadComplete}
-      entityId={id}
+      entityId={user._id}
     />
   </div>
 );
