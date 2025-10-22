@@ -15,11 +15,11 @@ import { useToast } from '@/components/ui/use-toast';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 import moment from 'moment';
 import { DynamicPagination } from '@/components/shared/DynamicPagination';
-import { NoticeDialog } from './noticeDialog';
 import { DateRangePicker } from 'react-date-range';
 import 'react-date-range/dist/styles.css';
 import 'react-date-range/dist/theme/default.css';
 import Select from 'react-select';
+import { NoticeDialog } from './NoticeDialog';
 
 export default function AdminNoticeBoard() {
   const [notice, setNotice] = useState<any[]>([]);

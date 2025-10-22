@@ -303,14 +303,12 @@ const AdminDashboardPage = () => {
           ))}
         </div>
 
-        {/* Device Status Section */}
-        <div className="rounded-xl bg-white p-6 shadow-lg">
+        {/* <div className="rounded-xl bg-white p-6 shadow-lg">
           <div className="mb-6 flex items-center space-x-3">
             <Monitor className="h-6 w-6 text-gray-600" />
             <h2 className="text-2xl font-bold text-gray-900">DEVICE STATUS</h2>
           </div>
 
-          {/* Search */}
           <div className="mb-6 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
             <div className="flex items-center space-x-2">
               <span className="text-sm text-gray-600">Search:</span>
@@ -327,7 +325,6 @@ const AdminDashboardPage = () => {
             </div>
           </div>
 
-          {/* Table */}
           {loading ? (
             <div className="flex justify-center py-12">
               <BlinkingDots size="large" color="bg-supperagent" />
@@ -375,7 +372,6 @@ const AdminDashboardPage = () => {
                 </Table>
               </div>
 
-              {/* Pagination */}
               <div className="mt-6">
                 <DynamicPagination
                   pageSize={entriesPerPage}
@@ -387,7 +383,7 @@ const AdminDashboardPage = () => {
               </div>
             </>
           )}
-        </div>
+        </div> */}
       </div>
     </div>
   );
