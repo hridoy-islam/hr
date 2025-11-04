@@ -45,6 +45,7 @@ export const DashboardPage = () => {
       path: '/admin/people-planner',
     },
   ];
+  
 
   return (
     <div className="mx-auto mt-8 px-4 sm:px-6 lg:px-8">
