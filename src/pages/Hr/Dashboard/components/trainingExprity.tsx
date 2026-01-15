@@ -46,7 +46,7 @@ const TrainingExpiryPage = () => {
       setLoading(true);
       try {
         const response = await axiosInstance.get("/users", { params: { role: "employee", limit: "all" } });
-        const fetchedEmployees: Employee[] = response.data.data.result || response.data.data;
+        const fetchedEmployees: Employee[] = response.data?.data?.result || response.data.data;
 
         // Filter employees with expired or expiring trainings
         const expiringEmployees = fetchedEmployees.filter((emp) =>
@@ -71,10 +71,10 @@ const TrainingExpiryPage = () => {
   useEffect(() => {
     const filtered = employees.filter(
       (emp) =>
-        emp.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        emp.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        emp.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        emp.departmentId?.departmentName.toLowerCase().includes(searchTerm.toLowerCase())
+        emp?.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        emp?.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        emp?.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        emp?.departmentId?.departmentName.toLowerCase().includes(searchTerm.toLowerCase())
     );
     setFilteredEmployees(filtered);
     setCurrentPage(1);
@@ -188,12 +188,12 @@ const getExpiringTrainings = (employee: Employee) =>
                           return (
                             <TableRow key={`${employee._id}-${training._id}`} className="hover:bg-gray-50">
                               <TableCell>
-                                <p className="font-medium">{employee.firstName} {employee.lastName}</p>
-                                <p className="text-sm text-gray-500">{employee.email}</p>
+                                <p className="font-medium">{employee?.firstName} {employee.lastName}</p>
+                                <p className="text-sm text-gray-500">{employee?.email}</p>
                               </TableCell>
                               <TableCell className="text-gray-600">{employee.departmentId?.departmentName}</TableCell>
                               <TableCell className="text-gray-600">{employee.position}</TableCell>
-                              <TableCell className="font-medium">{training.trainingId.name}</TableCell>
+                              <TableCell className="font-medium">{training.trainingId?.name}</TableCell>
                               <TableCell className="font-medium">{formatDate(training.expireDate)}</TableCell>
                               <TableCell>
                                 <Badge className={`${status.color} text-white`}>{status.status}</Badge>
