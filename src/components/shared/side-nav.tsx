@@ -26,7 +26,18 @@ import {
   Menu,
   X,
   FileSpreadsheet,
-  Clock4
+  Clock4,
+  Building2,
+  BarChart3,
+  Bell,
+  CreditCard,
+  MapPin,
+  Receipt,
+  ShieldCheck,
+  DollarSign,
+  History,
+  Briefcase,
+  GraduationCap
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
@@ -36,115 +47,450 @@ import { logout } from '@/redux/features/authSlice';
 import axiosInstance from '@/lib/axios';
 import { AppDispatch } from '@/redux/store';
 
-// Define navigation items with role-based access
+// ... [navItems array remains exactly the same as your code] ...
+// const navItems = [
+//   {
+//     icon: LayoutDashboard,
+//     label: 'Dashboard',
+//     href: '',
+//     roles: ['admin', 'company']
+//   },
+//   {
+//     icon: Building2,
+//     label: 'Company',
+//     href: 'company',
+//     roles: ['admin']
+//   },
+//   {
+//     icon: Box,
+//     label: 'My Holidays',
+//     href: 'holiday',
+//     roles: [, 'employee']
+//   },
+//   {
+//     icon: PencilRuler,
+//     label: 'My Staff',
+//     href: 'my-staff',
+//     roles: []
+//   },
+//   {
+//     icon: FileTextIcon,
+//     label: 'Notice',
+//     href: 'notice',
+//     roles: [, 'employee']
+//   },
+//   {
+//     icon: DoorOpen,
+//     label: 'Vacancy',
+//     href: 'vacancy',
+//     roles: []
+//   },
+//   {
+//     icon: BookText,
+//     label: 'Training',
+//     href: 'training',
+//     roles: ['employee']
+//   },
+//   {
+//     icon: UsersIcon,
+//     label: 'Employee',
+//     roles: [],
+//     subItems: [
+//       {
+//         icon: Users,
+//         label: 'Employee List',
+//         href: 'employee',
+//         roles: []
+//       },
+//       {
+//         icon: LayoutPanelTop,
+//         label: 'Department',
+//         href: 'department',
+//         roles: []
+//       },
+//       {
+//         icon: ArrowBigUp,
+//         label: 'Shift',
+//         href: 'shift',
+//         roles: []
+//       },
+//       {
+//         icon: Award,
+//         label: 'Designation',
+//         href: 'designation',
+//         roles: []
+//       },
+//       {
+//         icon: BookText,
+//         label: 'Training',
+//         href: 'training',
+//         roles: []
+//       }
+//     ]
+//   },
+//   {
+//     icon: FileCheck2,
+//     label: 'Attendance',
+//     roles: [],
+//     subItems: [
+//       {
+//         icon: FileCheck2,
+//         label: 'Attendance List',
+//         href: 'attendance',
+//         roles: []
+//       },
+//       {
+//         icon: CircleCheckBig,
+//         label: 'Attendance Approve',
+//         href: 'attendance-approve',
+//         roles: []
+//       },
+//       {
+//         icon: BetweenVerticalStart,
+//         label: 'Attendance Entry',
+//         href: 'attendance/attendance-entry',
+//         roles: []
+//       },
+//       {
+//         icon: Calendar,
+//         label: 'Attendance Report',
+//         href: 'attendance-report',
+//         roles: []
+//       }
+//     ]
+//   },
+//   {
+//     icon: Clock4,
+//     label: 'Attendance',
+//     href: 'staff-attendance',
+//     roles: ['employee']
+//   },
+//   {
+//     icon: CircleDollarSign,
+//     label: 'Payroll',
+//     href: 'payroll',
+//     roles: [, 'employee']
+//   },
+//   {
+//     icon: CircleGauge,
+//     label: 'Leave',
+//     href: 'leave-approve',
+//     roles: []
+//   },
+//   {
+//     icon: FileSpreadsheet,
+//     label: 'Documents',
+//     href: 'documents',
+//     roles: ['employee']
+//   },
+//   {
+//     icon: FileSpreadsheet,
+//     label: 'Document Requests',
+//     href: 'document-request',
+//     roles: []
+//   },
+//   {
+//     icon: Settings,
+//     label: 'Settings',
+//     roles: [],
+//     subItems: [
+//       {
+//         icon: ReceiptText,
+//         label: 'Company Details',
+//         href: 'company-details',
+//         roles: []
+//       },
+//       {
+//         icon: Mails,
+//         label: 'Email Setup',
+//         href: 'email-setup',
+//         roles: []
+//       },
+//       {
+//         icon: Calendar,
+//         label: 'Bank Holiday',
+//         href: 'bank-holiday',
+//         roles: []
+//       }
+//     ]
+//   }
+// ];
+
 const navItems = [
+  // --- Common ---
   {
     icon: LayoutDashboard,
     label: 'Dashboard',
     href: '',
-    roles: ['admin', 'employee']
+    roles: ['admin', 'company']
+  },
+
+  // --- Admin Specific ---
+  {
+    icon: Building2,
+    label: 'Company',
+    href: 'company',
+    roles: ['admin']
   },
   {
-    icon: Box,
-    label: 'My Holidays',
-    href: 'holiday',
-    roles: ['admin', 'employee']
-  },
-  {
-    icon: PencilRuler,
-    label: 'My Staff',
-    href: 'my-staff',
+    icon: DollarSign,
+    label: 'Subscription Plans',
+    href: 'subscription-plan',
+
     roles: ['admin']
   },
   {
     icon: FileTextIcon,
     label: 'Notice',
     href: 'notice',
-    roles: ['admin', 'employee']
+    roles: ['admin']
+  },
+  {
+    icon: History,
+    label: 'Report',
+    href: 'report',
+    roles: ['admin']
+  },
+
+  // --- Company Specific Routes (Requested) ---
+  {
+    icon: DoorOpen,
+    label: 'Vacancy',
+    href: 'vacancy',
+    roles: ['company'] // Assuming vacancy management is admin
+  },
+  {
+    icon: Users,
+    label: 'Employees',
+    href: 'employee', // Using existing employee list route or new one 'employees'
+    roles: ['company']
+  },
+
+  {
+    icon: Calendar,
+    label: 'Leave Management',
+    href: '#',
+    roles: ['company']
+  },
+  {
+    icon: FileSpreadsheet,
+    label: 'Documents',
+    href: '#',
+    roles: ['company']
+  },
+  {
+    icon: ShieldCheck,
+    label: 'Right to Work',
+    href: '#',
+    roles: ['company']
+  },
+
+  {
+    icon: BarChart3,
+    label: 'Reports',
+    href: '#',
+    roles: ['company']
+  },
+
+  {
+    icon: CreditCard,
+    label: 'Subscription',
+    href: '#',
+    roles: ['company']
+  },
+  {
+    icon: Receipt,
+    label: 'Billing',
+    href: '#',
+    roles: ['company']
+  },
+  {
+    icon: Bell,
+    label: 'Notice',
+    href: 'notice',
+    roles: ['company']
+  },
+
+  {
+    icon: Settings,
+    label: 'Settings',
+    roles: ['company'],
+    subItems: [
+      {
+        icon: ReceiptText,
+        label: 'Company Details',
+        href: 'company-details',
+        roles: ['company']
+      },
+      {
+        icon: Mails,
+        label: 'Email Setup',
+        href: 'email-setup',
+        roles: ['company']
+      },
+      {
+        icon: Calendar,
+        label: 'Bank Holiday',
+        href: 'bank-holiday',
+        roles: ['company']
+      },
+      {
+        icon: Clock4,
+        label: 'Shifts / Rota',
+        href: 'shift',
+        roles: ['company']
+      },
+      {
+        icon: Building2,
+        label: 'Department',
+        href: 'department',
+        roles: ['company']
+      },
+      {
+        icon: Briefcase,
+        label: 'Designation',
+        href: 'designation',
+        roles: ['company']
+      },
+      {
+        icon: GraduationCap,
+        label: 'Training',
+        href: 'training',
+        roles: ['company']
+      },
+
+      {
+        icon: UsersIcon,
+        label: 'Users & Permissions',
+        href: '#',
+        roles: ['company']
+      },
+      {
+        icon: UsersIcon,
+        label: 'Schedule',
+        href: 'schedule-check',
+        roles: ['company']
+      },
+      {
+        icon: MapPin,
+        label: 'Branches / Locations',
+        href: '#',
+        roles: ['company']
+      },
+
+      {
+        icon: BarChart3,
+        label: 'Appraisal',
+        href: '#',
+        roles: ['company']
+      }
+    ]
+  },
+
+  // --- Employee Specific ---
+  {
+    icon: Box,
+    label: 'My Holidays',
+    href: 'holiday',
+    roles: ['employee']
+  },
+  {
+    icon: PencilRuler,
+    label: 'My Staff',
+    href: 'my-staff',
+    roles: [] // Explicitly empty or specific roles? Keeping as per previous code
+  },
+  {
+    icon: FileTextIcon,
+    label: 'Notice',
+    href: 'notice',
+    roles: ['employee']
   },
   {
     icon: DoorOpen,
     label: 'Vacancy',
     href: 'vacancy',
-    roles: ['admin']
+    roles: [] // Assuming vacancy management is admin
   },
   {
     icon: BookText,
     label: 'Training',
     href: 'training',
-    roles: ['employee']
+    roles: ['employee'] // Employee view of training
   },
+
+  // --- Legacy / Admin Sub-menus (Preserved for Admin) ---
   {
     icon: UsersIcon,
-    label: 'Employee',
-    roles: ['admin'],
+    label: 'Employee Management',
+    roles: [], // Restricted to admin now since Company has flat structure above
     subItems: [
       {
         icon: Users,
         label: 'Employee List',
         href: 'employee',
-        roles: ['admin']
+        roles: []
       },
       {
         icon: LayoutPanelTop,
         label: 'Department',
         href: 'department',
-        roles: ['admin']
+        roles: []
       },
       {
         icon: ArrowBigUp,
         label: 'Shift',
         href: 'shift',
-        roles: ['admin']
+        roles: []
       },
       {
         icon: Award,
         label: 'Designation',
         href: 'designation',
-        roles: ['admin']
+        roles: []
       },
       {
         icon: BookText,
         label: 'Training',
         href: 'training',
-        roles: ['admin']
+        roles: []
       }
     ]
   },
   {
     icon: FileCheck2,
     label: 'Attendance',
-    roles: ['admin'],
+    roles: [],
     subItems: [
       {
         icon: FileCheck2,
         label: 'Attendance List',
         href: 'attendance',
-        roles: ['admin']
+        roles: []
       },
       {
         icon: CircleCheckBig,
         label: 'Attendance Approve',
         href: 'attendance-approve',
-        roles: ['admin']
+        roles: []
       },
       {
         icon: BetweenVerticalStart,
         label: 'Attendance Entry',
         href: 'attendance/attendance-entry',
-        roles: ['admin']
+        roles: []
       },
       {
         icon: Calendar,
         label: 'Attendance Report',
         href: 'attendance-report',
-        roles: ['admin']
+        roles: []
       }
     ]
   },
   {
     icon: Clock4,
-    label: 'Attendance',
+    label: 'My Attendance',
     href: 'staff-attendance',
     roles: ['employee']
   },
@@ -152,50 +498,51 @@ const navItems = [
     icon: CircleDollarSign,
     label: 'Payroll',
     href: 'payroll',
-    roles: ['admin', 'employee']
+    roles: ['employee']
   },
   {
     icon: CircleGauge,
     label: 'Leave',
     href: 'leave-approve',
-    roles: ['admin']
+    roles: []
   },
   {
     icon: FileSpreadsheet,
-    label: 'Documents',
+    label: 'My Documents',
     href: 'documents',
     roles: ['employee']
   },
-
   {
     icon: FileSpreadsheet,
     label: 'Document Requests',
     href: 'document-request',
-    roles: ['admin']
+    roles: []
   },
+
+  // --- Settings (Shared but likely different views) ---
 
   {
     icon: Settings,
-    label: 'Settings',
-    roles: ['admin'],
+    label: 'System Settings',
+    roles: [],
     subItems: [
       {
         icon: ReceiptText,
         label: 'Company Details',
         href: 'company-details',
-        roles: ['admin']
+        roles: []
       },
       {
         icon: Mails,
         label: 'Email Setup',
         href: 'email-setup',
-        roles: ['admin']
+        roles: []
       },
       {
         icon: Calendar,
         label: 'Bank Holiday',
         href: 'bank-holiday',
-        roles: ['admin']
+        roles: []
       }
     ]
   }
@@ -222,21 +569,31 @@ const filterNavItemsByRole = (items, userRole) => {
     });
 };
 
-const NavItem = ({ item, expandedItems, toggleExpanded, depth = 0 }) => {
+// 1. Updated NavItem to accept basePath
+const NavItem = ({
+  item,
+  expandedItems,
+  toggleExpanded,
+  depth = 0,
+  basePath
+}) => {
   const location = useLocation();
-const isActiveLeaf =
-  !item.subItems &&
-  (item.href === ''
-    ? location.pathname === '/admin/hr/'
-    : location.pathname === `/admin/hr/${item.href}`);
-
-const isActiveParent =
-  item.subItems &&
-  location.pathname.startsWith(`/admin/hr/${item.href}`);
-
-
-
   const isExpanded = expandedItems[item.label];
+
+  // Construct the full path based on the dynamic basePath
+  // If item.href is empty (Dashboard), path is just basePath
+  // Otherwise it is basePath/href
+  const targetPath = item.href ? `${basePath}/${item.href}` : basePath;
+
+  const isActiveLeaf =
+    !item.subItems &&
+    (item.href === ''
+      ? location.pathname === basePath || location.pathname === `${basePath}/`
+      : location.pathname === targetPath ||
+        location.pathname.startsWith(`${targetPath}/`));
+
+  const isActiveParent =
+    item.subItems && location.pathname.startsWith(targetPath);
 
   if (item.subItems) {
     return (
@@ -275,6 +632,7 @@ const isActiveParent =
                 expandedItems={expandedItems}
                 toggleExpanded={toggleExpanded}
                 depth={depth + 1}
+                basePath={basePath} // Pass basePath recursively
               />
             ))}
           </div>
@@ -285,7 +643,7 @@ const isActiveParent =
 
   return (
     <Link
-      to={`/admin/hr/${item.href}`}
+      to={targetPath}
       className={cn(
         'group flex w-full items-center space-x-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 hover:bg-supperagent hover:text-white',
         isActiveLeaf && 'bg-blue-50 text-supperagent shadow-sm',
@@ -303,10 +661,13 @@ export function SideNav() {
   const location = useLocation();
   const dispatch = useDispatch<AppDispatch>();
   const user = useSelector((state: any) => state.auth?.user) || null;
-  const userRole = user?.role || 'employee';
+  const userRole = user?.role || 'staff';
   const [expandedItems, setExpandedItems] = useState({});
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [fetchedUser, setFetchedUser] = useState(null);
+
+  // 2. Define the Base Path based on the role
+  const basePath = userRole === 'company' ? '/company' : '/admin';
 
   useEffect(() => {
     const fetchUserInfo = async () => {
@@ -371,15 +732,7 @@ export function SideNav() {
   const sidebarContent = (
     <div className="flex h-full flex-col">
       {/* Header */}
-      <div className="flex h-16 items-center justify-between px-4">
-        <div className="flex items-center space-x-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-supperagent">
-            <span className="text-sm font-bold text-white">HR</span>
-          </div>
-          <div className="hidden lg:block">
-            <h1 className="text-lg font-semibold text-gray-900">HR System</h1>
-          </div>
-        </div>
+      <div className="flex items-center justify-between px-4">
         <button
           onClick={() => setIsMobileMenuOpen(false)}
           className="lg:hidden"
@@ -389,23 +742,38 @@ export function SideNav() {
       </div>
 
       {/* User Profile */}
-      <div className="flex flex-col items-center space-y-3 px-4 py-6">
+      <div className="flex flex-col items-center  px-4 ">
         <img
           src={user?.image || '/placeholder.jpg'}
           alt="User avatar"
           className="h-24 w-24 rounded-full object-cover"
         />
         <div className="flex flex-col items-center space-y-1">
-          <p className="text-xl font-semibold text-gray-900">Welcome!</p>
+          {/* <p className="text-xl font-semibold text-gray-900">Welcome!</p> */}
           <div
-            onClick={() => navigate('/admin/hr/profile')}
-            className="text-md cursor-pointer font-medium text-gray-900 underline"
+            onClick={() => {
+              if (user?.role !== 'admin' && user?.role !== 'company') {
+                navigate(`${basePath}/profile`);
+              }
+            }}
+            className={`text-md font-medium text-gray-900
+    ${
+      user?.role === 'admin' || user?.role === 'company'
+        ? 'cursor-default'
+        : 'cursor-pointer underline'
+    }`}
           >
-            {fetchedUser
-              ? `${fetchedUser?.firstName} ${fetchedUser?.lastName}`
-              : 'User'}
+            {user ? user.name : 'User'}
           </div>
         </div>
+        {/* <div className="flex items-center justify-start space-x-3 pt-4">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-supperagent">
+            <span className="text-sm font-bold text-white">HR</span>
+          </div>
+          <div className="hidden lg:block">
+            <h1 className="text-lg font-semibold text-gray-900">HR System</h1>
+          </div>
+        </div> */}
       </div>
 
       {/* Navigation */}
@@ -416,6 +784,7 @@ export function SideNav() {
             item={item}
             expandedItems={expandedItems}
             toggleExpanded={toggleExpanded}
+            basePath={basePath} // 3. Pass the base path here
           />
         ))}
       </nav>

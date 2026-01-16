@@ -10,10 +10,16 @@ export default function SignInPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (user) {
-      navigate('/admin/hr'); // Adjust the path as needed
-    }
-  }, [user, navigate]);
+  if (!user) return;
+
+  if (user?.role === 'admin') {
+    navigate('/admin');
+  } else if (user?.role === 'company') {
+    navigate('/company');  
+  } else {
+    navigate('/'); 
+  }
+}, [user, navigate]);
 
   return (
     <div className="flex min-h-screen">
