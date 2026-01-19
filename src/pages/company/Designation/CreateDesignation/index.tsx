@@ -13,6 +13,7 @@ import { MoveLeft } from 'lucide-react';
 type Inputs = {
   title: string;
   description: string;
+  companyId:string;
   permissions: Record<
     string,
     {
@@ -63,7 +64,9 @@ export default function AddDesignation() {
 
     const payload: Inputs = {
       ...data,
-      permissions: permissionsPayload
+      permissions: permissionsPayload,
+       companyId:user?._id
+      
     };
 
     try {

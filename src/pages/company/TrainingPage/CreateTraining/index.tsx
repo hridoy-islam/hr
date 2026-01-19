@@ -19,6 +19,7 @@ import axiosInstance from '@/lib/axios';
 import { useNavigate } from 'react-router-dom';
 import { MoveLeft } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { useSelector } from 'react-redux';
 
 const trainingFormSchema = z.object({
   name: z.string().nonempty('Name is required'),
@@ -46,6 +47,8 @@ type TrainingFormData = z.infer<typeof trainingFormSchema>;
 
 export default function CreateTraining() {
   const { toast } = useToast();
+  const user = useSelector((state: any) => state.auth.user);
+
   const form = useForm<TrainingFormData>({
     resolver: zodResolver(trainingFormSchema),
     defaultValues: {
@@ -61,7 +64,10 @@ export default function CreateTraining() {
 
   const onSubmit = async (data: TrainingFormData) => {
     try {
-      await axiosInstance.post(`/hr/training`, data);
+      await axiosInstance.post(`/hr/training`, {
+        ...data,
+        companyId: user?._id
+      });
 
       toast({
         title: 'Training Created',

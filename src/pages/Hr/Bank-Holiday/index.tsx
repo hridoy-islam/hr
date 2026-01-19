@@ -24,6 +24,7 @@ import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 import moment from 'moment';
+import { useSelector } from 'react-redux';
 
 interface BankHoliday {
   _id: string;
@@ -50,13 +51,14 @@ function BankHolidayPage() {
   const [selectedYear, setSelectedYear] = useState<number>(
     new Date().getFullYear()
   );
+const user = useSelector((state: any) => state.auth.user);
 
   // Fetch holidays filtered by selected year
   const fetchHolidays = async (year: number) => {
     setIsLoadingHolidays(true);
     try {
       const response = await axiosInstance.get<ApiResponse>(
-        `/hr/bank-holiday?year=${year}`
+        `/hr/bank-holiday?year=${year}&companyId=${user?._id}`
       );
       const holidaysData = response.data?.data?.result || [];
       setHolidays(holidaysData);
@@ -99,7 +101,8 @@ function BankHolidayPage() {
     const holidayData = {
       date: formattedDate,
       title: title.trim(),
-      year: date.getFullYear()
+      year: date.getFullYear(),
+      companyId:user?._id
     };
 
     try {

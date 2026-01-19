@@ -20,6 +20,7 @@ import moment from 'moment';
 import { DynamicPagination } from '@/components/shared/DynamicPagination';
 import { DepartmentDialog } from './Components/departmentDialog';
 import { Badge } from '@/components/ui/badge';
+import { useSelector } from 'react-redux';
 
 export default function Department() {
   const [department, setDepartment] = useState<any>([]);
@@ -31,7 +32,7 @@ export default function Department() {
   const [totalPages, setTotalPages] = useState(1);
   const [entriesPerPage, setEntriesPerPage] = useState(100);
   const [searchTerm, setSearchTerm] = useState('');
-
+const user = useSelector((state: any) => state.auth.user);
   const fetchData = async (page, entriesPerPage, searchTerm = '') => {
     try {
       if (initialLoading) setInitialLoading(true);
@@ -39,6 +40,7 @@ export default function Department() {
         params: {
           page,
           limit: entriesPerPage,
+          companyId:user?._id,
           ...(searchTerm ? { searchTerm } : {})
         }
       });
@@ -63,7 +65,10 @@ export default function Department() {
       } else {
         // Create new institution
 
-        response = await axiosInstance.post(`/hr/department`, data);
+        response = await axiosInstance.post(`/hr/department`, {
+        ...data,
+        companyId: user?._id
+      });
       }
 
       // Check if the API response indicates success
