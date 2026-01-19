@@ -20,6 +20,10 @@ import TrainingTab from './tabs/TrainingTab';
 import HolidayTab from './tabs/HolidayTab';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 import EmployeeDocumentTab from './tabs/DocumentTab';
+import VisaTab from './tabs/VisaTab';
+import DbsTab from './tabs/DbsTab';
+import PassportTab from './tabs/passportTab';
+import ImmigrationTab from './tabs/immigrationTab';
 const EditEmployee = () => {
   const navigate = useNavigate();
   const {
@@ -86,6 +90,83 @@ const EditEmployee = () => {
       )
     },
     {
+      id: 'rightToWork',
+      label: 'Right To Work',
+      component: (
+        <RightToWorkTab
+          formData={formData}
+          onUpdate={handleNestedFieldUpdate}
+          onCheckboxChange={handleCheckboxChange}
+          onDateChange={handleDateChange}
+          isFieldSaving={isFieldSaving}
+        />
+      )
+    },
+    {
+      id: 'visa',
+      label: 'Visa',
+      component: (
+        <VisaTab
+          formData={formData}
+          onUpdate={handleNestedFieldUpdate}
+          onCheckboxChange={handleCheckboxChange}
+          onDateChange={handleDateChange}
+          isFieldSaving={isFieldSaving}
+        />
+      )
+    },
+    {
+      id: 'dbs',
+      label: 'DBS',
+      component: (
+        <DbsTab
+          formData={formData}
+          onUpdate={handleNestedFieldUpdate}
+          onCheckboxChange={handleCheckboxChange}
+          onDateChange={handleDateChange}
+          isFieldSaving={isFieldSaving}
+        />
+      )
+    },
+     {
+      id: 'passport',
+      label: 'Passport',
+      component: (
+        <PassportTab
+          formData={formData}
+          onUpdate={handleNestedFieldUpdate}
+          onCheckboxChange={handleCheckboxChange}
+          onDateChange={handleDateChange}
+          isFieldSaving={isFieldSaving}
+        />
+      )
+    },
+     {
+      id: 'immigration',
+      label: 'Immigration',
+      component: (
+        <ImmigrationTab
+          formData={formData}
+          onUpdate={handleNestedFieldUpdate}
+          onCheckboxChange={handleCheckboxChange}
+          onDateChange={handleDateChange}
+          isFieldSaving={isFieldSaving}
+        />
+      )
+    },
+    {
+      id: 'training',
+      label: 'Training',
+      component: (
+        <TrainingTab
+          formData={formData}
+          onUpdate={handleFieldUpdate}
+          isFieldSaving={isFieldSaving}
+        />
+      )
+    },
+    { id: 'holiday', label: 'Holiday', component: <HolidayTab /> },
+    {
       id: 'contact',
       label: 'Contact',
       component: (
@@ -122,19 +203,7 @@ const EditEmployee = () => {
         />
       )
     },
-    {
-      id: 'rightToWork',
-      label: 'Right to Work',
-      component: (
-        <RightToWorkTab
-          formData={formData}
-          onUpdate={handleNestedFieldUpdate}
-          onCheckboxChange={handleCheckboxChange}
-          onDateChange={handleDateChange}
-          isFieldSaving={isFieldSaving}
-        />
-      )
-    },
+   
     {
       id: 'payroll',
       label: 'Payroll',
@@ -175,7 +244,7 @@ const EditEmployee = () => {
     },
     {
       id: 'beneficiary',
-      label: 'Next To Kin',
+      label: 'Next Of Kin',
       component: (
         <BeneficiaryTab
           formData={formData}
@@ -186,19 +255,8 @@ const EditEmployee = () => {
         />
       )
     },
-    // { id: 'notes', label: 'Notes', component: <NotesTab formData={formData} onUpdate={handleFieldUpdate} isFieldSaving={isFieldSaving} /> },
-    {
-      id: 'training',
-      label: 'Training',
-      component: (
-        <TrainingTab
-          formData={formData}
-          onUpdate={handleFieldUpdate}
-          isFieldSaving={isFieldSaving}
-        />
-      )
-    },
-    { id: 'holiday', label: 'Holiday', component: <HolidayTab /> },
+    
+    
      { id: 'document', label: 'Documents', component: <EmployeeDocumentTab /> },
     {
       id: 'settings',

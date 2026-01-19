@@ -37,6 +37,7 @@ type Inputs = {
   applicationDeadline: Date;
   postedBy: string;
   status: string;
+  companyId: string;
 };
 
 export default function CreateVacancy() {
@@ -52,6 +53,7 @@ export default function CreateVacancy() {
 
   const onSubmit: SubmitHandler<Inputs> = async (data) => {
     data.postedBy = user._id;
+    data.companyId= user?._id;
     data.status = 'active';
     try {
       const response = await axiosInstance.post(`/hr/vacancy`, data);

@@ -1,6 +1,6 @@
 import type React from 'react';
 import { useEffect, useState, useRef } from 'react';
-import { Calendar, FileText, Upload, X, Eye, History, AlertCircle } from 'lucide-react';
+import { Calendar, FileText, Upload, X, Eye, History } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
@@ -37,15 +37,16 @@ interface HistoryEntry {
   updatedBy: string | { firstName: string; lastName: string };
 }
 
-interface RTWData {
+interface VisaData {
   _id: string;
-  nextCheckDate: string | null;
-  status: 'active' | 'expired' | 'needs-check';
+  startDate?: string | null;
+  expiryDate: string | null;
+  status: 'active' | 'closed' | 'expired' | 'needs-check';
   employeeId: string;
   logs?: HistoryEntry[];
 }
 
-function RightToWorkTab() {
+function VisaTab() {
   const { id } = useParams();
   const { user } = useSelector((state: any) => state.auth);
   const { toast } = useToast();
@@ -56,27 +57,31 @@ function RightToWorkTab() {
 
   // Display State
   const [complianceStatus, setComplianceStatus] = useState<
-    'active' | 'expired' | 'expiring-soon' | null
+    'active' | 'expired' | null
   >(null);
-  const [currentCheckDate, setCurrentCheckDate] = useState<string | null>(null);
-  const [checkInterval, setCheckInterval] = useState<number>(0);
+  const [currentExpiryDate, setCurrentExpiryDate] = useState<string | null>(
+    null
+  );
+  const [currentStartDate, setCurrentStartDate] = useState<string | null>(null);
+  const [visaCheckInterval, setVisaCheckInterval] = useState<number>(0);
 
   // Data State
-  const [rtwId, setRtwId] = useState<string | null>(null);
+  const [visaId, setVisaId] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
 
   // Modal & Form State
   const [showUpdateModal, setShowUpdateModal] = useState(false);
-  const [newCheckDate, setNewCheckDate] = useState<Date | null>(null);
+  const [newExpiryDate, setNewExpiryDate] = useState<Date | null>(null);
+  const [newStartDate, setNewStartDate] = useState<Date | null>(null);
   const [uploadedFileUrl, setUploadedFileUrl] = useState<string | null>(null);
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
 
-  // Loading States
+  // Action Loading States
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
-  // 1. Fetch Schedule Settings
+  // 1. Fetch Schedule Settings (Visa Interval)
   const fetchScheduleSettings = async () => {
     if (!user?._id) return;
     try {
@@ -85,40 +90,40 @@ function RightToWorkTab() {
       );
       const result = res.data?.data?.result;
       if (result && result.length > 0) {
-        setCheckInterval(result[0].rtwCheckDate || 0);
+        setVisaCheckInterval(result[0].visaCheckDate || 0);
       }
     } catch (err) {
       console.error('Error fetching schedule settings:', err);
     }
   };
 
-  // 2. Fetch RTW Data
-  const fetchRTWData = async () => {
+  // 2. Fetch Visa Data
+  const fetchVisaData = async () => {
     if (!id) return;
     try {
-      const rtwRes = await axiosInstance.get(
-        `/hr/right-to-work?employeeId=${id}`
-      );
-      const rtwList: RTWData[] = rtwRes.data.data.result;
+      const res = await axiosInstance.get(`/visa?employeeId=${id}`);
+      const visaList: VisaData[] = res.data.data.result;
 
-      if (rtwList.length > 0) {
-        const rtwData = rtwList[0];
-        setRtwId(rtwData._id);
+      if (visaList.length > 0) {
+        const visaData = visaList[0];
+        setVisaId(visaData._id);
 
-        // Store current check date for display
-        setCurrentCheckDate(rtwData.nextCheckDate);
+        // Store dates for display
+        setCurrentExpiryDate(visaData.expiryDate);
+        setCurrentStartDate(visaData.startDate || null);
 
         // Set history
-        setHistory(rtwData.logs || []);
+        setHistory(visaData.logs || []);
       } else {
-        setRtwId(null);
-        setCurrentCheckDate(null);
+        setVisaId(null);
+        setCurrentExpiryDate(null);
+        setCurrentStartDate(null);
         setHistory([]);
       }
     } catch (err) {
-      console.error('Error fetching RTW data:', err);
+      console.error('Error fetching Visa data:', err);
       toast({
-        title: 'Failed to load RTW data.',
+        title: 'Failed to load Visa data.',
         className: 'bg-destructive text-white'
       });
     }
@@ -128,62 +133,28 @@ function RightToWorkTab() {
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
-      await Promise.all([fetchScheduleSettings(), fetchRTWData()]);
+      await Promise.all([fetchScheduleSettings(), fetchVisaData()]);
       setIsLoading(false);
     };
 
     loadData();
   }, [id, user?._id]);
 
-  // 3. Status Calculation (Warning threshold = checkInterval)
+  // 3. Status Calculation
   useEffect(() => {
-    if (currentCheckDate) {
-      const now = moment().startOf('day'); // Normalize to start of day for accurate comparison
-      const checkDate = moment(currentCheckDate).startOf('day');
-      const diffDays = checkDate.diff(now, 'days');
+    if (currentExpiryDate) {
+      const now = moment();
+      const expiry = moment(currentExpiryDate);
 
-      // 1. Check if Expired (Date has passed)
-      if (now.isAfter(checkDate)) {
+      if (now.isAfter(expiry, 'day')) {
         setComplianceStatus('expired');
-      } 
-      // 2. Check if Expiring Soon (Within the checkInterval window)
-      // Example: If interval is 30 days, warning shows if remaining days <= 30
-      else if (checkInterval > 0 && diffDays <= checkInterval) {
-        setComplianceStatus('expiring-soon');
-      } 
-      // 3. Otherwise Active
-      else {
+      } else {
         setComplianceStatus('active');
       }
     } else {
       setComplianceStatus(null);
     }
-  }, [currentCheckDate, checkInterval]);
-
-  const getStatusBadge = () => {
-    switch (complianceStatus) {
-      case 'active':
-        return (
-          <Badge className="bg-green-100 text-green-800 hover:bg-green-100 px-3 py-1">
-            Active
-          </Badge>
-        );
-      case 'expiring-soon':
-        return (
-          <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100 px-3 py-1">
-            Expiring Soon
-          </Badge>
-        );
-      case 'expired':
-        return (
-          <Badge className="bg-red-100 text-red-800 hover:bg-red-100 px-3 py-1">
-            Expired
-          </Badge>
-        );
-      default:
-        return null;
-    }
-  };
+  }, [currentExpiryDate]);
 
   // File Upload Logic
   const handleFileSelect = async (
@@ -232,7 +203,8 @@ function RightToWorkTab() {
   };
 
   const openUpdateModal = () => {
-    setNewCheckDate(null);
+    setNewExpiryDate(null);
+    setNewStartDate(null);
     setUploadedFileUrl(null);
     setSelectedFileName(null);
     setUploadError(null);
@@ -241,30 +213,37 @@ function RightToWorkTab() {
 
   // Submit Logic
   const handleSubmitUpdate = async () => {
-    if (!user?._id || !uploadedFileUrl || !newCheckDate) return;
+    if (
+      !user?._id ||
+      !uploadedFileUrl ||
+      !newExpiryDate ||
+      !newStartDate
+    )
+      return;
 
     setIsSubmitting(true);
 
     const payload: any = {
       updatedBy: user._id,
       document: uploadedFileUrl,
-      title: selectedFileName || 'Right to Work Check',
-      nextCheckDate: moment(newCheckDate).toISOString()
+      title: selectedFileName || 'Visa Check Updated',
+      startDate: moment(newStartDate).toISOString(),
+      expiryDate: moment(newExpiryDate).toISOString()
     };
 
-    if (!rtwId && id) {
+    if (!visaId && id) {
       payload.employeeId = id;
     }
 
     try {
-      const url = rtwId ? `/hr/right-to-work/${rtwId}` : `/hr/right-to-work`;
-      const method = rtwId ? 'patch' : 'post';
+      const url = visaId ? `/visa/${visaId}` : `/visa`;
+      const method = visaId ? 'patch' : 'post';
 
       await axiosInstance[method](url, payload);
 
-      await fetchRTWData();
+      await fetchVisaData();
       toast({
-        title: 'RTW check updated successfully!',
+        title: 'Visa details updated successfully!',
         className: 'bg-supperagent text-white'
       });
       setShowUpdateModal(false);
@@ -295,22 +274,48 @@ function RightToWorkTab() {
           <div className="h-full rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
             <h2 className="mb-6 flex items-center gap-2 text-xl font-semibold text-gray-900">
               <Calendar className="h-5 w-5 text-supperagent" />
-              RTW Status
+              Visa Status
             </h2>
 
-            <div className="space-y-8">
-              {/* Status Display */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium uppercase tracking-wide text-gray-500">
-                  RTW Next Check Date
-                </Label>
-                <div className="text-2xl font-bold text-gray-900">
-                  {currentCheckDate
-                    ? moment(currentCheckDate).format('DD MMMM YYYY')
-                    : 'Not Set'}
+            <div className="space-y-6">
+              {/* Dates Display */}
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-sm font-medium uppercase tracking-wide text-gray-500">
+                    Visa Start Date
+                  </Label>
+                  <div className="text-lg font-semibold text-gray-900">
+                    {currentStartDate
+                      ? moment(currentStartDate).format('DD MMMM YYYY')
+                      : 'Not Set'}
+                  </div>
                 </div>
 
-                <div className="pt-1">{getStatusBadge()}</div>
+                <div>
+                  <Label className="text-sm font-medium uppercase tracking-wide text-gray-500">
+                    Visa Expiry Date
+                  </Label>
+                  <div className="text-lg font-semibold text-gray-900">
+                    {currentExpiryDate
+                      ? moment(currentExpiryDate).format('DD MMMM YYYY')
+                      : 'Not Set'}
+                  </div>
+                </div>
+
+                {complianceStatus && (
+                  <div className="pt-1">
+                    <Badge
+                      className={cn(
+                        'px-3 py-1 text-sm',
+                        complianceStatus === 'active'
+                          ? 'bg-green-100 text-green-800 hover:bg-green-100'
+                          : 'bg-red-100 text-red-800 hover:bg-red-100'
+                      )}
+                    >
+                      {complianceStatus === 'active' ? 'Active' : 'Expired'}
+                    </Badge>
+                  </div>
+                )}
               </div>
 
               {/* Action Button */}
@@ -319,13 +324,13 @@ function RightToWorkTab() {
                   onClick={openUpdateModal}
                   className="w-full bg-supperagent text-white hover:bg-supperagent/90"
                 >
-                  Update Next Check Date
+                  Update Visa Details
                 </Button>
-                {/* {checkInterval > 0 && (
+                {visaCheckInterval > 0 && (
                   <p className="mt-3 text-center text-xs text-gray-500">
-                    Alert triggers {checkInterval} days before expiry
+                    Policy: Check required every {visaCheckInterval} days
                   </p>
-                )} */}
+                )}
               </div>
             </div>
           </div>
@@ -378,7 +383,7 @@ function RightToWorkTab() {
                           <TableCell className="text-gray-600">
                             {entry.updatedBy &&
                             typeof entry.updatedBy === 'object'
-                              ? entry.updatedBy?.name ||
+                              ? entry.updatedBy.name ||
                                 `${entry.updatedBy.firstName ?? ''} ${entry.updatedBy.lastName ?? ''}`.trim()
                               : 'System'}
                           </TableCell>
@@ -386,6 +391,7 @@ function RightToWorkTab() {
                           <TableCell className="text-right">
                             {entry.document ? (
                               <Button
+                           
                                 size="sm"
                                 className="h-8 "
                                 onClick={() =>
@@ -413,43 +419,41 @@ function RightToWorkTab() {
       <Dialog open={showUpdateModal} onOpenChange={setShowUpdateModal}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Update RTW Status Check</DialogTitle>
+            <DialogTitle>Update Visa Details</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-6 py-4">
-            {/* Context Alert */}
-            {currentCheckDate && (
-              <div className="rounded-md bg-blue-50 p-3 text-sm text-blue-700 flex items-start gap-2">
-                <AlertCircle className="h-4 w-4 mt-0.5" />
-                <p>
-                  Current check expires on{' '}
-                  <span className="font-semibold">
-                    {moment(currentCheckDate).format('DD MMM YYYY')}
-                  </span>
-                  .
-                </p>
-              </div>
-            )}
-
-            {/* Date Input */}
+            {/* Start Date Input */}
             <div className="flex flex-col space-y-2">
               <Label className="text-sm font-medium text-gray-700">
-                New Next Check Date <span className="text-red-500">*</span>
+                Visa Start Date <span className="text-red-500">*</span>
               </Label>
               <DatePicker
-                selected={newCheckDate}
-                onChange={(date) => setNewCheckDate(date)}
+                selected={newStartDate}
+                onChange={(date) => setNewStartDate(date)}
                 dateFormat="dd-MM-yyyy"
                 className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholderText="Select date..."
+                placeholderText="Select start date..."
                 showMonthDropdown
                 showYearDropdown
-                // minDate is strictly the previous check date (or today)
-                minDate={
-                  currentCheckDate && moment(currentCheckDate).isValid()
-                    ? new Date(currentCheckDate)
-                    : new Date()
-                }
+                preventOpenOnFocus
+              />
+            </div>
+
+            {/* Expiry Date Input */}
+            <div className="flex flex-col space-y-2">
+              <Label className="text-sm font-medium text-gray-700">
+                Visa Expiry Date <span className="text-red-500">*</span>
+              </Label>
+              <DatePicker
+                selected={newExpiryDate}
+                onChange={(date) => setNewExpiryDate(date)}
+                dateFormat="dd-MM-yyyy"
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholderText="Select expiry date..."
+                showMonthDropdown
+                showYearDropdown
+                minDate={newStartDate || undefined}
                 preventOpenOnFocus
               />
             </div>
@@ -537,7 +541,11 @@ function RightToWorkTab() {
               className="bg-supperagent text-white hover:bg-supperagent/90"
               onClick={handleSubmitUpdate}
               disabled={
-                isSubmitting || isUploading || !uploadedFileUrl || !newCheckDate
+                isSubmitting ||
+                isUploading ||
+                !uploadedFileUrl ||
+                !newExpiryDate ||
+                !newStartDate
               }
             >
               {isSubmitting ? 'Saving...' : 'Update'}
@@ -549,4 +557,4 @@ function RightToWorkTab() {
   );
 }
 
-export default RightToWorkTab;
+export default VisaTab;

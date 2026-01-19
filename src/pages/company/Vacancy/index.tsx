@@ -22,6 +22,7 @@ import {
   TooltipTrigger,
   TooltipContent
 } from '@/components/ui/tooltip';
+import { useSelector } from 'react-redux';
 
 export default function Vacancy() {
   const [vacancy, setVacancy] = useState<any[]>([]);
@@ -32,6 +33,7 @@ export default function Vacancy() {
   const [searchTerm, setSearchTerm] = useState('');
   const { toast } = useToast();
   const navigate = useNavigate();
+  const user = useSelector((state: any) => state.auth?.user) || null;
 
   const fetchData = async (page: number, limit: number, search = '') => {
     try {
@@ -39,6 +41,7 @@ export default function Vacancy() {
       const response = await axiosInstance.get('/hr/vacancy', {
         params: {
           page,
+          companyId:user?._id,
           limit,
           ...(search ? { searchTerm: search } : {})
         }

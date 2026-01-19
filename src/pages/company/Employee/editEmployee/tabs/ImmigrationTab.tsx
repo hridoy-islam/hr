@@ -29,23 +29,23 @@ import {
 import { cn } from '@/lib/utils';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 
+// Interfaces based on the provided Mongoose model
 interface HistoryEntry {
   _id: string;
   title: string;
   date: string;
   document?: string;
-  updatedBy: string | { firstName: string; lastName: string };
+  updatedBy: string | { firstName: string; lastName: string; name?: string };
 }
 
-interface RTWData {
+interface ImmigrationData {
   _id: string;
   nextCheckDate: string | null;
-  status: 'active' | 'expired' | 'needs-check';
   employeeId: string;
   logs?: HistoryEntry[];
 }
 
-function RightToWorkTab() {
+function ImmigrationTab() {
   const { id } = useParams();
   const { user } = useSelector((state: any) => state.auth);
   const { toast } = useToast();
@@ -62,7 +62,7 @@ function RightToWorkTab() {
   const [checkInterval, setCheckInterval] = useState<number>(0);
 
   // Data State
-  const [rtwId, setRtwId] = useState<string | null>(null);
+  const [immigrationId, setImmigrationId] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
 
   // Modal & Form State
@@ -71,7 +71,7 @@ function RightToWorkTab() {
   const [uploadedFileUrl, setUploadedFileUrl] = useState<string | null>(null);
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
 
-  // Loading States
+  // Operation Loading States
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -85,42 +85,38 @@ function RightToWorkTab() {
       );
       const result = res.data?.data?.result;
       if (result && result.length > 0) {
-        setCheckInterval(result[0].rtwCheckDate || 0);
+        setCheckInterval(result[0].immigrationCheckDate || 0);
       }
     } catch (err) {
       console.error('Error fetching schedule settings:', err);
     }
   };
 
-  // 2. Fetch RTW Data
-  const fetchRTWData = async () => {
+  // 2. Fetch Immigration Data
+  const fetchImmigrationData = async () => {
     if (!id) return;
     try {
-      const rtwRes = await axiosInstance.get(
-        `/hr/right-to-work?employeeId=${id}`
+      const res = await axiosInstance.get(
+        `/immigration?employeeId=${id}`
       );
-      const rtwList: RTWData[] = rtwRes.data.data.result;
+      const dataList: ImmigrationData[] = res.data.data.result;
 
-      if (rtwList.length > 0) {
-        const rtwData = rtwList[0];
-        setRtwId(rtwData._id);
+      if (dataList.length > 0) {
+        const record = dataList[0];
+        setImmigrationId(record._id);
 
         // Store current check date for display
-        setCurrentCheckDate(rtwData.nextCheckDate);
+        setCurrentCheckDate(record.nextCheckDate);
 
         // Set history
-        setHistory(rtwData.logs || []);
+        setHistory(record.logs || []);
       } else {
-        setRtwId(null);
+        setImmigrationId(null);
         setCurrentCheckDate(null);
         setHistory([]);
       }
     } catch (err) {
-      console.error('Error fetching RTW data:', err);
-      toast({
-        title: 'Failed to load RTW data.',
-        className: 'bg-destructive text-white'
-      });
+      console.error('Error fetching Immigration data:', err);
     }
   };
 
@@ -128,30 +124,27 @@ function RightToWorkTab() {
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
-      await Promise.all([fetchScheduleSettings(), fetchRTWData()]);
+      await Promise.all([fetchScheduleSettings(), fetchImmigrationData()]);
       setIsLoading(false);
     };
 
     loadData();
   }, [id, user?._id]);
 
-  // 3. Status Calculation (Warning threshold = checkInterval)
+  // 3. Status Calculation (Logic: Warn if within checkInterval days)
   useEffect(() => {
     if (currentCheckDate) {
-      const now = moment().startOf('day'); // Normalize to start of day for accurate comparison
+      const now = moment().startOf('day');
       const checkDate = moment(currentCheckDate).startOf('day');
       const diffDays = checkDate.diff(now, 'days');
 
-      // 1. Check if Expired (Date has passed)
       if (now.isAfter(checkDate)) {
         setComplianceStatus('expired');
       } 
-      // 2. Check if Expiring Soon (Within the checkInterval window)
-      // Example: If interval is 30 days, warning shows if remaining days <= 30
+      // Warn if remaining days are less than or equal to the interval
       else if (checkInterval > 0 && diffDays <= checkInterval) {
         setComplianceStatus('expiring-soon');
       } 
-      // 3. Otherwise Active
       else {
         setComplianceStatus('active');
       }
@@ -248,23 +241,23 @@ function RightToWorkTab() {
     const payload: any = {
       updatedBy: user._id,
       document: uploadedFileUrl,
-      title: selectedFileName || 'Right to Work Check',
+      title: selectedFileName || 'Immigration Status Check',
       nextCheckDate: moment(newCheckDate).toISOString()
     };
 
-    if (!rtwId && id) {
+    if (!immigrationId && id) {
       payload.employeeId = id;
     }
 
     try {
-      const url = rtwId ? `/hr/right-to-work/${rtwId}` : `/hr/right-to-work`;
-      const method = rtwId ? 'patch' : 'post';
+      const url = immigrationId ? `/immigration/${immigrationId}` : `/immigration`;
+      const method = immigrationId ? 'patch' : 'post';
 
       await axiosInstance[method](url, payload);
 
-      await fetchRTWData();
+      await fetchImmigrationData();
       toast({
-        title: 'RTW check updated successfully!',
+        title: 'Immigration status updated successfully!',
         className: 'bg-supperagent text-white'
       });
       setShowUpdateModal(false);
@@ -288,21 +281,21 @@ function RightToWorkTab() {
   }
 
   return (
-    <div className=" ">
+    <div className="">
       <div className="grid grid-cols-1 gap-2 lg:grid-cols-3">
         {/* Left Column: Status & Action */}
         <div className="lg:col-span-1">
           <div className="h-full rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
             <h2 className="mb-6 flex items-center gap-2 text-xl font-semibold text-gray-900">
               <Calendar className="h-5 w-5 text-supperagent" />
-              RTW Status
+              Immigration Status
             </h2>
 
             <div className="space-y-8">
               {/* Status Display */}
               <div className="space-y-2">
                 <Label className="text-sm font-medium uppercase tracking-wide text-gray-500">
-                  RTW Next Check Date
+                  Next Check Date
                 </Label>
                 <div className="text-2xl font-bold text-gray-900">
                   {currentCheckDate
@@ -333,7 +326,7 @@ function RightToWorkTab() {
 
         {/* Right Column: History Log & Documents */}
         <div className="lg:col-span-2">
-          <div className=" rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+          <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
             <h2 className="mb-6 flex items-center gap-2 text-xl font-semibold text-gray-900">
               <History className="h-5 w-5 text-supperagent" />
               History Log
@@ -378,7 +371,7 @@ function RightToWorkTab() {
                           <TableCell className="text-gray-600">
                             {entry.updatedBy &&
                             typeof entry.updatedBy === 'object'
-                              ? entry.updatedBy?.name ||
+                              ? entry.updatedBy.name ||
                                 `${entry.updatedBy.firstName ?? ''} ${entry.updatedBy.lastName ?? ''}`.trim()
                               : 'System'}
                           </TableCell>
@@ -387,7 +380,7 @@ function RightToWorkTab() {
                             {entry.document ? (
                               <Button
                                 size="sm"
-                                className="h-8 "
+                                className="h-8"
                                 onClick={() =>
                                   window.open(entry.document, '_blank')
                                 }
@@ -413,7 +406,7 @@ function RightToWorkTab() {
       <Dialog open={showUpdateModal} onOpenChange={setShowUpdateModal}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Update RTW Status Check</DialogTitle>
+            <DialogTitle>Update Immigration Status Check</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-6 py-4">
@@ -444,7 +437,7 @@ function RightToWorkTab() {
                 placeholderText="Select date..."
                 showMonthDropdown
                 showYearDropdown
-                // minDate is strictly the previous check date (or today)
+                // minDate is strictly the previous check date (or today if none)
                 minDate={
                   currentCheckDate && moment(currentCheckDate).isValid()
                     ? new Date(currentCheckDate)
@@ -549,4 +542,4 @@ function RightToWorkTab() {
   );
 }
 
-export default RightToWorkTab;
+export default ImmigrationTab;

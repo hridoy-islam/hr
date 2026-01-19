@@ -173,7 +173,7 @@ export default function Department() {
             <TableHeader>
               <TableRow>
                 <TableHead>Department Name</TableHead>
-                <TableHead className="text-center">Status</TableHead>
+                {/* <TableHead className="text-center">Status</TableHead> */}
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -182,16 +182,14 @@ export default function Department() {
                 <TableRow key={department._id}>
                   <TableCell>{department.departmentName}</TableCell>
 
-                  <TableCell className="text-center">
+                  {/* <TableCell className="text-center">
                     <div className="flex items-center justify-center gap-2">
-                      {/* Toggle Switch */}
                       <Switch
                         checked={department.status === 'active'}
                         onCheckedChange={(checked) =>
                           handleStatusChange(department._id, checked)
                         }
                       />
-                      {/* Status Badge */}
                       <Badge
                         variant={
                           department.status === 'active'
@@ -210,7 +208,7 @@ export default function Department() {
                         {department.status === 'active' ? 'Active' : 'Inactive'}
                       </Badge>
                     </div>
-                  </TableCell>
+                  </TableCell> */}
                   <TableCell className="text-center">
                     <div className="flex flex-row items-center  justify-end gap-4">
                       <Button

@@ -12,7 +12,7 @@ import {
   CardTitle
 } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
-import { Loader2, Save, CalendarClock } from 'lucide-react';
+import { Loader2, Save } from 'lucide-react';
 import {
   Form,
   FormControl,
@@ -28,6 +28,9 @@ interface ScheduleCheckValues {
   dbsCheckDate: number;
   rtwCheckDate: number;
   passportCheckDate: number;
+  visaCheckDate: number;
+  appraisalCheckDate: number;
+  immigrationCheckDate: number; // Added
 }
 
 export default function CompanyScheduleCheckPage() {
@@ -43,7 +46,10 @@ export default function CompanyScheduleCheckPage() {
     defaultValues: {
       dbsCheckDate: 0,
       rtwCheckDate: 0,
-      passportCheckDate: 0
+      passportCheckDate: 0,
+      visaCheckDate: 0,
+      appraisalCheckDate: 0,
+      immigrationCheckDate: 0 // Added
     }
   });
 
@@ -70,14 +76,17 @@ export default function CompanyScheduleCheckPage() {
           form.reset({
             dbsCheckDate: data.dbsCheckDate,
             rtwCheckDate: data.rtwCheckDate,
-            passportCheckDate: data.passportCheckDate
+            passportCheckDate: data.passportCheckDate,
+            visaCheckDate: data.visaCheckDate || 0,
+            appraisalCheckDate: data.appraisalCheckDate || 0,
+            immigrationCheckDate: data.immigrationCheckDate || 0 // Added
           });
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error fetching schedule settings:', error);
         toast({
           title: 'Error',
-          description: error?.response?.data?.message ||'Failed to load schedule settings.',
+          description: error?.response?.data?.message || 'Failed to load schedule settings.',
           variant: 'destructive'
         });
       } finally {
@@ -123,11 +132,11 @@ export default function CompanyScheduleCheckPage() {
           className: 'bg-supperagent border-none text-white'
         });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving settings:', error);
       toast({
         title: 'Error',
-        description: error?.response?.data?.message ||'Failed to save settings. Please try again.',
+        description: error?.response?.data?.message || 'Failed to save settings. Please try again.',
         variant: 'destructive'
       });
     } finally {
@@ -144,9 +153,7 @@ export default function CompanyScheduleCheckPage() {
   }
 
   return (
-    <div className="mx-auto space-y-6 ">
-      
-
+    <div className="mx-auto space-y-6">
       <Card className="border-gray-200 bg-white shadow-sm">
         <CardHeader>
           <CardTitle>Check Intervals</CardTitle>
@@ -172,7 +179,7 @@ export default function CompanyScheduleCheckPage() {
                           type="number"
                           placeholder="e.g. 365"
                           {...field}
-                          value={field.value === 0 ? '' : field.value} // Show empty string if 0
+                          value={field.value === 0 ? '' : field.value}
                           onChange={(e) => {
                             const val = e.target.value;
                             field.onChange(val === '' ? 0 : Number(val));
@@ -197,7 +204,7 @@ export default function CompanyScheduleCheckPage() {
                           type="number"
                           placeholder="e.g. 180"
                           {...field}
-                          value={field.value === 0 ? '' : field.value} // Show empty string if 0
+                          value={field.value === 0 ? '' : field.value}
                           onChange={(e) => {
                             const val = e.target.value;
                             field.onChange(val === '' ? 0 : Number(val));
@@ -220,9 +227,9 @@ export default function CompanyScheduleCheckPage() {
                       <FormControl>
                         <Input
                           type="number"
-                          placeholder="e.g. 3650"
+                          placeholder="e.g. 365"
                           {...field}
-                          value={field.value === 0 ? '' : field.value} // Show empty string if 0
+                          value={field.value === 0 ? '' : field.value}
                           onChange={(e) => {
                             const val = e.target.value;
                             field.onChange(val === '' ? 0 : Number(val));
@@ -234,6 +241,82 @@ export default function CompanyScheduleCheckPage() {
                     </FormItem>
                   )}
                 />
+
+                {/* Visa Check Date */}
+                <FormField
+                  control={form.control}
+                  name="visaCheckDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Visa Check Interval (Days)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="e.g. 365"
+                          {...field}
+                          value={field.value === 0 ? '' : field.value}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            field.onChange(val === '' ? 0 : Number(val));
+                          }}
+                          className="mt-1"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Appraisal Check Date */}
+                <FormField
+                  control={form.control}
+                  name="appraisalCheckDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Appraisal Interval (Days)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="e.g. 90"
+                          {...field}
+                          value={field.value === 0 ? '' : field.value}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            field.onChange(val === '' ? 0 : Number(val));
+                          }}
+                          className="mt-1"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Immigration Check Date - Added */}
+                <FormField
+                  control={form.control}
+                  name="immigrationCheckDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Immigration Check Interval (Days)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="e.g. 365"
+                          {...field}
+                          value={field.value === 0 ? '' : field.value}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            field.onChange(val === '' ? 0 : Number(val));
+                          }}
+                          className="mt-1"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
               </div>
 
               <div className="flex justify-end pt-4">

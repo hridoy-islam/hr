@@ -97,16 +97,19 @@ const RecruitApplicantForm = () => {
     }
 
     try {
+      // 1. Prepare User Data
       const flatDataWithStatus = {
         ...formData.GeneralInformation,
         ...formData.EqualityInformation,
         applicantId: id,
         status: 'hired'
       };
-      // await axiosInstance.post(`/hr/recruitment`, flatDataWithStatus);
+      
       await axiosInstance.patch(`/hr/applicant/${id}`, { status: 'hired' });
+      
       const { status: _, ...flatData } = flatDataWithStatus;
       const { status: __, ...cleanApplicant } = applicant;
+      
       const data = {
         ...cleanApplicant,
         ...flatData,
@@ -114,15 +117,43 @@ const RecruitApplicantForm = () => {
         company: user?._id
       };
 
-      // console.log(cleanApplicant)
+      // 2. Create User
       const res = await axiosInstance.post(`/auth/signup`, data);
       const newUser = res.data.data;
 
-      // Create Right-to-Work record for the employee
-      await axiosInstance.post(`/hr/right-to-work`, {
-        nextCheckDate: moment().add(90, 'days').format('YYYY-MM-DD'), // today in YYYY-MM-DD
-        employeeId: newUser._id
-      });
+      // 3. Fetch Schedule Settings (to determine RTW duration)
+      let rtwDuration = 0;
+      try {
+        const scheduleRes = await axiosInstance.get(
+          `/schedule-check?companyId=${user?._id}`
+        );
+        const scheduleResult = scheduleRes.data?.data?.result;
+        
+        if (scheduleResult && scheduleResult.length > 0) {
+          // Use the fetched duration if available
+          rtwDuration = scheduleResult[0].rtwCheckDate || 0;
+        }
+      } catch (scheduleError) {
+        console.log('Failed to fetch schedule settings, defaulting duration to 0', scheduleError);
+      }
+
+      // 4. Create Right-to-Work Record (Only if duration > 0)
+      if (rtwDuration > 0) {
+        await axiosInstance.post(`/hr/right-to-work`, {
+          nextCheckDate: moment().add(rtwDuration, 'days').format('YYYY-MM-DD'),
+          employeeId: newUser._id,
+          updatedBy:user?._id
+        });
+      }
+
+      // 5. Create Passport Record (If passport info exists)
+      if (newUser.passportNo || newUser.passportExpiry) {
+        await axiosInstance.post(`/passport`, {
+            userId: newUser._id,
+            passportNumber: newUser.passportNo,
+            passportExpiryDate: newUser.passportExpiry
+        });
+      }
 
       toast({
         title: 'Application Submitted',
@@ -131,7 +162,7 @@ const RecruitApplicantForm = () => {
       });
 
       navigate('/company/vacancy/recruit-applicant/employee', {
-        state: { user: res.data.data }
+        state: { user: newUser }
       });
       setFormSubmitted(true);
     } catch (error: any) {

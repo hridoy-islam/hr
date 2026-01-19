@@ -132,7 +132,7 @@ export const useEditEmployee = () => {
           gender: data.gender || '',
           maritalStatus: data.maritalStatus || '',
           ethnicOrigin: data.ethnicOrigin || '',
-
+          image:data.image || '',
           // Contact Information
           email: data.email || '',
           homePhone: data.homePhone || '',

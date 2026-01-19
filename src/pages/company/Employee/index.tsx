@@ -18,6 +18,7 @@ import { DynamicPagination } from '@/components/shared/DynamicPagination';
 import { useNavigate } from 'react-router-dom';
 import Select from 'react-select';
 import { Badge } from '@/components/ui/badge';
+import { useSelector } from 'react-redux';
 
 interface OptionType {
   value: string;
@@ -46,6 +47,7 @@ export default function Employee() {
   const [selectedTraining, setSelectedTraining] = useState<OptionType | null>(
     null
   );
+  const user = useSelector((state: any) => state.auth?.user) || null;
 
   const navigate = useNavigate();
 
@@ -55,7 +57,8 @@ export default function Employee() {
       const params: any = {
         page: currentPage,
         limit: entriesPerPage,
-        role: 'employee'
+        role: 'employee',
+        company:user?._id
       };
 
       if (searchTerm) params.searchTerm = searchTerm;
@@ -72,7 +75,7 @@ export default function Employee() {
       toast({
         title: 'Error',
         description:
-          error.response?.data?.message || 'Failed to load employees.',
+        error.response?.data?.message || 'Failed to load employees.',
         variant: 'destructive'
       });
     } finally {
@@ -271,7 +274,7 @@ export default function Employee() {
               </TableHeader>
               <TableBody>
                 {employees.map((employee) => (
-                  <TableRow key={employee._id}>
+                  <TableRow key={employee._id} className='cursor-pointer'>
                     <TableCell onClick={() => navigate(`${employee._id}`)}>
                       {employee.title} {employee.firstName} {employee.initial}{' '}
                       {employee.lastName}

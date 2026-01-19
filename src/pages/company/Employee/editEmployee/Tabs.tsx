@@ -16,7 +16,7 @@ interface TabsProps {
 
 export const Tabs: React.FC<TabsProps> = ({ tabs, activeTab, onChange }) => {
   return (
-    <div className="flex flex-col md:flex-row gap-6 w-full items-start">
+    <div className="flex flex-col md:flex-row gap-2 w-full items-start">
       
       {/* 1. Tab List (Sidebar) - Left Side */}
       <div className="w-full md:w-64 flex-shrink-0 space-y-2 bg-white p-4 shadow-md  rounded-lg border border-gray-200">
@@ -28,11 +28,11 @@ export const Tabs: React.FC<TabsProps> = ({ tabs, activeTab, onChange }) => {
               key={tab.id}
               onClick={() => onChange(tab.id)}
               className={`
-                group flex w-full items-center justify-between rounded-lg border px-4 py-1 text-sm font-medium transition-all duration-200 ease-in-out
+                group flex w-full items-center justify-between rounded-lg border-2 border-gray-300  px-4 py-1 text-sm font-medium transition-all duration-200 ease-in-out
                 ${
                   isActive
-                    ? 'border-supperagent bg-white text-supperagent ring-1 ring-supperagent shadow-sm'
-                    : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'
+                    ? 'border-supperagent bg-white text-supperagent ring-2 ring-supperagent shadow-sm'
+                    : 'border-gray-200 bg-white  hover:border-gray-300 hover:bg-gray-50'
                 }
               `}
               aria-current={isActive ? 'page' : undefined}

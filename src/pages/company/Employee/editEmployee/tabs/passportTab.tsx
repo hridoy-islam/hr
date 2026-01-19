@@ -1,6 +1,6 @@
 import type React from 'react';
 import { useEffect, useState, useRef } from 'react';
-import { Calendar, FileText, Upload, X, Eye, History, AlertCircle } from 'lucide-react';
+import { Book, FileText, Upload, X, Eye, History, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
@@ -19,6 +19,7 @@ import {
 import moment from 'moment';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import {
   Dialog,
   DialogContent,
@@ -29,23 +30,25 @@ import {
 import { cn } from '@/lib/utils';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 
-interface HistoryEntry {
+// Interfaces based on your Mongoose Schema
+interface LogEntry {
   _id: string;
   title: string;
   date: string;
   document?: string;
-  updatedBy: string | { firstName: string; lastName: string };
+  updatedBy: string | { firstName: string; lastName: string; name?: string };
 }
 
-interface RTWData {
+interface PassportData {
   _id: string;
-  nextCheckDate: string | null;
-  status: 'active' | 'expired' | 'needs-check';
-  employeeId: string;
-  logs?: HistoryEntry[];
+  userId: string;
+  passportNumber: string;
+  passportExpiryDate: string;
+  dateOfIssue?: string;
+  logs?: LogEntry[];
 }
 
-function RightToWorkTab() {
+function PassportTab() {
   const { id } = useParams();
   const { user } = useSelector((state: any) => state.auth);
   const { toast } = useToast();
@@ -58,25 +61,33 @@ function RightToWorkTab() {
   const [complianceStatus, setComplianceStatus] = useState<
     'active' | 'expired' | 'expiring-soon' | null
   >(null);
-  const [currentCheckDate, setCurrentCheckDate] = useState<string | null>(null);
-  const [checkInterval, setCheckInterval] = useState<number>(0);
 
-  // Data State
-  const [rtwId, setRtwId] = useState<string | null>(null);
-  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  // Settings State (From ScheduleCheck)
+  const [passportCheckInterval, setPassportCheckInterval] = useState<number>(0);
+
+  // Current Data State
+  const [passportId, setPassportId] = useState<string | null>(null);
+  const [currentPassportNumber, setCurrentPassportNumber] = useState<string | null>(null);
+  const [currentExpiryDate, setCurrentExpiryDate] = useState<string | null>(null);
+  const [currentDateOfIssue, setCurrentDateOfIssue] = useState<string | null>(null);
+  const [history, setHistory] = useState<LogEntry[]>([]);
 
   // Modal & Form State
   const [showUpdateModal, setShowUpdateModal] = useState(false);
-  const [newCheckDate, setNewCheckDate] = useState<Date | null>(null);
+  
+  // Form Inputs
+  const [newPassportNumber, setNewPassportNumber] = useState<string>('');
+  const [newDateOfIssue, setNewDateOfIssue] = useState<Date | null>(null);
+  const [newExpiryDate, setNewExpiryDate] = useState<Date | null>(null);
+  
+  // File Upload State
   const [uploadedFileUrl, setUploadedFileUrl] = useState<string | null>(null);
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
-
-  // Loading States
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
-  // 1. Fetch Schedule Settings
+  // 1. Fetch Schedule Settings (To get auto-calculation interval)
   const fetchScheduleSettings = async () => {
     if (!user?._id) return;
     try {
@@ -85,40 +96,39 @@ function RightToWorkTab() {
       );
       const result = res.data?.data?.result;
       if (result && result.length > 0) {
-        setCheckInterval(result[0].rtwCheckDate || 0);
+        // Assuming passportCheckDate is stored as DAYS in the backend setting
+        setPassportCheckInterval(result[0].passportCheckDate || 0);
       }
     } catch (err) {
       console.error('Error fetching schedule settings:', err);
     }
   };
 
-  // 2. Fetch RTW Data
-  const fetchRTWData = async () => {
+  // 2. Fetch Passport Data
+  const fetchPassportData = async () => {
     if (!id) return;
     try {
-      const rtwRes = await axiosInstance.get(
-        `/hr/right-to-work?employeeId=${id}`
-      );
-      const rtwList: RTWData[] = rtwRes.data.data.result;
+      const res = await axiosInstance.get(`/passport?userId=${id}`);
+      const result: PassportData[] = res.data?.data?.result || [];
 
-      if (rtwList.length > 0) {
-        const rtwData = rtwList[0];
-        setRtwId(rtwData._id);
-
-        // Store current check date for display
-        setCurrentCheckDate(rtwData.nextCheckDate);
-
-        // Set history
-        setHistory(rtwData.logs || []);
+      if (result.length > 0) {
+        const data = result[0];
+        setPassportId(data._id);
+        setCurrentPassportNumber(data.passportNumber);
+        setCurrentExpiryDate(data.passportExpiryDate);
+        setCurrentDateOfIssue(data.dateOfIssue || null);
+        setHistory(data.logs || []);
       } else {
-        setRtwId(null);
-        setCurrentCheckDate(null);
+        setPassportId(null);
+        setCurrentPassportNumber(null);
+        setCurrentExpiryDate(null);
+        setCurrentDateOfIssue(null);
         setHistory([]);
       }
     } catch (err) {
-      console.error('Error fetching RTW data:', err);
+      console.error('Error fetching Passport data:', err);
       toast({
-        title: 'Failed to load RTW data.',
+        title: 'Failed to load Passport data.',
         className: 'bg-destructive text-white'
       });
     }
@@ -128,37 +138,35 @@ function RightToWorkTab() {
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
-      await Promise.all([fetchScheduleSettings(), fetchRTWData()]);
+      await Promise.all([fetchPassportData(), fetchScheduleSettings()]);
       setIsLoading(false);
     };
-
     loadData();
   }, [id, user?._id]);
 
-  // 3. Status Calculation (Warning threshold = checkInterval)
+  // 3. Status Calculation (Days Logic)
   useEffect(() => {
-    if (currentCheckDate) {
-      const now = moment().startOf('day'); // Normalize to start of day for accurate comparison
-      const checkDate = moment(currentCheckDate).startOf('day');
-      const diffDays = checkDate.diff(now, 'days');
+    if (currentExpiryDate) {
+      const now = moment().startOf('day');
+      const expiry = moment(currentExpiryDate).startOf('day');
+      
+      // Calculate difference in DAYS
+      const daysDiff = expiry.diff(now, 'days');
 
-      // 1. Check if Expired (Date has passed)
-      if (now.isAfter(checkDate)) {
+      if (now.isAfter(expiry)) {
         setComplianceStatus('expired');
       } 
-      // 2. Check if Expiring Soon (Within the checkInterval window)
-      // Example: If interval is 30 days, warning shows if remaining days <= 30
-      else if (checkInterval > 0 && diffDays <= checkInterval) {
+      // Warn if expiring within the configured interval (DAYS)
+      else if (passportCheckInterval > 0 && daysDiff <= passportCheckInterval) {
         setComplianceStatus('expiring-soon');
       } 
-      // 3. Otherwise Active
       else {
         setComplianceStatus('active');
       }
     } else {
       setComplianceStatus(null);
     }
-  }, [currentCheckDate, checkInterval]);
+  }, [currentExpiryDate, passportCheckInterval]);
 
   const getStatusBadge = () => {
     switch (complianceStatus) {
@@ -185,6 +193,18 @@ function RightToWorkTab() {
     }
   };
 
+  // Auto-calculate Expiry Date based on Issue Date + Interval (DAYS)
+  const handleIssueDateChange = (date: Date | null) => {
+    setNewDateOfIssue(date);
+    
+    // If we have a date and a configured interval > 0
+    if (date && passportCheckInterval > 0) {
+      // Logic changed to DAYS
+      const calculatedExpiry = moment(date).add(passportCheckInterval, 'days').toDate();
+      setNewExpiryDate(calculatedExpiry);
+    }
+  };
+
   // File Upload Logic
   const handleFileSelect = async (
     event: React.ChangeEvent<HTMLInputElement>
@@ -208,7 +228,7 @@ function RightToWorkTab() {
 
     const formData = new FormData();
     formData.append('entityId', user._id);
-    formData.append('file_type', 'document');
+    formData.append('file_type', 'document'); 
     formData.append('file', file);
 
     try {
@@ -231,40 +251,56 @@ function RightToWorkTab() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  // Pre-fill data when opening modal
   const openUpdateModal = () => {
-    setNewCheckDate(null);
+    // 1. Text Fields
+    setNewPassportNumber(currentPassportNumber || '');
+    
+    // 2. Dates
+    setNewDateOfIssue(currentDateOfIssue ? new Date(currentDateOfIssue) : null);
+    setNewExpiryDate(currentExpiryDate ? new Date(currentExpiryDate) : null);
+
+    // 3. Files: Reset
     setUploadedFileUrl(null);
     setSelectedFileName(null);
     setUploadError(null);
+    
     setShowUpdateModal(true);
   };
 
-  // Submit Logic
   const handleSubmitUpdate = async () => {
-    if (!user?._id || !uploadedFileUrl || !newCheckDate) return;
+    if (
+      !user?._id || 
+      !uploadedFileUrl || 
+      !newExpiryDate || 
+      !newPassportNumber
+    ) return;
 
     setIsSubmitting(true);
 
     const payload: any = {
       updatedBy: user._id,
+      title: 'Passport Details Updated',
       document: uploadedFileUrl,
-      title: selectedFileName || 'Right to Work Check',
-      nextCheckDate: moment(newCheckDate).toISOString()
+      passportNumber: newPassportNumber,
+      // We send Issue Date if available, useful for future calculations
+      dateOfIssue: newDateOfIssue ? moment(newDateOfIssue).toISOString() : undefined,
+      passportExpiryDate: moment(newExpiryDate).toISOString(),
     };
 
-    if (!rtwId && id) {
-      payload.employeeId = id;
+    if (!passportId && id) {
+      payload.userId = id;
     }
 
     try {
-      const url = rtwId ? `/hr/right-to-work/${rtwId}` : `/hr/right-to-work`;
-      const method = rtwId ? 'patch' : 'post';
+      const url = passportId ? `/passport/${passportId}` : `/passport`;
+      const method = passportId ? 'patch' : 'post';
 
       await axiosInstance[method](url, payload);
 
-      await fetchRTWData();
+      await fetchPassportData();
       toast({
-        title: 'RTW check updated successfully!',
+        title: 'Passport details updated successfully!',
         className: 'bg-supperagent text-white'
       });
       setShowUpdateModal(false);
@@ -288,52 +324,63 @@ function RightToWorkTab() {
   }
 
   return (
-    <div className=" ">
+    <div className="">
       <div className="grid grid-cols-1 gap-2 lg:grid-cols-3">
-        {/* Left Column: Status & Action */}
+        {/* Left Column: Status & Current Details */}
         <div className="lg:col-span-1">
           <div className="h-full rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
             <h2 className="mb-6 flex items-center gap-2 text-xl font-semibold text-gray-900">
-              <Calendar className="h-5 w-5 text-supperagent" />
-              RTW Status
+              <Book className="h-5 w-5 text-supperagent" />
+              Passport Status
             </h2>
 
-            <div className="space-y-8">
-              {/* Status Display */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium uppercase tracking-wide text-gray-500">
-                  RTW Next Check Date
+            <div className="space-y-6">
+              {/* Passport Number */}
+              <div className="space-y-1">
+                <Label className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                  Passport Number
                 </Label>
-                <div className="text-2xl font-bold text-gray-900">
-                  {currentCheckDate
-                    ? moment(currentCheckDate).format('DD MMMM YYYY')
-                    : 'Not Set'}
+                <div className="text-lg font-semibold text-gray-900">
+                  {currentPassportNumber || 'Not Set'}
                 </div>
-
-                <div className="pt-1">{getStatusBadge()}</div>
               </div>
 
-              {/* Action Button */}
-              <div className="border-t border-gray-100 pt-4">
+              {/* Expiry Date */}
+              <div className="space-y-1">
+                <Label className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                  Expiry Date
+                </Label>
+                <div className="text-lg font-bold text-gray-900">
+                  {currentExpiryDate
+                    ? moment(currentExpiryDate).format('DD MMMM YYYY')
+                    : 'Not Set'}
+                </div>
+              </div>
+
+              {/* Status Badge */}
+              <div className="pt-1">{getStatusBadge()}</div>
+
+              {/* Action Buttons */}
+              <div className="border-t border-gray-100 pt-6 space-y-3">
                 <Button
                   onClick={openUpdateModal}
                   className="w-full bg-supperagent text-white hover:bg-supperagent/90"
                 >
-                  Update Next Check Date
+                  Update Passport Details
                 </Button>
-                {/* {checkInterval > 0 && (
-                  <p className="mt-3 text-center text-xs text-gray-500">
-                    Alert triggers {checkInterval} days before expiry
+                {complianceStatus === 'expiring-soon' && (
+                  <p className="text-center text-xs text-yellow-600 font-medium">
+                    Passport expires in less than {passportCheckInterval} days.
                   </p>
-                )} */}
+                )}
               </div>
             </div>
           </div>
         </div>
 
-        {/* Right Column: History Log & Documents */}
+        {/* Right Column: History Log */}
         <div className="lg:col-span-2">
-          <div className=" rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+          <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
             <h2 className="mb-6 flex items-center gap-2 text-xl font-semibold text-gray-900">
               <History className="h-5 w-5 text-supperagent" />
               History Log
@@ -343,10 +390,10 @@ function RightToWorkTab() {
               <Table>
                 <TableHeader className="bg-gray-50">
                   <TableRow>
-                    <TableHead className="w-[180px]">Date & Time</TableHead>
-                    <TableHead>Activity</TableHead>
+                    <TableHead className="w-[180px]">Date Updated</TableHead>
+                    <TableHead>Activity Title</TableHead>
                     <TableHead>Updated By</TableHead>
-                    <TableHead className="text-right">Document</TableHead>
+                    <TableHead className='text-right'>Document</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -373,7 +420,7 @@ function RightToWorkTab() {
                             {moment(entry.date).format('DD MMM YYYY')}
                           </TableCell>
                           <TableCell className="font-medium text-gray-900">
-                            {entry.title || 'Update'}
+                            {entry.title || 'Updated'}
                           </TableCell>
                           <TableCell className="text-gray-600">
                             {entry.updatedBy &&
@@ -382,22 +429,19 @@ function RightToWorkTab() {
                                 `${entry.updatedBy.firstName ?? ''} ${entry.updatedBy.lastName ?? ''}`.trim()
                               : 'System'}
                           </TableCell>
-
                           <TableCell className="text-right">
-                            {entry.document ? (
+                             {entry.document ? (
                               <Button
                                 size="sm"
-                                className="h-8 "
-                                onClick={() =>
-                                  window.open(entry.document, '_blank')
-                                }
+                                className="h-8"
+                                onClick={() => window.open(entry.document, '_blank')}
                               >
                                 <Eye className="mr-2 h-4 w-4" />
                                 View
                               </Button>
-                            ) : (
-                              <span className="text-gray-300">-</span>
-                            )}
+                             ) : (
+                               <span className="text-gray-300">-</span>
+                             )}
                           </TableCell>
                         </TableRow>
                       ))
@@ -411,53 +455,88 @@ function RightToWorkTab() {
 
       {/* Update Dialog */}
       <Dialog open={showUpdateModal} onOpenChange={setShowUpdateModal}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle>Update RTW Status Check</DialogTitle>
+            <DialogTitle>Update Passport Details</DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-6 py-4">
+          <div className="space-y-4 py-4">
             {/* Context Alert */}
-            {currentCheckDate && (
+            {currentExpiryDate && (
               <div className="rounded-md bg-blue-50 p-3 text-sm text-blue-700 flex items-start gap-2">
                 <AlertCircle className="h-4 w-4 mt-0.5" />
                 <p>
-                  Current check expires on{' '}
+                  Current passport expires on{' '}
                   <span className="font-semibold">
-                    {moment(currentCheckDate).format('DD MMM YYYY')}
+                    {moment(currentExpiryDate).format('DD MMM YYYY')}
                   </span>
                   .
                 </p>
               </div>
             )}
 
-            {/* Date Input */}
-            <div className="flex flex-col space-y-2">
+            {/* Passport Number */}
+            <div className="space-y-2">
               <Label className="text-sm font-medium text-gray-700">
-                New Next Check Date <span className="text-red-500">*</span>
+                Passport Number <span className="text-red-500">*</span>
               </Label>
-              <DatePicker
-                selected={newCheckDate}
-                onChange={(date) => setNewCheckDate(date)}
-                dateFormat="dd-MM-yyyy"
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholderText="Select date..."
-                showMonthDropdown
-                showYearDropdown
-                // minDate is strictly the previous check date (or today)
-                minDate={
-                  currentCheckDate && moment(currentCheckDate).isValid()
-                    ? new Date(currentCheckDate)
-                    : new Date()
-                }
-                preventOpenOnFocus
+              <Input
+                placeholder="Enter passport number"
+                value={newPassportNumber}
+                onChange={(e) => setNewPassportNumber(e.target.value)}
               />
             </div>
 
+            <div className="grid grid-cols-2 gap-4">
+              {/* Date of Issue */}
+              <div className="flex flex-col space-y-2">
+                <Label className="text-sm font-medium text-gray-700">
+                  Date of Issue <span className="text-red-500">*</span>
+                </Label>
+                <DatePicker
+                  selected={newDateOfIssue}
+                  onChange={handleIssueDateChange}
+                  dateFormat="dd-MM-yyyy"
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholderText="Select issue date..."
+                  showMonthDropdown
+                  showYearDropdown
+                  maxDate={new Date()}
+                />
+              </div>
+
+              {/* Expiry Date */}
+              <div className="flex flex-col space-y-2">
+                <Label className="text-sm font-medium text-gray-700">
+                  Expiry Date <span className="text-red-500">*</span>
+                </Label>
+                <DatePicker
+                  selected={newExpiryDate}
+                  onChange={(date) => setNewExpiryDate(date)}
+                  dateFormat="dd-MM-yyyy"
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholderText="Select expiry date..."
+                  showMonthDropdown
+                  showYearDropdown
+                  // Prevent backdating before the current expiry
+                  minDate={
+                    currentExpiryDate && moment(currentExpiryDate).isValid()
+                    ? new Date(currentExpiryDate)
+                    : new Date()
+                  }
+                />
+                 {passportCheckInterval > 0 && (
+                    <span className="text-[10px] text-gray-400">
+                      Auto-calculated: {passportCheckInterval} day validity
+                    </span>
+                )}
+              </div>
+            </div>
+
             {/* Document Upload */}
-            <div className="space-y-2">
+            <div className="space-y-2 pt-2">
               <Label className="text-sm font-medium text-gray-700">
-                Supporting Document <span className="text-red-500">*</span>
+                Passport Scan <span className="text-red-500">*</span>
               </Label>
 
               <div
@@ -513,7 +592,7 @@ function RightToWorkTab() {
                   <div className="flex flex-col items-center gap-1 text-center">
                     <Upload className="h-6 w-6 text-gray-400" />
                     <span className="text-sm font-medium text-gray-600">
-                      Upload Proof
+                      Upload Copy
                     </span>
                     <span className="text-xs text-gray-400">PDF/Image</span>
                   </div>
@@ -537,7 +616,12 @@ function RightToWorkTab() {
               className="bg-supperagent text-white hover:bg-supperagent/90"
               onClick={handleSubmitUpdate}
               disabled={
-                isSubmitting || isUploading || !uploadedFileUrl || !newCheckDate
+                isSubmitting || 
+                isUploading || 
+                !uploadedFileUrl || 
+                !newExpiryDate ||
+                !newDateOfIssue ||
+                !newPassportNumber
               }
             >
               {isSubmitting ? 'Saving...' : 'Update'}
@@ -549,4 +633,4 @@ function RightToWorkTab() {
   );
 }
 
-export default RightToWorkTab;
+export default PassportTab;

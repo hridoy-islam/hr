@@ -1,6 +1,6 @@
 import type React from 'react';
 import { useEffect, useState, useRef } from 'react';
-import { Calendar, FileText, Upload, X, Eye, History, AlertCircle } from 'lucide-react';
+import { ShieldCheck, FileText, Upload, X, Eye, History } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
@@ -19,6 +19,7 @@ import {
 import moment from 'moment';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import {
   Dialog,
   DialogContent,
@@ -29,23 +30,24 @@ import {
 import { cn } from '@/lib/utils';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 
-interface HistoryEntry {
+interface LogEntry {
   _id: string;
   title: string;
   date: string;
-  document?: string;
-  updatedBy: string | { firstName: string; lastName: string };
+  updatedBy: string | { firstName: string; lastName: string; name?: string };
 }
 
-interface RTWData {
+interface DbsData {
   _id: string;
-  nextCheckDate: string | null;
-  status: 'active' | 'expired' | 'needs-check';
-  employeeId: string;
-  logs?: HistoryEntry[];
+  userId: string;
+  disclosureNumber: string;
+  dbsDocumentUrl: string;
+  dateOfIssue: string;
+  expiryDate: string;
+  logs?: LogEntry[];
 }
 
-function RightToWorkTab() {
+function DbsTab() {
   const { id } = useParams();
   const { user } = useSelector((state: any) => state.auth);
   const { toast } = useToast();
@@ -56,69 +58,80 @@ function RightToWorkTab() {
 
   // Display State
   const [complianceStatus, setComplianceStatus] = useState<
-    'active' | 'expired' | 'expiring-soon' | null
+    'active' | 'expired' | null
   >(null);
-  const [currentCheckDate, setCurrentCheckDate] = useState<string | null>(null);
-  const [checkInterval, setCheckInterval] = useState<number>(0);
+  
+  // Settings State (From ScheduleCheck)
+  const [dbsCheckInterval, setDbsCheckInterval] = useState<number>(0);
 
-  // Data State
-  const [rtwId, setRtwId] = useState<string | null>(null);
-  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  // Current Data State
+  const [dbsId, setDbsId] = useState<string | null>(null);
+  const [currentExpiryDate, setCurrentExpiryDate] = useState<string | null>(null);
+  const [currentDateOfIssue, setCurrentDateOfIssue] = useState<string | null>(null);
+  const [currentDisclosureNum, setCurrentDisclosureNum] = useState<string | null>(null);
+  const [currentDbsDocUrl, setCurrentDbsDocUrl] = useState<string | null>(null);
+  const [history, setHistory] = useState<LogEntry[]>([]);
 
   // Modal & Form State
   const [showUpdateModal, setShowUpdateModal] = useState(false);
-  const [newCheckDate, setNewCheckDate] = useState<Date | null>(null);
+  
+  // Form Inputs
+  const [newDisclosureNumber, setNewDisclosureNumber] = useState<string>('');
+  const [newDateOfIssue, setNewDateOfIssue] = useState<Date | null>(null);
+  const [newExpiryDate, setNewExpiryDate] = useState<Date | null>(null);
+  
+  // File Upload State
   const [uploadedFileUrl, setUploadedFileUrl] = useState<string | null>(null);
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
-
-  // Loading States
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
-  // 1. Fetch Schedule Settings
+  // 1. Fetch Schedule Settings (To get auto-calculation interval)
   const fetchScheduleSettings = async () => {
     if (!user?._id) return;
     try {
+      // Assuming user._id is the companyId or the user belongs to a company
       const res = await axiosInstance.get(
         `/schedule-check?companyId=${user._id}`
       );
       const result = res.data?.data?.result;
       if (result && result.length > 0) {
-        setCheckInterval(result[0].rtwCheckDate || 0);
+        // Store the interval (Assuming value is in Months)
+        setDbsCheckInterval(result[0].dbsCheckDate || 0);
       }
     } catch (err) {
       console.error('Error fetching schedule settings:', err);
     }
   };
 
-  // 2. Fetch RTW Data
-  const fetchRTWData = async () => {
+  // 2. Fetch DBS Data
+  const fetchDbsData = async () => {
     if (!id) return;
     try {
-      const rtwRes = await axiosInstance.get(
-        `/hr/right-to-work?employeeId=${id}`
-      );
-      const rtwList: RTWData[] = rtwRes.data.data.result;
+      const res = await axiosInstance.get(`/dbs?userId=${id}`);
+      const result: DbsData[] = res.data?.data?.result || [];
 
-      if (rtwList.length > 0) {
-        const rtwData = rtwList[0];
-        setRtwId(rtwData._id);
-
-        // Store current check date for display
-        setCurrentCheckDate(rtwData.nextCheckDate);
-
-        // Set history
-        setHistory(rtwData.logs || []);
+      if (result.length > 0) {
+        const data = result[0];
+        setDbsId(data._id);
+        setCurrentExpiryDate(data.expiryDate);
+        setCurrentDateOfIssue(data.dateOfIssue);
+        setCurrentDisclosureNum(data.disclosureNumber);
+        setCurrentDbsDocUrl(data.dbsDocumentUrl);
+        setHistory(data.logs || []);
       } else {
-        setRtwId(null);
-        setCurrentCheckDate(null);
+        setDbsId(null);
+        setCurrentExpiryDate(null);
+        setCurrentDateOfIssue(null);
+        setCurrentDisclosureNum(null);
+        setCurrentDbsDocUrl(null);
         setHistory([]);
       }
     } catch (err) {
-      console.error('Error fetching RTW data:', err);
+      console.error('Error fetching DBS data:', err);
       toast({
-        title: 'Failed to load RTW data.',
+        title: 'Failed to load DBS data.',
         className: 'bg-destructive text-white'
       });
     }
@@ -128,60 +141,37 @@ function RightToWorkTab() {
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
-      await Promise.all([fetchScheduleSettings(), fetchRTWData()]);
+      await Promise.all([fetchDbsData(), fetchScheduleSettings()]);
       setIsLoading(false);
     };
-
     loadData();
   }, [id, user?._id]);
 
-  // 3. Status Calculation (Warning threshold = checkInterval)
+  // 3. Status Calculation
   useEffect(() => {
-    if (currentCheckDate) {
-      const now = moment().startOf('day'); // Normalize to start of day for accurate comparison
-      const checkDate = moment(currentCheckDate).startOf('day');
-      const diffDays = checkDate.diff(now, 'days');
+    if (currentExpiryDate) {
+      const now = moment();
+      const expiry = moment(currentExpiryDate);
 
-      // 1. Check if Expired (Date has passed)
-      if (now.isAfter(checkDate)) {
+      if (now.isAfter(expiry, 'day')) {
         setComplianceStatus('expired');
-      } 
-      // 2. Check if Expiring Soon (Within the checkInterval window)
-      // Example: If interval is 30 days, warning shows if remaining days <= 30
-      else if (checkInterval > 0 && diffDays <= checkInterval) {
-        setComplianceStatus('expiring-soon');
-      } 
-      // 3. Otherwise Active
-      else {
+      } else {
         setComplianceStatus('active');
       }
     } else {
       setComplianceStatus(null);
     }
-  }, [currentCheckDate, checkInterval]);
+  }, [currentExpiryDate]);
 
-  const getStatusBadge = () => {
-    switch (complianceStatus) {
-      case 'active':
-        return (
-          <Badge className="bg-green-100 text-green-800 hover:bg-green-100 px-3 py-1">
-            Active
-          </Badge>
-        );
-      case 'expiring-soon':
-        return (
-          <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100 px-3 py-1">
-            Expiring Soon
-          </Badge>
-        );
-      case 'expired':
-        return (
-          <Badge className="bg-red-100 text-red-800 hover:bg-red-100 px-3 py-1">
-            Expired
-          </Badge>
-        );
-      default:
-        return null;
+  // Auto-calculate Expiry Date based on Issue Date + Interval
+  const handleIssueDateChange = (date: Date | null) => {
+    setNewDateOfIssue(date);
+    
+    // If we have a date and a configured interval > 0
+    if (date && dbsCheckInterval > 0) {
+      // Assuming dbsCheckInterval is in MONTHS
+      const calculatedExpiry = moment(date).add(dbsCheckInterval, 'months').toDate();
+      setNewExpiryDate(calculatedExpiry);
     }
   };
 
@@ -208,7 +198,7 @@ function RightToWorkTab() {
 
     const formData = new FormData();
     formData.append('entityId', user._id);
-    formData.append('file_type', 'document');
+    formData.append('file_type', 'document'); 
     formData.append('file', file);
 
     try {
@@ -231,40 +221,57 @@ function RightToWorkTab() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  // Pre-fill data when opening modal
   const openUpdateModal = () => {
-    setNewCheckDate(null);
+    // 1. Text Fields
+    setNewDisclosureNumber(currentDisclosureNum || '');
+    
+    // 2. Dates
+    setNewDateOfIssue(currentDateOfIssue ? new Date(currentDateOfIssue) : null);
+    setNewExpiryDate(currentExpiryDate ? new Date(currentExpiryDate) : null);
+
+    // 3. Files: Reset
     setUploadedFileUrl(null);
     setSelectedFileName(null);
     setUploadError(null);
+    
     setShowUpdateModal(true);
   };
 
-  // Submit Logic
   const handleSubmitUpdate = async () => {
-    if (!user?._id || !uploadedFileUrl || !newCheckDate) return;
+    if (
+      !user?._id || 
+      !uploadedFileUrl || 
+      !newExpiryDate || 
+      !newDateOfIssue || 
+      !newDisclosureNumber
+    ) return;
 
     setIsSubmitting(true);
 
     const payload: any = {
       updatedBy: user._id,
-      document: uploadedFileUrl,
-      title: selectedFileName || 'Right to Work Check',
-      nextCheckDate: moment(newCheckDate).toISOString()
+      title: 'DBS Details Updated', // Added title for Logs
+      dbsDocumentUrl: uploadedFileUrl,
+      disclosureNumber: newDisclosureNumber,
+      dateOfIssue: moment(newDateOfIssue).toISOString(),
+      expiryDate: moment(newExpiryDate).toISOString(),
+      date: new Date().toISOString()
     };
 
-    if (!rtwId && id) {
-      payload.employeeId = id;
+    if (!dbsId && id) {
+      payload.userId = id;
     }
 
     try {
-      const url = rtwId ? `/hr/right-to-work/${rtwId}` : `/hr/right-to-work`;
-      const method = rtwId ? 'patch' : 'post';
+      const url = dbsId ? `/dbs/${dbsId}` : `/dbs`;
+      const method = dbsId ? 'patch' : 'post';
 
       await axiosInstance[method](url, payload);
 
-      await fetchRTWData();
+      await fetchDbsData();
       toast({
-        title: 'RTW check updated successfully!',
+        title: 'DBS details updated successfully!',
         className: 'bg-supperagent text-white'
       });
       setShowUpdateModal(false);
@@ -288,52 +295,82 @@ function RightToWorkTab() {
   }
 
   return (
-    <div className=" ">
+    <div className="">
       <div className="grid grid-cols-1 gap-2 lg:grid-cols-3">
-        {/* Left Column: Status & Action */}
+        {/* Left Column: Status & Current Details */}
         <div className="lg:col-span-1">
           <div className="h-full rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
             <h2 className="mb-6 flex items-center gap-2 text-xl font-semibold text-gray-900">
-              <Calendar className="h-5 w-5 text-supperagent" />
-              RTW Status
+              <ShieldCheck className="h-5 w-5 text-supperagent" />
+              DBS Status
             </h2>
 
-            <div className="space-y-8">
-              {/* Status Display */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium uppercase tracking-wide text-gray-500">
-                  RTW Next Check Date
+            <div className="space-y-6">
+              {/* Disclosure Number */}
+              <div className="space-y-1">
+                <Label className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                  Disclosure Number
                 </Label>
-                <div className="text-2xl font-bold text-gray-900">
-                  {currentCheckDate
-                    ? moment(currentCheckDate).format('DD MMMM YYYY')
-                    : 'Not Set'}
+                <div className="text-lg font-semibold text-gray-900">
+                  {currentDisclosureNum || 'Not Set'}
                 </div>
-
-                <div className="pt-1">{getStatusBadge()}</div>
               </div>
 
-              {/* Action Button */}
-              <div className="border-t border-gray-100 pt-4">
+              {/* Expiry Date */}
+              <div className="space-y-1">
+                <Label className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                  Expiry Date
+                </Label>
+                <div className="text-lg font-bold text-gray-900">
+                  {currentExpiryDate
+                    ? moment(currentExpiryDate).format('DD MMMM YYYY')
+                    : 'Not Set'}
+                </div>
+              </div>
+
+              {/* Status Badge */}
+              {complianceStatus && (
+                <div>
+                  <Badge
+                    className={cn(
+                      'px-3 py-1 text-sm',
+                      complianceStatus === 'active'
+                        ? 'bg-green-100 text-green-800 hover:bg-green-100'
+                        : 'bg-red-100 text-red-800 hover:bg-red-100'
+                    )}
+                  >
+                    {complianceStatus === 'active' ? 'Active' : 'Expired'}
+                  </Badge>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="border-t border-gray-100 pt-6 space-y-3">
+                {currentDbsDocUrl && (
+                  <Button
+                    variant="outline"
+                    className="w-full "
+                    onClick={() => window.open(currentDbsDocUrl, '_blank')}
+                  >
+                    <Eye className="mr-2 h-4 w-4" />
+                    View Certificate
+                  </Button>
+                )}
+                
                 <Button
                   onClick={openUpdateModal}
                   className="w-full bg-supperagent text-white hover:bg-supperagent/90"
                 >
-                  Update Next Check Date
+                  Update DBS Certificate
                 </Button>
-                {/* {checkInterval > 0 && (
-                  <p className="mt-3 text-center text-xs text-gray-500">
-                    Alert triggers {checkInterval} days before expiry
-                  </p>
-                )} */}
               </div>
             </div>
           </div>
         </div>
 
-        {/* Right Column: History Log & Documents */}
+        {/* Right Column: History Log */}
         <div className="lg:col-span-2">
-          <div className=" rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+          <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
             <h2 className="mb-6 flex items-center gap-2 text-xl font-semibold text-gray-900">
               <History className="h-5 w-5 text-supperagent" />
               History Log
@@ -343,17 +380,16 @@ function RightToWorkTab() {
               <Table>
                 <TableHeader className="bg-gray-50">
                   <TableRow>
-                    <TableHead className="w-[180px]">Date & Time</TableHead>
-                    <TableHead>Activity</TableHead>
-                    <TableHead>Updated By</TableHead>
-                    <TableHead className="text-right">Document</TableHead>
+                    <TableHead className="w-[180px]">Date Updated</TableHead>
+                    <TableHead>Activity Title</TableHead>
+                    <TableHead className='text-right'>Updated By</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {history.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={4}
+                        colSpan={3}
                         className="py-8 text-center italic text-gray-500"
                       >
                         No history records found.
@@ -369,35 +405,18 @@ function RightToWorkTab() {
                       )
                       .map((entry) => (
                         <TableRow key={entry._id} className="hover:bg-gray-50">
-                          <TableCell className="font-medium text-gray-600">
+                          <TableCell className="font-medium ">
                             {moment(entry.date).format('DD MMM YYYY')}
                           </TableCell>
-                          <TableCell className="font-medium text-gray-900">
-                            {entry.title || 'Update'}
+                          <TableCell className="font-medium ">
+                            {entry.title || 'Updated'}
                           </TableCell>
-                          <TableCell className="text-gray-600">
+                          <TableCell className="text-right">
                             {entry.updatedBy &&
                             typeof entry.updatedBy === 'object'
                               ? entry.updatedBy?.name ||
                                 `${entry.updatedBy.firstName ?? ''} ${entry.updatedBy.lastName ?? ''}`.trim()
                               : 'System'}
-                          </TableCell>
-
-                          <TableCell className="text-right">
-                            {entry.document ? (
-                              <Button
-                                size="sm"
-                                className="h-8 "
-                                onClick={() =>
-                                  window.open(entry.document, '_blank')
-                                }
-                              >
-                                <Eye className="mr-2 h-4 w-4" />
-                                View
-                              </Button>
-                            ) : (
-                              <span className="text-gray-300">-</span>
-                            )}
                           </TableCell>
                         </TableRow>
                       ))
@@ -411,53 +430,65 @@ function RightToWorkTab() {
 
       {/* Update Dialog */}
       <Dialog open={showUpdateModal} onOpenChange={setShowUpdateModal}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Update RTW Status Check</DialogTitle>
+            <DialogTitle>Update DBS Details</DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-6 py-4">
-            {/* Context Alert */}
-            {currentCheckDate && (
-              <div className="rounded-md bg-blue-50 p-3 text-sm text-blue-700 flex items-start gap-2">
-                <AlertCircle className="h-4 w-4 mt-0.5" />
-                <p>
-                  Current check expires on{' '}
-                  <span className="font-semibold">
-                    {moment(currentCheckDate).format('DD MMM YYYY')}
-                  </span>
-                  .
-                </p>
-              </div>
-            )}
-
-            {/* Date Input */}
-            <div className="flex flex-col space-y-2">
+          <div className="space-y-4 py-4">
+            {/* Disclosure Number */}
+            <div className="space-y-2">
               <Label className="text-sm font-medium text-gray-700">
-                New Next Check Date <span className="text-red-500">*</span>
+                Disclosure Number <span className="text-red-500">*</span>
               </Label>
-              <DatePicker
-                selected={newCheckDate}
-                onChange={(date) => setNewCheckDate(date)}
-                dateFormat="dd-MM-yyyy"
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholderText="Select date..."
-                showMonthDropdown
-                showYearDropdown
-                // minDate is strictly the previous check date (or today)
-                minDate={
-                  currentCheckDate && moment(currentCheckDate).isValid()
-                    ? new Date(currentCheckDate)
-                    : new Date()
-                }
-                preventOpenOnFocus
+              <Input
+                placeholder="Enter certificate number"
+                value={newDisclosureNumber}
+                onChange={(e) => setNewDisclosureNumber(e.target.value)}
               />
             </div>
 
+            <div className="grid grid-cols-2 gap-4">
+              {/* Date of Issue */}
+              <div className="flex flex-col space-y-2">
+                <Label className="text-sm font-medium text-gray-700">
+                  Date of Issue <span className="text-red-500">*</span>
+                </Label>
+                <DatePicker
+                  selected={newDateOfIssue}
+                  onChange={handleIssueDateChange}
+                  dateFormat="dd-MM-yyyy"
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholderText="Select date..."
+                  showMonthDropdown
+                  showYearDropdown
+                  maxDate={new Date()} // Cannot be in future
+                />
+              </div>
+
+              {/* Expiry Date */}
+              <div className="flex flex-col space-y-2">
+                <Label className="text-sm font-medium text-gray-700">
+                  Expiry Date <span className="text-red-500">*</span>
+                </Label>
+                <DatePicker
+                  selected={newExpiryDate}
+                  onChange={(date) => setNewExpiryDate(date)}
+                  dateFormat="dd-MM-yyyy"
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholderText="Select date..."
+                  showMonthDropdown
+                  showYearDropdown
+                  minDate={new Date()}
+                />
+               
+              </div>
+            </div>
+
             {/* Document Upload */}
-            <div className="space-y-2">
+            <div className="space-y-2 pt-2">
               <Label className="text-sm font-medium text-gray-700">
-                Supporting Document <span className="text-red-500">*</span>
+                DBS Certificate Scan <span className="text-red-500">*</span>
               </Label>
 
               <div
@@ -513,7 +544,7 @@ function RightToWorkTab() {
                   <div className="flex flex-col items-center gap-1 text-center">
                     <Upload className="h-6 w-6 text-gray-400" />
                     <span className="text-sm font-medium text-gray-600">
-                      Upload Proof
+                      Upload Certificate
                     </span>
                     <span className="text-xs text-gray-400">PDF/Image</span>
                   </div>
@@ -537,7 +568,12 @@ function RightToWorkTab() {
               className="bg-supperagent text-white hover:bg-supperagent/90"
               onClick={handleSubmitUpdate}
               disabled={
-                isSubmitting || isUploading || !uploadedFileUrl || !newCheckDate
+                isSubmitting || 
+                isUploading || 
+                !uploadedFileUrl || 
+                !newExpiryDate ||
+                !newDateOfIssue ||
+                !newDisclosureNumber
               }
             >
               {isSubmitting ? 'Saving...' : 'Update'}
@@ -549,4 +585,4 @@ function RightToWorkTab() {
   );
 }
 
-export default RightToWorkTab;
+export default DbsTab;

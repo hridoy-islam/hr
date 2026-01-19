@@ -37,7 +37,11 @@ import {
   DollarSign,
   History,
   Briefcase,
-  GraduationCap
+  GraduationCap,
+  BadgeCheck,
+  FileCheck,
+  Book,
+  BookUser
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
@@ -265,7 +269,48 @@ const navItems = [
     href: 'employee', // Using existing employee list route or new one 'employees'
     roles: ['company']
   },
-
+  {
+    icon: ShieldCheck,
+    label: 'Right to Work',
+    href: '#',
+    roles: ['company']
+  },
+  {
+    icon: ShieldCheck,
+    label: 'DBS',
+    href: '#',
+    roles: ['company']
+  },
+  {
+    icon: BarChart3,
+    label: 'Appraisal',
+    href: '#',
+    roles: ['company']
+  },
+  {
+    icon: BookUser,
+    label: 'Passport',
+    href: '#',
+    roles: ['company']
+  },
+  {
+    icon: BadgeCheck,
+    label: 'Visa Status',
+    href: '#',
+    roles: ['company']
+  },
+  {
+    icon: FileCheck,
+    label: 'Immigration Status',
+    href: '#',
+    roles: ['company']
+  },
+  {
+    icon: GraduationCap,
+    label: 'Training Status',
+    href: '#',
+    roles: ['company']
+  },
   {
     icon: Calendar,
     label: 'Leave Management',
@@ -275,12 +320,6 @@ const navItems = [
   {
     icon: FileSpreadsheet,
     label: 'Documents',
-    href: '#',
-    roles: ['company']
-  },
-  {
-    icon: ShieldCheck,
-    label: 'Right to Work',
     href: '#',
     roles: ['company']
   },
@@ -310,7 +349,37 @@ const navItems = [
     href: 'notice',
     roles: ['company']
   },
-
+  {
+    icon: FileCheck2,
+    label: 'Attendance',
+    roles: ['company'],
+    subItems: [
+      {
+        icon: FileCheck2,
+        label: 'Attendance List',
+        href: 'attendance',
+        roles: ['company']
+      },
+      {
+        icon: CircleCheckBig,
+        label: 'Attendance Approve',
+        href: 'attendance-approve',
+        roles: ['company']
+      },
+      {
+        icon: BetweenVerticalStart,
+        label: 'Attendance Entry',
+        href: 'attendance/attendance-entry',
+        roles: ['company']
+      },
+      {
+        icon: Calendar,
+        label: 'Attendance Report',
+        href: 'attendance-report',
+        roles: ['company']
+      }
+    ]
+  },
   {
     icon: Settings,
     label: 'Settings',
@@ -336,7 +405,7 @@ const navItems = [
       },
       {
         icon: Clock4,
-        label: 'Shifts / Rota',
+        label: 'Shifts',
         href: 'shift',
         roles: ['company']
       },
@@ -374,13 +443,6 @@ const navItems = [
       {
         icon: MapPin,
         label: 'Branches / Locations',
-        href: '#',
-        roles: ['company']
-      },
-
-      {
-        icon: BarChart3,
-        label: 'Appraisal',
         href: '#',
         roles: ['company']
       }

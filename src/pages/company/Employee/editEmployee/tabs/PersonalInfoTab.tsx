@@ -36,15 +36,15 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const [uploadedDocUrl, setUploadedDocUrl] = useState<string | null>(formData?.profilePictureUrl || null);
+  const [uploadedDocUrl, setUploadedDocUrl] = useState<string | null>(formData?.image || null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Sync uploaded URL with local state if formData updates from parent
   useEffect(() => {
-    if (formData?.profilePictureUrl) {
-      setUploadedDocUrl(formData.profilePictureUrl);
+    if (formData?.image) {
+      setUploadedDocUrl(formData.image);
     }
-  }, [formData?.profilePictureUrl]);
+  }, [formData?.image]);
 
   // --- Options ---
   const titleOptions = [
@@ -115,7 +115,7 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
       setUploadedDocUrl(url);
       
       // Update parent component with new image URL
-      onUpdate('profilePictureUrl', url);
+      onUpdate('image', url);
       
       setIsDialogOpen(false); 
       

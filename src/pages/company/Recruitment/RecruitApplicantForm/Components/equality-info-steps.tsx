@@ -223,7 +223,7 @@ export function EqualityInfomation({
 
             {/* Beneficiary Information */}
             <h1 className="font-semibold text-xl">
-             Next To kin
+             Next Of kin
             </h1>
             <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
               <FormField
