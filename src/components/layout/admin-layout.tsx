@@ -10,9 +10,9 @@ export default function AdminLayout({
   })  {
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* <AutoLogout inactivityLimit={30 * 60 * 1000} /> */}
-      {/* <TopNav /> */}
-      {/* <SideNav /> */}
+    <aside className="lg:w-64  bg-gray-100 border-r">
+        <SideNav />
+      </aside>
 
       <main>
       {children}

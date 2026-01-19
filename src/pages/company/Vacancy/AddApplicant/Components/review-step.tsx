@@ -1,0 +1,174 @@
+import React from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardFooter } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableRow 
+} from "@/components/ui/table";
+import moment from 'moment';
+import { CheckCircle2, User, Phone, FileText, Briefcase, Accessibility, MoveLeft } from 'lucide-react';
+
+interface ReviewStepProps {
+  formData: any;
+  onSubmit: () => void;
+  onBack: () => void;
+}
+
+// Helper for section headers within the table
+const TableSectionHeader = ({ icon: Icon, title }: { icon: any, title: string }) => (
+  <TableRow className="bg-gray-100  hover:bg-gray-100">
+    <TableCell colSpan={2} className="py-3 pl-4">
+      <div className="flex items-center gap-2 font-semibold text-gray-900">
+        <Icon className="h-4 w-4 text-gray-500" />
+        {title}
+      </div>
+    </TableCell>
+  </TableRow>
+);
+
+// Helper for data rows
+const DataRow = ({ label, value, className = "" }: { label: string, value: React.ReactNode, className?: string }) => (
+  <TableRow className={`hover:bg-transparent ${className}`}>
+    <TableCell className="w-[30%] min-w-[150px] align-top bg-gray-50/40 py-3 font-medium text-gray-500 border-r">
+      {label}
+    </TableCell>
+    <TableCell className="py-3 font-medium text-gray-900 align-top">
+      {value || <span className="text-gray-300 italic">Not provided</span>}
+    </TableCell>
+  </TableRow>
+);
+
+const ReviewStep: React.FC<ReviewStepProps> = ({ formData, onSubmit, onBack }) => {
+  const {
+    personalDetails = {},
+    contact = {},
+    demography = {}
+  } = formData || {};
+
+  console.log(formData)
+
+  return (
+    <div className="mx-auto w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <Card className="overflow-hidden border-gray-200 shadow-none rounded-none">
+        
+        {/* --- Header Section (Image & Name) --- */}
+        <CardHeader className="flex flex-col items-center border-b bg-white py-8 text-center">
+          <div className="relative mb-4 h-28 w-28 overflow-hidden rounded-full border-4 border-gray-100 shadow-sm">
+            <img
+              src={personalDetails?.image || '/user.png'}
+              alt="Profile"
+              className="h-full w-full object-cover"
+            />
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900">
+            {personalDetails.firstName} {personalDetails.lastName}
+          </h1>
+          
+        </CardHeader>
+
+        <CardContent className="p-0">
+          <div className="">
+            <Table>
+              <TableBody>
+                
+                {/* --- 1. Personal Identity --- */}
+                <TableSectionHeader icon={User} title="Personal Details" />
+                <DataRow label="Title" value={personalDetails.title} />
+                <DataRow label="First Name" value={personalDetails.firstName} />
+                <DataRow label="Last Name" value={personalDetails.lastName} />
+                <DataRow label="Date of Birth" value={personalDetails.dateOfBirth ? moment(personalDetails.dateOfBirth).format('DD MMMM YYYY') : null} />
+                <DataRow label="Gender" value={demography.gender} />
+                <DataRow label="Marital Status" value={demography.maritalStatus} />
+                <DataRow label="Ethnic Origin" value={demography.ethnicOrigin} />
+
+                {/* --- 2. Contact Information --- */}
+                <TableSectionHeader icon={Phone} title="Contact Information" />
+                <DataRow label="Email Address" value={contact.email} />
+                <DataRow label="Mobile Phone" value={contact.mobilePhone} />
+                <DataRow label="Home Phone" value={contact.homePhone} />
+                <DataRow label="Other Phone" value={contact.otherPhone} />
+                <DataRow label="Street Address" value={contact.address} />
+                <DataRow label="City / Town" value={contact.cityOrTown} />
+                <DataRow label="State / Province" value={contact.stateOrProvince} />
+                <DataRow label="Post Code" value={contact.postCode} />
+                <DataRow label="Country" value={contact.country} />
+
+                {/* --- 3. Official Documents --- */}
+                <TableSectionHeader icon={FileText} title="Official Documents" />
+                <DataRow label="NI Number" value={personalDetails.nationalInsuranceNumber} />
+                <DataRow label="NHS Number" value={personalDetails.nhsNumber} />
+                <DataRow label="Passport Number" value={personalDetails.passportNo} />
+                <DataRow 
+                  label="Passport Expiry" 
+                  value={personalDetails.passportExpiry ? (
+                    moment(personalDetails.passportExpiry).format('DD MMM YYYY')
+                  ) : null} 
+                />
+
+                {/* --- 4. Application Details --- */}
+                <TableSectionHeader icon={Briefcase} title="Application Context" />
+                <DataRow label="Position Applied" value={personalDetails.position} />
+                <DataRow label="Employment Type" value={personalDetails.employmentType} />
+                <DataRow label="Application Source" value={personalDetails.source} />
+                <DataRow label="Branch" value={personalDetails.branch} />
+                <DataRow label="Application Date" value={personalDetails.applicationDate ? moment(personalDetails.applicationDate).format('DD MMM YYYY') : null} />
+                <DataRow label="Available From" value={personalDetails.availableFromDate ? moment(personalDetails.availableFromDate).format('DD MMM YYYY') : null} />
+
+                {/* --- 5. Health & Disability --- */}
+                <TableSectionHeader icon={Accessibility} title="Health & Adjustments" />
+                <DataRow 
+                  label="Has Disability?" 
+                  value={
+                    demography.hasDisability ? (
+                      <span className="inline-flex items-center gap-2 font-semibold">
+                        Yes
+                        <span className="text-gray-400 font-normal text-xs">|</span>
+                        <span className="text-gray-700 font-normal">{demography.disabilityDetails}</span>
+                      </span>
+                    ) : (
+                      "No"
+                    )
+                  } 
+                />
+                <DataRow 
+                  label="Requires Adjustments?" 
+                  value={
+                    demography.needsReasonableAdjustment ? (
+                      <span className="inline-flex items-center gap-2 font-semibold">
+                        Yes
+                        <span className="text-gray-400 font-normal text-xs">|</span>
+                        <span className="text-gray-700 font-normal">{demography.reasonableAdjustmentDetails}</span>
+                      </span>
+                    ) : (
+                      "No"
+                    )
+                  } 
+                />
+
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+
+        <CardFooter className="flex flex-col-reverse justify-between gap-4 border-t p-0 pt-4 sm:flex-row">
+          <Button
+            onClick={onBack}
+            variant={'outline'}
+          >
+            Back
+          </Button>
+          <Button
+            onClick={onSubmit}
+          >
+            Confirm Applicant
+          </Button>
+        </CardFooter>
+      </Card>
+    </div>
+  );
+};
+
+export default ReviewStep;
