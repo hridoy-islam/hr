@@ -23,7 +23,7 @@ import EmployeeDocumentTab from './tabs/DocumentTab';
 import VisaTab from './tabs/VisaTab';
 import DbsTab from './tabs/DbsTab';
 import PassportTab from './tabs/passportTab';
-import ImmigrationTab from './tabs/immigrationTab';
+import ImmigrationTab from './tabs/ImmigrationTab';
 const EditEmployee = () => {
   const navigate = useNavigate();
   const {
