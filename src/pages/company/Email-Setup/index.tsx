@@ -17,6 +17,7 @@ import { BlinkingDots } from '@/components/shared/blinking-dots';
 import { Input } from '@/components/ui/input';
 import { DynamicPagination } from '@/components/shared/DynamicPagination';
 import { EmailConfigDialog } from './Components/emailConfigDialog';
+import { useSelector } from 'react-redux';
 
 export default function EmailSetup() {
   const [emailConfigs, setEmailConfigs] = useState<any>([]);
@@ -28,6 +29,7 @@ export default function EmailSetup() {
   const [totalPages, setTotalPages] = useState(1);
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [searchTerm, setSearchTerm] = useState('');
+const user = useSelector((state: any) => state.auth.user);
 
   const fetchData = async (page, entriesPerPage, searchTerm = '') => {
     try {
@@ -36,6 +38,7 @@ export default function EmailSetup() {
         params: {
           page,
           limit: entriesPerPage,
+           companyId:user?._id,
           ...(searchTerm ? { searchTerm } : {})
         }
       });
@@ -60,7 +63,10 @@ export default function EmailSetup() {
         );
       } else {
         // Create new email configuration
-        response = await axiosInstance.post(`/hr/email-setup`, data);
+        response = await axiosInstance.post(`/hr/email-setup`,  {
+        ...data,
+        companyId: user?._id
+      });
       }
 
       // Check if the API response indicates success

@@ -19,6 +19,7 @@ import { Input } from '@/components/ui/input';
 import moment from 'moment';
 import { DynamicPagination } from '@/components/shared/DynamicPagination';
 import { useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 
 export default function CompanyTrainingPage() {
   const [training, setTraining] = useState<any>([]);
@@ -30,6 +31,7 @@ export default function CompanyTrainingPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [searchTerm, setSearchTerm] = useState('');
+const user = useSelector((state: any) => state.auth.user);
 
   const fetchData = async (page, entriesPerPage, searchTerm = '') => {
     try {
@@ -38,6 +40,7 @@ export default function CompanyTrainingPage() {
         params: {
           page,
           limit: entriesPerPage,
+           companyId:user?._id,
           ...(searchTerm ? { searchTerm } : {})
         }
       });

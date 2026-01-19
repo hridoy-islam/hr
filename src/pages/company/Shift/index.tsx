@@ -27,6 +27,7 @@ import { Input } from '@/components/ui/input';
 import moment from 'moment';
 import { DynamicPagination } from '@/components/shared/DynamicPagination';
 import { useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 
 export default function Shift() {
   const [shifts, setShifts] = useState<any>([]);
@@ -38,6 +39,7 @@ export default function Shift() {
   const [searchTerm, setSearchTerm] = useState('');
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
   const [shiftToDelete, setShiftToDelete] = useState<string | null>(null);
+const user = useSelector((state: any) => state.auth.user);
 
   const fetchData = async (
     page: number,
@@ -50,6 +52,7 @@ export default function Shift() {
         params: {
           page,
           limit: entriesPerPage,
+           companyId:user?._id,
           ...(searchTerm ? { searchTerm } : {})
         }
       });

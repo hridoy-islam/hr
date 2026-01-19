@@ -1,4 +1,3 @@
-
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -26,7 +25,7 @@ import { cn } from '@/lib/utils';
 import axiosInstance from '@/lib/axios';
 import { useNavigate } from 'react-router-dom';
 import { MoveLeft } from 'lucide-react';
-
+import { useSelector } from 'react-redux';
 
 const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
@@ -49,6 +48,7 @@ export default function TimeOnlyPickerForm() {
   });
 
   const navigate = useNavigate();
+  const user = useSelector((state: any) => state.auth.user);
 
   const [openDialog, setOpenDialog] = useState<'start' | 'end' | null>(null);
   const [tempTime, setTempTime] = useState({ hour: 9, minute: 0 });
@@ -82,12 +82,13 @@ export default function TimeOnlyPickerForm() {
       const payload = {
         name: data.name,
         startTime: data.startTime,
-        endTime: data.endTime
+        endTime: data.endTime,
+        companyId: user?._id
       };
 
       const response = await axiosInstance.post('/hr/shift', payload);
       if (response) {
-        navigate('/admin/hr/shift');
+        navigate(-1);
       }
     } catch (error) {
       console.error('Error creating shift:', error);
@@ -188,100 +189,102 @@ export default function TimeOnlyPickerForm() {
 
       {/* Time Selection Dialog */}
       <Dialog
-  open={!!openDialog}
-  onOpenChange={(open) => !open && setOpenDialog(null)}
->
-  <DialogContent className="sm:max-w-[425px]">
-    <DialogHeader>
-      <DialogTitle>
-        Select {openDialog === 'start' ? 'Start' : 'End'} Time
-      </DialogTitle>
-    </DialogHeader>
+        open={!!openDialog}
+        onOpenChange={(open) => !open && setOpenDialog(null)}
+      >
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>
+              Select {openDialog === 'start' ? 'Start' : 'End'} Time
+            </DialogTitle>
+          </DialogHeader>
 
-    <div className="grid gap-4 py-4">
-      {/* Current time display */}
-      <div className="flex items-center justify-center gap-2">
-        <span className="text-2xl font-bold">
-          {String(tempTime.hour).padStart(2, '0')}:
-          {String(tempTime.minute).padStart(2, '0')}
-        </span>
-      </div>
+          <div className="grid gap-4 py-4">
+            {/* Current time display */}
+            <div className="flex items-center justify-center gap-2">
+              <span className="text-2xl font-bold">
+                {String(tempTime.hour).padStart(2, '0')}:
+                {String(tempTime.minute).padStart(2, '0')}
+              </span>
+            </div>
 
-      {/* Manual Input */}
-      <div className="flex gap-4 justify-center">
-        <div className="flex flex-col items-center">
-          <label className="text-sm font-medium">Hour</label>
-          <Input
-            type="number"
-            min="0"
-            max="23"
-            value={tempTime.hour}
-            onChange={(e) =>
-              selectTime(
-                Math.min(23, Math.max(0, parseInt(e.target.value || '0'))),
-                tempTime.minute
-              )
-            }
-            className="w-32 text-center border rounded-md py-1"
-          />
-        </div>
-        <div className="flex flex-col items-center">
-          <label className="text-sm font-medium">Minute</label>
-          <Input
-            type="number"
-            min="0"
-            max="59"
-            step="5"
-            value={tempTime.minute}
-            onChange={(e) =>
-              selectTime(
-                tempTime.hour,
-                Math.min(59, Math.max(0, parseInt(e.target.value || '0')))
-              )
-            }
-            className="w-32 text-center border rounded-md py-1"
-          />
-        </div>
-      </div>
+            {/* Manual Input */}
+            <div className="flex justify-center gap-4">
+              <div className="flex flex-col items-center">
+                <label className="text-sm font-medium">Hour</label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="23"
+                  value={tempTime.hour}
+                  onChange={(e) =>
+                    selectTime(
+                      Math.min(
+                        23,
+                        Math.max(0, parseInt(e.target.value || '0'))
+                      ),
+                      tempTime.minute
+                    )
+                  }
+                  className="w-32 rounded-md border py-1 text-center"
+                />
+              </div>
+              <div className="flex flex-col items-center">
+                <label className="text-sm font-medium">Minute</label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="59"
+                  step="5"
+                  value={tempTime.minute}
+                  onChange={(e) =>
+                    selectTime(
+                      tempTime.hour,
+                      Math.min(59, Math.max(0, parseInt(e.target.value || '0')))
+                    )
+                  }
+                  className="w-32 rounded-md border py-1 text-center"
+                />
+              </div>
+            </div>
 
-      {/* Scroll List */}
-      <div className="flex gap-4">
-        <TimeScrollList
-          title="Hours"
-          items={Array.from({ length: 24 }, (_, i) => ({
-            value: i,
-            label: i.toString().padStart(2, '0')
-          }))}
-          selectedValue={tempTime.hour}
-          onSelect={(value) => selectTime(value, tempTime.minute)}
-        />
-        <TimeScrollList
-          title="Minutes"
-          items={Array.from({ length: 12 }, (_, i) => i * 5).map((m) => ({
-            value: m,
-            label: m.toString().padStart(2, '0')
-          }))}
-          selectedValue={tempTime.minute}
-          onSelect={(value) => selectTime(tempTime.hour, value)}
-        />
-      </div>
+            {/* Scroll List */}
+            <div className="flex gap-4">
+              <TimeScrollList
+                title="Hours"
+                items={Array.from({ length: 24 }, (_, i) => ({
+                  value: i,
+                  label: i.toString().padStart(2, '0')
+                }))}
+                selectedValue={tempTime.hour}
+                onSelect={(value) => selectTime(value, tempTime.minute)}
+              />
+              <TimeScrollList
+                title="Minutes"
+                items={Array.from({ length: 12 }, (_, i) => i * 5).map((m) => ({
+                  value: m,
+                  label: m.toString().padStart(2, '0')
+                }))}
+                selectedValue={tempTime.minute}
+                onSelect={(value) => selectTime(tempTime.hour, value)}
+              />
+            </div>
 
-      {/* Action Buttons */}
-      <div className="flex justify-end gap-2 pt-4">
-        <Button variant="outline" onClick={() => setOpenDialog(null)}>
-          Cancel
-        </Button>
-        <Button
-          onClick={confirmTime}
-          className="bg-supperagent text-white hover:bg-supperagent/90"
-        >
-          Confirm
-        </Button>
-      </div>
-    </div>
-  </DialogContent>
-</Dialog>
-
+            {/* Action Buttons */}
+            <div className="flex justify-end gap-2 pt-4">
+              <Button variant="outline" onClick={() => setOpenDialog(null)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={confirmTime}
+                className="bg-supperagent text-white hover:bg-supperagent/90"
+              >
+                Confirm
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

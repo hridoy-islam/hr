@@ -16,6 +16,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 import { DynamicPagination } from '@/components/shared/DynamicPagination';
 import { useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 
 type Permission = {
   canView?: boolean;
@@ -39,6 +40,7 @@ export default function Designation() {
   const [totalPages, setTotalPages] = useState(1);
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [searchTerm, setSearchTerm] = useState('');
+const user = useSelector((state: any) => state.auth.user);
 
   const fetchData = async (page: number, limit: number, search = '') => {
     try {
@@ -47,6 +49,7 @@ export default function Designation() {
         params: {
           page,
           limit,
+           companyId:user?._id,
           ...(search ? { searchTerm: search } : {})
         }
       });
