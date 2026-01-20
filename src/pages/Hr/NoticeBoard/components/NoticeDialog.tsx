@@ -310,7 +310,7 @@ export function NoticeDialog({
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
-              <Button type="submit" className="bg-supperagent text-white hover:bg-supperagent/90">
+              <Button type="submit" className="bg-theme text-white hover:bg-theme/90">
                 {initialData ? 'Update' : 'Submit'}
               </Button>
             </div>

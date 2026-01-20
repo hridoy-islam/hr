@@ -11,7 +11,7 @@ export function Stepper({ currentStep, steps }: StepperProps) {
     <div className="relative">
       <div className="absolute top-5 left-0 right-0 h-1 bg-gray-200">
         <motion.div
-          className="absolute top-0 left-0 h-full bg-supperagent"
+          className="absolute top-0 left-0 h-full bg-theme"
           initial={{ width: '0%' }}
           animate={{ width: `${(currentStep / (steps.length - 1)) * 100}%` }}
           transition={{ duration: 0.5 }}
@@ -23,7 +23,7 @@ export function Stepper({ currentStep, steps }: StepperProps) {
             <motion.div
               className={`z-10 flex h-10 w-10 items-center justify-center rounded-full border-2 ${
                 index <= currentStep
-                  ? 'border-supperagent bg-supperagent text-white'
+                  ? 'border-theme bg-theme text-white'
                   : 'border-gray-300 bg-white text-gray-300'
               }`}
               initial={{ scale: 1 }}
@@ -39,7 +39,7 @@ export function Stepper({ currentStep, steps }: StepperProps) {
             <div className="mt-2 text-center">
               <motion.div
                 className={`text-sm font-medium ${
-                  index <= currentStep ? 'text-supperagent' : 'text-gray-500'
+                  index <= currentStep ? 'text-theme' : 'text-gray-500'
                 }`}
                 initial={{ y: 10, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}

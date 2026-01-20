@@ -18,7 +18,7 @@ const TableContainer = ({ title, icon: Icon, children, className = "" }) => (
   <div className={`overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm h-fit ${className}`}>
     {/* Table Header - Compacted */}
     <div className="flex items-center gap-2 border-b border-gray-200 bg-gray-50/80 px-3 py-2">
-      {Icon && <Icon className="h-4 w-4 text-supperagent" />}
+      {Icon && <Icon className="h-4 w-4 text-theme" />}
       <h3 className="text-xs font-bold uppercase tracking-wider text-gray-700">
         {title}
       </h3>
@@ -176,7 +176,7 @@ const ReviewStep = ({ formData, onSubmit, onBack, applicantData }) => {
           type="button"
           size={'sm'}
           onClick={onSubmit}
-          className="w-full bg-supperagent hover:bg-supperagent/90 sm:w-auto sm:px-6 h-9 text-xs"
+          className="w-full bg-theme hover:bg-theme/90 sm:w-auto sm:px-6 h-9 text-xs"
         >
           <CheckCircle2 className="mr-2 h-3.5 w-3.5" />
           Confirm Recruitment

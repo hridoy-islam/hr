@@ -35,7 +35,7 @@ export const PayslipModal: React.FC<PayslipModalProps> = ({
             <Button
               size="sm"
               onClick={() => onDownload(record)}
-              className="bg-supperagent hover:bg-supperagent/90 text-white"
+              className="bg-theme hover:bg-theme/90 text-white"
             >
               <Download className="h-4 w-4 mr-1" />
               Download PDF

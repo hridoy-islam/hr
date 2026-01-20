@@ -211,7 +211,7 @@ export default function CreateTraining() {
               <div className="flex w-full items-center justify-end gap-4">
                 <Button
                   type="submit"
-                  className="border-none bg-supperagent text-white hover:bg-supperagent/90"
+                  className="border-none bg-theme text-white hover:bg-theme/90"
                 >
                   Submit
                 </Button>

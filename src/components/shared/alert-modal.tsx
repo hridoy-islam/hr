@@ -31,7 +31,7 @@ export const AlertModal = ({
         <Button disabled={loading} variant="outline" onClick={onClose}>
           Cancel
         </Button>
-        <Button disabled={loading}  className='bg-supperagent text-white hover:bg-supperagent' onClick={onConfirm}>
+        <Button disabled={loading}  className='bg-theme text-white hover:bg-theme' onClick={onConfirm}>
           Continue
         </Button>
       </div>

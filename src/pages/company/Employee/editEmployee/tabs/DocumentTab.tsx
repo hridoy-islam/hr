@@ -238,7 +238,7 @@ export default function EmployeeDocumentTab() {
           <DialogTrigger asChild>
             <Button
               onClick={handleOpenCreate}
-              className="bg-supperagent text-white shadow-sm hover:bg-supperagent/90"
+              className="bg-theme text-white shadow-sm hover:bg-theme/90"
             >
               <Plus className="mr-2 h-4 w-4" /> Upload Document
             </Button>
@@ -362,7 +362,7 @@ export default function EmployeeDocumentTab() {
                 </Button>
                 <Button
                   type="submit"
-                  className="bg-supperagent hover:bg-supperagent/90"
+                  className="bg-theme hover:bg-theme/90"
                   disabled={isSubmitting || !uploadedDocUrl || !documentTitle}
                 >
                   {isSubmitting ? (
@@ -409,7 +409,7 @@ export default function EmployeeDocumentTab() {
                   >
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
-                        <FileText className="h-4 w-4 text-supperagent" />
+                        <FileText className="h-4 w-4 text-theme" />
                         {doc.documentTitle}
                       </div>
                     </TableCell>
@@ -461,7 +461,7 @@ export default function EmployeeDocumentTab() {
             {/* 1. Hero / Header Section */}
             <div className="flex flex-col items-center justify-center border-b bg-slate-50/80 p-10">
               <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-2xl border bg-white shadow-sm">
-                <FileText className="h-10 w-10 text-supperagent" />
+                <FileText className="h-10 w-10 text-theme" />
               </div>
               <DialogHeader className="mb-2">
                 <DialogTitle className="text-center text-3xl font-bold tracking-tight text-slate-900">
@@ -504,7 +504,7 @@ export default function EmployeeDocumentTab() {
                 <Button
                   size="lg"
                   onClick={() => window.open(viewingDoc.documentUrl, '_blank')}
-                  className="h-12 w-full bg-supperagent text-base text-white hover:bg-supperagent/90"
+                  className="h-12 w-full bg-theme text-base text-white hover:bg-theme/90"
                 >
                   <ExternalLink className="mr-2 h-5 w-5" />
                   View File

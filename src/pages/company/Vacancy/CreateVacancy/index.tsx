@@ -87,7 +87,7 @@ export default function CreateVacancy() {
           <h1 className="text-2xl font-bold text-gray-800">Add New Vacancy</h1>
           <Button
             onClick={handleBack}
-            className="bg-supperagent text-white hover:bg-supperagent/90"
+            className="bg-theme text-white hover:bg-theme/90"
           >
             <MoveLeft className="mr-2 h-4 w-4" />
             Back
@@ -309,7 +309,7 @@ export default function CreateVacancy() {
           <div className=" flex justify-end ">
             <Button
               type="submit"
-              className="rounded-md bg-supperagent px-6 py-2 font-semibold text-white transition-colors hover:bg-supperagent/90"
+              className="rounded-md bg-theme px-6 py-2 font-semibold text-white transition-colors hover:bg-theme/90"
             >
               Submit
             </Button>

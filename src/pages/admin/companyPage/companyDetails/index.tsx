@@ -204,7 +204,7 @@ export function CompanyDetailsPage() {
       toast({
         title: 'Success',
         description: 'Company details updated successfully',
-        className: 'bg-supperagent text-white'
+        className: 'bg-theme text-white'
       });
 
       fetchData();
@@ -224,7 +224,7 @@ export function CompanyDetailsPage() {
     toast({
       title: 'Success',
       description: 'Profile image updated successfully',
-      className: 'bg-supperagent text-white'
+      className: 'bg-theme text-white'
     });
   };
 
@@ -246,7 +246,7 @@ export function CompanyDetailsPage() {
       toast({
         title: 'Success',
         description: 'Subscription updated successfully',
-        className: 'bg-supperagent text-white'
+        className: 'bg-theme text-white'
       });
       fetchData();
     } catch (error: any) {
@@ -264,7 +264,7 @@ export function CompanyDetailsPage() {
   if (loading) {
     return (
       <div className="flex h-[50vh] w-full items-center justify-center">
-        <BlinkingDots size="large" color="bg-supperagent" />
+        <BlinkingDots size="large" color="bg-theme" />
       </div>
     );
   }
@@ -333,13 +333,13 @@ export function CompanyDetailsPage() {
             <TabsList className="mb-4 h-12 w-full justify-start rounded-lg border border-gray-200 bg-white p-1">
               <TabsTrigger
                 value="general"
-                className="px-6 data-[state=active]:bg-supperagent data-[state=active]:text-white"
+                className="px-6 data-[state=active]:bg-theme data-[state=active]:text-white"
               >
                 General Information
               </TabsTrigger>
               <TabsTrigger
                 value="subscription"
-                className="px-6 data-[state=active]:bg-supperagent data-[state=active]:text-white"
+                className="px-6 data-[state=active]:bg-theme data-[state=active]:text-white"
               >
                 Subscription
               </TabsTrigger>
@@ -353,7 +353,7 @@ export function CompanyDetailsPage() {
                     {/* Basic Info */}
                     <div className="space-y-3">
                       <div className="flex items-center gap-2 pb-2">
-                        <div className="h-5 w-1 rounded-full bg-supperagent"></div>
+                        <div className="h-5 w-1 rounded-full bg-theme"></div>
                         <h3 className="font-semibold text-gray-900">
                           Basic Information
                         </h3>
@@ -430,7 +430,7 @@ export function CompanyDetailsPage() {
                     {/* Address */}
                     <div className="space-y-4">
                       <div className="flex items-center gap-2 pb-2">
-                        <div className="h-5 w-1 rounded-full bg-supperagent"></div>
+                        <div className="h-5 w-1 rounded-full bg-theme"></div>
                         <h3 className="font-semibold text-gray-900">
                           Location Details
                         </h3>
@@ -523,7 +523,7 @@ export function CompanyDetailsPage() {
                     {/* Financial */}
                     <div className="space-y-3">
                       <div className="flex items-center gap-2 pb-2">
-                        <div className="h-5 w-1 rounded-full bg-supperagent"></div>
+                        <div className="h-5 w-1 rounded-full bg-theme"></div>
                         <h3 className="font-semibold text-gray-900">
                           Financial Details
                         </h3>
@@ -577,7 +577,7 @@ export function CompanyDetailsPage() {
                     {/* App Config */}
                     <div className="space-y-3">
                       <div className="flex items-center gap-2 pb-2">
-                        <div className="h-5 w-1 rounded-full bg-supperagent"></div>
+                        <div className="h-5 w-1 rounded-full bg-theme"></div>
                         <h3 className="font-semibold text-gray-900">
                           App Configuration
                         </h3>
@@ -662,11 +662,11 @@ export function CompanyDetailsPage() {
                         return (
                           <div
                             key={plan._id}
-                            className={`flex items-center justify-between rounded-lg border p-4 transition-all ${isSelected ? 'border-supperagent bg-supperagent/5' : 'hover:border-gray-300'}`}
+                            className={`flex items-center justify-between rounded-lg border p-4 transition-all ${isSelected ? 'border-theme bg-theme/5' : 'hover:border-gray-300'}`}
                           >
                             <div className="flex items-center gap-4">
                               <div
-                                className={`flex h-10 w-10 items-center justify-center rounded-full ${isSelected ? 'bg-supperagent text-white' : 'bg-gray-100 text-gray-500'}`}
+                                className={`flex h-10 w-10 items-center justify-center rounded-full ${isSelected ? 'bg-theme text-white' : 'bg-gray-100 text-gray-500'}`}
                               >
                                 <Crown className="h-5 w-5" />
                               </div>
@@ -689,7 +689,7 @@ export function CompanyDetailsPage() {
                               variant={isSelected ? 'default' : 'outline'}
                               className={
                                 isSelected
-                                  ? 'bg-supperagent hover:bg-supperagent/90'
+                                  ? 'bg-theme hover:bg-theme/90'
                                   : ''
                               }
                             >
@@ -823,7 +823,7 @@ export function CompanyDetailsPage() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={executePlanChange}
-              className="bg-supperagent hover:bg-supperagent/90"
+              className="bg-theme hover:bg-theme/90"
             >
               Confirm Change
             </AlertDialogAction>

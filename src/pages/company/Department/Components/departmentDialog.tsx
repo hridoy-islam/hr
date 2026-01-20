@@ -54,7 +54,7 @@ export function DepartmentDialog({ open, onOpenChange, onSubmit, initialData }) 
             </Button>
             <Button
               type="submit"
-              className="bg-supperagent text-white hover:bg-supperagent/90 border-none"
+              className="bg-theme text-white hover:bg-theme/90 border-none"
             >
               Submit
             </Button>

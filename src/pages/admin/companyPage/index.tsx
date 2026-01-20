@@ -196,7 +196,7 @@ export function CompanyPage() {
         toast({
           title: 'Success',
           description: 'Company updated successfully',
-          className: 'bg-supperagent text-white'
+          className: 'bg-theme text-white'
         });
       } else {
         payload.role = 'company';
@@ -205,7 +205,7 @@ export function CompanyPage() {
         toast({
           title: 'Success',
           description: 'Company created successfully',
-          className: 'bg-supperagent text-white'
+          className: 'bg-theme text-white'
         });
       }
       fetchData(currentPage, entriesPerPage);
@@ -286,7 +286,7 @@ export function CompanyPage() {
       toast({
         title: 'Success',
         description: `Company has been ${newStatus === 'active' ? 'activated' : 'suspended'}.`,
-        className: 'bg-supperagent text-white'
+        className: 'bg-theme text-white'
       });
     } catch (error: any) {
       console.error('Error updating status:', error);
@@ -353,7 +353,7 @@ export function CompanyPage() {
       <div className="rounded-md">
         {initialLoading ? (
           <div className="flex justify-center py-8">
-            <BlinkingDots size="large" color="bg-supperagent" />
+            <BlinkingDots size="large" color="bg-theme" />
           </div>
         ) : (
           <Table>
@@ -452,7 +452,7 @@ export function CompanyPage() {
               {/* Column 1: Basic Info */}
               <div className="space-y-4">
                 <div className="flex items-center gap-2 border-b pb-2">
-                  <div className="h-6 w-1 rounded-full bg-supperagent"></div>
+                  <div className="h-6 w-1 rounded-full bg-theme"></div>
                   <h3 className="font-semibold text-gray-900">
                     Basic Information
                   </h3>
@@ -532,7 +532,7 @@ export function CompanyPage() {
               {/* Column 2: Address */}
               <div className="space-y-4">
                 <div className="flex items-center gap-2 border-b pb-2">
-                  <div className="h-6 w-1 rounded-full bg-supperagent"></div>
+                  <div className="h-6 w-1 rounded-full bg-theme"></div>
                   <h3 className="font-semibold text-gray-900">
                     Address Details
                   </h3>
@@ -637,7 +637,7 @@ export function CompanyPage() {
               {/* Column 3: Finance & Settings */}
               <div className="space-y-4">
                 <div className="flex items-center gap-2 border-b pb-2">
-                  <div className="h-6 w-1 rounded-full bg-supperagent"></div>
+                  <div className="h-6 w-1 rounded-full bg-theme"></div>
                   <h3 className="font-semibold text-gray-900">
                     Finance & Branding
                   </h3>
@@ -688,7 +688,7 @@ export function CompanyPage() {
               <Button
                 type="submit"
                 disabled={submitLoading}
-                className="min-w-[140px] bg-supperagent hover:bg-supperagent/90"
+                className="min-w-[140px] bg-theme hover:bg-theme/90"
               >
                 {submitLoading ? (
                   <>

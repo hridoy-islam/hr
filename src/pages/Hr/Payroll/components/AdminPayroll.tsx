@@ -684,7 +684,7 @@ const AdminPayRoll = () => {
 
             <Button
               onClick={() => setShowPayloadDialog(true)}
-              className="bg-supperagent text-white hover:bg-supperagent/90"
+              className="bg-theme text-white hover:bg-theme/90"
             >
               <Plus className="mr-2 h-4 w-4" />
               Generate Payload
@@ -693,7 +693,7 @@ const AdminPayRoll = () => {
 
           {fetching ? (
             <div className="flex justify-center py-12">
-              <BlinkingDots size="large" color="bg-supperagent" />
+              <BlinkingDots size="large" color="bg-theme" />
             </div>
           ) : error ? (
             <div className="rounded-lg bg-red-50 p-4 text-center text-red-600">
@@ -767,7 +767,7 @@ const AdminPayRoll = () => {
                         {/* <Button
                           size="sm"
                           onClick={() => handleGeneratePayroll(payroll)}
-                          className="bg-supperagent text-white hover:bg-supperagent/90"
+                          className="bg-theme text-white hover:bg-theme/90"
                         >
                           <Calculator className="mr-1 h-4 w-4" />
                           Generate
@@ -890,7 +890,7 @@ const AdminPayRoll = () => {
 
               {isSearching ? (
                 <div className="flex justify-center py-4">
-                  <BlinkingDots size="large" color="bg-supperagent" />
+                  <BlinkingDots size="large" color="bg-theme" />
                 </div>
               ) : (
                 searchedAttendance.length > 0 && (
@@ -988,7 +988,7 @@ const AdminPayRoll = () => {
                 <Button
                   onClick={handleSavePayroll}
                   disabled={isSearching}
-                  className="bg-supperagent text-white hover:bg-supperagent/90"
+                  className="bg-theme text-white hover:bg-theme/90"
                 >
                   Create Payroll
                 </Button>
@@ -1001,7 +1001,7 @@ const AdminPayRoll = () => {
                     !payloadToDate ||
                     isSearching
                   }
-                  className="bg-supperagent text-white hover:bg-supperagent/90"
+                  className="bg-theme text-white hover:bg-theme/90"
                 >
                   {isSearching ? (
                     <BlinkingDots size="small" color="bg-white" />
@@ -1060,7 +1060,7 @@ const AdminPayRoll = () => {
               <Button
                 onClick={handleApproveWithPdf}
                 disabled={!pdfFile || loading}
-                className="bg-supperagent text-white hover:bg-supperagent/90"
+                className="bg-theme text-white hover:bg-theme/90"
               >
                 {loading ? (
                   <BlinkingDots size="small" color="bg-white" />

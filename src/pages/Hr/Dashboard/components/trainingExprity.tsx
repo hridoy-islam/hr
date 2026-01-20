@@ -133,7 +133,7 @@ const getExpiringTrainings = (employee: Employee) =>
               <p className="text-sm text-gray-600">Expiring training courses</p>
             </div>
           </div>
-          <Button variant="outline" size="sm" onClick={() => navigate(-1)} className="bg-supperagent hover:bg-supperagent/90 border-none flex items-center space-x-2">
+          <Button variant="outline" size="sm" onClick={() => navigate(-1)} className="bg-theme hover:bg-theme/90 border-none flex items-center space-x-2">
             <ArrowLeft className="h-4 w-4" /> Back
           </Button>
         </div>
@@ -154,7 +154,7 @@ const getExpiringTrainings = (employee: Employee) =>
           {/* Table */}
           {loading ? (
             <div className="flex justify-center py-12">
-              <BlinkingDots size="large" color="bg-supperagent" />
+              <BlinkingDots size="large" color="bg-theme" />
             </div>
           ) : (
             <>
@@ -199,7 +199,7 @@ const getExpiringTrainings = (employee: Employee) =>
                                 <Badge className={`${status.color} text-white`}>{status.status}</Badge>
                               </TableCell>
                               <TableCell className="flex justify-end">
-                                <Button size="sm" onClick={() => handleEmployeeClick(employee._id)} className="bg-supperagent hover:bg-supperagent/90 text-white">
+                                <Button size="sm" onClick={() => handleEmployeeClick(employee._id)} className="bg-theme hover:bg-theme/90 text-white">
                                   View Details
                                 </Button>
                               </TableCell>

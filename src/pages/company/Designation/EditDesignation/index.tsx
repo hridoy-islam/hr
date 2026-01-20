@@ -170,7 +170,7 @@ export default function EditDesignation() {
       <div className="flex w-full items-center justify-between">
         <h1 className="mb-6 text-3xl font-bold text-gray-800">Edit Designation</h1>
         <Button
-          className="bg-supperagent text-white hover:bg-supperagent/90"
+          className="bg-theme text-white hover:bg-theme/90"
           onClick={() => navigate(-1)}
         >
           <MoveLeft /> Back
@@ -208,7 +208,7 @@ export default function EditDesignation() {
           <div className="w-full rounded-md border border-gray-200 shadow-lg overflow-hidden">
             <Table>
               <TableHeader>
-                <TableRow className="bg-supperagent text-white">
+                <TableRow className="bg-theme text-white">
                   <TableHead className="text-left text-sm font-bold px-6 py-3">
                     Module
                   </TableHead>
@@ -236,28 +236,28 @@ export default function EditDesignation() {
                       <input
                         type="checkbox"
                         {...register(`permissions.${module}.canView`)}
-                        className="accent-supperagent"
+                        className="accent-theme"
                       />
                     </TableCell>
                     <TableCell className="px-6 py-4 text-center">
                       <input
                         type="checkbox"
                         {...register(`permissions.${module}.canCreate`)}
-                        className="accent-supperagent"
+                        className="accent-theme"
                       />
                     </TableCell>
                     <TableCell className="px-6 py-4 text-center">
                       <input
                         type="checkbox"
                         {...register(`permissions.${module}.canEdit`)}
-                        className="accent-supperagent"
+                        className="accent-theme"
                       />
                     </TableCell>
                     <TableCell className="px-6 py-4 text-center">
                       <input
                         type="checkbox"
                         {...register(`permissions.${module}.canDelete`)}
-                        className="accent-supperagent"
+                        className="accent-theme"
                       />
                     </TableCell>
                   </TableRow>
@@ -270,7 +270,7 @@ export default function EditDesignation() {
           <div className="mt-8 flex justify-end">
             <Button
               type="submit"
-              className="rounded-md bg-supperagent px-6 py-2 font-semibold text-white transition-colors hover:bg-supperagent/90"
+              className="rounded-md bg-theme px-6 py-2 font-semibold text-white transition-colors hover:bg-theme/90"
             >
               Update
             </Button>

@@ -243,7 +243,7 @@ const TrainingTab = ({ formData, onUpdate, isFieldSaving }) => {
             size="sm"
             onClick={() => openDialog(null)}
             disabled={isFieldSaving['training']}
-            className="bg-supperagent text-white hover:bg-supperagent/90"
+            className="bg-theme text-white hover:bg-theme/90"
           >
             + Add Training
           </Button>
@@ -311,7 +311,7 @@ const TrainingTab = ({ formData, onUpdate, isFieldSaving }) => {
                           variant="default"
                           size="icon"
                           onClick={() => openDialog(index)}
-                          className="bg-supperagent text-white hover:bg-supperagent/90"
+                          className="bg-theme text-white hover:bg-theme/90"
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -480,7 +480,7 @@ const TrainingTab = ({ formData, onUpdate, isFieldSaving }) => {
           <Button
             type="button"
             onClick={handleSave}
-            className="bg-supperagent text-white hover:bg-supperagent/90"
+            className="bg-theme text-white hover:bg-theme/90"
           >
             Save
           </Button>

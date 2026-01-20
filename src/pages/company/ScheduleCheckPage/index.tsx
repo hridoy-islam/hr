@@ -30,7 +30,9 @@ interface ScheduleCheckValues {
   passportCheckDate: number;
   visaCheckDate: number;
   appraisalCheckDate: number;
-  immigrationCheckDate: number; // Added
+  immigrationCheckDate: number;
+  spotCheckDate: number;        // Added
+  supervisionCheckDate: number; // Added
 }
 
 export default function CompanyScheduleCheckPage() {
@@ -49,7 +51,9 @@ export default function CompanyScheduleCheckPage() {
       passportCheckDate: 0,
       visaCheckDate: 0,
       appraisalCheckDate: 0,
-      immigrationCheckDate: 0 // Added
+      immigrationCheckDate: 0,
+      spotCheckDate: 0,       // Added
+      supervisionCheckDate: 0 // Added
     }
   });
 
@@ -79,7 +83,9 @@ export default function CompanyScheduleCheckPage() {
             passportCheckDate: data.passportCheckDate,
             visaCheckDate: data.visaCheckDate || 0,
             appraisalCheckDate: data.appraisalCheckDate || 0,
-            immigrationCheckDate: data.immigrationCheckDate || 0 // Added
+            immigrationCheckDate: data.immigrationCheckDate || 0,
+            spotCheckDate: data.spotCheckDate || 0,              // Added
+            supervisionCheckDate: data.supervisionCheckDate || 0 // Added
           });
         }
       } catch (error: any) {
@@ -129,7 +135,7 @@ export default function CompanyScheduleCheckPage() {
         toast({
           title: 'Success',
           description: 'Schedule check settings saved successfully.',
-          className: 'bg-supperagent border-none text-white'
+          className: 'bg-theme border-none text-white'
         });
       }
     } catch (error: any) {
@@ -147,7 +153,7 @@ export default function CompanyScheduleCheckPage() {
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <BlinkingDots size="large" color="bg-supperagent" />
+        <BlinkingDots size="large" color="bg-theme" />
       </div>
     );
   }
@@ -292,7 +298,7 @@ export default function CompanyScheduleCheckPage() {
                   )}
                 />
 
-                {/* Immigration Check Date - Added */}
+                {/* Immigration Check Date */}
                 <FormField
                   control={form.control}
                   name="immigrationCheckDate"
@@ -317,13 +323,63 @@ export default function CompanyScheduleCheckPage() {
                   )}
                 />
 
+                {/* Spot Check Date - Added */}
+                <FormField
+                  control={form.control}
+                  name="spotCheckDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Spot Check Interval (Days)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="e.g. 30"
+                          {...field}
+                          value={field.value === 0 ? '' : field.value}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            field.onChange(val === '' ? 0 : Number(val));
+                          }}
+                          className="mt-1"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Supervision Check Date - Added */}
+                <FormField
+                  control={form.control}
+                  name="supervisionCheckDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Supervision Check Interval (Days)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="e.g. 60"
+                          {...field}
+                          value={field.value === 0 ? '' : field.value}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            field.onChange(val === '' ? 0 : Number(val));
+                          }}
+                          className="mt-1"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
               </div>
 
               <div className="flex justify-end pt-4">
                 <Button
                   type="submit"
                   disabled={submitting}
-                  className="bg-supperagent px-8 text-white hover:bg-supperagent/90"
+                  className="bg-theme px-8 text-white hover:bg-theme/90"
                 >
                   {submitting ? (
                     <>

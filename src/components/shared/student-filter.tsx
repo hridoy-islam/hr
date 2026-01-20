@@ -207,7 +207,7 @@ export default function StudentFilter({ onSubmit }) {
         <div className="flex justify-end gap-4">
           <Button
             type="submit"
-            className="bg-supperagent text-white hover:bg-supperagent/90"
+            className="bg-theme text-white hover:bg-theme/90"
           >
             <Search className="mr-3 h-4 w-4" /> Search
           </Button>

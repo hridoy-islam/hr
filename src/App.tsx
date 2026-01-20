@@ -5,6 +5,7 @@ import AppRouter from './routes';
 import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { ScheduleStatusProvider } from './context/scheduleStatusContext';
 
 const persistor = persistStore(store);
 
@@ -14,8 +15,9 @@ export default function App() {
       <PersistGate loading={null} persistor={persistor}>
         <AppProvider>
           <TooltipProvider>
-
-          <AppRouter />
+            <ScheduleStatusProvider>
+              <AppRouter />
+            </ScheduleStatusProvider>
           </TooltipProvider>
         </AppProvider>
       </PersistGate>

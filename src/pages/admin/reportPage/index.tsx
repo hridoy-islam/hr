@@ -195,7 +195,7 @@ export default function ReportPage() {
                   <TableRow>
                     <TableCell colSpan={4} className="h-24 text-center">
                       <div className="flex items-center justify-center gap-2 text-gray-500">
-                        <BlinkingDots size="large" color="bg-supperagent" />
+                        <BlinkingDots size="large" color="bg-theme" />
                       </div>
                     </TableCell>
                   </TableRow>

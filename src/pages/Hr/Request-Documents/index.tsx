@@ -339,7 +339,7 @@ const RequestDocumentPage = () => {
                           variant="default"
                           size="sm"
                           onClick={() => handleApproveClick(req)}
-                          className="bg-supperagent hover:bg-supperagent/90 text-white"
+                          className="bg-theme hover:bg-theme/90 text-white"
                         >
                           <Check className="mr-1 h-4 w-4" />
                           Approve
@@ -465,7 +465,7 @@ const RequestDocumentPage = () => {
             <Button
               onClick={handleApproveWithPdf}
               disabled={!uploadedFileUrl || loading || isUploading}
-              className="bg-supperagent hover:bg-supperagent/90 text-white"
+              className="bg-theme hover:bg-theme/90 text-white"
             >
               {loading ? 'Approving...' : 'Approve'}
             </Button>

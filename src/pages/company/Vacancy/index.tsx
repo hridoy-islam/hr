@@ -69,7 +69,7 @@ export default function Vacancy() {
       await axiosInstance.patch(`/hr/vacancy/${id}`, { status: updatedStatus });
       toast({
         title: 'Record updated successfully',
-        className: 'bg-supperagent border-none text-white'
+        className: 'bg-theme border-none text-white'
       });
       fetchData(currentPage, entriesPerPage);
     } catch (error) {
@@ -112,14 +112,14 @@ export default function Vacancy() {
             <Button
               onClick={handleSearch}
               size="sm"
-              className="min-w-[100px] border-none bg-supperagent text-white hover:bg-supperagent/90"
+              className="min-w-[100px] border-none bg-theme text-white hover:bg-theme/90"
             >
               Search
             </Button>
           </div>
         </div>
         <Button
-          className="bg-supperagent text-white hover:bg-supperagent/90"
+          className="bg-theme text-white hover:bg-theme/90"
           size="sm"
           onClick={handleNewVacancyClick}
         >
@@ -132,7 +132,7 @@ export default function Vacancy() {
       <div className="">
         {initialLoading ? (
           <div className="flex justify-center py-6">
-            <BlinkingDots size="large" color="bg-supperagent" />
+            <BlinkingDots size="large" color="bg-theme" />
           </div>
         ) : vacancy.length === 0 ? (
           <div className="flex justify-center py-6 text-gray-500">
@@ -188,7 +188,7 @@ export default function Vacancy() {
                       <TooltipTrigger asChild>
                         <Button
                           variant="ghost"
-                          className="border-none bg-supperagent text-white hover:bg-supperagent/90"
+                          className="border-none bg-theme text-white hover:bg-theme/90"
                           size="sm"
                           onClick={() => navigate(`view-applicants/${vac._id}`)}
                         >
@@ -203,7 +203,7 @@ export default function Vacancy() {
                       <TooltipTrigger asChild>
                         <Button
                           variant="ghost"
-                          className="border-none bg-supperagent text-white hover:bg-supperagent/90"
+                          className="border-none bg-theme text-white hover:bg-theme/90"
                           size="sm"
                           onClick={() => handleEdit(vac)}
                         >
@@ -218,7 +218,7 @@ export default function Vacancy() {
                       <TooltipTrigger asChild>
                         <Button
                           variant="ghost"
-                          className="border-none bg-supperagent px-2 text-white hover:bg-supperagent/90"
+                          className="border-none bg-theme px-2 text-white hover:bg-theme/90"
                           size="sm"
                           onClick={() =>
                             navigate(`add-applicant/${vac._id}`, {

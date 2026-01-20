@@ -250,7 +250,7 @@ const HolidayRequestsCard: React.FC<HolidayRequestsCardProps> = ({
   return (
     <TooltipProvider>
       <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden hover:shadow-xl transition-shadow duration-300">
-        <div className="bg-gradient-to-r from-supperagent/70 to-supperagent px-6 py-4">
+        <div className="bg-gradient-to-r from-theme/70 to-theme px-6 py-4">
           <div className="flex items-center">
             <Calendar className="h-6 w-6 text-white mr-3" />
             <h2 className="text-xl font-semibold text-white">Pending Holiday Requests</h2>

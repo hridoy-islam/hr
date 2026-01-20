@@ -196,7 +196,7 @@ export default function CreateTraining() {
 
               <Button
                 type="submit"
-                className="border-none bg-supperagent text-white hover:bg-supperagent/90"
+                className="border-none bg-theme text-white hover:bg-theme/90"
                 >
                 Submit
               </Button>

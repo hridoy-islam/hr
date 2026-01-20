@@ -73,7 +73,7 @@ export function StepsIndicator({
                 className={cn(
                   'mb-2 flex h-12 w-12 items-center justify-center rounded-full text-sm font-medium transition-all duration-200',
                   isActive
-                    ? 'scale-110 bg-supperagent text-white shadow-lg'
+                    ? 'scale-110 bg-theme text-white shadow-lg'
                     : isCompleted || isPrevious
                     ? 'bg-blue-600 text-white'
                     : 'border-2 border-gray-300 bg-white text-gray-500 hover:border-blue-400'
@@ -89,7 +89,7 @@ export function StepsIndicator({
                 className={cn(
                   'text-center text-sm font-medium transition-colors',
                   isActive
-                    ? 'text-supperagent'
+                    ? 'text-theme'
                     : isCompleted || isPrevious
                     ? 'text-blue-600'
                     : 'text-gray-600'

@@ -269,7 +269,7 @@ export default function AttendanceReport() {
                     type="month"
                     value={fromDate}
                     onChange={(e) => setFromDate(e.target.value)}
-                    className="w-full rounded-md border-gray-300 pl-9 focus:border-supperagent focus:ring focus:ring-supperagent/20"
+                    className="w-full rounded-md border-gray-300 pl-9 focus:border-theme focus:ring focus:ring-theme/20"
                     required
                   />
                 </div>
@@ -287,7 +287,7 @@ export default function AttendanceReport() {
                     type="month"
                     value={toDate}
                     onChange={(e) => setToDate(e.target.value)}
-                    className="w-full rounded-md border-gray-300 pl-9 focus:border-supperagent focus:ring focus:ring-supperagent/20"
+                    className="w-full rounded-md border-gray-300 pl-9 focus:border-theme focus:ring focus:ring-theme/20"
                     required
                   />
                 </div>
@@ -298,7 +298,7 @@ export default function AttendanceReport() {
                 type="button"
                 onClick={generateReport}
                 disabled={isLoading || !fromDate || !toDate}
-                className="flex h-10 items-center gap-2 bg-supperagent px-5 py-2 text-white transition-colors hover:bg-supperagent/90 disabled:opacity-70"
+                className="flex h-10 items-center gap-2 bg-theme px-5 py-2 text-white transition-colors hover:bg-theme/90 disabled:opacity-70"
               >
                 {isLoading ? (
                   <>

@@ -156,7 +156,7 @@ export default function Employee() {
       toast({
         title: 'Success',
         description: 'Status updated successfully.',
-        className: 'bg-supperagent text-white'
+        className: 'bg-theme text-white'
       });
       fetchData();
     } catch (error: any) {
@@ -231,7 +231,7 @@ export default function Employee() {
             <div className="flex w-full flex-row items-center gap-3">
               <Button
                 onClick={handleSearch}
-                className="flex h-9 w-20 items-center gap-1 bg-supperagent text-white hover:bg-supperagent/90"
+                className="flex h-9 w-20 items-center gap-1 bg-theme text-white hover:bg-theme/90"
                 size="sm"
               >
                 Search
@@ -252,7 +252,7 @@ export default function Employee() {
 
         {initialLoading ? (
           <div className="flex justify-center py-8">
-            <BlinkingDots size="large" color="bg-supperagent" />
+            <BlinkingDots size="large" color="bg-theme" />
           </div>
         ) : employees.length === 0 ? (
           <div className="flex justify-center py-8 text-gray-500">
@@ -302,7 +302,7 @@ export default function Employee() {
                           onCheckedChange={(checked) =>
                             handleStatusChange(employee._id, checked)
                           }
-                          className="data-[state=checked]:bg-supperagent data-[state=checked]:hover:bg-supperagent/90"
+                          className="data-[state=checked]:bg-theme data-[state=checked]:hover:bg-theme/90"
                         />
                         <Badge
                           variant={
@@ -314,7 +314,7 @@ export default function Employee() {
         min-w-[70px] justify-center shadow-none
         ${
           employee.status === 'active'
-            ? 'bg-supperagent text-white hover:bg-supperagent/90'
+            ? 'bg-theme text-white hover:bg-theme/90'
             : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
         }
       `}
@@ -327,7 +327,7 @@ export default function Employee() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="bg-supperagent text-white hover:bg-supperagent/90"
+                        className="bg-theme text-white hover:bg-theme/90"
                         onClick={() =>
                           navigate(`${employee._id}/employee-rate`, {
                             state: employee
@@ -339,7 +339,7 @@ export default function Employee() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="bg-supperagent text-white hover:bg-supperagent/90"
+                        className="bg-theme text-white hover:bg-theme/90"
                         onClick={() => navigate(`${employee._id}`)}
                       >
                         View

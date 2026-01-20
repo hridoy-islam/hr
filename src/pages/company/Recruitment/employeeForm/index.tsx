@@ -100,7 +100,7 @@ function EmployeeForm() {
   const handleFinish = () => {
     toast({ 
       title: 'Employee Created Successfully',
-      className: 'bg-supperagent text-white border-none' // Optional styling
+      className: 'bg-theme text-white border-none' // Optional styling
     });
     navigate('/company/employee');
   };

@@ -191,7 +191,7 @@ export function NoticeDialog({
                   required
                   rows={3}
                   placeholder="Enter notice description"
-                  className="flex w-full h-[30vh] rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-supperagent focus:ring-supperagent"
+                  className="flex w-full h-[30vh] rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-theme focus:ring-theme"
                 />
               </div>
             </div>
@@ -200,7 +200,7 @@ export function NoticeDialog({
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
-              <Button type="submit" className="bg-supperagent text-white hover:bg-supperagent/90">
+              <Button type="submit" className="bg-theme text-white hover:bg-theme/90">
                 {initialData ? 'Update' : 'Submit'}
               </Button>
             </div>

@@ -111,7 +111,7 @@ export const PayrollHistory: React.FC<PayrollHistoryProps> = ({
                     size="sm"
                     variant="default"
                     onClick={() => onViewPayslip(record)}
-                    className="bg-supperagent text-white hover:bg-supperagent"
+                    className="bg-theme text-white hover:bg-theme"
                   >
                     <Eye className="h-4 w-4" />
                   </Button> */}
@@ -120,7 +120,7 @@ export const PayrollHistory: React.FC<PayrollHistoryProps> = ({
                       size="sm"
                       variant="default"
                       onClick={() => onDownloadPayslip(record)}
-                      className="bg-supperagent text-white hover:bg-supperagent"
+                      className="bg-theme text-white hover:bg-theme"
                     >
                       <Download className="h-4 w-4" />
                     </Button>

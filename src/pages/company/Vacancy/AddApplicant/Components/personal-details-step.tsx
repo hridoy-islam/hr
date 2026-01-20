@@ -47,8 +47,8 @@ const personalDetailsSchema = z.object({
   dateOfBirth: z.date({ required_error: 'Date of birth is required' }),
   nationalInsuranceNumber: z.string().optional(),
   nhsNumber: z.string().optional(),
-  passportNo: z.string().min(1, { message: 'Passport number is required' }),
-  passportExpiry: z.date({ required_error: 'Passport expiry date is required' }),
+  // passportNo: z.string().min(1, { message: 'Passport number is required' }),
+  // passportExpiry: z.date({ required_error: 'Passport expiry date is required' }),
   applicationDate: z.date({ required_error: 'Application date is required' }),
   availableFromDate: z.date({ required_error: 'Available from date is required' }),
   employmentType: z.string().min(1, { message: 'Please select employment type' }),
@@ -96,8 +96,8 @@ export function PersonalDetailsStep({
       position: defaultValues?.position || '',
       source: defaultValues?.source || '',
       branch: defaultValues?.branch || '',
-      passportNo: defaultValues?.passportNo || '',
-      passportExpiry: defaultValues?.passportExpiry || undefined,
+      // passportNo: defaultValues?.passportNo || '',
+      // passportExpiry: defaultValues?.passportExpiry || undefined,
       image: defaultValues?.image || undefined
     }
   });
@@ -224,7 +224,7 @@ export function PersonalDetailsStep({
                   type="button"
                   size="icon"
                   onClick={() => setIsDialogOpen(true)}
-                  className="absolute bottom-2 right-8 z-10 rounded-full bg-supperagent hover:bg-supperagent/90"
+                  className="absolute bottom-2 right-8 z-10 rounded-full bg-theme hover:bg-theme/90"
                 >
                   <Camera className="h-5 w-5 text-white" />
                 </Button>
@@ -309,7 +309,7 @@ export function PersonalDetailsStep({
                         onChange={(date: Date) => field.onChange(date)}
                         dateFormat="dd-MM-yyyy"
                         placeholderText="Select date of birth"
-                        className="mt-1 w-full rounded-md border border-gray-300 px-3 py-1 focus:border-supperagent focus:ring-2 focus:ring-supperagent"
+                        className="mt-1 w-full rounded-md border border-gray-300 px-3 py-1 focus:border-theme focus:ring-2 focus:ring-theme"
                         showMonthDropdown
                         showYearDropdown
                         dropdownMode="select"
@@ -350,7 +350,7 @@ export function PersonalDetailsStep({
                 )}
               />
 
-              <FormField
+              {/* <FormField
                 control={form.control}
                 name="passportNo"
                 render={({ field }) => (
@@ -374,7 +374,7 @@ export function PersonalDetailsStep({
                         onChange={(date: Date) => field.onChange(date)}
                         dateFormat="dd-MM-yyyy"
                         placeholderText="Select passport expiry"
-                        className="mt-1 w-full rounded-md border border-gray-300 px-3 py-1 focus:border-supperagent focus:ring-2 focus:ring-supperagent"
+                        className="mt-1 w-full rounded-md border border-gray-300 px-3 py-1 focus:border-theme focus:ring-2 focus:ring-theme"
                         showMonthDropdown
                         showYearDropdown
                         dropdownMode="select"
@@ -385,7 +385,7 @@ export function PersonalDetailsStep({
                     <FormMessage />
                   </FormItem>
                 )}
-              />
+              /> */}
             </div>
 
             <h1 className="text-2xl mt-6">Application Details</h1>
@@ -402,7 +402,7 @@ export function PersonalDetailsStep({
                         onChange={(date: Date) => field.onChange(date)}
                         dateFormat="dd-MM-yyyy"
                         placeholderText="Select application date"
-                        className="mt-1 w-full rounded-md border border-gray-300 px-3 py-1 focus:border-supperagent focus:ring-2 focus:ring-supperagent"
+                        className="mt-1 w-full rounded-md border border-gray-300 px-3 py-1 focus:border-theme focus:ring-2 focus:ring-theme"
                         showMonthDropdown
                         showYearDropdown
                         dropdownMode="select"
@@ -427,7 +427,7 @@ export function PersonalDetailsStep({
                         onChange={(date: Date) => field.onChange(date)}
                         dateFormat="dd-MM-yyyy"
                         placeholderText="Select available from date"
-                        className="mt-1 w-full rounded-md border border-gray-300 px-3 py-1 focus:border-supperagent focus:ring-2 focus:ring-supperagent"
+                        className="mt-1 w-full rounded-md border border-gray-300 px-3 py-1 focus:border-theme focus:ring-2 focus:ring-theme"
                         showMonthDropdown
                         showYearDropdown
                         dropdownMode="select"
@@ -528,7 +528,7 @@ export function PersonalDetailsStep({
             <div className="flex justify-end space-x-4">
               <Button
                 type="submit"
-                className="bg-supperagent text-white hover:bg-supperagent/90"
+                className="bg-theme text-white hover:bg-theme/90"
               >
                 Save
               </Button>
@@ -569,8 +569,8 @@ export function PersonalDetailsStep({
               >
                 {isUploading ? (
                   <>
-                    <Loader2 className="mb-2 h-10 w-10 animate-spin text-supperagent" />
-                    <p className="text-sm font-medium text-supperagent">
+                    <Loader2 className="mb-2 h-10 w-10 animate-spin text-theme" />
+                    <p className="text-sm font-medium text-theme">
                       Uploading...
                     </p>
                   </>

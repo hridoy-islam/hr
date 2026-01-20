@@ -167,7 +167,7 @@ export default function AttendanceApproveList() {
       if (response.data && response.data.success === true) {
         toast({
           title: response.data.message || 'Record Updated successfully',
-          className: 'bg-supperagent border-none text-white'
+          className: 'bg-theme border-none text-white'
         });
       } else if (response.data && response.data.success === false) {
         toast({
@@ -287,7 +287,7 @@ export default function AttendanceApproveList() {
 
       toast({
         title: 'Attendance updated successfully',
-        className: 'bg-supperagent border-none text-white'
+        className: 'bg-theme border-none text-white'
       });
 
       setModifiedAttendance((prev) => {
@@ -350,7 +350,7 @@ export default function AttendanceApproveList() {
             Attendance Details
           </h1>
           <Button
-            className="flex h-9 items-center gap-2 bg-supperagent text-white hover:bg-supperagent/90"
+            className="flex h-9 items-center gap-2 bg-theme text-white hover:bg-theme/90"
             onClick={() => navigate(-1)}
           >
             <MoveLeft className="h-4 w-4" />
@@ -382,7 +382,7 @@ export default function AttendanceApproveList() {
         <div className="rounded-md bg-white">
           {initialLoading ? (
             <div className="flex justify-center py-6">
-              <BlinkingDots size="large" color="bg-supperagent" />
+              <BlinkingDots size="large" color="bg-theme" />
             </div>
           ) : attendence.length === 0 ? (
             <div className="flex justify-center py-6 text-gray-500">
@@ -452,7 +452,7 @@ export default function AttendanceApproveList() {
                       {modifiedAttendance[att._id] && (
                         <Button
                           variant="ghost"
-                          className="bg-supperagent text-white hover:bg-supperagent/90"
+                          className="bg-theme text-white hover:bg-theme/90"
                           size="sm"
                           onClick={() => updateAttendance(att._id)}
                         >
@@ -462,7 +462,7 @@ export default function AttendanceApproveList() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="bg-supperagent px-4 text-white hover:bg-supperagent/90"
+                        className="bg-theme px-4 text-white hover:bg-theme/90"
                         onClick={() => openConfirmDialog(att)}
                       >
                         Approve
@@ -505,7 +505,7 @@ export default function AttendanceApproveList() {
                   onClick={() =>
                     selectedAttendance && handleApprove(selectedAttendance)
                   }
-                  className="bg-supperagent text-white hover:bg-supperagent/90"
+                  className="bg-theme text-white hover:bg-theme/90"
                 >
                   Approve
                 </AlertDialogAction>

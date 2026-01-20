@@ -323,7 +323,7 @@ const RightToWorkExpiryPage = () => {
             variant="outline"
             size="sm"
             onClick={() => navigate(-1)}
-            className="flex items-center space-x-2 border-none bg-supperagent text-white hover:bg-supperagent/90"
+            className="flex items-center space-x-2 border-none bg-theme text-white hover:bg-theme/90"
           >
             <ArrowLeft className="h-4 w-4" />
             <span>Back</span>
@@ -350,7 +350,7 @@ const RightToWorkExpiryPage = () => {
           {/* Table */}
           {loading ? (
             <div className="flex justify-center py-12">
-              <BlinkingDots size="large" color="bg-supperagent" />
+              <BlinkingDots size="large" color="bg-theme" />
             </div>
           ) : (
             <>
@@ -398,7 +398,7 @@ const RightToWorkExpiryPage = () => {
                                 <Button
                                   size="sm"
                                   onClick={() => handleEmployeeClick(record.employeeId._id)}
-                                  className="bg-supperagent text-white hover:bg-supperagent/90"
+                                  className="bg-theme text-white hover:bg-theme/90"
                                 >
                                   View Details
                                 </Button>
@@ -406,7 +406,7 @@ const RightToWorkExpiryPage = () => {
                                 <Button
                                   size="sm"
                                   onClick={() => handleUpdateClick(record)}
-                                  className="bg-supperagent text-white hover:bg-supperagent/90"
+                                  className="bg-theme text-white hover:bg-theme/90"
                                 >
                                   Update
                                 </Button>
@@ -557,7 +557,7 @@ const RightToWorkExpiryPage = () => {
                   Cancel
                 </Button>
                 <Button
-                  className="bg-supperagent text-white hover:bg-supperagent/90"
+                  className="bg-theme text-white hover:bg-theme/90"
                   onClick={handleSubmitUpdate}
                   disabled={submitting || isUploading || !uploadedFileUrl}
                 >

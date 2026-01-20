@@ -268,7 +268,7 @@ const StaffAttendancePage = () => {
           <h2 className="text-2xl font-semibold text-gray-700">Attendance Records</h2>
           <button
             onClick={() => setIsModalOpen(true)}
-            className="rounded-md bg-supperagent px-5 py-2 font-medium text-white transition hover:bg-supperagent/90"
+            className="rounded-md bg-theme px-5 py-2 font-medium text-white transition hover:bg-theme/90"
           >
             Download PDF
           </button>
@@ -309,7 +309,7 @@ const StaffAttendancePage = () => {
           </div>
           <button
             onClick={handleFilter}
-            className="rounded-md bg-supperagent px-5 py-2 font-medium text-white transition hover:bg-supperagent/90"
+            className="rounded-md bg-theme px-5 py-2 font-medium text-white transition hover:bg-theme/90"
           >
             Apply Filter
           </button>
@@ -444,7 +444,7 @@ const StaffAttendancePage = () => {
                     type="button"
                     disabled={loading}
                     className={`rounded-md px-4 py-2 font-medium text-white ${
-                      loading ? 'bg-supperagent/80' : 'bg-supperagent hover:bg-supperagent/90'
+                      loading ? 'bg-theme/80' : 'bg-theme hover:bg-theme/90'
                     }`}
                   >
                     {loading ? 'Generating...' : 'Generate PDF'}

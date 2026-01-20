@@ -83,7 +83,7 @@ const StaffPayroll: React.FC = () => {
     toast({
       title: 'Payslip Download',
       description: `Downloading payslip for ${start} - ${end}`,
-      className: 'bg-supperagent text-white border-none',
+      className: 'bg-theme text-white border-none',
     });
   };
 
@@ -118,7 +118,7 @@ const StaffPayroll: React.FC = () => {
       toast({
         title: 'Request submitted',
         description: 'You will receive a notification once it’s processed.',
-        className: 'bg-supperagent text-white border-none',
+        className: 'bg-theme text-white border-none',
       });
     } catch (error: any) {
       console.error('Failed to submit request:', error);
@@ -163,7 +163,7 @@ const StaffPayroll: React.FC = () => {
         <CardContent>
           {loading ? (
             <div className="flex h-64 items-center justify-center">
-              <BlinkingDots size="large" color="bg-supperagent" />
+              <BlinkingDots size="large" color="bg-theme" />
             </div>
           ) : records.length === 0 ? (
             <p className="py-4 text-center text-gray-500">No payroll records found.</p>
@@ -200,7 +200,7 @@ const StaffPayroll: React.FC = () => {
                             size="sm"
                             variant="default"
                             onClick={() => handleDownloadPayslip(record)}
-                            className="bg-supperagent text-white hover:bg-supperagent"
+                            className="bg-theme text-white hover:bg-theme"
                           >
                             <Download className="h-4 w-4" />
                           </Button>

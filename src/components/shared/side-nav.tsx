@@ -1,11 +1,9 @@
 import {
   UsersIcon,
   FileTextIcon,
-  UserIcon,
   ChevronDown,
   ChevronRight,
   Users,
-  UserRoundCheck,
   LayoutDashboard,
   Box,
   PencilRuler,
@@ -40,7 +38,6 @@ import {
   GraduationCap,
   BadgeCheck,
   FileCheck,
-  Book,
   BookUser
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -50,175 +47,8 @@ import { useEffect, useState } from 'react';
 import { logout } from '@/redux/features/authSlice';
 import axiosInstance from '@/lib/axios';
 import { AppDispatch } from '@/redux/store';
-
-// ... [navItems array remains exactly the same as your code] ...
-// const navItems = [
-//   {
-//     icon: LayoutDashboard,
-//     label: 'Dashboard',
-//     href: '',
-//     roles: ['admin', 'company']
-//   },
-//   {
-//     icon: Building2,
-//     label: 'Company',
-//     href: 'company',
-//     roles: ['admin']
-//   },
-//   {
-//     icon: Box,
-//     label: 'My Holidays',
-//     href: 'holiday',
-//     roles: [, 'employee']
-//   },
-//   {
-//     icon: PencilRuler,
-//     label: 'My Staff',
-//     href: 'my-staff',
-//     roles: []
-//   },
-//   {
-//     icon: FileTextIcon,
-//     label: 'Notice',
-//     href: 'notice',
-//     roles: [, 'employee']
-//   },
-//   {
-//     icon: DoorOpen,
-//     label: 'Vacancy',
-//     href: 'vacancy',
-//     roles: []
-//   },
-//   {
-//     icon: BookText,
-//     label: 'Training',
-//     href: 'training',
-//     roles: ['employee']
-//   },
-//   {
-//     icon: UsersIcon,
-//     label: 'Employee',
-//     roles: [],
-//     subItems: [
-//       {
-//         icon: Users,
-//         label: 'Employee List',
-//         href: 'employee',
-//         roles: []
-//       },
-//       {
-//         icon: LayoutPanelTop,
-//         label: 'Department',
-//         href: 'department',
-//         roles: []
-//       },
-//       {
-//         icon: ArrowBigUp,
-//         label: 'Shift',
-//         href: 'shift',
-//         roles: []
-//       },
-//       {
-//         icon: Award,
-//         label: 'Designation',
-//         href: 'designation',
-//         roles: []
-//       },
-//       {
-//         icon: BookText,
-//         label: 'Training',
-//         href: 'training',
-//         roles: []
-//       }
-//     ]
-//   },
-//   {
-//     icon: FileCheck2,
-//     label: 'Attendance',
-//     roles: [],
-//     subItems: [
-//       {
-//         icon: FileCheck2,
-//         label: 'Attendance List',
-//         href: 'attendance',
-//         roles: []
-//       },
-//       {
-//         icon: CircleCheckBig,
-//         label: 'Attendance Approve',
-//         href: 'attendance-approve',
-//         roles: []
-//       },
-//       {
-//         icon: BetweenVerticalStart,
-//         label: 'Attendance Entry',
-//         href: 'attendance/attendance-entry',
-//         roles: []
-//       },
-//       {
-//         icon: Calendar,
-//         label: 'Attendance Report',
-//         href: 'attendance-report',
-//         roles: []
-//       }
-//     ]
-//   },
-//   {
-//     icon: Clock4,
-//     label: 'Attendance',
-//     href: 'staff-attendance',
-//     roles: ['employee']
-//   },
-//   {
-//     icon: CircleDollarSign,
-//     label: 'Payroll',
-//     href: 'payroll',
-//     roles: [, 'employee']
-//   },
-//   {
-//     icon: CircleGauge,
-//     label: 'Leave',
-//     href: 'leave-approve',
-//     roles: []
-//   },
-//   {
-//     icon: FileSpreadsheet,
-//     label: 'Documents',
-//     href: 'documents',
-//     roles: ['employee']
-//   },
-//   {
-//     icon: FileSpreadsheet,
-//     label: 'Document Requests',
-//     href: 'document-request',
-//     roles: []
-//   },
-//   {
-//     icon: Settings,
-//     label: 'Settings',
-//     roles: [],
-//     subItems: [
-//       {
-//         icon: ReceiptText,
-//         label: 'Company Details',
-//         href: 'company-details',
-//         roles: []
-//       },
-//       {
-//         icon: Mails,
-//         label: 'Email Setup',
-//         href: 'email-setup',
-//         roles: []
-//       },
-//       {
-//         icon: Calendar,
-//         label: 'Bank Holiday',
-//         href: 'bank-holiday',
-//         roles: []
-//       }
-//     ]
-//   }
-// ];
+// IMPORT THE CONTEXT HOOK
+import { useScheduleStatus } from '@/context/scheduleStatusContext';
 
 const navItems = [
   // --- Common ---
@@ -240,7 +70,6 @@ const navItems = [
     icon: DollarSign,
     label: 'Subscription Plans',
     href: 'subscription-plan',
-
     roles: ['admin']
   },
   {
@@ -256,55 +85,62 @@ const navItems = [
     roles: ['admin']
   },
 
-  // --- Company Specific Routes (Requested) ---
   {
     icon: DoorOpen,
     label: 'Vacancy',
     href: 'vacancy',
-    roles: ['company'] // Assuming vacancy management is admin
+    roles: ['company']
   },
   {
     icon: Users,
     label: 'Employees',
-    href: 'employee', // Using existing employee list route or new one 'employees'
+    href: 'employee',
     roles: ['company']
   },
+  // --- BADGE ITEMS START HERE ---
   {
     icon: ShieldCheck,
     label: 'Right to Work',
-    href: '#',
-    roles: ['company']
+    href: 'expiry/rtw',
+    roles: ['company'],
+    badgeKey: 'rtw' // Added Key
   },
   {
     icon: ShieldCheck,
     label: 'DBS',
-    href: '#',
-    roles: ['company']
+    href: 'expiry/dbs',
+    roles: ['company'],
+    badgeKey: 'dbs' // Added Key
   },
   {
     icon: BarChart3,
     label: 'Appraisal',
-    href: '#',
-    roles: ['company']
+    href: 'expiry/appraisal',
+    roles: ['company'],
+    badgeKey: 'appraisal' // Added Key
   },
   {
     icon: BookUser,
     label: 'Passport',
-    href: '#',
-    roles: ['company']
+    href: 'expiry/passport',
+    roles: ['company'],
+    badgeKey: 'passport' // Added Key
   },
   {
     icon: BadgeCheck,
     label: 'Visa Status',
-    href: '#',
-    roles: ['company']
+    href: 'expiry/visa',
+    roles: ['company'],
+    badgeKey: 'visa' // Added Key
   },
   {
     icon: FileCheck,
     label: 'Immigration Status',
-    href: '#',
-    roles: ['company']
+    href: 'expiry/immigration',
+    roles: ['company'],
+    badgeKey: 'immigration' // Added Key
   },
+  // --- BADGE ITEMS END ---
   {
     icon: GraduationCap,
     label: 'Training Status',
@@ -460,7 +296,7 @@ const navItems = [
     icon: PencilRuler,
     label: 'My Staff',
     href: 'my-staff',
-    roles: [] // Explicitly empty or specific roles? Keeping as per previous code
+    roles: []
   },
   {
     icon: FileTextIcon,
@@ -472,20 +308,20 @@ const navItems = [
     icon: DoorOpen,
     label: 'Vacancy',
     href: 'vacancy',
-    roles: [] // Assuming vacancy management is admin
+    roles: []
   },
   {
     icon: BookText,
     label: 'Training',
     href: 'training',
-    roles: ['employee'] // Employee view of training
+    roles: ['employee']
   },
 
-  // --- Legacy / Admin Sub-menus (Preserved for Admin) ---
+  // --- Legacy / Admin Sub-menus ---
   {
     icon: UsersIcon,
     label: 'Employee Management',
-    roles: [], // Restricted to admin now since Company has flat structure above
+    roles: [],
     subItems: [
       {
         icon: Users,
@@ -581,7 +417,7 @@ const navItems = [
     roles: []
   },
 
-  // --- Settings (Shared but likely different views) ---
+  // --- Settings ---
 
   {
     icon: Settings,
@@ -631,20 +467,19 @@ const filterNavItemsByRole = (items, userRole) => {
     });
 };
 
-// 1. Updated NavItem to accept basePath
+// 1. Updated NavItem to accept basePath AND status
 const NavItem = ({
   item,
   expandedItems,
   toggleExpanded,
   depth = 0,
-  basePath
+  basePath,
+  status // Receive status prop
 }) => {
   const location = useLocation();
   const isExpanded = expandedItems[item.label];
 
   // Construct the full path based on the dynamic basePath
-  // If item.href is empty (Dashboard), path is just basePath
-  // Otherwise it is basePath/href
   const targetPath = item.href ? `${basePath}/${item.href}` : basePath;
 
   const isActiveLeaf =
@@ -654,8 +489,8 @@ const NavItem = ({
       : location.pathname === targetPath ||
         location.pathname.startsWith(`${targetPath}/`));
 
-  const isActiveParent =
-    item.subItems && location.pathname.startsWith(targetPath);
+  // Logic to determine badge count
+  const badgeCount = item.badgeKey && status ? status[item.badgeKey] : 0;
 
   if (item.subItems) {
     return (
@@ -663,20 +498,26 @@ const NavItem = ({
         <button
           onClick={() => toggleExpanded(item.label)}
           className={cn(
-            'group flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-all duration-200 hover:bg-supperagent hover:text-white',
+            'group flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-all duration-200 hover:bg-theme hover:text-white',
             depth > 0 && 'pl-6'
           )}
         >
           <div className="flex items-center space-x-3">
-            <item.icon className="h-4 w-4 text-supperagent group-hover:text-white" />
+            <item.icon className="h-4 w-4 text-theme group-hover:text-white" />
             <span className="text-black group-hover:text-white">
               {item.label}
             </span>
+            {/* Show Badge on Parent items if needed (optional, usually on leaf) */}
+            {badgeCount > 0 && (
+              <span className="ml-2 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1 text-xs font-bold text-white">
+                {badgeCount}
+              </span>
+            )}
           </div>
           {isExpanded ? (
-            <ChevronDown className="h-4 w-4 text-supperagent group-hover:text-white" />
+            <ChevronDown className="h-4 w-4 text-theme group-hover:text-white" />
           ) : (
-            <ChevronRight className="h-4 w-4 text-supperagent group-hover:text-white" />
+            <ChevronRight className="h-4 w-4 text-theme group-hover:text-white" />
           )}
         </button>
 
@@ -694,7 +535,8 @@ const NavItem = ({
                 expandedItems={expandedItems}
                 toggleExpanded={toggleExpanded}
                 depth={depth + 1}
-                basePath={basePath} // Pass basePath recursively
+                basePath={basePath}
+                status={status} // Pass status recursively
               />
             ))}
           </div>
@@ -707,13 +549,21 @@ const NavItem = ({
     <Link
       to={targetPath}
       className={cn(
-        'group flex w-full items-center space-x-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 hover:bg-supperagent hover:text-white',
-        isActiveLeaf && 'bg-blue-50 text-supperagent shadow-sm',
+        'group flex w-full items-center space-x-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 hover:bg-theme hover:text-white',
+        isActiveLeaf && 'bg-blue-50 text-theme shadow-sm',
         depth > 0 && 'pl-6'
       )}
     >
-      <item.icon className="h-4 w-4 text-supperagent group-hover:text-white" />
-      <span className="text-black group-hover:text-white">{item.label}</span>
+      <item.icon className="h-4 w-4 text-theme group-hover:text-white" />
+      <span className="flex-1 text-black group-hover:text-white">
+        {item.label}
+      </span>
+      {/* RENDER BADGE HERE */}
+      {badgeCount > 0 && (
+        <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1 text-xs font-bold text-white group-hover:bg-red-400 group-hover:text-white">
+          {badgeCount}
+        </span>
+      )}
     </Link>
   );
 };
@@ -723,28 +573,54 @@ export function SideNav() {
   const location = useLocation();
   const dispatch = useDispatch<AppDispatch>();
   const user = useSelector((state: any) => state.auth?.user) || null;
-  const userRole = user?.role || 'staff';
+  const userRole = user?.role;
   const [expandedItems, setExpandedItems] = useState({});
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [fetchedUser, setFetchedUser] = useState(null);
+  
+  const [companyThemeColor, setCompanyThemeColor] = useState<string>('');
 
-  // 2. Define the Base Path based on the role
-  const basePath = userRole === 'company' ? '/company' : '/admin';
+   useEffect(() => {
+    const savedTheme = localStorage.getItem("themeColor");
+    if (savedTheme) {
+      document.documentElement.style.setProperty("--theme", savedTheme);
+      setCompanyThemeColor(savedTheme); // Set the theme color from localStorage
+    }
+  }, []);
+
 
   useEffect(() => {
-    const fetchUserInfo = async () => {
-      try {
-        if (user?._id) {
-          const res = await axiosInstance.get(`/users/${user._id}`);
-          setFetchedUser(res.data?.data);
+    if (user) {
+      const fetchCompanyData = async () => {
+        try {
+          const response = await axiosInstance.get(`/users/${user?._id}`);
+          const themeColor = response.data.data.themeColor || '#38bdf8'; // Fallback theme color
+          setCompanyThemeColor(themeColor);
+          localStorage.setItem("themeColor", themeColor); // Store it in localStorage
+          document.documentElement.style.setProperty("--theme", themeColor); // Apply the new theme
+        } catch (error) {
+          console.error('Error fetching company data:', error);
+          // Fallback theme color in case of an error
+          const fallbackColor = '#38bdf8';
+          setCompanyThemeColor(fallbackColor);
+          localStorage.setItem("themeColor", fallbackColor); // Store fallback in localStorage
+          document.documentElement.style.setProperty("--theme", fallbackColor); // Apply fallback theme
         }
-      } catch (err) {
-        console.error('Error fetching user info:', err);
-      }
-    };
+      };
+      fetchCompanyData();
+    } else {
+      // If id is undefined, apply default theme color
+      const fallbackColor = '#38bdf8';
+      setCompanyThemeColor(fallbackColor);
+      localStorage.setItem("themeColor", fallbackColor); // Store fallback in localStorage
+      document.documentElement.style.setProperty("--theme", fallbackColor); // Apply fallback theme
+    }
+  }, [user]);
 
-    fetchUserInfo();
-  }, [user?._id]);
+
+  // Use the Context Hook
+  const { status } = useScheduleStatus(); 
+
+  const basePath = userRole === 'company' ? '/company' : '/admin';
 
   const handleLogout = async () => {
     await dispatch(logout());
@@ -804,14 +680,13 @@ export function SideNav() {
       </div>
 
       {/* User Profile */}
-      <div className="flex flex-col items-center  px-4 ">
+      <div className="flex flex-col items-center px-4 ">
         <img
           src={user?.image || '/placeholder.jpg'}
           alt="User avatar"
           className="h-24 w-24 rounded-full object-cover"
         />
         <div className="flex flex-col items-center space-y-1">
-          {/* <p className="text-xl font-semibold text-gray-900">Welcome!</p> */}
           <div
             onClick={() => {
               if (user?.role !== 'admin' && user?.role !== 'company') {
@@ -828,14 +703,6 @@ export function SideNav() {
             {user ? user.name : 'User'}
           </div>
         </div>
-        {/* <div className="flex items-center justify-start space-x-3 pt-4">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-supperagent">
-            <span className="text-sm font-bold text-white">HR</span>
-          </div>
-          <div className="hidden lg:block">
-            <h1 className="text-lg font-semibold text-gray-900">HR System</h1>
-          </div>
-        </div> */}
       </div>
 
       {/* Navigation */}
@@ -846,7 +713,8 @@ export function SideNav() {
             item={item}
             expandedItems={expandedItems}
             toggleExpanded={toggleExpanded}
-            basePath={basePath} // 3. Pass the base path here
+            basePath={basePath}
+            status={status} // Pass status props down
           />
         ))}
       </nav>

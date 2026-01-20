@@ -108,7 +108,7 @@ export default function CompanyNoticeBoard() {
       <div className="">
         {/* Header */}
         <div className="mb-8 flex items-center gap-4">
-            <Bell className="h-6 w-6 text-supperagent" />
+            <Bell className="h-6 w-6 text-theme" />
             <h1 className="text-2xl font-bold tracking-tight text-slate-900">Notice Board</h1>
         </div>
 
@@ -116,7 +116,7 @@ export default function CompanyNoticeBoard() {
         <div className="space-y-4">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-24">
-              <BlinkingDots size="large" color="bg-supperagent" />
+              <BlinkingDots size="large" color="bg-theme" />
             </div>
           ) : filteredNotices.length === 0 ? (
             <Card className="border border-slate-200 bg-white py-16 text-center shadow-sm">

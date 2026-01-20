@@ -94,7 +94,7 @@ const Profile = () => {
         <h1 className="text-2xl font-bold">{user?.title} {user?.firstName} {user?.initial} {user?.lastName}</h1>
         <Button
           variant="outline"
-          className="border-none bg-supperagent text-white hover:bg-supperagent/90"
+          className="border-none bg-theme text-white hover:bg-theme/90"
           onClick={() => navigate(-1)}
         >
           <MoveLeft className="mr-2 h-4 w-4" />

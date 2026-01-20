@@ -116,7 +116,7 @@ export default function AdminNoticeBoard() {
       if (response.data && response.data.success) {
         toast({
           title: response.data.message || 'Record Updated successfully',
-          className: 'bg-supperagent border-none text-white'
+          className: 'bg-theme border-none text-white'
         });
       } else {
         toast({
@@ -193,7 +193,7 @@ export default function AdminNoticeBoard() {
             All Notice
           </h2>
         <Button
-          className="bg-supperagent text-white hover:bg-supperagent/90"
+          className="bg-theme text-white hover:bg-theme/90"
           size={'sm'}
           onClick={() => setDialogOpen(true)}
         >
@@ -249,7 +249,7 @@ export default function AdminNoticeBoard() {
           </label>
           <div
             onClick={() => setShowCalendar((prev) => !prev)}
-            className="relative mt-1 flex cursor-pointer items-center justify-between rounded-md border border-gray-300 px-4 py-2 shadow-sm hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-supperagent focus:ring-offset-2 sm:w-[300px]"
+            className="relative mt-1 flex cursor-pointer items-center justify-between rounded-md border border-gray-300 px-4 py-2 shadow-sm hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-theme focus:ring-offset-2 sm:w-[300px]"
           >
             <span className="text-sm text-gray-700">
               {dateRange[0].startDate && dateRange[0].endDate
@@ -304,7 +304,7 @@ export default function AdminNoticeBoard() {
                       setShowCalendar(false);
                       handleSearch();
                     }}
-                    className="bg-supperagent text-white hover:bg-supperagent/90"
+                    className="bg-theme text-white hover:bg-theme/90"
                   >
                     Apply
                   </Button>
@@ -319,7 +319,7 @@ export default function AdminNoticeBoard() {
       <div className="py-4 ">
         {initialLoading ? (
           <div className="flex justify-center py-6">
-            <BlinkingDots size="large" color="bg-supperagent" />
+            <BlinkingDots size="large" color="bg-theme" />
           </div>
         ) : notice.length === 0 ? (
           <div className="flex justify-center py-6 text-gray-500">
@@ -374,7 +374,7 @@ export default function AdminNoticeBoard() {
                   <TableCell className="text-center">
                     <Button
                       variant="ghost"
-                      className="border-none bg-supperagent text-white hover:bg-supperagent/90"
+                      className="border-none bg-theme text-white hover:bg-theme/90"
                       size="icon"
                       onClick={() => handleEdit(n)}
                     >

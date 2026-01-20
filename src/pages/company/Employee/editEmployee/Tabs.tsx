@@ -31,7 +31,7 @@ export const Tabs: React.FC<TabsProps> = ({ tabs, activeTab, onChange }) => {
                 group flex w-full items-center justify-between rounded-lg border-2 border-gray-300  px-4 py-1 text-sm font-medium transition-all duration-200 ease-in-out
                 ${
                   isActive
-                    ? 'border-supperagent bg-white text-supperagent ring-2 ring-supperagent shadow-sm'
+                    ? 'border-theme bg-white text-theme ring-2 ring-theme shadow-sm'
                     : 'border-gray-200 bg-white  hover:border-gray-300 hover:bg-gray-50'
                 }
               `}
@@ -50,7 +50,7 @@ export const Tabs: React.FC<TabsProps> = ({ tabs, activeTab, onChange }) => {
                 {/* Chevron Icon */}
                 <ChevronRight 
                   className={`h-4 w-4 transition-colors ${
-                    isActive ? 'text-supperagent' : 'text-gray-400 group-hover:text-gray-500'
+                    isActive ? 'text-theme' : 'text-gray-400 group-hover:text-gray-500'
                   }`} 
                 />
               </div>

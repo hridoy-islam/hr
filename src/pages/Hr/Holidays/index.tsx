@@ -339,7 +339,7 @@ useEffect(() => {
   if (loading)
     return (
       <div className="flex justify-center py-12">
-        <BlinkingDots size="large" color="bg-supperagent" />
+        <BlinkingDots size="large" color="bg-theme" />
       </div>
     );
 
@@ -572,7 +572,7 @@ useEffect(() => {
             <Card className="shadow-sm">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <CheckCircle className="h-5 w-5 text-supperagent" />
+                  <CheckCircle className="h-5 w-5 text-theme" />
                   Submit Leave Request
                 </CardTitle>
               </CardHeader>
@@ -645,7 +645,7 @@ useEffect(() => {
                   </div>
                   <Button
                     onClick={handleSubmitRequest}
-                    className="w-full bg-supperagent text-white hover:bg-supperagent/90"
+                    className="w-full bg-theme text-white hover:bg-theme/90"
                     disabled={
                       !selectedType || !startDate || !endDate || !reason
                     }

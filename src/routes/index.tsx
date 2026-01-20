@@ -47,7 +47,7 @@ import LeaveApprovalPage from '@/pages/Hr/LeaveApproval';
 
 import TrainingExpiryPage from '@/pages/Hr/Dashboard/components/trainingExprity';
 import RightToWorkExpiryPage from '@/pages/Hr/Dashboard/components/rightToWork';
-import PassportExpiryPage from '@/pages/Hr/Dashboard/components/passportExpiray';
+import PassportExpiryPage from '@/pages/company/ExpiryPage/passportExpiray';
 import RtwPage from '@/pages/company/Employee/rightToWorkEmployee';
 import RightToWorkStatusPage from '@/pages/Hr/Dashboard/components/rightToWorkStatus';
 import BankHolidayPage from '@/pages/Hr/Bank-Holiday';
@@ -65,6 +65,11 @@ import CreateTraining from '@/pages/company/TrainingPage/CreateTraining';
 import EditTraining from '@/pages/company/TrainingPage/EditTraining';
 import CompanyScheduleCheckPage from '@/pages/company/ScheduleCheckPage';
 import CompanyNoticeBoard from '@/pages/company/NoticePage';
+import DbsExpiryPage from '@/pages/company/ExpiryPage/dbsExpiryPage';
+import VisaExpiryPage from '@/pages/company/ExpiryPage/visaExpiryPage';
+import RtwExpiryPage from '@/pages/company/ExpiryPage/rtwExpiryPage';
+import ImmigrationExpiryPage from '@/pages/company/ExpiryPage/immigrationExpiryPage';
+import AppraisalExpiryPage from '@/pages/company/ExpiryPage/appraisalExpiryPage';
 
 const SignInPage = lazy(() => import('@/pages/auth/signin'));
 
@@ -117,11 +122,13 @@ export default function AppRouter() {
     
 
         { path: 'expiry/passport', element: <PassportExpiryPage /> },
-        { path: 'expiry/training', element: <TrainingExpiryPage /> },
-        { path: 'expiry/rightToWork', element: <RightToWorkExpiryPage /> },
+        { path: 'expiry/dbs', element: <DbsExpiryPage /> },
+        { path: 'expiry/visa', element: <VisaExpiryPage /> },
+        { path: 'expiry/appraisal', element: <AppraisalExpiryPage /> },
+        { path: 'expiry/immigration', element: <ImmigrationExpiryPage /> },
         {
-          path: 'expiry/rightToWorkStatus',
-          element: <RightToWorkStatusPage />
+          path: 'expiry/rtw',
+          element: <RtwExpiryPage />
         },
 
         { path: 'profile', element: <Profile /> },

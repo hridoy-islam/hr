@@ -103,7 +103,7 @@ export default function TimeOnlyPickerForm() {
         </CardTitle>
         <Button
           onClick={() => navigate(-1)}
-          className="bg-supperagent text-white hover:bg-supperagent/90"
+          className="bg-theme text-white hover:bg-theme/90"
         >
           <MoveLeft />
           Back
@@ -178,7 +178,7 @@ export default function TimeOnlyPickerForm() {
               </Button>
               <Button
                 type="submit"
-                className="bg-supperagent text-white hover:bg-supperagent/90"
+                className="bg-theme text-white hover:bg-theme/90"
               >
                 Save Shift
               </Button>
@@ -277,7 +277,7 @@ export default function TimeOnlyPickerForm() {
               </Button>
               <Button
                 onClick={confirmTime}
-                className="bg-supperagent text-white hover:bg-supperagent/90"
+                className="bg-theme text-white hover:bg-theme/90"
               >
                 Confirm
               </Button>

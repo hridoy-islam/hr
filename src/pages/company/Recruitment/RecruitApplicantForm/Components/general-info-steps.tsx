@@ -16,12 +16,12 @@ import { Input } from '@/components/ui/input';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import Select from 'react-select';
-import { 
-  Loader2, 
-  Upload, 
-  CheckCircle, 
-  AlertCircle, 
-  FileText, 
+import {
+  Loader2,
+  Upload,
+  CheckCircle,
+  AlertCircle,
+  FileText,
   X,
   Eye
 } from 'lucide-react';
@@ -41,7 +41,11 @@ const generalInfoSchema = z
       required_error: 'Available from date is required'
     }),
     startDate: z.date({ required_error: 'Start date is required' }),
-    rtwDocumentUrl: z.union([z.string().url(), z.literal('')]).optional(),
+   rtwDocumentUrl: z
+  .string()
+  .min(1, { message: 'RTW document is required' })
+  .url({ message: 'Invalid document URL' }),
+
     area: z.string().min(1, { message: 'Area is required' }),
     contractHours: z.coerce
       .number()
@@ -113,7 +117,7 @@ export function GeneralInformation({
   applicantData
 }: GeneralInfoStepProps) {
   const { id } = useParams();
-  
+
   // --- Upload State ---
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -173,10 +177,15 @@ export function GeneralInformation({
       return false;
     }
     // Allow PDF and Images
-    const validTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
+    const validTypes = [
+      'image/jpeg',
+      'image/png',
+      'image/jpg',
+      'application/pdf'
+    ];
     if (!validTypes.includes(file.type)) {
-        setUploadError('Please select a valid file (PDF, JPG, PNG).');
-        return false;
+      setUploadError('Please select a valid file (PDF, JPG, PNG).');
+      return false;
     }
     return true;
   };
@@ -192,8 +201,8 @@ export function GeneralInformation({
     setFileName(file.name);
 
     const formData = new FormData();
-    if (id) formData.append('entityId', id); 
-    formData.append('file_type', 'rtwDocument'); 
+    if (id) formData.append('entityId', id);
+    formData.append('file_type', 'rtwDocument');
     formData.append('file', file);
 
     try {
@@ -202,14 +211,13 @@ export function GeneralInformation({
           'Content-Type': 'multipart/form-data'
         }
       });
-      
+
       const url = res.data?.data?.fileUrl;
-      
+
       if (!url) throw new Error('No file URL returned from server');
 
       setFileUrl(url);
       form.setValue('rtwDocumentUrl', url, { shouldValidate: true });
-      
     } catch (err) {
       console.error('Upload failed:', err);
       setUploadError('Upload failed. Please try again.');
@@ -222,7 +230,7 @@ export function GeneralInformation({
 
   const triggerFileInput = () => {
     if (!isUploading) {
-        fileInputRef.current?.click();
+      fileInputRef.current?.click();
     }
   };
 
@@ -249,7 +257,6 @@ export function GeneralInformation({
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)}>
         <CardContent className="space-y-6">
-          
           <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
             {/* Available From */}
             <FormField
@@ -257,14 +264,16 @@ export function GeneralInformation({
               name="availableFrom"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Available From <span className="text-red-500">*</span></FormLabel>
+                  <FormLabel>
+                    Available From <span className="text-red-500">*</span>
+                  </FormLabel>
                   <FormControl>
                     <DatePicker
                       selected={field.value}
                       onChange={(date: Date | null) => field.onChange(date)}
                       dateFormat="dd-MM-yyyy"
                       placeholderText="Select available from date"
-                      className="h-9 w-full rounded-sm border border-gray-300 px-3 py-1 focus:border-supperagent focus:ring-2 focus:ring-supperagent"
+                      className="h-9 w-full rounded-sm border border-gray-300 px-3 py-1 focus:border-theme focus:ring-2 focus:ring-theme"
                       showMonthDropdown
                       showYearDropdown
                       dropdownMode="select"
@@ -283,14 +292,16 @@ export function GeneralInformation({
               name="startDate"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Start Date <span className="text-red-500">*</span></FormLabel>
+                  <FormLabel>
+                    Start Date <span className="text-red-500">*</span>
+                  </FormLabel>
                   <FormControl>
                     <DatePicker
                       selected={field.value}
                       onChange={(date: Date | null) => field.onChange(date)}
                       dateFormat="dd-MM-yyyy"
                       placeholderText="Select start date"
-                      className="h-9 w-full rounded-sm border border-gray-300 px-3 py-1 focus:border-supperagent focus:ring-2 focus:ring-supperagent"
+                      className="h-9 w-full rounded-sm border border-gray-300 px-3 py-1 focus:border-theme focus:ring-2 focus:ring-theme"
                       showMonthDropdown
                       showYearDropdown
                       dropdownMode="select"
@@ -309,7 +320,7 @@ export function GeneralInformation({
               name="rtwDocumentUrl"
               render={({ field }) => (
                 <FormItem className="row-span-2">
-                  <FormLabel>RTW Document</FormLabel>
+                  <FormLabel>RTW Document <span className="text-red-500">*</span></FormLabel>
                   <FormControl>
                     <div className="space-y-2">
                       <input
@@ -334,8 +345,8 @@ export function GeneralInformation({
                       >
                         {isUploading ? (
                           <>
-                            <Loader2 className="mb-2 h-8 w-8 animate-spin text-supperagent" />
-                            <p className="text-xs font-medium text-supperagent">
+                            <Loader2 className="mb-2 h-8 w-8 animate-spin text-theme" />
+                            <p className="text-xs font-medium text-theme">
                               Uploading...
                             </p>
                           </>
@@ -346,33 +357,33 @@ export function GeneralInformation({
                               Document Attached
                             </p>
                             {fileName && (
-                                <p className="mt-1 max-w-[150px] truncate text-[10px] text-green-600">
+                              <p className="mt-1 max-w-[150px] truncate text-[10px] text-green-600">
                                 {fileName}
-                                </p>
+                              </p>
                             )}
-                            
+
                             <div className="mt-3 flex gap-2">
-                                <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-7 px-2 text-xs"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        window.open(fileUrl, '_blank');
-                                    }}
-                                >
-                                    <Eye className="mr-1 h-3 w-3" /> View
-                                </Button>
-                                <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="destructive"
-                                    className="h-7 px-2 text-xs"
-                                    onClick={handleRemoveFile}
-                                >
-                                    <X className="mr-1 h-3 w-3" /> Remove
-                                </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="h-7 px-2 text-xs"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  window.open(fileUrl, '_blank');
+                                }}
+                              >
+                                <Eye className="mr-1 h-3 w-3" /> View
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="destructive"
+                                className="h-7 px-2 text-xs"
+                                onClick={handleRemoveFile}
+                              >
+                                <X className="mr-1 h-3 w-3" /> Remove
+                              </Button>
                             </div>
                           </>
                         ) : (
@@ -409,7 +420,9 @@ export function GeneralInformation({
               name="area"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Area <span className="text-red-500">*</span></FormLabel>
+                  <FormLabel>
+                    Area <span className="text-red-500">*</span>
+                  </FormLabel>
                   <FormControl>
                     <Input {...field} />
                   </FormControl>
@@ -424,7 +437,9 @@ export function GeneralInformation({
               name="contractHours"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Contract Hours <span className="text-red-500">*</span></FormLabel>
+                  <FormLabel>
+                    Contract Hours <span className="text-red-500">*</span>
+                  </FormLabel>
                   <FormControl>
                     <Input
                       type="number"
@@ -459,13 +474,13 @@ export function GeneralInformation({
                       className="react-select"
                       classNamePrefix="react-select"
                       styles={{
-                            control: (base) => ({
-                              ...base,
-                              borderColor: '#e2e8f0',
-                              '&:hover': { borderColor: '#cbd5e1' },
-                              boxShadow: 'none',
-                            }),
-                          }}
+                        control: (base) => ({
+                          ...base,
+                          borderColor: '#e2e8f0',
+                          '&:hover': { borderColor: '#cbd5e1' },
+                          boxShadow: 'none'
+                        })
+                      }}
                     />
                   </FormControl>
                   <FormMessage />
@@ -479,7 +494,9 @@ export function GeneralInformation({
               name="payroll.payrollNumber"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Payroll Number <span className="text-red-500">*</span></FormLabel>
+                  <FormLabel>
+                    Payroll Number <span className="text-red-500">*</span>
+                  </FormLabel>
                   <FormControl>
                     <Input {...field} />
                   </FormControl>
@@ -494,7 +511,9 @@ export function GeneralInformation({
               name="payroll.paymentMethod"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Payment Method <span className="text-red-500">*</span></FormLabel>
+                  <FormLabel>
+                    Payment Method <span className="text-red-500">*</span>
+                  </FormLabel>
                   <FormControl>
                     <Select<OptionType>
                       options={[
@@ -511,11 +530,11 @@ export function GeneralInformation({
                       styles={{
                         menuPortal: (base) => ({ ...base, zIndex: 9999 }),
                         control: (base) => ({
-                              ...base,
-                              borderColor: '#e2e8f0',
-                              '&:hover': { borderColor: '#cbd5e1' },
-                              boxShadow: 'none',
-                            }),
+                          ...base,
+                          borderColor: '#e2e8f0',
+                          '&:hover': { borderColor: '#cbd5e1' },
+                          boxShadow: 'none'
+                        })
                       }}
                     />
                   </FormControl>
@@ -531,7 +550,9 @@ export function GeneralInformation({
                   name="payroll.bankName"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Bank Name <span className="text-red-500">*</span></FormLabel>
+                      <FormLabel>
+                        Bank Name <span className="text-red-500">*</span>
+                      </FormLabel>
                       <FormControl>
                         <Input {...field} placeholder="Enter bank name" />
                       </FormControl>
@@ -545,7 +566,9 @@ export function GeneralInformation({
                   name="payroll.accountNumber"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Account Number <span className="text-red-500">*</span></FormLabel>
+                      <FormLabel>
+                        Account Number <span className="text-red-500">*</span>
+                      </FormLabel>
                       <FormControl>
                         <Input {...field} placeholder="Enter account number" />
                       </FormControl>
@@ -559,7 +582,9 @@ export function GeneralInformation({
                   name="payroll.sortCode"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Sort Code <span className="text-red-500">*</span></FormLabel>
+                      <FormLabel>
+                        Sort Code <span className="text-red-500">*</span>
+                      </FormLabel>
                       <FormControl>
                         <Input {...field} placeholder="Enter sort code" />
                       </FormControl>
@@ -573,7 +598,9 @@ export function GeneralInformation({
                   name="payroll.beneficiary"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Beneficiary Name <span className="text-red-500">*</span></FormLabel>
+                      <FormLabel>
+                        Beneficiary Name <span className="text-red-500">*</span>
+                      </FormLabel>
                       <FormControl>
                         <Input
                           {...field}
@@ -587,12 +614,12 @@ export function GeneralInformation({
               </>
             )}
           </div>
-          
+
           {/* Action Buttons */}
           <div className="flex justify-end space-x-4 pt-4">
             <Button
               type="submit"
-              className="bg-supperagent text-white hover:bg-supperagent/90"
+              className="bg-theme text-white hover:bg-theme/90"
             >
               Save
             </Button>

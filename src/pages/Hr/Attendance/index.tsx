@@ -118,7 +118,7 @@ export default function Attendance() {
       if (response.data?.success) {
         toast({
           title: response.data.message || 'Record updated successfully',
-          className: 'bg-supperagent border-none text-white'
+          className: 'bg-theme border-none text-white'
         });
       } else {
         throw new Error('Unexpected response');
@@ -163,7 +163,7 @@ useEffect(() => {
       <div className="flex items-center space-x-4">
         <div className="flex items-center space-x-2">
           <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-            <SelectTrigger className="h-8 w-[140px] rounded-md border border-gray-300 px-2 focus:outline-none focus:ring-2 focus:ring-supperagent">
+            <SelectTrigger className="h-8 w-[140px] rounded-md border border-gray-300 px-2 focus:outline-none focus:ring-2 focus:ring-theme">
               <SelectValue placeholder="Select Month" />
             </SelectTrigger>
             <SelectContent>
@@ -177,7 +177,7 @@ useEffect(() => {
 
           {/* Year Select Dropdown */}
           <Select value={selectedYear} onValueChange={setSelectedYear}>
-            <SelectTrigger className="h-8 w-[120px] rounded-md border border-gray-300 px-2 focus:outline-none focus:ring-2 focus:ring-supperagent">
+            <SelectTrigger className="h-8 w-[120px] rounded-md border border-gray-300 px-2 focus:outline-none focus:ring-2 focus:ring-theme">
               <SelectValue placeholder="Select Year" />
             </SelectTrigger>
             <SelectContent>
@@ -196,7 +196,7 @@ useEffect(() => {
         <Button
           onClick={handleSearch}
           size="sm"
-          className="min-w-[100px] border-none bg-supperagent text-white hover:bg-supperagent/90"
+          className="min-w-[100px] border-none bg-theme text-white hover:bg-theme/90"
           disabled={!selectedMonth || !selectedYear}
         >
           Search
@@ -206,7 +206,7 @@ useEffect(() => {
       <div className="">
         {initialLoading ? (
           <div className="flex justify-center py-6">
-            <BlinkingDots size="large" color="bg-supperagent" />
+            <BlinkingDots size="large" color="bg-theme" />
           </div>
         ) : groupedData.length === 0 ? (
           <div className="flex justify-center py-6 text-gray-500">
@@ -233,7 +233,7 @@ useEffect(() => {
                   <TableCell className="text-center">
                     <Button
                       variant="ghost"
-                      className="border-none bg-supperagent text-white hover:bg-supperagent/90"
+                      className="border-none bg-theme text-white hover:bg-theme/90"
                       size="icon"
                       onClick={(e) => {
                         e.stopPropagation(); // prevent row click

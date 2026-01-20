@@ -98,7 +98,7 @@ export default function AdminNoticeBoard() {
       if (response.data && response.data.success) {
         toast({
           title: response.data.message || 'Record Updated successfully',
-          className: 'bg-supperagent border-none text-white'
+          className: 'bg-theme border-none text-white'
         });
       } else {
         toast({
@@ -209,14 +209,14 @@ export default function AdminNoticeBoard() {
             }}
             isClearable={true}
             placeholderText="Select date range"
-            className="flex w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-supperagent focus:ring-supperagent outline-none shadow-sm h-[38px]"
+            className="flex w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-theme focus:ring-theme outline-none shadow-sm h-[38px]"
             dateFormat="MMM d, yyyy"
           />
         </div>
       </div>
         </div>
         <Button
-          className="bg-supperagent text-white hover:bg-supperagent/90"
+          className="bg-theme text-white hover:bg-theme/90"
           size={'sm'}
           onClick={() => setDialogOpen(true)}
         >
@@ -231,7 +231,7 @@ export default function AdminNoticeBoard() {
       <div className="py-4 ">
         {initialLoading ? (
           <div className="flex justify-center py-6">
-            <BlinkingDots size="large" color="bg-supperagent" />
+            <BlinkingDots size="large" color="bg-theme" />
           </div>
         ) : notice.length === 0 ? (
           <div className="flex justify-center py-6 text-gray-500">
@@ -312,7 +312,7 @@ export default function AdminNoticeBoard() {
                   <TableCell className="text-center">
                     <Button
                       variant="ghost"
-                      className="border-none bg-supperagent text-white hover:bg-supperagent/90"
+                      className="border-none bg-theme text-white hover:bg-theme/90"
                       size="icon"
                       onClick={() => handleEdit(n)}
                     >

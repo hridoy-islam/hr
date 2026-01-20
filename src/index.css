@@ -33,7 +33,8 @@
     --chart-5: 27 87% 67%;
     --supperagent: 198.44 93.2% 59.61%;
     --supperagent-foreground: 0 0% 98%;
-    --watney: 215 62.69% 26.27%
+    --watney: 215 62.69% 26.27%;
+    --theme:198.44 93.2% 59.61%;
   }
 
   .dark {
@@ -74,7 +75,7 @@
   }
 
   .btn-super {
-    @apply bg-supperagent text-white hover:bg-supperagent/90 border-none;
+    @apply bg-supperagent text-white hover:bg-theme/90 border-none;
   }
 }
 

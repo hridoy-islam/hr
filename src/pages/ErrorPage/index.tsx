@@ -10,7 +10,7 @@ const ErrorPage = () => {
       </div>
       <div className='ml-5'>
         <h1 className='text-5xl font-bold mb-10 '> PAGE <br />  NOT FOUND</h1>
-        <Link to="/" className='bg-supperagent px-5 py-3 rounded-2xl font-bold text-white'>Back To Home</Link>
+        <Link to="/" className='bg-theme px-5 py-3 rounded-2xl font-bold text-white'>Back To Home</Link>
       </div>
     </div>
   );

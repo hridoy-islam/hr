@@ -327,7 +327,7 @@ const AdminDashboardPage = () => {
 
           {loading ? (
             <div className="flex justify-center py-12">
-              <BlinkingDots size="large" color="bg-supperagent" />
+              <BlinkingDots size="large" color="bg-theme" />
             </div>
           ) : (
             <>
@@ -355,7 +355,7 @@ const AdminDashboardPage = () => {
                       currentDevices.map((device) => (
                         <TableRow key={device.id} className="hover:bg-gray-50">
                           <TableCell>
-                            <span className="rounded-md bg-supperagent px-3 py-1 text-sm font-medium text-white">
+                            <span className="rounded-md bg-theme px-3 py-1 text-sm font-medium text-white">
                               {device.id}
                             </span>
                           </TableCell>

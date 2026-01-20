@@ -138,7 +138,7 @@ export default function EditShift() {
 
   if (isLoading) {
     return  <div className="flex justify-center py-6">
-                <BlinkingDots size="large" color="bg-supperagent" />
+                <BlinkingDots size="large" color="bg-theme" />
               </div>;
   }
 
@@ -150,7 +150,7 @@ export default function EditShift() {
         </CardTitle>
         <Button
           onClick={() => navigate(-1)}
-          className="bg-supperagent text-white hover:bg-supperagent/90"
+          className="bg-theme text-white hover:bg-theme/90"
         >
           <MoveLeft />
           Back
@@ -225,7 +225,7 @@ export default function EditShift() {
               </Button>
               <Button
                 type="submit"
-                className="bg-supperagent text-white hover:bg-supperagent/90"
+                className="bg-theme text-white hover:bg-theme/90"
               >
                 Update Shift
               </Button>
@@ -321,7 +321,7 @@ export default function EditShift() {
               </Button>
               <Button
                 onClick={confirmTime}
-                className="bg-supperagent text-white hover:bg-supperagent/90"
+                className="bg-theme text-white hover:bg-theme/90"
               >
                 Confirm
               </Button>

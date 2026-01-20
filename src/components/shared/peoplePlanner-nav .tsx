@@ -111,18 +111,18 @@ const NavItem = ({ item, expandedItems, toggleExpanded, depth = 0 }) => {
         <button
           onClick={() => toggleExpanded(item.label)}
           className={cn(
-            'group flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-all duration-200 hover:bg-supperagent hover:text-white',
+            'group flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-all duration-200 hover:bg-theme hover:text-white',
             depth > 0 && 'pl-6'
           )}
         >
           <div className="flex items-center space-x-3">
-            <item.icon className="h-4 w-4 text-supperagent group-hover:text-white" />
+            <item.icon className="h-4 w-4 text-theme group-hover:text-white" />
             <span className="text-black group-hover:text-white">{item.label}</span>
           </div>
           {isExpanded ? (
-            <ChevronDown className="h-4 w-4 text-supperagent group-hover:text-white" />
+            <ChevronDown className="h-4 w-4 text-theme group-hover:text-white" />
           ) : (
-            <ChevronRight className="h-4 w-4 text-supperagent group-hover:text-white" />
+            <ChevronRight className="h-4 w-4 text-theme group-hover:text-white" />
           )}
         </button>
 
@@ -152,12 +152,12 @@ const NavItem = ({ item, expandedItems, toggleExpanded, depth = 0 }) => {
     <Link
       to={item.href}
       className={cn(
-        'group flex w-full items-center space-x-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 hover:bg-supperagent hover:text-white',
-        isActiveLeaf && 'bg-blue-50 text-supperagent shadow-sm',
+        'group flex w-full items-center space-x-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 hover:bg-theme hover:text-white',
+        isActiveLeaf && 'bg-blue-50 text-theme shadow-sm',
         depth > 0 && 'pl-6'
       )}
     >
-      <item.icon className="h-4 w-4 text-supperagent group-hover:text-white" />
+      <item.icon className="h-4 w-4 text-theme group-hover:text-white" />
       <span className="text-black group-hover:text-white">{item.label}</span>
     </Link>
   );
@@ -214,7 +214,7 @@ export function PeoplePlannerSideNav() {
       {/* Header */}
       <div className="flex h-16 items-center justify-between px-4">
         <div className="flex items-center space-x-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-supperagent">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-theme">
             <span className="text-sm font-bold text-white">PP</span>
           </div>
           <div className="hidden lg:block">

@@ -7,7 +7,7 @@ import { UserNav } from './user-nav';
 
 export function TopNav() {
   return (
-    <div className="flex h-16 items-center justify-between bg-supperagent px-4">
+    <div className="flex h-16 items-center justify-between bg-theme px-4">
       <div className="flex items-center space-x-4">
         {/* <Link to="/" className="flex items-center space-x-2 text-white">
           <Layers className="h-6 w-6" />

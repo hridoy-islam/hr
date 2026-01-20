@@ -71,7 +71,7 @@ export default function AdminTrainingPage() {
       if (response.data && response.data.success === true) {
         toast({
           title: response.data.message || 'Record Updated successfully',
-          className: 'bg-supperagent border-none text-white'
+          className: 'bg-theme border-none text-white'
         });
       } else if (response.data && response.data.success === false) {
         toast({
@@ -104,7 +104,7 @@ export default function AdminTrainingPage() {
         });
         toast({
           title: 'Record updated successfully',
-          className: 'bg-supperagent border-none text-white'
+          className: 'bg-theme border-none text-white'
         });
         fetchData(currentPage, entriesPerPage);
       } catch (error) {
@@ -135,7 +135,7 @@ export default function AdminTrainingPage() {
           All Training
         </h2>{' '}
         <Button
-          className="bg-supperagent text-white hover:bg-supperagent/90"
+          className="bg-theme text-white hover:bg-theme/90"
           size={'sm'}
           onClick={()=>{navigate(`/admin/hr/create-training`)}}
         >
@@ -155,7 +155,7 @@ export default function AdminTrainingPage() {
         <Button
           onClick={handleSearch}
           size="sm"
-          className="min-w-[100px] border-none bg-supperagent text-white hover:bg-supperagent/90"
+          className="min-w-[100px] border-none bg-theme text-white hover:bg-theme/90"
         >
           Search
         </Button>
@@ -164,7 +164,7 @@ export default function AdminTrainingPage() {
       <div className="">
         {initialLoading ? (
           <div className="flex justify-center py-6">
-            <BlinkingDots size="large" color="bg-supperagent" />
+            <BlinkingDots size="large" color="bg-theme" />
           </div>
         ) : training.length === 0 ? (
           <div className="flex justify-center py-6 text-gray-500">
@@ -198,7 +198,7 @@ export default function AdminTrainingPage() {
                   <TableCell className="text-right">
                     <Button
                       variant="ghost"
-                      className="border-none bg-supperagent text-white hover:bg-supperagent/90"
+                      className="border-none bg-theme text-white hover:bg-theme/90"
                       size="icon"
                       onClick={()=>{navigate(`/admin/hr/edit-training/${training._id}`)}}
                     >

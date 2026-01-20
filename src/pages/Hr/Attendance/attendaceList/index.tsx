@@ -194,7 +194,7 @@ export default function AttendanceList() {
 
       toast({
         title: 'Attendance updated successfully',
-        className: 'bg-supperagent border-none text-white'
+        className: 'bg-theme border-none text-white'
       });
 
       setModifiedAttendance((prev) => {
@@ -257,7 +257,7 @@ export default function AttendanceList() {
             Attendance Details
           </h1>
           <Button
-            className="flex h-9 items-center gap-2 bg-supperagent text-white hover:bg-supperagent/90"
+            className="flex h-9 items-center gap-2 bg-theme text-white hover:bg-theme/90"
             onClick={() => navigate(-1)}
           >
             <MoveLeft className="h-4 w-4" />
@@ -289,7 +289,7 @@ export default function AttendanceList() {
         <div className="rounded-md">
           {initialLoading ? (
             <div className="flex justify-center py-6">
-              <BlinkingDots size="large" color="bg-supperagent" />
+              <BlinkingDots size="large" color="bg-theme" />
             </div>
           ) : attendance.length === 0 ? (
             <div className="flex justify-center py-6 text-gray-500">
@@ -406,7 +406,7 @@ export default function AttendanceList() {
                       {modifiedAttendance[attendence._id] && (
                         <Button
                           variant="ghost"
-                          className="border-none bg-supperagent text-white hover:bg-supperagent/90"
+                          className="border-none bg-theme text-white hover:bg-theme/90"
                           onClick={() => updateAttendance(attendence._id)}
                         >
                           <Save className="h-4 w-4" />

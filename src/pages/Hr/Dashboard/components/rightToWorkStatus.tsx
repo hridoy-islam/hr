@@ -252,7 +252,7 @@ const RightToWorkStatusPage = () => {
             variant="outline"
             size="sm"
             onClick={() => navigate(-1)}
-            className="flex items-center space-x-2 border-none bg-supperagent hover:bg-supperagent/90"
+            className="flex items-center space-x-2 border-none bg-theme hover:bg-theme/90"
           >
             <ArrowLeft className="h-4 w-4" />
             <span>Back</span>
@@ -279,7 +279,7 @@ const RightToWorkStatusPage = () => {
           {/* Table */}
           {loading ? (
             <div className="flex justify-center py-12">
-              <BlinkingDots size="large" color="bg-supperagent" />
+              <BlinkingDots size="large" color="bg-theme" />
             </div>
           ) : (
             <>
@@ -322,7 +322,7 @@ const RightToWorkStatusPage = () => {
                             <Button
                               size="sm"
                               onClick={() => handleUpdateClick(record)}
-                              className="bg-supperagent text-white hover:bg-supperagent/90"
+                              className="bg-theme text-white hover:bg-theme/90"
                             >
                               Update
                             </Button>
@@ -383,7 +383,7 @@ const RightToWorkStatusPage = () => {
                       selected={newNextCheckDate}
                       onChange={(date: Date) => setNewNextCheckDate(date)}
                       dateFormat="dd/MM/yyyy"
-                      className="w-full rounded-md border border-gray-300 py-2 pl-10 pr-4 shadow-sm focus:border-supperagent focus:ring-supperagent"
+                      className="w-full rounded-md border border-gray-300 py-2 pl-10 pr-4 shadow-sm focus:border-theme focus:ring-theme"
                       wrapperClassName="w-full"
                       showMonthDropdown
                       showYearDropdown
@@ -464,7 +464,7 @@ const RightToWorkStatusPage = () => {
                     Cancel
                   </Button>
                   <Button
-                    className="bg-supperagent text-white hover:bg-supperagent/90"
+                    className="bg-theme text-white hover:bg-theme/90"
                     onClick={handleSubmitUpdate}
                     disabled={submitting || isUploading || !newNextCheckDate || !uploadedFileUrl}
                   >

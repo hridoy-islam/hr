@@ -100,13 +100,13 @@ const ReviewStep: React.FC<ReviewStepProps> = ({ formData, onSubmit, onBack }) =
                 <TableSectionHeader icon={FileText} title="Official Documents" />
                 <DataRow label="NI Number" value={personalDetails.nationalInsuranceNumber} />
                 <DataRow label="NHS Number" value={personalDetails.nhsNumber} />
-                <DataRow label="Passport Number" value={personalDetails.passportNo} />
+                {/* <DataRow label="Passport Number" value={personalDetails.passportNo} />
                 <DataRow 
                   label="Passport Expiry" 
                   value={personalDetails.passportExpiry ? (
                     moment(personalDetails.passportExpiry).format('DD MMM YYYY')
                   ) : null} 
-                />
+                /> */}
 
                 {/* --- 4. Application Details --- */}
                 <TableSectionHeader icon={Briefcase} title="Application Context" />

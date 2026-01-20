@@ -176,7 +176,7 @@ const user = useSelector((state: any) => state.auth.user);
                 id="yearFilter"
                 value={selectedYear}
                 onChange={(e) => setSelectedYear(Number(e.target.value))}
-                className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-supperagent"
+                className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-theme"
               >
                 {Array.from({ length: 15 }, (_, i) => {
                   const year = new Date().getFullYear() - 7 + i;
@@ -195,7 +195,7 @@ const user = useSelector((state: any) => state.auth.user);
             <DialogTrigger asChild>
               <Button
                 onClick={resetForm}
-                className="bg-supperagent text-white hover:bg-supperagent/90"
+                className="bg-theme text-white hover:bg-theme/90"
               >
                 <Plus className="mr-2 h-4 w-4" />
                 Add Holiday
@@ -220,7 +220,7 @@ const user = useSelector((state: any) => state.auth.user);
                       customInput={
                         <button
                           type="button"
-                          className="flex w-full items-center justify-start rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-supperagent"
+                          className="flex w-full items-center justify-start rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-theme"
                         >
                           <CalendarIcon className="mr-2 h-4 w-4" />
                           {date ? (
@@ -273,7 +273,7 @@ const user = useSelector((state: any) => state.auth.user);
                 <Button
                   onClick={handleSaveHoliday}
                   disabled={isLoading || !date || !title.trim()}
-                  className="bg-supperagent text-white hover:bg-supperagent/90"
+                  className="bg-theme text-white hover:bg-theme/90"
                 >
                   {isLoading ? (
                     <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
@@ -303,7 +303,7 @@ const user = useSelector((state: any) => state.auth.user);
               {isLoadingHolidays ? (
                 <TableRow>
                   <TableCell colSpan={4} className="h-24 text-center">
-                    <BlinkingDots size="medium" color="bg-supperagent" />
+                    <BlinkingDots size="medium" color="bg-theme" />
                   </TableCell>
                 </TableRow>
               ) : holidays.length === 0 ? (
@@ -327,7 +327,7 @@ const user = useSelector((state: any) => state.auth.user);
                             size="icon"
                             onClick={() => handleEditClick(holiday)}
                             title="Edit holiday"
-                            className="bg-supperagent text-white hover:bg-supperagent/90"
+                            className="bg-theme text-white hover:bg-theme/90"
                           >
                             <Edit className="h-4 w-4" />
                           </Button>

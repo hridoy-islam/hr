@@ -480,7 +480,7 @@ export default function EntryAttendance() {
           <Button
             onClick={handleSubmit}
             disabled={loading.submitting || !attendanceData.clockIn}
-            className="bg-supperagent px-6 py-2 text-white hover:bg-supperagent/90 disabled:cursor-not-allowed disabled:bg-gray-400"
+            className="bg-theme px-6 py-2 text-white hover:bg-theme/90 disabled:cursor-not-allowed disabled:bg-gray-400"
           >
             {loading.submitting ? 'Submitting...' : 'Submit Attendance'}
           </Button>

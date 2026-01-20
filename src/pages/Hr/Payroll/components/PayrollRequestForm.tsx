@@ -127,7 +127,7 @@ const handleSubmit = (e: React.FormEvent) => {
 
           <Button
             type="submit"
-            className="w-full bg-supperagent text-white hover:bg-supperagent/90"
+            className="w-full bg-theme text-white hover:bg-theme/90"
             disabled={!isFormValid || isSubmitting}
           >
             {isSubmitting ? (

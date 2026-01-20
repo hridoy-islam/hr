@@ -168,7 +168,7 @@ export default function SubscriptionPlanPage() {
         await axiosInstance.post(`/subscription-plans`, payload);
         toast({
           title: 'Plan created successfully',
-          className: 'bg-supperagent text-white'
+          className: 'bg-theme text-white'
         });
       }
 
@@ -225,7 +225,7 @@ export default function SubscriptionPlanPage() {
             <Button
               onClick={handleSearch}
               size="sm"
-              className="min-w-[100px] bg-supperagent text-white hover:bg-supperagent/90"
+              className="min-w-[100px] bg-theme text-white hover:bg-theme/90"
             >
               <Search className="mr-2 h-4 w-4" />
               Search
@@ -233,7 +233,7 @@ export default function SubscriptionPlanPage() {
           </div>
         </div>
         <Button
-          className="bg-supperagent text-white hover:bg-supperagent/90"
+          className="bg-theme text-white hover:bg-theme/90"
           size={'sm'}
           onClick={() => handleOpenDialog()}
         >
@@ -245,7 +245,7 @@ export default function SubscriptionPlanPage() {
       <div>
         {loading ? (
           <div className="flex justify-center py-6">
-            <BlinkingDots size="large" color="bg-supperagent" />
+            <BlinkingDots size="large" color="bg-theme" />
           </div>
         ) : plans.length === 0 ? (
           <div className="flex justify-center py-6 text-gray-500">
@@ -278,7 +278,7 @@ export default function SubscriptionPlanPage() {
                     <TableCell className="space-x-2 text-right">
                       <Button
                         variant="ghost"
-                        className="h-8 w-8 bg-supperagent p-0 text-white hover:bg-supperagent/90"
+                        className="h-8 w-8 bg-theme p-0 text-white hover:bg-theme/90"
                         onClick={() => handleOpenDialog(plan)}
                       >
                         <Pen className="h-4 w-4" />
@@ -400,7 +400,7 @@ export default function SubscriptionPlanPage() {
               </Button>
               <Button
                 type="submit"
-                className="bg-supperagent"
+                className="bg-theme"
                 disabled={isSubmitLoading}
               >
                 {isSubmitLoading ? 'Saving...' : 'Save Plan'}

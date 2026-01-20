@@ -156,7 +156,7 @@ export default function StaffNoticeBoard() {
         <div className="space-y-3">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-24">
-              <BlinkingDots size="large" color="bg-supperagent" />
+              <BlinkingDots size="large" color="bg-theme" />
             </div>
           ) : filteredNotices.length === 0 ? (
             <Card className="border border-slate-200 bg-white py-16 text-center shadow-sm">
@@ -212,7 +212,7 @@ export default function StaffNoticeBoard() {
                     {notice.noticeBy && (
                       <div className="flex items-center gap-1.5 text-xs">
                         <UserIcon className="h-3.5 w-3.5 text-slate-400" />
-                        <span className="font-semibold text-supperagent">
+                        <span className="font-semibold text-theme">
                           {notice.noticeBy.firstName} {notice.noticeBy.lastName}
                         </span>
                       </div>

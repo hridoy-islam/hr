@@ -44,7 +44,6 @@ interface PassportData {
   userId: string;
   passportNumber: string;
   passportExpiryDate: string;
-  dateOfIssue?: string;
   logs?: LogEntry[];
 }
 
@@ -69,7 +68,6 @@ function PassportTab() {
   const [passportId, setPassportId] = useState<string | null>(null);
   const [currentPassportNumber, setCurrentPassportNumber] = useState<string | null>(null);
   const [currentExpiryDate, setCurrentExpiryDate] = useState<string | null>(null);
-  const [currentDateOfIssue, setCurrentDateOfIssue] = useState<string | null>(null);
   const [history, setHistory] = useState<LogEntry[]>([]);
 
   // Modal & Form State
@@ -77,7 +75,6 @@ function PassportTab() {
   
   // Form Inputs
   const [newPassportNumber, setNewPassportNumber] = useState<string>('');
-  const [newDateOfIssue, setNewDateOfIssue] = useState<Date | null>(null);
   const [newExpiryDate, setNewExpiryDate] = useState<Date | null>(null);
   
   // File Upload State
@@ -87,7 +84,7 @@ function PassportTab() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
-  // 1. Fetch Schedule Settings (To get auto-calculation interval)
+  // 1. Fetch Schedule Settings
   const fetchScheduleSettings = async () => {
     if (!user?._id) return;
     try {
@@ -96,7 +93,6 @@ function PassportTab() {
       );
       const result = res.data?.data?.result;
       if (result && result.length > 0) {
-        // Assuming passportCheckDate is stored as DAYS in the backend setting
         setPassportCheckInterval(result[0].passportCheckDate || 0);
       }
     } catch (err) {
@@ -116,13 +112,11 @@ function PassportTab() {
         setPassportId(data._id);
         setCurrentPassportNumber(data.passportNumber);
         setCurrentExpiryDate(data.passportExpiryDate);
-        setCurrentDateOfIssue(data.dateOfIssue || null);
         setHistory(data.logs || []);
       } else {
         setPassportId(null);
         setCurrentPassportNumber(null);
         setCurrentExpiryDate(null);
-        setCurrentDateOfIssue(null);
         setHistory([]);
       }
     } catch (err) {
@@ -148,16 +142,14 @@ function PassportTab() {
   useEffect(() => {
     if (currentExpiryDate) {
       const now = moment().startOf('day');
-      const expiry = moment(currentExpiryDate).startOf('day');
+      const expiry = moment(currentExpiryDate);
       
-      // Calculate difference in DAYS
-      const daysDiff = expiry.diff(now, 'days');
+      const diffDays = expiry.diff(now, 'days');
 
-      if (now.isAfter(expiry)) {
+      if (now.isAfter(expiry, 'day')) {
         setComplianceStatus('expired');
       } 
-      // Warn if expiring within the configured interval (DAYS)
-      else if (passportCheckInterval > 0 && daysDiff <= passportCheckInterval) {
+      else if (passportCheckInterval > 0 && diffDays <= passportCheckInterval) {
         setComplianceStatus('expiring-soon');
       } 
       else {
@@ -190,18 +182,6 @@ function PassportTab() {
         );
       default:
         return null;
-    }
-  };
-
-  // Auto-calculate Expiry Date based on Issue Date + Interval (DAYS)
-  const handleIssueDateChange = (date: Date | null) => {
-    setNewDateOfIssue(date);
-    
-    // If we have a date and a configured interval > 0
-    if (date && passportCheckInterval > 0) {
-      // Logic changed to DAYS
-      const calculatedExpiry = moment(date).add(passportCheckInterval, 'days').toDate();
-      setNewExpiryDate(calculatedExpiry);
     }
   };
 
@@ -253,18 +233,11 @@ function PassportTab() {
 
   // Pre-fill data when opening modal
   const openUpdateModal = () => {
-    // 1. Text Fields
     setNewPassportNumber(currentPassportNumber || '');
-    
-    // 2. Dates
-    setNewDateOfIssue(currentDateOfIssue ? new Date(currentDateOfIssue) : null);
     setNewExpiryDate(currentExpiryDate ? new Date(currentExpiryDate) : null);
-
-    // 3. Files: Reset
     setUploadedFileUrl(null);
     setSelectedFileName(null);
     setUploadError(null);
-    
     setShowUpdateModal(true);
   };
 
@@ -283,8 +256,6 @@ function PassportTab() {
       title: 'Passport Details Updated',
       document: uploadedFileUrl,
       passportNumber: newPassportNumber,
-      // We send Issue Date if available, useful for future calculations
-      dateOfIssue: newDateOfIssue ? moment(newDateOfIssue).toISOString() : undefined,
       passportExpiryDate: moment(newExpiryDate).toISOString(),
     };
 
@@ -301,7 +272,7 @@ function PassportTab() {
       await fetchPassportData();
       toast({
         title: 'Passport details updated successfully!',
-        className: 'bg-supperagent text-white'
+        className: 'bg-theme text-white'
       });
       setShowUpdateModal(false);
     } catch (err: any) {
@@ -318,7 +289,7 @@ function PassportTab() {
   if (isLoading) {
     return (
       <div className="flex h-64 w-full items-center justify-center">
-        <BlinkingDots size="large" color="bg-supperagent" />
+        <BlinkingDots size="large" color="bg-theme" />
       </div>
     );
   }
@@ -330,7 +301,7 @@ function PassportTab() {
         <div className="lg:col-span-1">
           <div className="h-full rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
             <h2 className="mb-6 flex items-center gap-2 text-xl font-semibold text-gray-900">
-              <Book className="h-5 w-5 text-supperagent" />
+              <Book className="h-5 w-5 text-theme" />
               Passport Status
             </h2>
 
@@ -364,15 +335,10 @@ function PassportTab() {
               <div className="border-t border-gray-100 pt-6 space-y-3">
                 <Button
                   onClick={openUpdateModal}
-                  className="w-full bg-supperagent text-white hover:bg-supperagent/90"
+                  className="w-full bg-theme text-white hover:bg-theme/90"
                 >
-                  Update Passport Details
+                  {currentExpiryDate ? 'Update / Renew Passport' : 'Add Passport Details'}
                 </Button>
-                {complianceStatus === 'expiring-soon' && (
-                  <p className="text-center text-xs text-yellow-600 font-medium">
-                    Passport expires in less than {passportCheckInterval} days.
-                  </p>
-                )}
               </div>
             </div>
           </div>
@@ -382,72 +348,85 @@ function PassportTab() {
         <div className="lg:col-span-2">
           <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
             <h2 className="mb-6 flex items-center gap-2 text-xl font-semibold text-gray-900">
-              <History className="h-5 w-5 text-supperagent" />
+              <History className="h-5 w-5 text-theme" />
               History Log
             </h2>
 
             <div className="overflow-hidden rounded-md border border-gray-100">
-              <Table>
-                <TableHeader className="bg-gray-50">
-                  <TableRow>
-                    <TableHead className="w-[180px]">Date Updated</TableHead>
-                    <TableHead>Activity Title</TableHead>
-                    <TableHead>Updated By</TableHead>
-                    <TableHead className='text-right'>Document</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {history.length === 0 ? (
-                    <TableRow>
-                      <TableCell
-                        colSpan={4}
-                        className="py-8 text-center italic text-gray-500"
-                      >
-                        No history records found.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    history
-                      .slice()
-                      .sort(
-                        (a, b) =>
-                          new Date(b.date).getTime() -
-                          new Date(a.date).getTime()
-                      )
-                      .map((entry) => (
-                        <TableRow key={entry._id} className="hover:bg-gray-50">
-                          <TableCell className="font-medium text-gray-600">
-                            {moment(entry.date).format('DD MMM YYYY')}
-                          </TableCell>
-                          <TableCell className="font-medium text-gray-900">
-                            {entry.title || 'Updated'}
-                          </TableCell>
-                          <TableCell className="text-gray-600">
-                            {entry.updatedBy &&
-                            typeof entry.updatedBy === 'object'
-                              ? entry.updatedBy?.name ||
-                                `${entry.updatedBy.firstName ?? ''} ${entry.updatedBy.lastName ?? ''}`.trim()
-                              : 'System'}
-                          </TableCell>
-                          <TableCell className="text-right">
-                             {entry.document ? (
-                              <Button
-                                size="sm"
-                                className="h-8"
-                                onClick={() => window.open(entry.document, '_blank')}
-                              >
-                                <Eye className="mr-2 h-4 w-4" />
-                                View
-                              </Button>
-                             ) : (
-                               <span className="text-gray-300">-</span>
-                             )}
-                          </TableCell>
-                        </TableRow>
-                      ))
-                  )}
-                </TableBody>
-              </Table>
+               <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  {/* Date & Time Column Removed */}
+                                  <TableHead>Activity</TableHead>
+                                  <TableHead >Updated By</TableHead>
+                                  <TableHead className="text-right">Document</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {history.length === 0 ? (
+                                  <TableRow>
+                                    <TableCell
+                                      colSpan={3} // Adjusted colspan from 4 to 3
+                                      className="py-8 text-center italic text-gray-500"
+                                    >
+                                      No history records found.
+                                    </TableCell>
+                                  </TableRow>
+                                ) : (
+                                  history
+                                    .slice()
+                                    .sort(
+                                      (a, b) =>
+                                        new Date(b.date).getTime() -
+                                        new Date(a.date).getTime()
+                                    )
+                                    .map((entry) => (
+                                      <TableRow key={entry._id} className="hover:bg-gray-50">
+                                        {/* Date Cell Removed */}
+              
+                                        <TableCell className="font-medium text-gray-900">
+                                          {entry.title || 'Update'}
+                                        </TableCell>
+              
+                                        <TableCell className="">
+                                          <div className='flex '>
+                                          <div className="flex flex-col">
+                                            <span className="font-medium">
+                                              {entry.updatedBy &&
+                                              typeof entry.updatedBy === 'object'
+                                                ? entry.updatedBy.name ||
+                                                  `${entry.updatedBy.firstName ?? ''} ${entry.updatedBy.lastName ?? ''}`.trim()
+                                                : 'System'}
+                                            </span>
+                                            {/* Date moved here underneath the name */}
+                                            <span className="text-xs ">
+                                              {moment(entry.date).format('DD MMM YYYY')}
+                                            </span>
+                                          </div>
+                                          </div>
+                                        </TableCell>
+              
+                                        <TableCell className="text-right">
+                                          {entry.document ? (
+                                            <Button
+                                              size="sm"
+                                              className="h-8"
+                                              onClick={() =>
+                                                window.open(entry.document, '_blank')
+                                              }
+                                            >
+                                              <Eye className="mr-2 h-4 w-4" />
+                                              View
+                                            </Button>
+                                          ) : (
+                                            <span className="text-gray-300">-</span>
+                                          )}
+                                        </TableCell>
+                                      </TableRow>
+                                    ))
+                                )}
+                              </TableBody>
+                            </Table>
             </div>
           </div>
         </div>
@@ -487,24 +466,7 @@ function PassportTab() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              {/* Date of Issue */}
-              <div className="flex flex-col space-y-2">
-                <Label className="text-sm font-medium text-gray-700">
-                  Date of Issue <span className="text-red-500">*</span>
-                </Label>
-                <DatePicker
-                  selected={newDateOfIssue}
-                  onChange={handleIssueDateChange}
-                  dateFormat="dd-MM-yyyy"
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholderText="Select issue date..."
-                  showMonthDropdown
-                  showYearDropdown
-                  maxDate={new Date()}
-                />
-              </div>
-
+            <div className="grid grid-cols-1 gap-4">
               {/* Expiry Date */}
               <div className="flex flex-col space-y-2">
                 <Label className="text-sm font-medium text-gray-700">
@@ -518,17 +480,18 @@ function PassportTab() {
                   placeholderText="Select expiry date..."
                   showMonthDropdown
                   showYearDropdown
-                  // Prevent backdating before the current expiry
+                  dropdownMode="select"
+                  // UPDATED LOGIC: Cannot select a date before the current expiry (if exists)
                   minDate={
                     currentExpiryDate && moment(currentExpiryDate).isValid()
-                    ? new Date(currentExpiryDate)
-                    : new Date()
+                      ? new Date(currentExpiryDate)
+                      : new Date()
                   }
                 />
-                 {passportCheckInterval > 0 && (
-                    <span className="text-[10px] text-gray-400">
-                      Auto-calculated: {passportCheckInterval} day validity
-                    </span>
+                {currentExpiryDate && (
+                  <p className="text-xs text-gray-500">
+                    Must be after {moment(currentExpiryDate).format('DD MMM YYYY')}
+                  </p>
                 )}
               </div>
             </div>
@@ -613,14 +576,13 @@ function PassportTab() {
               Cancel
             </Button>
             <Button
-              className="bg-supperagent text-white hover:bg-supperagent/90"
+              className="bg-theme text-white hover:bg-theme/90"
               onClick={handleSubmitUpdate}
               disabled={
                 isSubmitting || 
                 isUploading || 
                 !uploadedFileUrl || 
-                !newExpiryDate ||
-                !newDateOfIssue ||
+                !newExpiryDate || 
                 !newPassportNumber
               }
             >

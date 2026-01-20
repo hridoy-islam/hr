@@ -298,7 +298,7 @@ export default function ViewApplicant() {
               <Button
                 onClick={handleSearch}
                 size="sm"
-                className="bg-supperagent text-white hover:bg-supperagent/90"
+                className="bg-theme text-white hover:bg-theme/90"
               >
                 Search
               </Button>
@@ -308,14 +308,14 @@ export default function ViewApplicant() {
             onClick={() => {
               navigate(`/company/vacancy/add-applicant/${id}`);
             }}
-            className="h-8 bg-supperagent text-white hover:bg-supperagent/90"
+            className="h-8 bg-theme text-white hover:bg-theme/90"
           >
             <Plus /> Create Applicant
           </Button>
         </div>
         {initialLoading ? (
           <div className="flex justify-center py-6">
-            <BlinkingDots size="large" color="bg-supperagent" />
+            <BlinkingDots size="large" color="bg-theme" />
           </div>
         ) : applicants.length === 0 ? (
           <div className="flex justify-center py-6 text-gray-500">
@@ -397,7 +397,7 @@ export default function ViewApplicant() {
                             onClick={() =>
                               handleStatusChange(app._id, app.status)
                             }
-                            className="cursor-pointer hover:bg-supperagent hover:text-white"
+                            className="cursor-pointer hover:bg-theme hover:text-white"
                           >
                             <CheckCircle className="mr-2 h-4 w-4" />
                             {app.status === 'shortlisted'
@@ -412,7 +412,7 @@ export default function ViewApplicant() {
                                   { state: { applicant: app } }
                                 )
                               }
-                              className="cursor-pointer hover:bg-supperagent hover:text-white"
+                              className="cursor-pointer hover:bg-theme hover:text-white"
                             >
                               <UserRoundPlus className="mr-2 h-4 w-4" />
                               Recruit Applicant

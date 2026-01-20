@@ -137,14 +137,14 @@ const user = useSelector((state: any) => state.auth.user);
             <Button
               onClick={handleSearch}
               size="sm"
-              className="min-w-[100px] bg-supperagent text-white hover:bg-supperagent/90"
+              className="min-w-[100px] bg-theme text-white hover:bg-theme/90"
             >
               Search
             </Button>
           </div>
         </div>
         <Button
-          className="bg-supperagent text-white hover:bg-supperagent/90"
+          className="bg-theme text-white hover:bg-theme/90"
           size={'sm'}
           onClick={() => navigate('/company/create-shift')}
         >
@@ -156,7 +156,7 @@ const user = useSelector((state: any) => state.auth.user);
       <div className="">
         {initialLoading ? (
           <div className="flex justify-center py-6">
-            <BlinkingDots size="large" color="bg-supperagent" />
+            <BlinkingDots size="large" color="bg-theme" />
           </div>
         ) : shifts.length === 0 ? (
           <div className="flex justify-center py-6 text-gray-500">
@@ -182,7 +182,7 @@ const user = useSelector((state: any) => state.auth.user);
                     <TableCell className="space-x-2 text-right">
                       <Button
                         variant="ghost"
-                        className="h-8 w-8 bg-supperagent p-0 text-primary hover:bg-supperagent/90"
+                        className="h-8 w-8 bg-theme p-0 text-primary hover:bg-theme/90"
                         onClick={() =>
                           navigate(`/company/edit-shift/${shift._id}`)
                         }

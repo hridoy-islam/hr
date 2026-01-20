@@ -252,7 +252,7 @@ export function EmailConfigDialog({
               <Button
                 type="submit"
                 disabled={isSubmitting}
-                className="bg-supperagent text-white hover:bg-supperagent/90"
+                className="bg-theme text-white hover:bg-theme/90"
               >
                 {isSubmitting ? 'Saving...' : initialData ? 'Update' : 'Save'}
               </Button>

@@ -104,12 +104,12 @@ const RecruitApplicantForm = () => {
         applicantId: id,
         status: 'hired'
       };
-      
+
       await axiosInstance.patch(`/hr/applicant/${id}`, { status: 'hired' });
-      
+
       const { status: _, ...flatData } = flatDataWithStatus;
       const { status: __, ...cleanApplicant } = applicant;
-      
+
       const data = {
         ...cleanApplicant,
         ...flatData,
@@ -128,32 +128,35 @@ const RecruitApplicantForm = () => {
           `/schedule-check?companyId=${user?._id}`
         );
         const scheduleResult = scheduleRes.data?.data?.result;
-        
+
         if (scheduleResult && scheduleResult.length > 0) {
           // Use the fetched duration if available
           rtwDuration = scheduleResult[0].rtwCheckDate || 0;
         }
       } catch (scheduleError) {
-        console.log('Failed to fetch schedule settings, defaulting duration to 0', scheduleError);
+        console.log(
+          'Failed to fetch schedule settings, defaulting duration to 0',
+          scheduleError
+        );
       }
 
       // 4. Create Right-to-Work Record (Only if duration > 0)
-      if (rtwDuration > 0) {
-        await axiosInstance.post(`/hr/right-to-work`, {
-          nextCheckDate: moment().add(rtwDuration, 'days').format('YYYY-MM-DD'),
-          employeeId: newUser._id,
-          updatedBy:user?._id
-        });
-      }
+
+      await axiosInstance.post(`/hr/right-to-work`, {
+        nextCheckDate: moment().add(rtwDuration, 'days').format('YYYY-MM-DD'),
+        employeeId: newUser._id,
+        updatedBy: user?._id,
+        document: newUser?.rtwDocumentUrl
+      });
 
       // 5. Create Passport Record (If passport info exists)
-      if (newUser.passportNo || newUser.passportExpiry) {
-        await axiosInstance.post(`/passport`, {
-            userId: newUser._id,
-            passportNumber: newUser.passportNo,
-            passportExpiryDate: newUser.passportExpiry
-        });
-      }
+      // if (newUser.passportNo || newUser.passportExpiry) {
+      //   await axiosInstance.post(`/passport`, {
+      //       userId: newUser._id,
+      //       passportNumber: newUser.passportNo,
+      //       passportExpiryDate: newUser.passportExpiry
+      //   });
+      // }
 
       toast({
         title: 'Application Submitted',
@@ -262,8 +265,8 @@ const RecruitApplicantForm = () => {
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
                   <h3 className="text-lg font-bold text-gray-900">
-                    {applicant.title} {applicant?.firstName} {applicant?.initial}{' '}
-                    {applicant?.lastName}
+                    {applicant.title} {applicant?.firstName}{' '}
+                    {applicant?.initial} {applicant?.lastName}
                   </h3>
                   {/* Gender & Emp Type as mini-badges next to name */}
                   <Badge className="h-5 px-1.5 text-[10px] font-semibold text-black">
@@ -282,32 +285,33 @@ const RecruitApplicantForm = () => {
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
                   <div className="flex items-center gap-1.5">
                     <Mail className="h-3.5 w-3.5" />
-                    <span className="max-w-[200px] truncate">
+                    <span className="max-w-[200px] truncate text-black">
                       {applicant.email}
                     </span>
                   </div>
                   <div className="hidden h-3 w-px bg-gray-300 sm:block" />{' '}
                   {/* Divider */}
                   <div className="flex items-center gap-1.5">
-                    <Phone className="h-3.5 w-3.5" />
-                    <span>{applicant.mobilePhone || 'N/A'}</span>
+                    <Phone className="h-3.5 w-3.5 " />
+                    <span className="text-black">
+                      {applicant.mobilePhone || 'N/A'}
+                    </span>
                   </div>
                   <div className="hidden h-3 w-px bg-gray-300 sm:block" />
                   <div className="flex items-center gap-1.5">
                     <MapPin className="h-3.5 w-3.5" />
-                    <span className="max-w-[250px] truncate">
+                    <span className="max-w-[250px] truncate text-black">
                       {applicant.address || 'N/A'}
                     </span>
                   </div>
+                  <div className="flex items-center gap-1.5">
+                    <Calendar className="h-3.5 w-3.5 " />
+                    <span className="text-black">
+                      Born:{' '}
+                      {moment(applicant.dateOfBirth).format('DD MMM, YYYY')}
+                    </span>
+                  </div>
                 </div>
-              </div>
-
-              {/* Right Side: DOB (or other critical dates) */}
-              <div className="flex items-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600">
-                <Calendar className="h-3.5 w-3.5 text-gray-400" />
-                <span>
-                  Born: {moment(applicant.dateOfBirth).format('MMM D, YYYY')}
-                </span>
               </div>
             </div>
           </Card>
@@ -322,7 +326,7 @@ const RecruitApplicantForm = () => {
               {currentStep !== 3 ? 'Recruit Applicant' : 'Review Application'}
             </h1>
             <Button
-              className="flex h-9 items-center gap-2 bg-supperagent text-white hover:bg-supperagent/90"
+              className="flex h-9 items-center gap-2 bg-theme text-white hover:bg-theme/90"
               onClick={() => navigate(-1)}
             >
               <MoveLeft className="h-4 w-4" />

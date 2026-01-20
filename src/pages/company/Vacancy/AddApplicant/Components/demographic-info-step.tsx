@@ -295,7 +295,7 @@ export function DemographicInfoStep({
 
             <Button
               type="submit"
-              className="bg-supperagent text-white hover:bg-supperagent/90"
+              className="bg-theme text-white hover:bg-theme/90"
             >
               Save
             </Button>

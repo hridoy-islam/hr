@@ -331,7 +331,7 @@ const StaffDashboardPage = () => {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
         <div className="flex justify-center py-6">
-          <BlinkingDots size="large" color="bg-supperagent" />
+          <BlinkingDots size="large" color="bg-theme" />
         </div>
       </div>
     );

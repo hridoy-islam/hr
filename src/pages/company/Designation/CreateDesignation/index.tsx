@@ -142,7 +142,7 @@ export default function AddDesignation() {
           <div className="mt-8 flex justify-end">
             <Button
               type="submit"
-              className="rounded-md bg-supperagent px-6 py-2 font-semibold text-white transition-colors hover:bg-supperagent/90"
+              className="rounded-md bg-theme px-6 py-2 font-semibold text-white transition-colors hover:bg-theme/90"
             >
               Submit
             </Button>

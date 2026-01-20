@@ -242,7 +242,7 @@ export default function CompanyDetails() {
               <div className="flex justify-end">
                 <Button
                   type="submit"
-                  className="border-none bg-supperagent text-white hover:bg-supperagent/90"
+                  className="border-none bg-theme text-white hover:bg-theme/90"
                 >
                   Update Details
                 </Button>

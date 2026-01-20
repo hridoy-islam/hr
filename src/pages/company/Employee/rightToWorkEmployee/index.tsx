@@ -171,7 +171,7 @@ function RtwPage() {
       await axiosInstance.patch(`/hr/right-to-work/${rtwId}`, payload);
       toast({
         title: 'RTW information updated successfully!',
-        className: 'bg-supperagent text-white'
+        className: 'bg-theme text-white'
       });
       fetchData();
     } catch (err: any) {
@@ -191,7 +191,7 @@ function RtwPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100">
-                <User className="h-6 w-6 text-supperagent" />
+                <User className="h-6 w-6 text-theme" />
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">
@@ -216,7 +216,7 @@ function RtwPage() {
               </div>
             </div>
             <Button
-              className="flex flex-row items-center gap-2 bg-supperagent text-white hover:bg-supperagent/90"
+              className="flex flex-row items-center gap-2 bg-theme text-white hover:bg-theme/90"
               onClick={() => navigate(-1)}
             >
               <MoveLeft className="h-4 w-4" />
@@ -228,7 +228,7 @@ function RtwPage() {
         {/* RTW Information */}
         <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
           <div className="mb-6 flex items-center gap-3">
-            <Calendar className="h-6 w-6 text-supperagent" />
+            <Calendar className="h-6 w-6 text-theme" />
             <h2 className="text-xl font-semibold text-gray-900">
               Right To Work Information
             </h2>
@@ -329,7 +329,7 @@ function RtwPage() {
           <div className="mt-6 flex justify-end text-white">
             <Button
               onClick={handleSave}
-              className="bg-supperagent text-white hover:bg-supperagent/90"
+              className="bg-theme text-white hover:bg-theme/90"
             >
               Save Changes
             </Button>
@@ -340,12 +340,12 @@ function RtwPage() {
         <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <FileText className="h-6 w-6 text-supperagent" />
+              <FileText className="h-6 w-6 text-theme" />
               <h2 className="text-xl font-semibold text-gray-900">Documents</h2>
             </div>
             <button
               onClick={() => setShowUploadModal(true)}
-              className="flex items-center gap-2 rounded-lg bg-supperagent px-4 py-2 text-white transition-colors hover:bg-blue-700"
+              className="flex items-center gap-2 rounded-lg bg-theme px-4 py-2 text-white transition-colors hover:bg-blue-700"
             >
               <Upload className="h-4 w-4" />
               Upload
@@ -367,7 +367,7 @@ function RtwPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button className="rounded p-2 text-gray-600 hover:bg-blue-50 hover:text-supperagent">
+                  <button className="rounded p-2 text-gray-600 hover:bg-blue-50 hover:text-theme">
                     <Eye className="h-4 w-4" />
                   </button>
                   <button className="rounded p-2 text-gray-600 hover:bg-green-50 hover:text-green-600">

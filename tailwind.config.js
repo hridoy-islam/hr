@@ -18,6 +18,7 @@ module.exports = {
     },
     extend: {
       colors: {
+        theme: 'color-mix(in srgb, var(--theme) calc(<alpha-value> * 100%), transparent)',
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',

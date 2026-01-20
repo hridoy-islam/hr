@@ -24,7 +24,7 @@ const ApplicantDetailPage = () => {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-50">
         <div className="text-center">
-          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-supperagent border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]"></div>
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-theme border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]"></div>
           <p className="mt-4 text-gray-600 font-medium">Loading applicant data...</p>
         </div>
       </div>
@@ -89,7 +89,7 @@ const ApplicantDetailPage = () => {
           </div>
           <Button
             variant="outline"
-            className="bg-supperagent text-white border-supperagent hover:bg-supperagent/90 hover:border-supperagent"
+            className="bg-theme text-white border-theme hover:bg-theme/90 hover:border-theme"
             onClick={() => window.history.back()}
           >
             <MoveLeft className="mr-2 h-4 w-4" />

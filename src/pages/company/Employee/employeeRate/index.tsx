@@ -309,7 +309,7 @@ export default function EmployeeRate() {
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <BlinkingDots size="large" color="bg-supperagent" />
+        <BlinkingDots size="large" color="bg-theme" />
       </div>
     );
   }
@@ -333,7 +333,7 @@ export default function EmployeeRate() {
               <span className="font-normal">{`${employee.title} ${employee.firstName} ${employee.initial} ${employee.lastName}`}</span>
             </h2>
             <Button
-              className="h-8 bg-supperagent text-white hover:bg-supperagent/90"
+              className="h-8 bg-theme text-white hover:bg-theme/90"
               onClick={() => navigate(-1)}
             >
               <MoveLeft />
@@ -457,7 +457,7 @@ export default function EmployeeRate() {
                             <Button
                               size="sm"
                               onClick={() => copyMondayRateToAll(shift._id)}
-                              className="bg-supperagent text-white hover:bg-supperagent/90"
+                              className="bg-theme text-white hover:bg-theme/90"
                             >
                               Copy To All
                             </Button>

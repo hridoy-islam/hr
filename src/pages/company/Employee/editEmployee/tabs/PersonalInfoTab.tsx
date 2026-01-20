@@ -151,7 +151,7 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
                 type="button"
                 size="icon"
                 onClick={() => setIsDialogOpen(true)}
-                className="absolute bottom-3 right-8 z-10 rounded-full bg-supperagent hover:bg-supperagent/90 shadow-md"
+                className="absolute bottom-3 right-8 z-10 rounded-full bg-theme hover:bg-theme/90 shadow-md"
               >
                 <Camera className="h-5 w-5 text-white" />
               </Button>
@@ -269,8 +269,8 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
               >
                 {isUploading ? (
                   <>
-                    <Loader2 className="mb-2 h-10 w-10 animate-spin text-supperagent" />
-                    <p className="text-sm font-medium text-supperagent">
+                    <Loader2 className="mb-2 h-10 w-10 animate-spin text-theme" />
+                    <p className="text-sm font-medium text-theme">
                       Uploading...
                     </p>
                   </>

@@ -34,6 +34,7 @@ interface LogEntry {
   _id: string;
   title: string;
   date: string;
+  document: string;
   updatedBy: string | { firstName: string; lastName: string; name?: string };
 }
 
@@ -56,30 +57,36 @@ function DbsTab() {
   // Loading State
   const [isLoading, setIsLoading] = useState(true);
 
-  // Display State
+  // --- UPDATED: Display State to include 'expiring-soon' ---
   const [complianceStatus, setComplianceStatus] = useState<
-    'active' | 'expired' | null
+    'active' | 'expired' | 'expiring-soon' | null
   >(null);
-  
+
   // Settings State (From ScheduleCheck)
   const [dbsCheckInterval, setDbsCheckInterval] = useState<number>(0);
 
   // Current Data State
   const [dbsId, setDbsId] = useState<string | null>(null);
-  const [currentExpiryDate, setCurrentExpiryDate] = useState<string | null>(null);
-  const [currentDateOfIssue, setCurrentDateOfIssue] = useState<string | null>(null);
-  const [currentDisclosureNum, setCurrentDisclosureNum] = useState<string | null>(null);
+  const [currentExpiryDate, setCurrentExpiryDate] = useState<string | null>(
+    null
+  );
+  const [currentDateOfIssue, setCurrentDateOfIssue] = useState<string | null>(
+    null
+  );
+  const [currentDisclosureNum, setCurrentDisclosureNum] = useState<
+    string | null
+  >(null);
   const [currentDbsDocUrl, setCurrentDbsDocUrl] = useState<string | null>(null);
   const [history, setHistory] = useState<LogEntry[]>([]);
 
   // Modal & Form State
   const [showUpdateModal, setShowUpdateModal] = useState(false);
-  
+
   // Form Inputs
   const [newDisclosureNumber, setNewDisclosureNumber] = useState<string>('');
   const [newDateOfIssue, setNewDateOfIssue] = useState<Date | null>(null);
   const [newExpiryDate, setNewExpiryDate] = useState<Date | null>(null);
-  
+
   // File Upload State
   const [uploadedFileUrl, setUploadedFileUrl] = useState<string | null>(null);
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
@@ -91,14 +98,12 @@ function DbsTab() {
   const fetchScheduleSettings = async () => {
     if (!user?._id) return;
     try {
-      // Assuming user._id is the companyId or the user belongs to a company
       const res = await axiosInstance.get(
         `/schedule-check?companyId=${user._id}`
       );
       const result = res.data?.data?.result;
       if (result && result.length > 0) {
-        // Store the interval (Assuming value is in Months)
-        setDbsCheckInterval(result[0].dbsCheckDate || 0);
+        setDbsCheckInterval(result[0].dbsCheckDate || 30);
       }
     } catch (err) {
       console.error('Error fetching schedule settings:', err);
@@ -147,30 +152,43 @@ function DbsTab() {
     loadData();
   }, [id, user?._id]);
 
-  // 3. Status Calculation
+  // --- UPDATED: Status Calculation Logic ---
   useEffect(() => {
     if (currentExpiryDate) {
       const now = moment();
       const expiry = moment(currentExpiryDate);
 
+      // Calculate difference in days
+      const diffDays = expiry.diff(now, 'days');
+
+      // 1. Check if Expired (Now is after Expiry)
       if (now.isAfter(expiry, 'day')) {
         setComplianceStatus('expired');
-      } else {
+      }
+      // 2. Check if Expiring Soon (Within the checkInterval window)
+      // Note: Assuming checkInterval is the warning threshold in days (e.g., 30 days)
+      else if (dbsCheckInterval > 0 && diffDays <= dbsCheckInterval) {
+        setComplianceStatus('expiring-soon');
+      }
+      // 3. Otherwise Active
+      else {
         setComplianceStatus('active');
       }
     } else {
       setComplianceStatus(null);
     }
-  }, [currentExpiryDate]);
+  }, [currentExpiryDate, dbsCheckInterval]);
 
   // Auto-calculate Expiry Date based on Issue Date + Interval
   const handleIssueDateChange = (date: Date | null) => {
     setNewDateOfIssue(date);
-    
+
     // If we have a date and a configured interval > 0
+    // Note: This assumes interval is used as Months for validity period
     if (date && dbsCheckInterval > 0) {
-      // Assuming dbsCheckInterval is in MONTHS
-      const calculatedExpiry = moment(date).add(dbsCheckInterval, 'months').toDate();
+      const calculatedExpiry = moment(date)
+        .add(dbsCheckInterval, 'months')
+        .toDate();
       setNewExpiryDate(calculatedExpiry);
     }
   };
@@ -198,7 +216,7 @@ function DbsTab() {
 
     const formData = new FormData();
     formData.append('entityId', user._id);
-    formData.append('file_type', 'document'); 
+    formData.append('file_type', 'document');
     formData.append('file', file);
 
     try {
@@ -221,37 +239,45 @@ function DbsTab() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  // Pre-fill data when opening modal
+  // Open Modal Logic
   const openUpdateModal = () => {
-    // 1. Text Fields
-    setNewDisclosureNumber(currentDisclosureNum || '');
-    
-    // 2. Dates
-    setNewDateOfIssue(currentDateOfIssue ? new Date(currentDateOfIssue) : null);
-    setNewExpiryDate(currentExpiryDate ? new Date(currentExpiryDate) : null);
-
-    // 3. Files: Reset
     setUploadedFileUrl(null);
     setSelectedFileName(null);
     setUploadError(null);
-    
+
+    setNewDisclosureNumber(currentDisclosureNum || '');
+
+    if (currentDateOfIssue) {
+      setNewDateOfIssue(new Date(currentDateOfIssue));
+    } else {
+      setNewDateOfIssue(new Date());
+    }
+
+    if (currentExpiryDate) {
+      setNewExpiryDate(new Date(currentExpiryDate));
+    } else {
+      setNewExpiryDate(null);
+    }
+
     setShowUpdateModal(true);
   };
 
+  // Submit Logic
   const handleSubmitUpdate = async () => {
     if (
-      !user?._id || 
-      !uploadedFileUrl || 
-      !newExpiryDate || 
-      !newDateOfIssue || 
+      !user?._id ||
+      !uploadedFileUrl ||
+      !newExpiryDate ||
+      !newDateOfIssue ||
       !newDisclosureNumber
-    ) return;
+    )
+      return;
 
     setIsSubmitting(true);
 
     const payload: any = {
       updatedBy: user._id,
-      title: 'DBS Details Updated', // Added title for Logs
+      title: 'DBS Details Updated',
       dbsDocumentUrl: uploadedFileUrl,
       disclosureNumber: newDisclosureNumber,
       dateOfIssue: moment(newDateOfIssue).toISOString(),
@@ -272,7 +298,7 @@ function DbsTab() {
       await fetchDbsData();
       toast({
         title: 'DBS details updated successfully!',
-        className: 'bg-supperagent text-white'
+        className: 'bg-theme text-white'
       });
       setShowUpdateModal(false);
     } catch (err: any) {
@@ -289,7 +315,7 @@ function DbsTab() {
   if (isLoading) {
     return (
       <div className="flex h-64 w-full items-center justify-center">
-        <BlinkingDots size="large" color="bg-supperagent" />
+        <BlinkingDots size="large" color="bg-theme" />
       </div>
     );
   }
@@ -301,7 +327,7 @@ function DbsTab() {
         <div className="lg:col-span-1">
           <div className="h-full rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
             <h2 className="mb-6 flex items-center gap-2 text-xl font-semibold text-gray-900">
-              <ShieldCheck className="h-5 w-5 text-supperagent" />
+              <ShieldCheck className="h-5 w-5 text-theme" />
               DBS Status
             </h2>
 
@@ -328,7 +354,7 @@ function DbsTab() {
                 </div>
               </div>
 
-              {/* Status Badge */}
+              {/* --- UPDATED: Status Badge with 3 States --- */}
               {complianceStatus && (
                 <div>
                   <Badge
@@ -336,16 +362,22 @@ function DbsTab() {
                       'px-3 py-1 text-sm',
                       complianceStatus === 'active'
                         ? 'bg-green-100 text-green-800 hover:bg-green-100'
-                        : 'bg-red-100 text-red-800 hover:bg-red-100'
+                        : complianceStatus === 'expiring-soon'
+                          ? 'bg-amber-100 text-amber-800 hover:bg-amber-100'
+                          : 'bg-red-100 text-red-800 hover:bg-red-100'
                     )}
                   >
-                    {complianceStatus === 'active' ? 'Active' : 'Expired'}
+                    {complianceStatus === 'active'
+                      ? 'Active'
+                      : complianceStatus === 'expiring-soon'
+                        ? 'Expiring Soon'
+                        : 'Expired'}
                   </Badge>
                 </div>
               )}
 
               {/* Action Buttons */}
-              <div className="border-t border-gray-100 pt-6 space-y-3">
+              <div className="space-y-3 border-t border-gray-100 pt-6">
                 {currentDbsDocUrl && (
                   <Button
                     variant="outline"
@@ -356,12 +388,12 @@ function DbsTab() {
                     View Certificate
                   </Button>
                 )}
-                
+
                 <Button
                   onClick={openUpdateModal}
-                  className="w-full bg-supperagent text-white hover:bg-supperagent/90"
+                  className="w-full bg-theme text-white hover:bg-theme/90"
                 >
-                  Update DBS Certificate
+                  {currentExpiryDate ? 'Update / Renew DBS' : 'Add DBS Details'}
                 </Button>
               </div>
             </div>
@@ -372,57 +404,85 @@ function DbsTab() {
         <div className="lg:col-span-2">
           <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
             <h2 className="mb-6 flex items-center gap-2 text-xl font-semibold text-gray-900">
-              <History className="h-5 w-5 text-supperagent" />
+              <History className="h-5 w-5 text-theme" />
               History Log
             </h2>
 
             <div className="overflow-hidden rounded-md border border-gray-100">
-              <Table>
-                <TableHeader className="bg-gray-50">
-                  <TableRow>
-                    <TableHead className="w-[180px]">Date Updated</TableHead>
-                    <TableHead>Activity Title</TableHead>
-                    <TableHead className='text-right'>Updated By</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {history.length === 0 ? (
-                    <TableRow>
-                      <TableCell
-                        colSpan={3}
-                        className="py-8 text-center italic text-gray-500"
-                      >
-                        No history records found.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    history
-                      .slice()
-                      .sort(
-                        (a, b) =>
-                          new Date(b.date).getTime() -
-                          new Date(a.date).getTime()
-                      )
-                      .map((entry) => (
-                        <TableRow key={entry._id} className="hover:bg-gray-50">
-                          <TableCell className="font-medium ">
-                            {moment(entry.date).format('DD MMM YYYY')}
-                          </TableCell>
-                          <TableCell className="font-medium ">
-                            {entry.title || 'Updated'}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {entry.updatedBy &&
-                            typeof entry.updatedBy === 'object'
-                              ? entry.updatedBy?.name ||
-                                `${entry.updatedBy.firstName ?? ''} ${entry.updatedBy.lastName ?? ''}`.trim()
-                              : 'System'}
-                          </TableCell>
-                        </TableRow>
-                      ))
-                  )}
-                </TableBody>
-              </Table>
+               <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  {/* Date & Time Column Removed */}
+                                  <TableHead>Activity</TableHead>
+                                  <TableHead >Updated By</TableHead>
+                                  <TableHead className="text-right">Document</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {history.length === 0 ? (
+                                  <TableRow>
+                                    <TableCell
+                                      colSpan={3} // Adjusted colspan from 4 to 3
+                                      className="py-8 text-center italic text-gray-500"
+                                    >
+                                      No history records found.
+                                    </TableCell>
+                                  </TableRow>
+                                ) : (
+                                  history
+                                    .slice()
+                                    .sort(
+                                      (a, b) =>
+                                        new Date(b.date).getTime() -
+                                        new Date(a.date).getTime()
+                                    )
+                                    .map((entry) => (
+                                      <TableRow key={entry._id} className="hover:bg-gray-50">
+                                        {/* Date Cell Removed */}
+              
+                                        <TableCell className="font-medium text-gray-900">
+                                          {entry.title || 'Update'}
+                                        </TableCell>
+              
+                                        <TableCell className="">
+                                          <div className='flex '>
+                                          <div className="flex flex-col">
+                                            <span className="font-medium">
+                                              {entry.updatedBy &&
+                                              typeof entry.updatedBy === 'object'
+                                                ? entry.updatedBy.name ||
+                                                  `${entry.updatedBy.firstName ?? ''} ${entry.updatedBy.lastName ?? ''}`.trim()
+                                                : 'System'}
+                                            </span>
+                                            {/* Date moved here underneath the name */}
+                                            <span className="text-xs ">
+                                              {moment(entry.date).format('DD MMM YYYY')}
+                                            </span>
+                                          </div>
+                                          </div>
+                                        </TableCell>
+              
+                                        <TableCell className="text-right">
+                                          {entry.document ? (
+                                            <Button
+                                              size="sm"
+                                              className="h-8"
+                                              onClick={() =>
+                                                window.open(entry.document, '_blank')
+                                              }
+                                            >
+                                              <Eye className="mr-2 h-4 w-4" />
+                                              View
+                                            </Button>
+                                          ) : (
+                                            <span className="text-gray-300">-</span>
+                                          )}
+                                        </TableCell>
+                                      </TableRow>
+                                    ))
+                                )}
+                              </TableBody>
+                            </Table>
             </div>
           </div>
         </div>
@@ -462,8 +522,18 @@ function DbsTab() {
                   placeholderText="Select date..."
                   showMonthDropdown
                   showYearDropdown
-                  maxDate={new Date()} // Cannot be in future
+                  dropdownMode="select"
+                  // Min date = Previous Expiry Date if preferred
+                  minDate={
+                    currentExpiryDate ? new Date(currentExpiryDate) : undefined
+                  }
                 />
+                {currentExpiryDate && (
+                  <p className="text-xs text-gray-500">
+                    Must be on or after{' '}
+                    {moment(currentExpiryDate).format('DD MMM YYYY')}
+                  </p>
+                )}
               </div>
 
               {/* Expiry Date */}
@@ -479,9 +549,9 @@ function DbsTab() {
                   placeholderText="Select date..."
                   showMonthDropdown
                   showYearDropdown
-                  minDate={new Date()}
+                  minDate={newDateOfIssue || undefined}
+                  dropdownMode="select"
                 />
-               
               </div>
             </div>
 
@@ -565,12 +635,12 @@ function DbsTab() {
               Cancel
             </Button>
             <Button
-              className="bg-supperagent text-white hover:bg-supperagent/90"
+              className="bg-theme text-white hover:bg-theme/90"
               onClick={handleSubmitUpdate}
               disabled={
-                isSubmitting || 
-                isUploading || 
-                !uploadedFileUrl || 
+                isSubmitting ||
+                isUploading ||
+                !uploadedFileUrl ||
                 !newExpiryDate ||
                 !newDateOfIssue ||
                 !newDisclosureNumber

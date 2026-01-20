@@ -116,7 +116,7 @@ export default function EditTraining() {
               Edit Training Module
             </h1>
             <Button
-              className="bg-supperagent text-white hover:bg-supperagent/90"
+              className="bg-theme text-white hover:bg-theme/90"
               onClick={() => navigate(-1)}
             >
               <MoveLeft /> Back
@@ -235,7 +235,7 @@ export default function EditTraining() {
               <div className="flex w-full items-center justify-end gap-4">
                 <Button
                   type="submit"
-                  className="border-none bg-supperagent text-white hover:bg-supperagent/90"
+                  className="border-none bg-theme text-white hover:bg-theme/90"
                 >
                   Submit
                 </Button>

@@ -322,7 +322,7 @@ const LeaveTooltipContent = ({ request }: { request: LeaveRequest }) => {
           <CardContent>
             {loading ? (
               <div className="flex justify-center py-12">
-                <BlinkingDots size="large" color="bg-supperagent" />
+                <BlinkingDots size="large" color="bg-theme" />
               </div>
             ) : (
               <>

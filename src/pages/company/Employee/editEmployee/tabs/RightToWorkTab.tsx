@@ -1,6 +1,14 @@
 import type React from 'react';
 import { useEffect, useState, useRef } from 'react';
-import { Calendar, FileText, Upload, X, Eye, History, AlertCircle } from 'lucide-react';
+import {
+  Calendar,
+  FileText,
+  Upload,
+  X,
+  Eye,
+  History,
+  AlertCircle
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
@@ -85,7 +93,7 @@ function RightToWorkTab() {
       );
       const result = res.data?.data?.result;
       if (result && result.length > 0) {
-        setCheckInterval(result[0].rtwCheckDate || 0);
+        setCheckInterval(result[0].rtwCheckDate || 30);
       }
     } catch (err) {
       console.error('Error fetching schedule settings:', err);
@@ -145,12 +153,12 @@ function RightToWorkTab() {
       // 1. Check if Expired (Date has passed)
       if (now.isAfter(checkDate)) {
         setComplianceStatus('expired');
-      } 
+      }
       // 2. Check if Expiring Soon (Within the checkInterval window)
       // Example: If interval is 30 days, warning shows if remaining days <= 30
       else if (checkInterval > 0 && diffDays <= checkInterval) {
         setComplianceStatus('expiring-soon');
-      } 
+      }
       // 3. Otherwise Active
       else {
         setComplianceStatus('active');
@@ -164,19 +172,19 @@ function RightToWorkTab() {
     switch (complianceStatus) {
       case 'active':
         return (
-          <Badge className="bg-green-100 text-green-800 hover:bg-green-100 px-3 py-1">
+          <Badge className="bg-green-100 px-3 py-1 text-green-800 hover:bg-green-100">
             Active
           </Badge>
         );
       case 'expiring-soon':
         return (
-          <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100 px-3 py-1">
+          <Badge className="bg-yellow-100 px-3 py-1 text-yellow-800 hover:bg-yellow-100">
             Expiring Soon
           </Badge>
         );
       case 'expired':
         return (
-          <Badge className="bg-red-100 text-red-800 hover:bg-red-100 px-3 py-1">
+          <Badge className="bg-red-100 px-3 py-1 text-red-800 hover:bg-red-100">
             Expired
           </Badge>
         );
@@ -265,7 +273,7 @@ function RightToWorkTab() {
       await fetchRTWData();
       toast({
         title: 'RTW check updated successfully!',
-        className: 'bg-supperagent text-white'
+        className: 'bg-theme text-white'
       });
       setShowUpdateModal(false);
     } catch (err: any) {
@@ -282,7 +290,7 @@ function RightToWorkTab() {
   if (isLoading) {
     return (
       <div className="flex h-64 w-full items-center justify-center">
-        <BlinkingDots size="large" color="bg-supperagent" />
+        <BlinkingDots size="large" color="bg-theme" />
       </div>
     );
   }
@@ -294,7 +302,7 @@ function RightToWorkTab() {
         <div className="lg:col-span-1">
           <div className="h-full rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
             <h2 className="mb-6 flex items-center gap-2 text-xl font-semibold text-gray-900">
-              <Calendar className="h-5 w-5 text-supperagent" />
+              <Calendar className="text-theme h-5 w-5" />
               RTW Status
             </h2>
 
@@ -317,7 +325,7 @@ function RightToWorkTab() {
               <div className="border-t border-gray-100 pt-4">
                 <Button
                   onClick={openUpdateModal}
-                  className="w-full bg-supperagent text-white hover:bg-supperagent/90"
+                  className="bg-theme hover:bg-theme/90 w-full text-white"
                 >
                   Update Next Check Date
                 </Button>
@@ -335,15 +343,15 @@ function RightToWorkTab() {
         <div className="lg:col-span-2">
           <div className=" rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
             <h2 className="mb-6 flex items-center gap-2 text-xl font-semibold text-gray-900">
-              <History className="h-5 w-5 text-supperagent" />
+              <History className="text-theme h-5 w-5" />
               History Log
             </h2>
 
             <div className="overflow-hidden rounded-md border border-gray-100">
               <Table>
-                <TableHeader className="bg-gray-50">
+                <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[180px]">Date & Time</TableHead>
+                    {/* Date & Time Column Removed */}
                     <TableHead>Activity</TableHead>
                     <TableHead>Updated By</TableHead>
                     <TableHead className="text-right">Document</TableHead>
@@ -353,7 +361,7 @@ function RightToWorkTab() {
                   {history.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={4}
+                        colSpan={3} // Adjusted colspan from 4 to 3
                         className="py-8 text-center italic text-gray-500"
                       >
                         No history records found.
@@ -369,25 +377,35 @@ function RightToWorkTab() {
                       )
                       .map((entry) => (
                         <TableRow key={entry._id} className="hover:bg-gray-50">
-                          <TableCell className="font-medium text-gray-600">
-                            {moment(entry.date).format('DD MMM YYYY')}
-                          </TableCell>
+                          {/* Date Cell Removed */}
+
                           <TableCell className="font-medium text-gray-900">
                             {entry.title || 'Update'}
                           </TableCell>
-                          <TableCell className="text-gray-600">
-                            {entry.updatedBy &&
-                            typeof entry.updatedBy === 'object'
-                              ? entry.updatedBy?.name ||
-                                `${entry.updatedBy.firstName ?? ''} ${entry.updatedBy.lastName ?? ''}`.trim()
-                              : 'System'}
+
+                          <TableCell className="">
+                            <div className="flex ">
+                              <div className="flex flex-col">
+                                <span className="font-medium">
+                                  {entry.updatedBy &&
+                                  typeof entry.updatedBy === 'object'
+                                    ? entry.updatedBy.name ||
+                                      `${entry.updatedBy.firstName ?? ''} ${entry.updatedBy.lastName ?? ''}`.trim()
+                                    : 'System'}
+                                </span>
+                                {/* Date moved here underneath the name */}
+                                <span className="text-xs ">
+                                  {moment(entry.date).format('DD MMM YYYY')}
+                                </span>
+                              </div>
+                            </div>
                           </TableCell>
 
                           <TableCell className="text-right">
                             {entry.document ? (
                               <Button
                                 size="sm"
-                                className="h-8 "
+                                className="h-8"
                                 onClick={() =>
                                   window.open(entry.document, '_blank')
                                 }
@@ -419,8 +437,8 @@ function RightToWorkTab() {
           <div className="space-y-6 py-4">
             {/* Context Alert */}
             {currentCheckDate && (
-              <div className="rounded-md bg-blue-50 p-3 text-sm text-blue-700 flex items-start gap-2">
-                <AlertCircle className="h-4 w-4 mt-0.5" />
+              <div className="flex items-start gap-2 rounded-md bg-blue-50 p-3 text-sm text-blue-700">
+                <AlertCircle className="mt-0.5 h-4 w-4" />
                 <p>
                   Current check expires on{' '}
                   <span className="font-semibold">
@@ -534,7 +552,7 @@ function RightToWorkTab() {
               Cancel
             </Button>
             <Button
-              className="bg-supperagent text-white hover:bg-supperagent/90"
+              className="bg-theme hover:bg-theme/90 text-white"
               onClick={handleSubmitUpdate}
               disabled={
                 isSubmitting || isUploading || !uploadedFileUrl || !newCheckDate

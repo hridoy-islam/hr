@@ -80,7 +80,7 @@ export default function Recruitment() {
         <Button
           onClick={handleSearch}
           size="sm"
-          className="min-w-[100px] border-none bg-supperagent text-white hover:bg-supperagent/90"
+          className="min-w-[100px] border-none bg-theme text-white hover:bg-theme/90"
         >
           Search
         </Button>
@@ -89,7 +89,7 @@ export default function Recruitment() {
       <div className="rounded-md bg-white p-4 shadow-2xl">
         {initialLoading ? (
           <div className="flex justify-center py-6">
-            <BlinkingDots size="large" color="bg-supperagent" />
+            <BlinkingDots size="large" color="bg-theme" />
           </div>
         ) : recruitments.length === 0 ? (
           <div className="flex justify-center py-6 text-gray-500">
@@ -114,7 +114,7 @@ export default function Recruitment() {
                   <TableCell className="text-right">
                     <Button
                       variant="ghost"
-                      className="border-none bg-supperagent text-white hover:bg-supperagent/90"
+                      className="border-none bg-theme text-white hover:bg-theme/90"
                       size="icon"
                       onClick={() => handleEdit(rec)}
                     >

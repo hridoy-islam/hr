@@ -24,6 +24,7 @@ import VisaTab from './tabs/VisaTab';
 import DbsTab from './tabs/DbsTab';
 import PassportTab from './tabs/passportTab';
 import ImmigrationTab from './tabs/ImmigrationTab';
+import AppraisalTab from './tabs/AppraisalTab';
 const EditEmployee = () => {
   const navigate = useNavigate();
   const {
@@ -69,7 +70,7 @@ const EditEmployee = () => {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="flex justify-center py-6">
-          <BlinkingDots size="large" color="bg-supperagent" />
+          <BlinkingDots size="large" color="bg-theme" />
         </div>
       </div>
     );
@@ -146,6 +147,19 @@ const EditEmployee = () => {
       label: 'Immigration',
       component: (
         <ImmigrationTab
+          formData={formData}
+          onUpdate={handleNestedFieldUpdate}
+          onCheckboxChange={handleCheckboxChange}
+          onDateChange={handleDateChange}
+          isFieldSaving={isFieldSaving}
+        />
+      )
+    },
+     {
+      id: 'appraisal',
+      label: 'Appraisal',
+      component: (
+        <AppraisalTab
           formData={formData}
           onUpdate={handleNestedFieldUpdate}
           onCheckboxChange={handleCheckboxChange}
@@ -282,7 +296,7 @@ const EditEmployee = () => {
         </h1>
         <Button
           variant="outline"
-          className="border-none bg-supperagent text-white hover:bg-supperagent/90"
+          className="border-none bg-theme text-white hover:bg-theme/90"
           onClick={() => navigate(-1)}
         >
           <MoveLeft className="mr-2 h-4 w-4" />

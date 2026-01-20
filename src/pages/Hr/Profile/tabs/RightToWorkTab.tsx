@@ -260,7 +260,7 @@ function RightToWorkTab() {
       await fetchData();
       toast({
         title: 'RTW updated successfully!',
-        className: 'bg-supperagent text-white'
+        className: 'bg-theme text-white'
       });
       setShowUpdateModal(false);
       setUpdateType(null);
@@ -281,7 +281,7 @@ function RightToWorkTab() {
         {/* Combined Visa Info & Documents */}
         <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
           <h2 className="mb-6 flex items-center gap-3 text-xl font-semibold text-gray-900">
-            <Calendar className="h-6 w-6 text-supperagent" />
+            <Calendar className="h-6 w-6 text-theme" />
             Right to Work Verification
           </h2>
 
@@ -334,7 +334,7 @@ function RightToWorkTab() {
                   <div className="mt-2">
                     <Button
                       onClick={() => handleUpdateClick('visa')}
-                      className="bg-supperagent text-white hover:bg-supperagent/90"
+                      className="bg-theme text-white hover:bg-theme/90"
                     >
                       Update Visa Information
                     </Button>
@@ -379,7 +379,7 @@ function RightToWorkTab() {
                   <div className="mt-2">
                     <Button
                       onClick={() => handleUpdateClick('compliance')}
-                      className="bg-supperagent text-white hover:bg-supperagent/90"
+                      className="bg-theme text-white hover:bg-theme/90"
                     >
                       Update Compliance
                     </Button>
@@ -392,7 +392,7 @@ function RightToWorkTab() {
           {/* Documents Section */}
           <div className="mt-8 border-t border-gray-200 pt-6">
             <h3 className="mb-4 flex items-center gap-2 text-lg font-medium text-gray-800">
-              <FileText className="h-5 w-5 text-supperagent" />
+              <FileText className="h-5 w-5 text-theme" />
               Uploaded Documents
             </h3>
 
@@ -412,7 +412,7 @@ function RightToWorkTab() {
                         </div>
                       </div>
                       <div className="flex items-center gap-1">
-                        <button className="rounded p-1 text-gray-600 hover:bg-blue-50 hover:text-supperagent">
+                        <button className="rounded p-1 text-gray-600 hover:bg-blue-50 hover:text-theme">
                           <Eye className="h-4 w-4" />
                         </button>
                         <button className="rounded p-1 text-gray-600 hover:bg-green-50 hover:text-green-600">
@@ -506,7 +506,7 @@ function RightToWorkTab() {
                 Cancel
               </Button>
               <Button
-                className="bg-supperagent text-white hover:bg-supperagent/90"
+                className="bg-theme text-white hover:bg-theme/90"
                 onClick={handleSubmitUpdate}
                 disabled={isSubmitting}
               >

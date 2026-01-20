@@ -174,7 +174,7 @@ export default function ReportPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-10">
-        <BlinkingDots size="large" color="bg-supperagent" />
+        <BlinkingDots size="large" color="bg-theme" />
       </div>
     );
   }
@@ -199,7 +199,7 @@ export default function ReportPage() {
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogTrigger asChild>
-          <Button className="bg-supperagent text-white hover:bg-supperagent/90">
+          <Button className="bg-theme text-white hover:bg-theme/90">
             <FileText className="mr-2 h-4 w-4" />
             Request New Document
           </Button>
@@ -361,7 +361,7 @@ export default function ReportPage() {
           <div className="flex justify-end">
             <Button
               onClick={handleSubmitRequest}
-              className="bg-supperagent text-white hover:bg-supperagent/90"
+              className="bg-theme text-white hover:bg-theme/90"
               disabled={
                 !selectedDocumentType ||
                 (selectedDocumentType === 'Attendance Report' &&
@@ -442,7 +442,7 @@ export default function ReportPage() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="bg-supperagent text-white hover:bg-supperagent"
+                      className="bg-theme text-white hover:bg-theme"
                       onClick={() => {
                         const link = document.createElement('a');
                         link.href = request.document;

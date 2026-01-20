@@ -57,8 +57,9 @@ function VisaTab() {
 
   // Display State
   const [complianceStatus, setComplianceStatus] = useState<
-    'active' | 'expired' | null
+    'active' | 'expired' | 'expiring-soon' | null
   >(null);
+  
   const [currentExpiryDate, setCurrentExpiryDate] = useState<string | null>(
     null
   );
@@ -90,7 +91,7 @@ function VisaTab() {
       );
       const result = res.data?.data?.result;
       if (result && result.length > 0) {
-        setVisaCheckInterval(result[0].visaCheckDate || 0);
+        setVisaCheckInterval(result[0].visaCheckDate || 30);
       }
     } catch (err) {
       console.error('Error fetching schedule settings:', err);
@@ -143,18 +144,22 @@ function VisaTab() {
   // 3. Status Calculation
   useEffect(() => {
     if (currentExpiryDate) {
-      const now = moment();
-      const expiry = moment(currentExpiryDate);
+      const now = moment().startOf('day');
+      const expiry = moment(currentExpiryDate).startOf('day');
+      
+      const daysUntilExpiry = expiry.diff(now, 'days');
 
-      if (now.isAfter(expiry, 'day')) {
+      if (daysUntilExpiry < 0) {
         setComplianceStatus('expired');
+      } else if (daysUntilExpiry <= visaCheckInterval) {
+        setComplianceStatus('expiring-soon');
       } else {
         setComplianceStatus('active');
       }
     } else {
       setComplianceStatus(null);
     }
-  }, [currentExpiryDate]);
+  }, [currentExpiryDate, visaCheckInterval]);
 
   // File Upload Logic
   const handleFileSelect = async (
@@ -202,24 +207,32 @@ function VisaTab() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  // --- UPDATED: Open Modal Logic ---
   const openUpdateModal = () => {
-    setNewExpiryDate(null);
-    setNewStartDate(null);
+    // Reset errors and file
     setUploadedFileUrl(null);
     setSelectedFileName(null);
     setUploadError(null);
+
+    // 1. Show Initial Data: Pre-fill with the CURRENT data
+    if (currentStartDate) {
+      setNewStartDate(new Date(currentStartDate));
+    } else {
+      setNewStartDate(new Date());
+    }
+
+    if (currentExpiryDate) {
+      setNewExpiryDate(new Date(currentExpiryDate));
+    } else {
+      setNewExpiryDate(null);
+    }
+    
     setShowUpdateModal(true);
   };
 
   // Submit Logic
   const handleSubmitUpdate = async () => {
-    if (
-      !user?._id ||
-      !uploadedFileUrl ||
-      !newExpiryDate ||
-      !newStartDate
-    )
-      return;
+    if (!user?._id || !uploadedFileUrl || !newExpiryDate || !newStartDate) return;
 
     setIsSubmitting(true);
 
@@ -244,14 +257,14 @@ function VisaTab() {
       await fetchVisaData();
       toast({
         title: 'Visa details updated successfully!',
-        className: 'bg-supperagent text-white'
+        className: 'bg-theme border-none text-white'
       });
       setShowUpdateModal(false);
     } catch (err: any) {
       console.error(err);
       toast({
         title: err.response?.data?.message || 'Update failed.',
-        className: 'bg-destructive text-white'
+        variant: 'destructive'
       });
     } finally {
       setIsSubmitting(false);
@@ -261,7 +274,7 @@ function VisaTab() {
   if (isLoading) {
     return (
       <div className="flex h-64 w-full items-center justify-center">
-        <BlinkingDots size="large" color="bg-supperagent" />
+        <BlinkingDots size="large" color="bg-theme" />
       </div>
     );
   }
@@ -273,7 +286,7 @@ function VisaTab() {
         <div className="lg:col-span-1">
           <div className="h-full rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
             <h2 className="mb-6 flex items-center gap-2 text-xl font-semibold text-gray-900">
-              <Calendar className="h-5 w-5 text-supperagent" />
+              <Calendar className="h-5 w-5 text-theme" />
               Visa Status
             </h2>
 
@@ -307,12 +320,17 @@ function VisaTab() {
                     <Badge
                       className={cn(
                         'px-3 py-1 text-sm',
-                        complianceStatus === 'active'
-                          ? 'bg-green-100 text-green-800 hover:bg-green-100'
-                          : 'bg-red-100 text-red-800 hover:bg-red-100'
+                        complianceStatus === 'active' && 'bg-green-100 text-green-800 hover:bg-green-100',
+                        complianceStatus === 'expiring-soon' && 'bg-amber-100 text-amber-800 hover:bg-amber-100',
+                        complianceStatus === 'expired' && 'bg-red-100 text-red-800 hover:bg-red-100'
                       )}
                     >
-                      {complianceStatus === 'active' ? 'Active' : 'Expired'}
+                      {complianceStatus === 'active' 
+                        ? 'Active' 
+                        : complianceStatus === 'expiring-soon' 
+                          ? 'Expiring Soon' 
+                          : 'Expired'
+                      }
                     </Badge>
                   </div>
                 )}
@@ -322,13 +340,13 @@ function VisaTab() {
               <div className="border-t border-gray-100 pt-4">
                 <Button
                   onClick={openUpdateModal}
-                  className="w-full bg-supperagent text-white hover:bg-supperagent/90"
+                  className="w-full bg-theme text-white hover:bg-theme/90"
                 >
-                  Update Visa Details
+                  {currentExpiryDate ? 'Renew / Update Visa' : 'Add Visa Details'}
                 </Button>
                 {visaCheckInterval > 0 && (
                   <p className="mt-3 text-center text-xs text-gray-500">
-                    Policy: Check required every {visaCheckInterval} days
+                    Policy: Alert if expiring within {visaCheckInterval} days
                   </p>
                 )}
               </div>
@@ -340,76 +358,85 @@ function VisaTab() {
         <div className="lg:col-span-2">
           <div className=" rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
             <h2 className="mb-6 flex items-center gap-2 text-xl font-semibold text-gray-900">
-              <History className="h-5 w-5 text-supperagent" />
+              <History className="h-5 w-5 text-theme" />
               History Log
             </h2>
 
             <div className="overflow-hidden rounded-md border border-gray-100">
               <Table>
-                <TableHeader className="bg-gray-50">
-                  <TableRow>
-                    <TableHead className="w-[180px]">Date & Time</TableHead>
-                    <TableHead>Activity</TableHead>
-                    <TableHead>Updated By</TableHead>
-                    <TableHead className="text-right">Document</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {history.length === 0 ? (
-                    <TableRow>
-                      <TableCell
-                        colSpan={4}
-                        className="py-8 text-center italic text-gray-500"
-                      >
-                        No history records found.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    history
-                      .slice()
-                      .sort(
-                        (a, b) =>
-                          new Date(b.date).getTime() -
-                          new Date(a.date).getTime()
-                      )
-                      .map((entry) => (
-                        <TableRow key={entry._id} className="hover:bg-gray-50">
-                          <TableCell className="font-medium text-gray-600">
-                            {moment(entry.date).format('DD MMM YYYY')}
-                          </TableCell>
-                          <TableCell className="font-medium text-gray-900">
-                            {entry.title || 'Update'}
-                          </TableCell>
-                          <TableCell className="text-gray-600">
-                            {entry.updatedBy &&
-                            typeof entry.updatedBy === 'object'
-                              ? entry.updatedBy.name ||
-                                `${entry.updatedBy.firstName ?? ''} ${entry.updatedBy.lastName ?? ''}`.trim()
-                              : 'System'}
-                          </TableCell>
-
-                          <TableCell className="text-right">
-                            {entry.document ? (
-                              <Button
-                           
-                                size="sm"
-                                className="h-8 "
-                                onClick={() =>
-                                  window.open(entry.document, '_blank')
-                                }
-                              >
-                                <Eye className="mr-2 h-4 w-4" />
-                                View
-                              </Button>
-                            ) : (
-                              <span className="text-gray-300">-</span>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))
-                  )}
-                </TableBody>
-              </Table>
+                             <TableHeader>
+                               <TableRow>
+                                 {/* Date & Time Column Removed */}
+                                 <TableHead>Activity</TableHead>
+                                 <TableHead >Updated By</TableHead>
+                                 <TableHead className="text-right">Document</TableHead>
+                               </TableRow>
+                             </TableHeader>
+                             <TableBody>
+                               {history.length === 0 ? (
+                                 <TableRow>
+                                   <TableCell
+                                     colSpan={3} // Adjusted colspan from 4 to 3
+                                     className="py-8 text-center italic text-gray-500"
+                                   >
+                                     No history records found.
+                                   </TableCell>
+                                 </TableRow>
+                               ) : (
+                                 history
+                                   .slice()
+                                   .sort(
+                                     (a, b) =>
+                                       new Date(b.date).getTime() -
+                                       new Date(a.date).getTime()
+                                   )
+                                   .map((entry) => (
+                                     <TableRow key={entry._id} className="hover:bg-gray-50">
+                                       {/* Date Cell Removed */}
+             
+                                       <TableCell className="font-medium text-gray-900">
+                                         {entry.title || 'Update'}
+                                       </TableCell>
+             
+                                       <TableCell className="">
+                                         <div className='flex '>
+                                         <div className="flex flex-col">
+                                           <span className="font-medium">
+                                             {entry.updatedBy &&
+                                             typeof entry.updatedBy === 'object'
+                                               ? entry.updatedBy.name ||
+                                                 `${entry.updatedBy.firstName ?? ''} ${entry.updatedBy.lastName ?? ''}`.trim()
+                                               : 'System'}
+                                           </span>
+                                           {/* Date moved here underneath the name */}
+                                           <span className="text-xs ">
+                                             {moment(entry.date).format('DD MMM YYYY')}
+                                           </span>
+                                         </div>
+                                         </div>
+                                       </TableCell>
+             
+                                       <TableCell className="text-right">
+                                         {entry.document ? (
+                                           <Button
+                                             size="sm"
+                                             className="h-8"
+                                             onClick={() =>
+                                               window.open(entry.document, '_blank')
+                                             }
+                                           >
+                                             <Eye className="mr-2 h-4 w-4" />
+                                             View
+                                           </Button>
+                                         ) : (
+                                           <span className="text-gray-300">-</span>
+                                         )}
+                                       </TableCell>
+                                     </TableRow>
+                                   ))
+                               )}
+                             </TableBody>
+                           </Table>
             </div>
           </div>
         </div>
@@ -423,10 +450,11 @@ function VisaTab() {
           </DialogHeader>
 
           <div className="space-y-6 py-4">
+            
             {/* Start Date Input */}
             <div className="flex flex-col space-y-2">
               <Label className="text-sm font-medium text-gray-700">
-                Visa Start Date <span className="text-red-500">*</span>
+                New Visa Start Date <span className="text-red-500">*</span>
               </Label>
               <DatePicker
                 selected={newStartDate}
@@ -437,13 +465,22 @@ function VisaTab() {
                 showMonthDropdown
                 showYearDropdown
                 preventOpenOnFocus
+                                dropdownMode='select'
+
+                // UPDATED: Min date is the PREVIOUS expiry date
+                minDate={currentExpiryDate ? new Date(currentExpiryDate) : undefined}
               />
+              {currentExpiryDate && (
+                <p className="text-xs text-gray-500">
+                  Must be on or after {moment(currentExpiryDate).format('DD MMM YYYY')}
+                </p>
+              )}
             </div>
 
             {/* Expiry Date Input */}
             <div className="flex flex-col space-y-2">
               <Label className="text-sm font-medium text-gray-700">
-                Visa Expiry Date <span className="text-red-500">*</span>
+                New Visa Expiry Date <span className="text-red-500">*</span>
               </Label>
               <DatePicker
                 selected={newExpiryDate}
@@ -455,6 +492,7 @@ function VisaTab() {
                 showYearDropdown
                 minDate={newStartDate || undefined}
                 preventOpenOnFocus
+                dropdownMode='select'
               />
             </div>
 
@@ -538,7 +576,7 @@ function VisaTab() {
               Cancel
             </Button>
             <Button
-              className="bg-supperagent text-white hover:bg-supperagent/90"
+              className="bg-theme text-white hover:bg-theme/90"
               onClick={handleSubmitUpdate}
               disabled={
                 isSubmitting ||
