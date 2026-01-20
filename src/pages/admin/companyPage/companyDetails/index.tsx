@@ -86,7 +86,7 @@ const companySchema = z.object({
   address2: z.string().optional().nullable(),
   cityOrTown: z.string().optional().nullable(),
   stateOrProvince: z.string().optional().nullable(),
-  postcode: z.string().optional().nullable(),
+  postCode: z.string().optional().nullable(),
   country: z.string().optional().nullable(),
   accountNo: z.string().optional().nullable(),
   sortCode: z.string().optional().nullable(),
@@ -168,7 +168,7 @@ export function CompanyDetailsPage() {
         address2: companyData.address2 || '',
         cityOrTown: companyData.cityOrTown || '',
         stateOrProvince: companyData.stateOrProvince || '',
-        postcode: companyData.postcode || '',
+        postCode: companyData.postCode || '',
         country: companyData.country || '',
         accountNo: companyData.accountNo || '',
         sortCode: companyData.sortCode || '',
@@ -384,6 +384,7 @@ export function CompanyDetailsPage() {
                               id="email"
                               type="email"
                               {...register('email')}
+                              disabled
                               className={`pl-9 ${errors.email ? 'border-red-500' : ''}`}
                             />
                           </div>
@@ -478,7 +479,7 @@ export function CompanyDetailsPage() {
                           </div>
                           <div className="space-y-2">
                             <Label htmlFor="postcode">Postcode</Label>
-                            <Input id="postcode" {...register('postcode')} />
+                            <Input id="postcode" {...register('postCode')} />
                           </div>
                           <div className="space-y-2">
                             <Label htmlFor="country">Country</Label>

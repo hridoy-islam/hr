@@ -24,7 +24,7 @@ import { useSelector } from 'react-redux';
 const trainingFormSchema = z.object({
   name: z.string().nonempty('Name is required'),
   description: z.string().optional(),
-  isRecurring: z.boolean({ required_error: 'Recurring status is required' }),
+  // isRecurring: z.boolean({ required_error: 'Recurring status is required' }),
   validityDays: z
     .number()
     .int('Must be an integer')
@@ -54,7 +54,7 @@ export default function CreateTraining() {
     defaultValues: {
       name: '',
       description: '',
-      isRecurring: false,
+      // isRecurring: false,
       validityDays: undefined,
       reminderBeforeDays: undefined
     }
@@ -126,7 +126,7 @@ export default function CreateTraining() {
                       <Textarea
                         placeholder="Enter training description"
                         {...field}
-                        className="border-gray-300"
+                        className="border-gray-300 h-[30vh]"
                       />
                     </FormControl>
                     <FormMessage />
@@ -135,7 +135,7 @@ export default function CreateTraining() {
               />
 
               {/* Is Recurring */}
-              <FormField
+              {/* <FormField
                 control={form.control}
                 name="isRecurring"
                 render={({ field }) => (
@@ -152,7 +152,7 @@ export default function CreateTraining() {
                     <FormMessage />
                   </FormItem>
                 )}
-              />
+              /> */}
 
               {/* Validity Days - conditional */}
               <div className="flex w-full  flex-row items-center justify-between gap-4">

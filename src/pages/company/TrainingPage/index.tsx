@@ -31,7 +31,7 @@ export default function CompanyTrainingPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [searchTerm, setSearchTerm] = useState('');
-const user = useSelector((state: any) => state.auth.user);
+  const user = useSelector((state: any) => state.auth.user);
 
   const fetchData = async (page, entriesPerPage, searchTerm = '') => {
     try {
@@ -40,7 +40,7 @@ const user = useSelector((state: any) => state.auth.user);
         params: {
           page,
           limit: entriesPerPage,
-           companyId:user?._id,
+          companyId: user?._id,
           ...(searchTerm ? { searchTerm } : {})
         }
       });
@@ -51,71 +51,6 @@ const user = useSelector((state: any) => state.auth.user);
     } finally {
       setInitialLoading(false);
     }
-  };
-
-  const handleSubmit = async (data) => {
-    try {
-      let response;
-      if (editingTraining) {
-        // Update training
-        response = await axiosInstance.patch(
-          `/hr/training/${editingTraining?._id}`,
-          data
-        );
-      } else {
-        // Create new training
-
-        response = await axiosInstance.post(`/hr/training`, data);
-      }
-
-      // Check if the API response indicates success
-      if (response.data && response.data.success === true) {
-        toast({
-          title: response.data.message || 'Record Updated successfully',
-          className: 'bg-theme border-none text-white'
-        });
-      } else if (response.data && response.data.success === false) {
-        toast({
-          title: response.data.message || 'Operation failed',
-          className: 'bg-red-500 border-none text-white'
-        });
-      } else {
-        toast({
-          title: 'Unexpected response. Please try again.',
-          className: 'bg-red-500 border-none text-white'
-        });
-      }
-
-      // Refresh data
-      fetchData(currentPage, entriesPerPage);
-      setEditingTraining(undefined); // Reset editing state
-    } catch (error) {
-      toast({
-        title: 'An error occurred. Please try again.',
-        className: 'bg-red-500 border-none text-white'
-      });
-    }
-  };
-
-  const handleStatusChange = async (id, status) => {
-    try {
-      const updatedStatus = status ? 'active' : 'inactive';
-      await axiosInstance.patch(`/hr/training/${id}`, {
-        status: updatedStatus
-      });
-      toast({
-        title: 'Record updated successfully',
-        className: 'bg-theme border-none text-white'
-      });
-      fetchData(currentPage, entriesPerPage);
-    } catch (error) {
-      console.error('Error updating status:', error);
-    }
-  };
-
-  const handleEdit = (training) => {
-    setEditingTraining(training);
-    setDialogOpen(true);
   };
 
   useEffect(() => {
@@ -147,14 +82,14 @@ const user = useSelector((state: any) => state.auth.user);
             <Button
               onClick={handleSearch}
               size="sm"
-              className="min-w-[100px] border-none bg-theme text-white hover:bg-theme/90"
+              className="bg-theme hover:bg-theme/90 min-w-[100px] border-none text-white"
             >
               Search
             </Button>
           </div>
         </div>
         <Button
-          className="bg-theme text-white hover:bg-theme/90"
+          className="bg-theme hover:bg-theme/90 text-white"
           size={'sm'}
           onClick={() => {
             navigate(`/company/create-training`);
@@ -180,10 +115,9 @@ const user = useSelector((state: any) => state.auth.user);
               <TableRow>
                 <TableHead>Training Name</TableHead>
                 <TableHead>Training Description</TableHead>
-                <TableHead>Is Recurring</TableHead>
                 <TableHead>Validity Days</TableHead>
                 <TableHead>Expiry Days</TableHead>
-                <TableHead className=" text-right">Actions</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -192,17 +126,12 @@ const user = useSelector((state: any) => state.auth.user);
                   <TableCell>{training.name}</TableCell>
                   <TableCell>{training.description}</TableCell>
 
-                  <TableCell>
-                    {training.isRecurring === true ? 'Yes' : 'No'}
-                    {/* {moment(training.isRecurring).format('MMMM Do YYYY')} */}
-                  </TableCell>
-
                   <TableCell>{training.validityDays}</TableCell>
                   <TableCell>{training.reminderBeforeDays}</TableCell>
                   <TableCell className="text-right">
                     <Button
                       variant="ghost"
-                      className="border-none bg-theme text-white hover:bg-theme/90"
+                      className="bg-theme hover:bg-theme/90 border-none text-white"
                       size="icon"
                       onClick={() => {
                         navigate(`/company/edit-training/${training._id}`);

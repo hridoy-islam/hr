@@ -8,15 +8,8 @@ import {
   DialogTitle,
   DialogFooter
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
 import {
   Table,
   TableBody,
@@ -25,469 +18,407 @@ import {
   TableHeader,
   TableRow
 } from '@/components/ui/table';
-import { Trash2, Pencil } from 'lucide-react';
+import { Eye, Plus } from 'lucide-react';
 import axiosInstance from '@/lib/axios';
 import moment from 'moment';
 import ReactSelect from 'react-select';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
+import { useNavigate, useParams } from 'react-router-dom';
+import { toast } from 'sonner';
+import { useSelector } from 'react-redux';
+import { BlinkingDots } from '@/components/shared/blinking-dots';
 
-// Types
+// --- Types ---
+
 type TrainingOption = {
   value: string;
   label: string;
   validityDays?: number;
 };
 
-type LocalTraining = {
-  _id?: string;
-  trainingId: string;
-  trainingName: string;
-  assignedDate: string; // YYYY-MM-DD
-  expireDate?: string | null;
-  status: 'inProgress' | 'completed' | 'expired';
-  completedAt?: string; // optional date
-  certificate?: File | null;
+type EmployeeTrainingRecord = {
+  _id: string;
+  employeeId: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+  };
+  trainingId: {
+    _id: string;
+    name: string;
+    description?: string;
+    validityDays?: number;
+    reminderBeforeDays?: number; // Added this field
+  };
+  assignedDate: string;
+  expireDate: string;
+  status: 'pending' | 'in-progress' | 'completed' | 'expired';
+  certificate?: string;
 };
 
-const TrainingTab = ({ formData, onUpdate, isFieldSaving }) => {
-  const [trainings, setTrainings] = useState<
-    Array<{ _id: string; name: string; validityDays?: number }>
-  >([]);
-  const [localTrainings, setLocalTrainings] = useState<LocalTraining[]>([]);
+const TrainingTab: React.FC = () => {
+  const navigate = useNavigate();
+  const { id: employeeId } = useParams();
+  const { user } = useSelector((state: any) => state.auth);
+
+  // State
+  const [availableTrainings, setAvailableTrainings] = useState<TrainingOption[]>([]);
+  const [employeeTrainings, setEmployeeTrainings] = useState<EmployeeTrainingRecord[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // Dialog State
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [dialogData, setDialogData] = useState<Partial<LocalTraining>>({
+
+  // Form State
+  const [formData, setFormData] = useState({
     trainingId: '',
     assignedDate: '',
-    status: 'inProgress',
-    certificate: null
+    expireDate: '',
+    status: 'pending'
   });
 
-  // Fetch available trainings
+  // DatePicker Open States
+  const [dateOpenState, setDateOpenState] = useState({
+    assigned: false
+  });
+
+  // --- 1. Fetch Data ---
+
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchOptions = async () => {
       try {
-        const res = await axiosInstance('/hr/training');
-        setTrainings(res.data.data.result || []);
+        const res = await axiosInstance.get(
+          `/hr/training?companyId=${user?._id}&limit=all`
+        );
+        const options = res.data.data.result.map((t: any) => ({
+          value: t._id,
+          label: t.name,
+          validityDays: t.validityDays
+        }));
+        setAvailableTrainings(options);
       } catch (error) {
-        console.error('Error fetching trainings:', error);
+        console.error('Error fetching training options:', error);
       }
     };
-    fetchData();
-  }, []);
+    fetchOptions();
+  }, [user?._id]);
 
-  // Map formData.training to localTrainings
+  const fetchEmployeeData = async () => {
+    if (!employeeId) return;
+    setLoading(true);
+    try {
+      const res = await axiosInstance.get(
+        `/employee-training?employeeId=${employeeId}&limit=all`
+      );
+      setEmployeeTrainings(res.data.data.result || []);
+    } catch (error) {
+      console.error('Error fetching employee training:', error);
+      toast.error('Failed to load training records');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    if (formData.training && Array.isArray(formData.training)) {
-      const mapped = formData.training.map((t) => {
-        const trainingInfo = trainings.find(
-          (tr) => tr._id === (t.trainingId?._id || t.trainingId)
-        );
-        const validityDays = trainingInfo?.validityDays || 90;
+    fetchEmployeeData();
+  }, [employeeId]);
 
-        const assignedDate = t.assignedDate
-          ? moment(t.assignedDate).format('YYYY-MM-DD')
-          : '';
-        const expireDate = assignedDate
-          ? moment(assignedDate).add(validityDays, 'days').format('YYYY-MM-DD')
-          : '';
+  // --- 2. Logic: Filter out already assigned trainings ---
+  const unassignedTrainings = availableTrainings.filter((option) => {
+    const isAssigned = employeeTrainings.some(
+      (record) => record.trainingId._id === option.value
+    );
+    return !isAssigned;
+  });
 
-        let status: 'inProgress' | 'completed' | 'expired' =
-          t.status || 'inProgress';
-        if (
-          expireDate &&
-          moment().isAfter(expireDate) &&
-          status !== 'completed'
-        ) {
-          status = 'expired';
-        }
+  // --- 3. Handlers ---
 
-        return {
-          _id: t._id,
-          trainingId: t.trainingId?._id || t.trainingId,
-          trainingName: t.trainingId?.name || trainingInfo?.name || '-',
-          assignedDate,
-          expireDate,
-          status,
-          completedAt: t.completedAt
-            ? moment(t.completedAt).format('YYYY-MM-DD')
-            : undefined,
-          certificate: t.certificate || null
-        };
-      });
-      setLocalTrainings(mapped);
-    }
-  }, [formData.training, trainings]);
-
-  // React Select options
-  const trainingOptions: TrainingOption[] = trainings.map((t) => ({
-    value: t._id,
-    label: t.name,
-    validityDays: t.validityDays
-  }));
-
-  const selectedTrainingOption = trainingOptions.find(
-    (t) => t.value === dialogData.trainingId
-  );
-
-  // Auto-calc expireDate
+  // Auto-calculate expiry date based on selection
   useEffect(() => {
-    if (dialogData.assignedDate && selectedTrainingOption?.validityDays) {
-      const expiry = moment(dialogData.assignedDate)
-        .add(selectedTrainingOption.validityDays, 'days')
-        .format('YYYY-MM-DD');
-      setDialogData((prev) => ({ ...prev, expireDate: expiry }));
+    if (formData.assignedDate && formData.trainingId) {
+      const selectedTraining = availableTrainings.find(
+        (t) => t.value === formData.trainingId
+      );
+      if (selectedTraining && selectedTraining.validityDays) {
+        const expiry = moment(formData.assignedDate)
+          .add(selectedTraining.validityDays, 'days')
+          .format('YYYY-MM-DD');
+        setFormData((prev) => ({ ...prev, expireDate: expiry }));
+      } else {
+        setFormData((prev) => ({ ...prev, expireDate: '' }));
+      }
     }
-  }, [dialogData.assignedDate, selectedTrainingOption]);
+  }, [formData.assignedDate, formData.trainingId, availableTrainings]);
 
-  // Open dialog
-  const openDialog = (index: number | null = null) => {
-    if (index !== null) {
-      const training = localTrainings[index];
-      setEditingIndex(index);
-      setDialogData({ ...training });
-    } else {
-      setEditingIndex(null);
-      setDialogData({
-        trainingId: '',
-        assignedDate: '',
-        status: 'inProgress',
-        certificate: null,
-        expireDate: '',
-        completedAt: ''
-      });
-    }
+  const openDialog = () => {
+    setFormData({
+      trainingId: '',
+      assignedDate: '',
+      expireDate: '',
+      status: 'pending'
+    });
     setIsDialogOpen(true);
   };
 
-  const handleDialogChange = (field: string, value: any) => {
-    setDialogData((prev) => ({ ...prev, [field]: value }));
-  };
-
-  // Save training
-  const handleSave = () => {
-    if (!dialogData.trainingId || !dialogData.assignedDate) {
-      alert('Please select a training and assigned date.');
+  const handleSave = async () => {
+    if (!formData.trainingId || !formData.assignedDate) {
+      toast.error('Training and Assigned Date are required');
       return;
     }
 
-    const trainingInfo = trainings.find(
-      (t) => t._id === dialogData.trainingId
-    )!;
+    try {
+      const payload = {
+        employeeId: employeeId,
+        trainingId: formData.trainingId,
+        assignedDate: formData.assignedDate,
+        expireDate: formData.expireDate,
+        status: 'pending',
+        updatedBy: user?._id
+      };
 
-    let status: 'inProgress' | 'completed' | 'expired' =
-      dialogData.status as any;
+      await axiosInstance.post('/employee-training', payload);
+      toast.success('Training assigned successfully');
 
-    // Only auto-expire if status is not manually completed
-    if (
-      dialogData.expireDate &&
-      moment().isAfter(dialogData.expireDate) &&
-      status !== 'completed'
-    ) {
-      status = 'expired';
+      setIsDialogOpen(false);
+      fetchEmployeeData();
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.response?.data?.message || 'Failed to save training');
+    }
+  };
+
+  // --- 4. Helper: Calculate Status Badge Logic ---
+  const getStatusDetails = (record: EmployeeTrainingRecord) => {
+    const { status, expireDate, trainingId } = record;
+
+    // 1. Completed
+    if (status === 'completed') {
+      return { 
+        label: 'Completed', 
+        className: 'bg-green-100 text-green-800 border-green-200' 
+      };
     }
 
-    // Completed At logic
-    let completedAt = dialogData.completedAt;
-    if (status === 'completed' && !completedAt) {
-      completedAt = moment().format('YYYY-MM-DD');
+    // 2. Pending (No Expiry set yet or explicitly pending)
+    if (!expireDate) {
+      return { 
+        label: 'Pending', 
+        className: 'bg-blue-100 text-blue-800 border-blue-200' 
+      };
     }
 
-    const newTraining: LocalTraining = {
-      _id: dialogData._id,
+    const today = moment();
+    const expiry = moment(expireDate);
+    // Use training specific reminder days or default to 30
+    const reminderDays = trainingId?.reminderBeforeDays || 30; 
+    const reminderDate = moment(expireDate).subtract(reminderDays, 'days');
 
-      trainingId: dialogData.trainingId,
-      assignedDate: dialogData.assignedDate,
-      expireDate: dialogData.expireDate || '',
-      status,
-      completedAt,
-      certificate: dialogData.certificate || null
+    // 3. Expired
+    if (today.isAfter(expiry, 'day')) {
+      return { 
+        label: 'Expired', 
+        className: 'bg-red-100 text-red-800 border-red-200' 
+      };
+    }
+
+    // 4. Expiring Soon (Between reminder date and expiry date)
+    if (today.isSameOrAfter(reminderDate, 'day')) {
+      return { 
+        label: 'Expiring Soon', 
+        className: 'bg-orange-100 text-orange-800 border-orange-200' 
+      };
+    }
+
+    // 5. Active
+    return { 
+      label: 'Active', 
+      className: 'bg-blue-100 text-blue-800 border-blue-200' 
     };
-
-    if (editingIndex !== null) {
-      const updated = localTrainings.map((t, i) =>
-        i === editingIndex ? newTraining : t
-      );
-      setLocalTrainings(updated);
-      onUpdate('training', updated);
-    } else {
-      const updated = [...localTrainings, newTraining];
-      setLocalTrainings(updated);
-      onUpdate('training', updated);
-    }
-
-    setIsDialogOpen(false);
-    setEditingIndex(null);
-    setDialogData({});
   };
-
-  const handleRemove = (index: number) => {
-    const updated = localTrainings.filter((_, i) => i !== index);
-    setLocalTrainings(updated);
-    onUpdate('training', updated);
-  };
-
-    const [isAssignedDateOpen, setIsAssignedDateOpen] = useState(false);
-  const [isCompletedAtOpen, setIsCompletedAtOpen] = useState(false);
-  const [isExpireDateOpen, setIsExpireDateOpen] = useState(false);
-
 
   return (
-    <Card>
+    <Card className="w-full shadow-sm">
       <CardContent className="pt-6">
-        {/* Add Training */}
-        <div className="mb-4 flex justify-end">
+        {/* Header Actions */}
+        <div className="mb-6 flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-gray-700">
+            Training Records
+          </h3>
           <Button
             type="button"
             size="sm"
-            onClick={() => openDialog(null)}
-            disabled={isFieldSaving['training']}
-            className="bg-theme text-white hover:bg-theme/90"
+            onClick={openDialog}
+            className="bg-theme hover:bg-theme/90 flex items-center gap-2 text-white"
           >
-            + Add Training
+            <Plus className="h-4 w-4" /> Assign Training
           </Button>
         </div>
 
-        {/* Training Table */}
-        {localTrainings.length > 0 ? (
-          <div className="overflow-hidden  rounded-md">
-            <Table>
-              <TableHeader>
+        {/* Data Table */}
+        <div className="overflow-hidden ">
+          <Table>
+            <TableHeader className="">
+              <TableRow>
+                <TableHead>Training Name</TableHead>
+                <TableHead>Assigned Date</TableHead>
+                <TableHead>Expiry Date</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
                 <TableRow>
-                  <TableHead>Training</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Assigned Date</TableHead>
-                  <TableHead>Completed At</TableHead>
-                  <TableHead>Expiry Date</TableHead>
-                  <TableHead>Certificate</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableCell colSpan={5} className="h-24 text-center">
+                    <BlinkingDots size="large" color="bg-theme" />
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {localTrainings.map((t, index) => (
-                  <TableRow key={index}>
-                    <TableCell className="font-medium">
-                      {t.trainingName}
-                    </TableCell>
-                    <TableCell>
-                      <span
-                        className={`rounded-full px-2 py-1 text-xs ${
-                          t.status === 'completed'
-                            ? 'bg-green-100 text-green-800'
-                            : t.status === 'expired'
-                              ? 'bg-red-100 text-red-800'
-                              : 'bg-yellow-100 text-yellow-800'
-                        }`}
-                      >
-                        {t.status.charAt(0).toUpperCase() + t.status.slice(1)}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-  {t.assignedDate ? moment(t.assignedDate).format('DD/MM/YYYY') : '-'}
-</TableCell>
-<TableCell>
-  {t.completedAt ? moment(t.completedAt).format('DD/MM/YYYY') : '-'}
-</TableCell>
-<TableCell>
-  {t.expireDate ? moment(t.expireDate).format('DD/MM/YYYY') : '-'}
-</TableCell>
-                    <TableCell>
-                      {t.certificate ? (
-                        <a
-                          href={URL.createObjectURL(t.certificate)}
-                          target="_blank"
-                          className="text-sm text-blue-600 underline"
+              ) : employeeTrainings.length > 0 ? (
+                employeeTrainings.map((t) => {
+                  // Calculate status for this row
+                  const statusInfo = getStatusDetails(t);
+
+                  return (
+                    <TableRow key={t._id} className="hover:bg-gray-50/50">
+                      <TableCell className="font-medium">
+                        {t.trainingId?.name || 'Unknown Training'}
+                      </TableCell>
+                      <TableCell>
+                        {t.assignedDate
+                          ? moment(t.assignedDate).format('DD MMM YYYY')
+                          : '-'}
+                      </TableCell>
+                      <TableCell>
+                        {t.expireDate
+                          ? moment(t.expireDate).format('DD MMM YYYY')
+                          : '-'}
+                      </TableCell>
+                      <TableCell>
+                        <span
+                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium border ${statusInfo.className}`}
                         >
-                          View
-                        </a>
-                      ) : (
-                        '-'
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex justify-end gap-2">
+                          {statusInfo.label}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right">
                         <Button
-                          variant="default"
-                          size="icon"
-                          onClick={() => openDialog(index)}
-                          className="bg-theme text-white hover:bg-theme/90"
+                          size="sm"
+                          onClick={() => navigate(`training-details/${t._id}`)}
                         >
-                          <Pencil className="h-4 w-4" />
+                          <Eye className="mr-1 h-4 w-4" /> View
                         </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        ) : (
-          <p className="text-sm italic text-gray-500">
-            No trainings assigned yet.
-          </p>
-        )}
-
-        {/* Dialog */}
- <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-      <DialogContent className="sm:max-w-md bg-white">
-        <DialogHeader>
-          <DialogTitle>
-            {editingIndex !== null ? 'Edit Training' : 'Add Training'}
-          </DialogTitle>
-        </DialogHeader>
-
-        <div className="grid gap-4 py-4">
-          {/* Training Select */}
-          <div className="grid gap-2">
-            <Label htmlFor="training">Training</Label>
-            <ReactSelect
-              id="training"
-              options={trainingOptions}
-              value={
-                trainingOptions.find(
-                  (t) => t.value === dialogData.trainingId
-                ) || null
-              }
-              onChange={(selected) =>
-                handleDialogChange('trainingId', selected?.value)
-              }
-              placeholder="Select Training"
-            />
-          </div>
-
-          {/* Assigned Date */}
-          <div className="grid gap-2">
-            <Label>Assigned Date (dd/mm/yyyy)</Label>
-            <DatePicker
-              selected={
-                dialogData.assignedDate
-                  ? moment(dialogData.assignedDate).toDate()
-                  : null
-              }
-              onChange={(date: Date | null) => {
-                handleDialogChange(
-                  'assignedDate',
-                  date ? moment(date).format('YYYY-MM-DD') : ''
-                );
-                setIsAssignedDateOpen(false); // 👈 Close on select
-              }}
-              dateFormat="dd/MM/yyyy" // 👈 Display: 25 Apr 2025
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-              placeholderText="Select assigned date"
-              isClearable
-              shouldCloseOnSelect={true}
-              open={isAssignedDateOpen} // 👈 Controlled
-              onInputClick={() => setIsAssignedDateOpen(true)} // 👈 Open on click
-              onClickOutside={() => setIsAssignedDateOpen(false)} // 👈 Close on outside click
-            />
-          </div>
-
-          {/* Status */}
-          <div className="grid gap-2">
-            <Label>Status</Label>
-            <Select
-              value={dialogData.status}
-              onValueChange={(value) => handleDialogChange('status', value)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="inProgress">In Progress</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-                <SelectItem value="expired">Expired</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Completed At */}
-          <div className="grid gap-2">
-            <Label>Completed At (dd/mm/yyyy)</Label>
-            <DatePicker
-              selected={
-                dialogData.completedAt
-                  ? moment(dialogData.completedAt).toDate()
-                  : null
-              }
-              onChange={(date: Date | null) => {
-                handleDialogChange(
-                  'completedAt',
-                  date ? moment(date).format('YYYY-MM-DD') : ''
-                );
-                setIsCompletedAtOpen(false); // 👈 Close on select
-              }}
-              dateFormat="dd/MM/yyyy"
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-              placeholderText="Select completed date"
-              isClearable
-              shouldCloseOnSelect={true}
-              open={isCompletedAtOpen}
-              onInputClick={() => setIsCompletedAtOpen(true)}
-              onClickOutside={() => setIsCompletedAtOpen(false)}
-            />
-          </div>
-
-          {/* Expiry Date */}
-          <div className="grid gap-2">
-            <Label>Expiry Date (dd/mm/yyyy)</Label>
-            <DatePicker
-              selected={
-                dialogData.expireDate
-                  ? moment(dialogData.expireDate).toDate()
-                  : null
-              }
-              onChange={(date: Date | null) => {
-                handleDialogChange(
-                  'expireDate',
-                  date ? moment(date).format('YYYY-MM-DD') : ''
-                );
-                setIsExpireDateOpen(false); // 👈 Close on select
-              }}
-              dateFormat="dd/MM/yyyy"
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-              placeholderText="Select expiry date"
-              isClearable
-              shouldCloseOnSelect={true}
-              open={isExpireDateOpen}
-              onInputClick={() => setIsExpireDateOpen(true)}
-              onClickOutside={() => setIsExpireDateOpen(false)}
-            />
-          </div>
-
-          {/* Certificate Upload */}
-          <div className="grid gap-2">
-            <Label>Certificate (Optional)</Label>
-            <Input
-              type="file"
-              accept=".pdf,.jpg,.png"
-              onChange={(e) => {
-                const file = e.target.files?.[0] || null;
-                handleDialogChange('certificate', file);
-              }}
-            />
-          </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              ) : (
+                <TableRow>
+                  <TableCell
+                    colSpan={5}
+                    className="h-32 text-center italic text-gray-500"
+                  >
+                    No training records found for this employee.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
         </div>
 
-        <DialogFooter>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => setIsDialogOpen(false)}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            onClick={handleSave}
-            className="bg-theme text-white hover:bg-theme/90"
-          >
-            Save
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        {/* --- Assign Dialog --- */}
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogContent className="bg-white sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Assign New Training</DialogTitle>
+            </DialogHeader>
 
+            <div className="grid gap-4 py-4">
+              {/* Training Selector */}
+              <div className="grid gap-2">
+                <Label htmlFor="training">Select Training Course</Label>
+                <ReactSelect
+                  id="training"
+                  options={unassignedTrainings}
+                  value={
+                    availableTrainings.find(
+                      (op) => op.value === formData.trainingId
+                    ) || null
+                  }
+                  onChange={(opt) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      trainingId: opt?.value || ''
+                    }))
+                  }
+                  placeholder="Search training..."
+                  noOptionsMessage={() => 'No new trainings available'}
+                  className="text-sm"
+                />
+              </div>
+
+              {/* Assigned Date */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label>Assigned Date</Label>
+                  <DatePicker
+                    selected={
+                      formData.assignedDate
+                        ? moment(formData.assignedDate).toDate()
+                        : null
+                    }
+                    onChange={(date) => {
+                      setFormData((prev) => ({
+                        ...prev,
+                        assignedDate: date
+                          ? moment(date).format('YYYY-MM-DD')
+                          : ''
+                      }));
+                      setDateOpenState((p) => ({ ...p, assigned: false }));
+                    }}
+                    dateFormat="dd/MM/yyyy"
+                    className="h-10 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-offset-2"
+                    placeholderText="DD/MM/YYYY"
+                    open={dateOpenState.assigned}
+                    onInputClick={() =>
+                      setDateOpenState((p) => ({ ...p, assigned: true }))
+                    }
+                    onClickOutside={() =>
+                      setDateOpenState((p) => ({ ...p, assigned: false }))
+                    }
+                  />
+                </div>
+
+                {/* Expiry Date - Read Only / Auto Calculated */}
+                <div className="grid gap-2">
+                  <Label>Expiry/Due Date</Label>
+                  <Input
+                    disabled
+                    value={
+                      formData.expireDate
+                        ? moment(formData.expireDate).format('DD/MM/YYYY')
+                        : ''
+                    }
+                    placeholder="Auto-calculated"
+                    className="h-10 bg-gray-100 text-gray-800"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSave}
+                className="bg-theme hover:bg-theme/90 text-white"
+              >
+                Assign Training
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>
   );

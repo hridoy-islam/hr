@@ -10,8 +10,7 @@ import {
   CheckCircle,
   AlertCircle,
   Pencil,
-  ExternalLink,
-  Calendar
+  Eye // Imported Eye icon for View
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -41,7 +40,7 @@ interface TEmployeeDocument {
   employeeId: string;
   documentTitle: string;
   documentUrl: string;
-  createdAt?: string; // Assuming timestamps: true is enabled in mongoose
+  createdAt?: string;
   updatedAt?: string;
 }
 
@@ -53,9 +52,10 @@ export default function EmployeeDocumentTab() {
   const [documents, setDocuments] = useState<TEmployeeDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Dialog States
+  // Dialog States (Only for Create/Edit now)
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [viewingDoc, setViewingDoc] = useState<TEmployeeDocument | null>(null);
+  
+  // Removed viewingDoc state
 
   // Edit State
   const [editingDoc, setEditingDoc] = useState<TEmployeeDocument | null>(null);
@@ -76,7 +76,6 @@ export default function EmployeeDocumentTab() {
       if (!id) return;
       try {
         setIsLoading(true);
-        // Assuming your backend route for fetching list is /employee-documents?employeeId=...
         const res = await axiosInstance.get(`/employee-documents?limit=all`, {
           params: { employeeId: id }
         });
@@ -113,7 +112,7 @@ export default function EmployeeDocumentTab() {
   const handleOpenEdit = (doc: TEmployeeDocument) => {
     setEditingDoc(doc);
     setDocumentTitle(doc.documentTitle);
-    setUploadedDocUrl(doc.documentUrl); // Existing URL mapped to schema
+    setUploadedDocUrl(doc.documentUrl);
     setFileToUpload(null);
     setUploadError(null);
     setIsDialogOpen(true);
@@ -131,11 +130,10 @@ export default function EmployeeDocumentTab() {
 
     const formData = new FormData();
     formData.append('entityId', id);
-    formData.append('file_type', 'employeeDoc'); // Changed folder name hint
+    formData.append('file_type', 'employeeDoc');
     formData.append('file', file);
 
     try {
-      // General file upload endpoint
       const res = await axiosInstance.post('/documents', formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
@@ -146,8 +144,6 @@ export default function EmployeeDocumentTab() {
       if (!url) throw new Error('No file URL returned from server');
 
       setUploadedDocUrl(url);
-
-     
     } catch (err) {
       console.error('Upload failed:', err);
       setUploadError('Upload failed. Please try again.');
@@ -168,7 +164,7 @@ export default function EmployeeDocumentTab() {
     if (!isUploading) fileInputRef.current?.click();
   };
 
-  // 2. Handle Final Form Submission (Create or Update)
+  // Handle Final Form Submission (Create or Update)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!id || !uploadedDocUrl || !documentTitle) {
@@ -178,7 +174,6 @@ export default function EmployeeDocumentTab() {
 
     setIsSubmitting(true);
     try {
-      // Payload matching TEmployeeDocument interface
       const payload = {
         employeeId: id,
         documentTitle: documentTitle,
@@ -222,6 +217,11 @@ export default function EmployeeDocumentTab() {
     } catch (error) {
       console.error('Delete failed', error);
     }
+  };
+
+  // New handler to open document in new tab
+  const handleViewDocument = (url: string) => {
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   return (
@@ -270,8 +270,6 @@ export default function EmployeeDocumentTab() {
                   required
                 />
               </div>
-
-              {/* Note: Category selection removed as per Schema */}
 
               {/* File Upload Area */}
               <div className="space-y-2">
@@ -391,7 +389,7 @@ export default function EmployeeDocumentTab() {
             <p className="text-muted-foreground">No documents uploaded yet.</p>
           </div>
         ) : (
-          <div className="overflow-hidden  rounded-md bg-white p-4 shadow-sm">
+          <div className="overflow-hidden rounded-md bg-white p-4 shadow-sm">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -404,8 +402,7 @@ export default function EmployeeDocumentTab() {
                 {documents.map((doc) => (
                   <TableRow
                     key={doc._id}
-                    className="cursor-pointer transition-colors hover:bg-gray-50"
-                    onClick={() => setViewingDoc(doc)}
+                    className="hover:bg-gray-50"
                   >
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
@@ -420,25 +417,31 @@ export default function EmployeeDocumentTab() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
+                        {/* View Button */}
                         <Button
                           size="icon"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleOpenEdit(doc);
-                          }}
+                          onClick={() => handleViewDocument(doc.documentUrl)}
+                          className="h-8 w-8"
+                          title="View Document"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+
+                        {/* Edit Button */}
+                        <Button
+                          size="icon"
+                          onClick={() => handleOpenEdit(doc)}
                           className="h-8 w-8"
                           title="Edit Document"
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
 
+                        {/* Delete Button */}
                         <Button
                           variant="destructive"
                           size="icon"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDelete(doc._id);
-                          }}
+                          onClick={() => handleDelete(doc._id)}
                           className="h-8 w-8"
                           title="Delete"
                         >
@@ -453,67 +456,7 @@ export default function EmployeeDocumentTab() {
           </div>
         )}
       </div>
-
-      {/* --- View Detail Modal --- */}
-      {viewingDoc && (
-        <Dialog open={!!viewingDoc} onOpenChange={() => setViewingDoc(null)}>
-          <DialogContent className="gap-0 overflow-hidden border-0 p-0 shadow-2xl outline-none sm:max-w-3xl">
-            {/* 1. Hero / Header Section */}
-            <div className="flex flex-col items-center justify-center border-b bg-slate-50/80 p-10">
-              <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-2xl border bg-white shadow-sm">
-                <FileText className="h-10 w-10 text-theme" />
-              </div>
-              <DialogHeader className="mb-2">
-                <DialogTitle className="text-center text-3xl font-bold tracking-tight text-slate-900">
-                  {viewingDoc.documentTitle}
-                </DialogTitle>
-              </DialogHeader>
-            </div>
-
-            {/* 2. Details Section */}
-            <div className="space-y-8 bg-white p-10">
-              <div className="grid grid-cols-1 gap-4">
-                {/* Date Row */}
-                <div className="flex items-center rounded-xl border bg-slate-50 p-4">
-                  <div className="mr-4 rounded-lg border bg-white p-3 text-slate-500 shadow-sm">
-                    <Calendar className="h-5 w-5" />
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="mb-0.5 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                      Uploaded On
-                    </span>
-                    <span className="text-base font-semibold text-slate-900">
-                      {viewingDoc.createdAt
-                        ? moment(viewingDoc.createdAt).format('DD MMM, YYYY')
-                        : 'Date N/A'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* 3. Footer / Actions */}
-              <div className="flex gap-4 pt-4">
-                <Button
-                  variant="outline"
-                  size="lg"
-                  onClick={() => setViewingDoc(null)}
-                  className="h-12 w-full text-base"
-                >
-                  Close
-                </Button>
-                <Button
-                  size="lg"
-                  onClick={() => window.open(viewingDoc.documentUrl, '_blank')}
-                  className="h-12 w-full bg-theme text-base text-white hover:bg-theme/90"
-                >
-                  <ExternalLink className="mr-2 h-5 w-5" />
-                  View File
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
+      {/* Removed the View Modal from here */}
     </div>
   );
 }

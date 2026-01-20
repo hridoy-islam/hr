@@ -24,7 +24,7 @@ import { useToast } from '@/components/ui/use-toast';
 const trainingFormSchema = z.object({
   name: z.string().nonempty('Name is required'),
   description: z.string().optional(),
-  isRecurring: z.boolean({ required_error: 'Recurring status is required' }),
+  // isRecurring: z.boolean({ required_error: 'Recurring status is required' }),
   validityDays: z
     .number()
     .int('Must be an integer')
@@ -54,7 +54,6 @@ export default function EditTraining() {
     defaultValues: {
       name: '',
       description: '',
-      isRecurring: false,
       validityDays: undefined,
       reminderBeforeDays: undefined
     }
@@ -72,7 +71,6 @@ export default function EditTraining() {
         // Prefill the form with existing data
         setValue('name', data.name);
         setValue('description', data.description || '');
-        setValue('isRecurring', data.isRecurring);
         setValue('validityDays', data.validityDays || undefined);
         setValue('reminderBeforeDays', data.reminderBeforeDays || undefined);
       } catch (error) {
@@ -159,7 +157,7 @@ export default function EditTraining() {
               />
 
               {/* Is Recurring */}
-              <FormField
+              {/* <FormField
                 control={form.control}
                 name="isRecurring"
                 render={({ field }) => (
@@ -176,7 +174,7 @@ export default function EditTraining() {
                     <FormMessage />
                   </FormItem>
                 )}
-              />
+              /> */}
 
               {/* Validity Days - conditional */}
               <div className="flex w-full flex-row items-center justify-between gap-4">

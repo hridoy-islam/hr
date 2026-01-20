@@ -22,7 +22,7 @@ import HrLayout from '@/components/layout/hr-layout';
 import Department from '@/pages/company/Department';
 import Shift from '@/pages/company/Shift';
 import Designation from '@/pages/company/Designation';
-import Training from '@/pages/Hr/Training';
+import Training from '@/pages/company/Training';
 import AttendanceReport from '@/pages/Hr/Attendance/Attendance-Report';
 import CompanyDetails from '@/pages/company/Company-Details';
 import EmailSetup from '@/pages/company/Email-Setup';
@@ -70,6 +70,7 @@ import VisaExpiryPage from '@/pages/company/ExpiryPage/visaExpiryPage';
 import RtwExpiryPage from '@/pages/company/ExpiryPage/rtwExpiryPage';
 import ImmigrationExpiryPage from '@/pages/company/ExpiryPage/immigrationExpiryPage';
 import AppraisalExpiryPage from '@/pages/company/ExpiryPage/appraisalExpiryPage';
+import TrainingDetailsPage from '@/pages/company/Employee/employeeTraining/employeeTrainingDetails';
 
 const SignInPage = lazy(() => import('@/pages/auth/signin'));
 
@@ -137,6 +138,7 @@ export default function AppRouter() {
 
         { path: 'employee', element: <Employee /> },
         { path: 'employee/:id', element: <EditEmployee /> },
+        { path: 'employee/:id/training-details/:tid', element: <TrainingDetailsPage /> },
         { path: 'employee/:id/employee-rate', element: <EmployeeRate /> },
         { path: 'employee/:id/rtw', element: <RtwPage /> },
 
