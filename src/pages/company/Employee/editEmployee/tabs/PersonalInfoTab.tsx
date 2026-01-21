@@ -1,11 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
+import React, { useState } from 'react';
 import { EditableField } from '../EditableField';
 import moment from 'moment';
 import { Button } from '@/components/ui/button';
-import { Camera, Loader2, Upload, AlertCircle } from 'lucide-react';
-import axiosInstance from '@/lib/axios'; // Ensure correct path
+import { Camera, Loader2, Upload, AlertCircle, User, Phone } from 'lucide-react';
 import { useParams } from 'react-router-dom';
+import axiosInstance from '@/lib/axios';
 import {
   Dialog,
   DialogContent,
@@ -13,7 +12,37 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from '@/components/ui/dialog';
+
+// --- Layout Components ---
+
+const SectionHeader = ({ icon: Icon, title }: { icon: any, title: string }) => (
+  <div className="flex items-center gap-2 border-b border-gray-200 bg-gray-50/80 px-4 py-3">
+    <Icon className="h-4 w-4 text-theme" />
+    <h3 className="text-sm font-bold uppercase tracking-wide text-gray-700">
+      {title}
+    </h3>
+  </div>
+);
+
+const FormRow = ({ label, children, className = '' }: { label: string, children: React.ReactNode, className?: string }) => (
+  <div className={`group flex flex-col border-b border-gray-100 last:border-0 sm:flex-row ${className}`}>
+    {/* Label Column */}
+    <div className="flex items-center bg-gray-50/30 px-4 py-3 sm:w-1/3 lg:w-2/5 xl:w-1/3">
+      <span className="text-sm font-medium text-gray-600 transition-colors group-hover:text-gray-900">
+        {label}
+      </span>
+    </div>
+    {/* Input Column */}
+    <div className="flex items-center bg-white px-4 py-2 sm:w-2/3 lg:w-3/5 xl:w-2/3">
+      <div className="w-full">
+        {children}
+      </div>
+    </div>
+  </div>
+);
+
+// --- Main Component ---
 
 interface PersonalInfoTabProps {
   formData: any;
@@ -28,263 +57,277 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
   onUpdate,
   onDateChange,
   onSelectChange,
-  isFieldSaving
+  isFieldSaving,
 }) => {
   const { id } = useParams();
-  
+
   // --- Upload State ---
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const [uploadedDocUrl, setUploadedDocUrl] = useState<string | null>(formData?.image || null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Sync uploaded URL with local state if formData updates from parent
-  useEffect(() => {
-    if (formData?.image) {
-      setUploadedDocUrl(formData.image);
-    }
-  }, [formData?.image]);
-
-  // --- Options ---
-  const titleOptions = [
-    { value: 'Mr', label: 'Mr' },
-    { value: 'Mrs', label: 'Mrs' },
-    { value: 'Miss', label: 'Miss' },
-    { value: 'Ms', label: 'Ms' },
-    { value: 'Dr', label: 'Dr' }
-  ];
-
-  const genderOptions = [
-    { value: 'Male', label: 'Male' },
-    { value: 'Female', label: 'Female' },
-    { value: 'Other', label: 'Other' },
-    { value: 'Prefer not to say', label: 'Prefer not to say' }
-  ];
-
-  const maritalStatusOptions = [
-    { value: 'Single', label: 'Single' },
-    { value: 'Married', label: 'Married' },
-    { value: 'Divorced', label: 'Divorced' },
-    { value: 'Widowed', label: 'Widowed' },
-    { value: 'Separated', label: 'Separated' },
-    { value: 'Civil Partnership', label: 'Civil Partnership' }
-  ];
-
-  // --- File Upload Logic ---
-  const validateFile = (file: File) => {
-    // 5MB Limit
-    if (file.size > 5 * 1024 * 1024) {
-      setUploadError('File size exceeds 5MB limit.');
-      return false;
-    }
-    // Allow images only
-    if (!file.type.startsWith('image/')) {
-        setUploadError('Please select a valid image file (JPG, PNG).');
-        return false;
-    }
-    return true;
-  };
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return; 
+    if (!file) return;
 
-    if (!validateFile(file)) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setUploadError('File size must be less than 5MB');
+      return;
+    }
+
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      setUploadError('Please upload a valid image (JPG, PNG, or WEBP)');
+      return;
+    }
 
     setUploadError(null);
     setIsUploading(true);
 
-    const data = new FormData();
-    if (id) data.append('entityId', id); 
-    // Use 'profile' as requested for file_type
-    data.append('file_type', 'profile'); 
-    data.append('file', file);
+    const formDataUpload = new FormData();
+    formDataUpload.append('file', file);
 
     try {
-      const res = await axiosInstance.post('/documents', data, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
+      // Adjust endpoint if needed (e.g. /documents or /upload)
+      const uploadRes = await axiosInstance.post('/documents', formDataUpload, {
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
-      
-      const url = res.data?.data?.fileUrl; 
-      
-      if (!url) throw new Error('No file URL returned from server');
 
-      setUploadedDocUrl(url);
+      // Assuming response structure: { data: { fileUrl: "..." } } based on previous context
+      const imageUrl = uploadRes.data?.data?.fileUrl || uploadRes.data.url;
       
-      // Update parent component with new image URL
-      onUpdate('image', url);
-      
-      setIsDialogOpen(false); 
-      
-    } catch (err) {
-      console.error('Upload failed:', err);
-      setUploadError('Upload failed. Please try again.');
+      onUpdate('image', imageUrl);
+      setIsDialogOpen(false);
+    } catch (error) {
+      console.error('Upload failed:', error);
+      setUploadError('Failed to upload image. Please try again.');
     } finally {
       setIsUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
-  const triggerFileInput = () => {
-    fileInputRef.current?.click();
-  };
-
   return (
-    <Card>
-      <CardContent className="pt-6">
-        
-        {/* Layout: Image on Left (desktop), Inputs on Right */}
-        <div className="flex flex-col md:flex-row gap-8">
-          
-          {/* Profile Picture Section */}
-          <div className="flex flex-col items-center md:items-start space-y-4">
-            <div className="relative h-48 w-48 shrink-0 overflow-hidden rounded-full border-4 border-gray-100 shadow-sm">
+    <div className="space-y-6 animate-in fade-in duration-500 h-screen">
+      
+      {/* 1. Profile Photo Header (Full Width) */}
+      <div className="flex flex-col items-center gap-6 rounded-lg border border-gray-200 bg-white p-6 shadow-sm sm:flex-row sm:items-start">
+        <div className="relative group shrink-0">
+          <div className="h-24 w-24 overflow-hidden rounded-full border-4 border-white bg-gray-100 shadow-md ring-1 ring-gray-200">
+            {formData.image ? (
               <img
-                src={uploadedDocUrl || '/user.png'}
+                src={formData.image}
                 alt="Profile"
                 className="h-full w-full object-cover"
               />
-              <Button
-                type="button"
-                size="icon"
-                onClick={() => setIsDialogOpen(true)}
-                className="absolute bottom-3 right-8 z-10 rounded-full bg-theme hover:bg-theme/90 shadow-md"
-              >
-                <Camera className="h-5 w-5 text-white" />
-              </Button>
-            </div>
+            ) : (
+              <User className="h-full w-full p-4 text-gray-300" />
+            )}
           </div>
-
-          {/* Form Fields Section */}
-          <div className="grid flex-1 grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-            <EditableField
-              id="title"
-              label="Title"
-              value={formData.title}
-              type="select"
-              options={titleOptions}
-              onUpdate={(value) => onSelectChange('title', value)}
-              isSaving={isFieldSaving['title']}
-            />
-
-            <EditableField
-              id="firstName"
-              label="First Name"
-              value={formData.firstName}
-              onUpdate={(value) => onUpdate('firstName', value)}
-              isSaving={isFieldSaving['firstName']}
-              required
-            />
-
-            <EditableField
-              id="initial"
-              label="Initial"
-              value={formData.initial}
-              onUpdate={(value) => onUpdate('initial', value)}
-              isSaving={isFieldSaving['initial']}
-            />
-
-            <EditableField
-              id="lastName"
-              label="Last Name"
-              value={formData.lastName}
-              onUpdate={(value) => onUpdate('lastName', value)}
-              isSaving={isFieldSaving['lastName']}
-              required
-            />
-
-            <EditableField
-              id="dateOfBirth"
-              label="Date of Birth"
-              value={formData.dateOfBirth ? moment(formData.dateOfBirth).format('YYYY-MM-DD') : ''}
-              type="date"
-              onUpdate={(value) => onDateChange('dateOfBirth', value)}
-              isSaving={isFieldSaving['dateOfBirth']}
-              max={moment().subtract(16, 'years').format('YYYY-MM-DD')}
-            />
-
-            <EditableField
-              id="gender"
-              label="Gender"
-              value={formData.gender}
-              type="select"
-              options={genderOptions}
-              onUpdate={(value) => onSelectChange('gender', value)}
-              isSaving={isFieldSaving['gender']}
-            />
-
-            <EditableField
-              id="maritalStatus"
-              label="Marital Status"
-              value={formData.maritalStatus}
-              type="select"
-              options={maritalStatusOptions}
-              onUpdate={(value) => onSelectChange('maritalStatus', value)}
-              isSaving={isFieldSaving['maritalStatus']}
-            />
-
-            <EditableField
-              id="ethnicOrigin"
-              label="Ethnic Origin"
-              value={formData.ethnicOrigin}
-              onUpdate={(value) => onUpdate('ethnicOrigin', value)}
-              isSaving={isFieldSaving['ethnicOrigin']}
-            />
+          <button
+            onClick={() => setIsDialogOpen(true)}
+            className="absolute bottom-0 right-0 rounded-full bg-theme p-2 text-white shadow-lg transition-transform hover:scale-110 hover:bg-theme/90"
+          >
+            <Camera className="h-4 w-4" />
+          </button>
+        </div>
+        
+        <div className="flex-1 space-y-1 text-center sm:text-left">
+          <h2 className="text-xl font-bold text-gray-900">
+            {formData.firstName} {formData.lastName}
+          </h2>
+          <div className="mt-2 flex items-center justify-center gap-4 text-xs text-gray-400 sm:justify-start">
+             <span className="rounded border border-theme/20 bg-theme/10 px-2 py-1 capitalize text-theme">
+               {formData.employmentType || 'Employment Type N/A'}
+             </span>
           </div>
         </div>
-      </CardContent>
+      </div>
 
-      {/* --- Image Upload Dialog --- */}
+      {/* 2. Main Content Grid (Two Columns on Large Screens) */}
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        
+        {/* Left Column: Identity Information */}
+        <div className=" rounded-lg border border-gray-200 bg-white shadow-sm h-fit">
+          <SectionHeader icon={User} title="General Information" />
+          <div className="flex flex-col">
+            <FormRow label="Title">
+              <EditableField
+                id="title"
+                label=""
+                value={formData.title}
+                type="select"
+                options={[
+                  { value: 'Mr', label: 'Mr' },
+                  { value: 'Mrs', label: 'Mrs' },
+                  { value: 'Miss', label: 'Miss' },
+                  { value: 'Ms', label: 'Ms' },
+                  { value: 'Dr', label: 'Dr' },
+                ]}
+                onUpdate={(val) => onSelectChange('title', val)}
+                isSaving={isFieldSaving.title}
+              />
+            </FormRow>
+
+            <FormRow label="First Name">
+              <EditableField
+                id="firstName"
+                label=""
+                value={formData.firstName}
+                onUpdate={(val) => onUpdate('firstName', val)}
+                isSaving={isFieldSaving.firstName}
+                required
+              />
+            </FormRow>
+
+            <FormRow label="Last Name">
+              <EditableField
+                id="lastName"
+                label=""
+                value={formData.lastName}
+                onUpdate={(val) => onUpdate('lastName', val)}
+                isSaving={isFieldSaving.lastName}
+                required
+              />
+            </FormRow>
+
+            <FormRow label="Date of Birth">
+              <EditableField
+                id="dateOfBirth"
+                label=""
+                value={formData.dateOfBirth}
+                type="date"
+                onUpdate={(val) => onDateChange('dateOfBirth', val)}
+                isSaving={isFieldSaving.dateOfBirth}
+              />
+            </FormRow>
+
+            <FormRow label="Gender">
+              <EditableField
+                id="gender"
+                label=""
+                value={formData.gender}
+                type="select"
+                options={[
+                  { value: 'Male', label: 'Male' },
+                  { value: 'Female', label: 'Female' },
+                  { value: 'Other', label: 'Other' },
+                ]}
+                onUpdate={(val) => onSelectChange('gender', val)}
+                isSaving={isFieldSaving.gender}
+              />
+            </FormRow>
+
+            <FormRow label="Marital Status">
+              <EditableField
+                id="maritalStatus"
+                label=""
+                value={formData.maritalStatus}
+                type="select"
+                options={[
+                  { value: 'Single', label: 'Single' },
+                  { value: 'Married', label: 'Married' },
+                  { value: 'Divorced', label: 'Divorced' },
+                  { value: 'Widowed', label: 'Widowed' },
+                ]}
+                onUpdate={(val) => onSelectChange('maritalStatus', val)}
+                isSaving={isFieldSaving.maritalStatus}
+              />
+            </FormRow>
+
+            <FormRow label="NI Number">
+              <EditableField
+                id="nationalInsuranceNumber"
+                label=""
+                value={formData.nationalInsuranceNumber}
+                onUpdate={(val) => onUpdate('nationalInsuranceNumber', val)}
+                isSaving={isFieldSaving.nationalInsuranceNumber}
+              />
+            </FormRow>
+          </div>
+        </div>
+
+        {/* Right Column: Contact Details */}
+        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm h-fit">
+          <SectionHeader icon={Phone} title="Contact Details" />
+          <div className="flex flex-col">
+            <FormRow label="Email Address">
+              <EditableField
+                id="email"
+                label=""
+                value={formData.email}
+                type="email"
+                disable
+                onUpdate={(val) => onUpdate('email', val)}
+                isSaving={isFieldSaving.email}
+              />
+            </FormRow>
+
+            <FormRow label="Mobile Phone">
+              <EditableField
+                id="mobilePhone"
+                label=""
+                value={formData.mobilePhone}
+                onUpdate={(val) => onUpdate('mobilePhone', val)}
+                isSaving={isFieldSaving.mobilePhone}
+              />
+            </FormRow>
+
+            <FormRow label="Home Phone">
+              <EditableField
+                id="homePhone"
+                label=""
+                value={formData.homePhone}
+                onUpdate={(val) => onUpdate('homePhone', val)}
+                isSaving={isFieldSaving.homePhone}
+              />
+            </FormRow>
+          </div>
+        </div>
+
+      </div>
+
+      {/* Photo Upload Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Upload Profile Picture</DialogTitle>
+            <DialogTitle>Update Profile Photo</DialogTitle>
             <DialogDescription>
-              Upload a new photo for your profile. Max size 5MB.
+              Upload a new photo. Recommended size: 400x400px.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-6 py-4">
-            <div className="space-y-2">
+          <div className="grid gap-4 py-4">
+            <div
+              className={`flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 transition-colors ${
+                isUploading
+                  ? 'border-theme bg-theme/5 cursor-wait'
+                  : 'border-gray-300 hover:border-theme hover:bg-gray-50'
+              }`}
+              onClick={() => !isUploading && fileInputRef.current?.click()}
+            >
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*"
-                onChange={handleFileSelect}
                 className="hidden"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={handleFileSelect}
                 disabled={isUploading}
               />
 
-              <div
-                onClick={triggerFileInput}
-                className={`relative flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-8 text-center transition-all
-                  ${
-                    isUploading
-                      ? 'cursor-wait border-blue-300 bg-blue-50'
-                      : 'border-gray-300 bg-gray-50 hover:border-gray-400 hover:bg-gray-100'
-                  }`}
-              >
+              <div className="flex flex-col items-center text-center">
                 {isUploading ? (
                   <>
                     <Loader2 className="mb-2 h-10 w-10 animate-spin text-theme" />
-                    <p className="text-sm font-medium text-theme">
-                      Uploading...
-                    </p>
+                    <p className="text-sm font-medium text-theme">Uploading...</p>
                   </>
                 ) : (
                   <>
                     <div className="mb-3 rounded-full bg-white p-3 shadow-sm">
                       <Upload className="h-6 w-6 text-gray-400" />
                     </div>
-                    <p className="text-sm font-medium text-gray-900">
-                      Click to upload photo
-                    </p>
-                    <p className="mt-1 text-xs text-gray-500">
-                      JPG, PNG (Max 5MB)
-                    </p>
+                    <p className="text-sm font-medium text-gray-900">Click to upload photo</p>
+                    <p className="mt-1 text-xs text-gray-500">JPG, PNG (Max 5MB)</p>
                   </>
                 )}
 
@@ -310,7 +353,7 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </Card>
+    </div>
   );
 };
 

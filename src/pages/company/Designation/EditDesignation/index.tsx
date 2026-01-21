@@ -167,17 +167,18 @@ export default function EditDesignation() {
 
   return (
     <div className="mx-auto">
-      <div className="flex w-full items-center justify-between">
+      
+
+      <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-md">
+        <div className="flex w-full items-center justify-between">
         <h1 className="mb-6 text-3xl font-bold text-gray-800">Edit Designation</h1>
         <Button
           className="bg-theme text-white hover:bg-theme/90"
           onClick={() => navigate(-1)}
         >
-          <MoveLeft /> Back
+          <MoveLeft className="h-4 w-4 mr-2"/> Back
         </Button>
       </div>
-
-      <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-md">
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           {/* Title & Description */}
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">

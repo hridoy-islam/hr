@@ -1,7 +1,6 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardFooter } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { 
   Table, 
   TableBody, 
@@ -9,7 +8,15 @@ import {
   TableRow 
 } from "@/components/ui/table";
 import moment from 'moment';
-import { CheckCircle2, User, Phone, FileText, Briefcase, Accessibility, MoveLeft } from 'lucide-react';
+import { 
+  User, 
+  Phone, 
+  FileText, 
+  Briefcase, 
+  Accessibility, 
+  FileCheck, // New icon for documents
+  ExternalLink
+} from 'lucide-react';
 
 interface ReviewStepProps {
   formData: any;
@@ -19,7 +26,7 @@ interface ReviewStepProps {
 
 // Helper for section headers within the table
 const TableSectionHeader = ({ icon: Icon, title }: { icon: any, title: string }) => (
-  <TableRow className="bg-gray-100  hover:bg-gray-100">
+  <TableRow className="bg-gray-100 hover:bg-gray-100">
     <TableCell colSpan={2} className="py-3 pl-4">
       <div className="flex items-center gap-2 font-semibold text-gray-900">
         <Icon className="h-4 w-4 text-gray-500" />
@@ -41,11 +48,30 @@ const DataRow = ({ label, value, className = "" }: { label: string, value: React
   </TableRow>
 );
 
+// ✅ New Helper to render file links
+const FileLink = ({ url }: { url?: string }) => {
+  if (!url) return <span className="text-gray-300 italic">Not uploaded</span>;
+  
+  return (
+    <a 
+      href={url} 
+      target="_blank" 
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-1.5 text-blue-600 hover:text-blue-800 hover:underline transition-colors"
+    >
+      <FileText className="h-4 w-4" />
+      <span>View File</span>
+      <ExternalLink className="h-3 w-3 opacity-50" />
+    </a>
+  );
+};
+
 const ReviewStep: React.FC<ReviewStepProps> = ({ formData, onSubmit, onBack }) => {
   const {
     personalDetails = {},
     contact = {},
-    demography = {}
+    demography = {},
+    documents = {} // ✅ Destructure documents
   } = formData || {};
 
   console.log(formData)
@@ -96,19 +122,19 @@ const ReviewStep: React.FC<ReviewStepProps> = ({ formData, onSubmit, onBack }) =
                 <DataRow label="Post Code" value={contact.postCode} />
                 <DataRow label="Country" value={contact.country} />
 
-                {/* --- 3. Official Documents --- */}
-                <TableSectionHeader icon={FileText} title="Official Documents" />
+                {/* --- 3. Official Documents (Numbers) --- */}
+                <TableSectionHeader icon={FileText} title="Official IDs" />
                 <DataRow label="NI Number" value={personalDetails.nationalInsuranceNumber} />
                 <DataRow label="NHS Number" value={personalDetails.nhsNumber} />
-                {/* <DataRow label="Passport Number" value={personalDetails.passportNo} />
+                  <DataRow label="Passport Number" value={personalDetails.passportNo} />
+                {/* ✅ Added Passport Expiry */}
                 <DataRow 
                   label="Passport Expiry" 
-                  value={personalDetails.passportExpiry ? (
-                    moment(personalDetails.passportExpiry).format('DD MMM YYYY')
-                  ) : null} 
-                /> */}
+                  value={personalDetails.passportExpiry ? moment(personalDetails.passportExpiry).format('DD MMM YYYY') : null} 
+                />
+                
 
-                {/* --- 4. Application Details --- */}
+                {/* --- 5. Application Details --- */}
                 <TableSectionHeader icon={Briefcase} title="Application Context" />
                 <DataRow label="Position Applied" value={personalDetails.position} />
                 <DataRow label="Employment Type" value={personalDetails.employmentType} />
@@ -117,7 +143,7 @@ const ReviewStep: React.FC<ReviewStepProps> = ({ formData, onSubmit, onBack }) =
                 <DataRow label="Application Date" value={personalDetails.applicationDate ? moment(personalDetails.applicationDate).format('DD MMM YYYY') : null} />
                 <DataRow label="Available From" value={personalDetails.availableFromDate ? moment(personalDetails.availableFromDate).format('DD MMM YYYY') : null} />
 
-                {/* --- 5. Health & Disability --- */}
+                {/* --- 6. Health & Disability --- */}
                 <TableSectionHeader icon={Accessibility} title="Health & Adjustments" />
                 <DataRow 
                   label="Has Disability?" 
@@ -146,6 +172,29 @@ const ReviewStep: React.FC<ReviewStepProps> = ({ formData, onSubmit, onBack }) =
                       "No"
                     )
                   } 
+                />
+
+                {/* --- 4. Uploaded Files (New Section) --- */}
+                <TableSectionHeader icon={FileCheck} title="Uploaded Documents" />
+                <DataRow 
+                  label="Passport" 
+                  value={<FileLink url={documents.passport} />} 
+                />
+                <DataRow 
+                  label="DBS Certificate" 
+                  value={<FileLink url={documents.dbs} />} 
+                />
+                <DataRow 
+                  label="Right to Work" 
+                  value={<FileLink url={documents.rightToWork} />} 
+                />
+                <DataRow 
+                  label="Immigration Status" 
+                  value={<FileLink url={documents.immigrationStatus} />} 
+                />
+                <DataRow 
+                  label="Proof of Address" 
+                  value={<FileLink url={documents.proofOfAddress} />} 
                 />
 
               </TableBody>

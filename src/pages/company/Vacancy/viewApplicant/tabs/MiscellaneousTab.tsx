@@ -38,16 +38,6 @@ const MiscellaneousTab: React.FC<MiscellaneousTabProps> = ({
     { value: 'Other', label: 'Other' },
   ];
 
-  // const statusOptions = [
-  //   { value: 'Applied', label: 'Applied' },
-  //   { value: 'Under Review', label: 'Under Review' },
-  //   { value: 'Interview Scheduled', label: 'Interview Scheduled' },
-  //   { value: 'Interviewed', label: 'Interviewed' },
-  //   { value: 'Offer Extended', label: 'Offer Extended' },
-  //   { value: 'Hired', label: 'Hired' },
-  //   { value: 'Rejected', label: 'Rejected' },
-  //   { value: 'Withdrawn', label: 'Withdrawn' },
-  // ];
 
   return (
     <div className="space-y-8">

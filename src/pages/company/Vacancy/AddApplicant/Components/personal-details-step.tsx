@@ -15,18 +15,16 @@ import {
 import { Input } from '@/components/ui/input';
 import Select from 'react-select';
 import { 
-  CalendarIcon, 
   Camera, 
   Loader2, 
   Upload, 
-  CheckCircle, 
   AlertCircle 
 } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import { useParams } from 'react-router-dom';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-import axiosInstance from '@/lib/axios'; // Ensure this path is correct
+import axiosInstance from '@/lib/axios';
 import {
   Dialog,
   DialogContent,
@@ -34,9 +32,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
-import { Label } from '@/components/ui/label';
 
 const personalDetailsSchema = z.object({
   image: z.string().url().optional(),
@@ -47,8 +43,10 @@ const personalDetailsSchema = z.object({
   dateOfBirth: z.date({ required_error: 'Date of birth is required' }),
   nationalInsuranceNumber: z.string().optional(),
   nhsNumber: z.string().optional(),
-  // passportNo: z.string().min(1, { message: 'Passport number is required' }),
-  // passportExpiry: z.date({ required_error: 'Passport expiry date is required' }),
+  // ✅ Added/Enabled Fields
+  passportNo: z.string().min(1, { message: 'Passport number is required' }),
+  passportExpiry: z.date({ required_error: 'Passport expiry date is required' }),
+  
   applicationDate: z.date({ required_error: 'Application date is required' }),
   availableFromDate: z.date({ required_error: 'Available from date is required' }),
   employmentType: z.string().min(1, { message: 'Please select employment type' }),
@@ -96,8 +94,8 @@ export function PersonalDetailsStep({
       position: defaultValues?.position || '',
       source: defaultValues?.source || '',
       branch: defaultValues?.branch || '',
-      // passportNo: defaultValues?.passportNo || '',
-      // passportExpiry: defaultValues?.passportExpiry || undefined,
+      passportNo: defaultValues?.passportNo || '',
+      passportExpiry: defaultValues?.passportExpiry || undefined,
       image: defaultValues?.image || undefined
     }
   });
@@ -113,19 +111,12 @@ export function PersonalDetailsStep({
     onSaveAndContinue(data);
   }
 
-  function handleSaveButton() {
-    const data = form.getValues() as PersonalDetailsData;
-    onSave(data);
-  }
-
   // --- File Upload Logic ---
   const validateFile = (file: File) => {
-    // 5MB Limit
     if (file.size > 5 * 1024 * 1024) {
       setUploadError('File size exceeds 5MB limit.');
       return false;
     }
-    // Allow images only
     if (!file.type.startsWith('image/')) {
         setUploadError('Please select a valid image file (JPG, PNG).');
         return false;
@@ -135,7 +126,7 @@ export function PersonalDetailsStep({
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return; // Removed ID check to allow upload even if creating new user (optional)
+    if (!file) return;
 
     if (!validateFile(file)) return;
 
@@ -143,7 +134,6 @@ export function PersonalDetailsStep({
     setIsUploading(true);
 
     const formData = new FormData();
-    // If ID exists, attach it, otherwise handle based on your backend API requirements
     if (id) formData.append('entityId', id); 
     formData.append('file_type', 'profileImage'); 
     formData.append('file', file);
@@ -155,19 +145,18 @@ export function PersonalDetailsStep({
         }
       });
       
-      const url = res.data?.data?.fileUrl; // Adjust based on your API response structure
+      const url = res.data?.data?.fileUrl; 
       
       if (!url) throw new Error('No file URL returned from server');
 
       setUploadedDocUrl(url);
-      setIsDialogOpen(false); // Close dialog on success
+      setIsDialogOpen(false); 
       
     } catch (err) {
       console.error('Upload failed:', err);
       setUploadError('Upload failed. Please try again.');
     } finally {
       setIsUploading(false);
-      // Reset input
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
@@ -350,7 +339,8 @@ export function PersonalDetailsStep({
                 )}
               />
 
-              {/* <FormField
+              {/* ✅ PASSPORT NUMBER ADDED HERE */}
+              <FormField
                 control={form.control}
                 name="passportNo"
                 render={({ field }) => (
@@ -362,6 +352,7 @@ export function PersonalDetailsStep({
                 )}
               />
 
+              {/* ✅ PASSPORT EXPIRY ADDED HERE */}
               <FormField
                 control={form.control}
                 name="passportExpiry"
@@ -385,7 +376,7 @@ export function PersonalDetailsStep({
                     <FormMessage />
                   </FormItem>
                 )}
-              /> */}
+              />
             </div>
 
             <h1 className="text-2xl mt-6">Application Details</h1>

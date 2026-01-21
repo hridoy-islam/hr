@@ -90,6 +90,8 @@ const EditEmployee = () => {
         />
       )
     },
+    { id: 'document', label: 'Documents', component: <EmployeeDocumentTab /> },
+
     {
       id: 'rightToWork',
       label: 'Right To Work',
@@ -129,7 +131,7 @@ const EditEmployee = () => {
         />
       )
     },
-     {
+    {
       id: 'passport',
       label: 'Passport',
       component: (
@@ -142,7 +144,7 @@ const EditEmployee = () => {
         />
       )
     },
-     {
+    {
       id: 'immigration',
       label: 'Immigration',
       component: (
@@ -155,7 +157,7 @@ const EditEmployee = () => {
         />
       )
     },
-     {
+    {
       id: 'appraisal',
       label: 'Appraisal',
       component: (
@@ -179,10 +181,14 @@ const EditEmployee = () => {
         />
       )
     },
-    { id: 'holiday', label: 'Holiday', component: <HolidayTab /> },
+    {
+      id: 'holiday',
+      label: 'Holiday',
+      component: <HolidayTab formData={formData} />
+    },
     {
       id: 'contact',
-      label: 'Contact',
+      label: 'Address',
       component: (
         <ContactInfoTab
           formData={formData}
@@ -217,7 +223,7 @@ const EditEmployee = () => {
         />
       )
     },
-   
+
     {
       id: 'payroll',
       label: 'Payroll',
@@ -269,9 +275,7 @@ const EditEmployee = () => {
         />
       )
     },
-    
-    
-     { id: 'document', label: 'Documents', component: <EmployeeDocumentTab /> },
+
     {
       id: 'settings',
       label: 'Settings',
@@ -289,7 +293,7 @@ const EditEmployee = () => {
   ];
 
   return (
-    <div className="mx-auto">
+    <div className="mx-auto rounded-md bg-white p-4 shadow-sm">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold">
           {user?.title} {user?.firstName} {user?.initial} {user?.lastName}

@@ -7,6 +7,7 @@ import { formSteps } from './Components/form-steps';
 import { PersonalDetailsStep } from './Components/personal-details-step';
 import { DemographicInfoStep } from './Components/demographic-info-step';
 import { ContactStep } from './Components/contact-step';
+import { DocumentStep } from './Components/document-step'; // ✅ Imported DocumentStep
 import { StepsIndicator } from './Components/steps-indicator';
 import { Card } from '@/components/ui/card';
 import ReviewStep from './Components/review-step';
@@ -31,9 +32,11 @@ export default function AddApplicant() {
   const [formData, setFormData] = useState<FormData>({});
   const [formSubmitted, setFormSubmitted] = useState(false);
 
-
-
   const { toast } = useToast();
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation(); // ✅ Added hook for location state
+  const { vacancyTitle } = location.state || {};
 
   // Allow navigation to any step regardless of completion status
   const handleStepClick = (stepId: number) => {
@@ -46,6 +49,7 @@ export default function AddApplicant() {
     }
   };
 
+  // --- Step 1: Personal Details ---
   const handlePersonalDetailsSave = (data: any) => {
     setFormData((prev) => ({ ...prev, personalDetails: data }));
     console.log('Saving personal details:', data);
@@ -57,6 +61,7 @@ export default function AddApplicant() {
     setCurrentStep(2);
   };
 
+  // --- Step 2: Contact ---
   const handleContactSave = (data: any) => {
     setFormData((prev) => ({ ...prev, contact: data }));
     console.log('Saving contact details:', data);
@@ -68,6 +73,7 @@ export default function AddApplicant() {
     setCurrentStep(3);
   };
 
+  // --- Step 3: Demography ---
   const handledemographySave = (data: any) => {
     setFormData((prev) => ({ ...prev, demography: data }));
     console.log('Saving demography:', data);
@@ -76,49 +82,25 @@ export default function AddApplicant() {
   const handledemographySaveAndContinue = (data: any) => {
     setFormData((prev) => ({ ...prev, demography: data }));
     markStepAsCompleted(3);
-    setCurrentStep(4);
+    setCurrentStep(4); // ✅ Move to Documents (Step 4)
   };
 
-  // const handleReviewClick = () => {
+  // --- Step 4: Documents (NEW) ---
+  const handleDocumentsSave = (data: any) => {
+    setFormData((prev) => ({ ...prev, documents: data }));
+    console.log('Saving documents:', data);
+  };
 
-  //   // Check if all required steps are completed before showing the review
-  //   const requiredSteps = [1, 2, 3, 4, 5, 6, 7, 8]; // All steps except the final Terms & Submit
-  //   const missingSteps = requiredSteps.filter(
-  //     (step) => !completedSteps.includes(step)
-  //   );
+  const handleDocumentsSaveAndContinue = (data: any) => {
+    setFormData((prev) => ({ ...prev, documents: data }));
+    markStepAsCompleted(4);
+    setCurrentStep(5); // ✅ Move to Review (Step 5)
+  };
 
-  //   if (missingSteps.length > 0) {
-  //     // Get the names of the missing steps
-  //     const missingStepNames = missingSteps.map(
-  //       (stepId) =>
-  //         formSteps.find((step) => step.id === stepId)?.label ||
-  //         `Step ${stepId}`
-  //     );
-
-  //     toast({
-  //       title: 'Incomplete Application',
-  //       description: `Please complete the following sections before reviewing: ${missingStepNames.join(', ')}`,
-  //       variant: 'destructive'
-  //     });
-
-  //     // Navigate to the first incomplete step
-  //     setCurrentStep(missingSteps[0]);
-  //     return;
-  //   }
-
-  //   setReviewModalOpen(true);
-  // };
-
-  const { id } = useParams();
-  const navigate = useNavigate();
-
-  
-  const { vacancyTitle } = location.state || {};
-
-  // submit full application
+  // Submit Full Application
   const handleSubmit = async () => {
-    // Check if all required steps are completed before final submission
-    const requiredSteps = [1, 2, 3]; // All steps except the final Terms & Submit
+    // ✅ Updated to include step 4 as required
+    const requiredSteps = [1, 2, 3, 4]; 
     const missingSteps = requiredSteps.filter(
       (step) => !completedSteps.includes(step)
     );
@@ -145,23 +127,31 @@ export default function AddApplicant() {
     const flatData = {
       ...formData.personalDetails,
       ...formData.contact,
-      ...formData.demography
+      ...formData.demography,
+      ...formData.documents, // ✅ Added documents to payload
+      vacancyId: id,
+      vacancyTitle: vacancyTitle,
+      status: 'applied'
     };
 
-    flatData.vacancyId = id;
-    flatData.vacancyTitle = vacancyTitle;
-
-    flatData.status = 'applied';
-    const response = await axiosInstance.post(`/hr/applicant`, flatData);
-    navigate(-1);
-
-    setFormSubmitted(true);
+    try {
+      await axiosInstance.post(`/hr/applicant`, flatData);
+      setFormSubmitted(true);
+      navigate(-1); 
+    } catch (error) {
+      console.error('Submission error:', error);
+      toast({
+        title: 'Submission Failed',
+        description: 'There was an error submitting the application.',
+        variant: 'destructive'
+      });
+    }
   };
 
   // Render the current step
   const renderStep = () => {
     const handleBack = () => setCurrentStep((prev) => Math.max(1, prev - 1));
-  
+
     switch (currentStep) {
       case 1:
         return (
@@ -189,9 +179,25 @@ export default function AddApplicant() {
             onBack={handleBack}
           />
         );
-      case 4:
-        return <ReviewStep formData={formData} onSubmit={handleSubmit} onBack={handleBack}/>;
-  
+      case 4: // ✅ Document Step
+        return (
+          <DocumentStep
+            defaultValues={formData.documents}
+            onSaveAndContinue={handleDocumentsSaveAndContinue}
+            onSave={handleDocumentsSave}
+            setCurrentStep={setCurrentStep}
+            saveAndLogout={() => navigate(-1)}
+          />
+        );
+      case 5: // ✅ Review Step (Shifted)
+        return (
+          <ReviewStep 
+            formData={formData} 
+            onSubmit={handleSubmit} 
+            onBack={handleBack} 
+          />
+        );
+
       default:
         return (
           <div className="rounded-lg bg-gray-50 p-8 text-center">
@@ -210,7 +216,7 @@ export default function AddApplicant() {
                 onClick={() => {
                   markStepAsCompleted(currentStep);
                   setCurrentStep((prev) =>
-                    Math.min(formSteps.length, prev + 1)
+                    Math.min(formSteps.length + 1, prev + 1)
                   );
                 }}
               >
@@ -221,47 +227,30 @@ export default function AddApplicant() {
         );
     }
   };
-  
 
-  if (formSubmitted) {
-    return (
-      <Alert className="border-green-200 bg-green-50">
-        <AlertCircle className="h-4 w-4 text-green-600" />
-        <AlertTitle className="text-green-800">Success!</AlertTitle>
-        <AlertDescription className="text-green-700">
-          Your application has been submitted successfully. We will contact you
-          shortly.
-        </AlertDescription>
-      </Alert>
-    );
-  }
+
 
   return (
-   <div className="mx-auto w-full ">
-  <Card className="p-6 shadow-sm">
-    {/* Header */}
-    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-      <h1 className="text-2xl font-semibold tracking-tight">
-        Add Applicant
-      </h1>
+    <div className="mx-auto w-full ">
+      <Card className="p-6 shadow-sm">
+        {/* Header */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Add Applicant
+          </h1>
 
-      <Button
-        onClick={() => navigate(-1)}
-      >
-        <MoveLeft className="h-4 w-4" />
-        Back
-      </Button>
+          <Button onClick={() => navigate(-1)}>
+            <MoveLeft className="h-4 w-4" />
+            Back
+          </Button>
+        </div>
+
+        {/* Divider */}
+        <div className="mb-6 h-px w-full" />
+
+        {/* Form Step Content */}
+        <div className="">{renderStep()}</div>
+      </Card>
     </div>
-
-    {/* Divider */}
-    <div className="mb-6 h-px w-full" />
-
-    {/* Form Step Content */}
-    <div className="">
-      {renderStep()}
-    </div>
-  </Card>
-</div>
-
   );
 }

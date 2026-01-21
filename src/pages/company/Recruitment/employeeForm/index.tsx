@@ -51,10 +51,10 @@ function EmployeeForm() {
   const fetchData = async () => {
     try {
       const [designationRes, departmentRes, shiftsRes, ratesRes] = await Promise.all([
-        axiosInstance('/hr/designation'),
-        axiosInstance('/hr/department'),
-        axiosInstance('/hr/shift'),
-        axiosInstance(`/hr/employeeRate?employeeId=${userId}`)
+        axiosInstance(`/hr/designation?employeeId=${userId}&limit=all`),
+        axiosInstance(`/hr/department?employeeId=${userId}&limit=all`),
+        axiosInstance(`/hr/shift?employeeId=${userId}&limit=all`),
+        axiosInstance(`/hr/employeeRate?employeeId=${userId}&limit=all`)
       ]);
 
       // 1. Setup Designations & Departments for React Select

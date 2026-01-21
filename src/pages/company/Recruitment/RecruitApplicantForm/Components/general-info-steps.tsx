@@ -1,4 +1,3 @@
-import { useState, useRef } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
@@ -16,17 +15,6 @@ import { Input } from '@/components/ui/input';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import Select from 'react-select';
-import {
-  Loader2,
-  Upload,
-  CheckCircle,
-  AlertCircle,
-  FileText,
-  X,
-  Eye
-} from 'lucide-react';
-import { useParams } from 'react-router-dom';
-import axiosInstance from '@/lib/axios';
 
 // Define option type for react-select
 type OptionType = {
@@ -41,10 +29,10 @@ const generalInfoSchema = z
       required_error: 'Available from date is required'
     }),
     startDate: z.date({ required_error: 'Start date is required' }),
-   rtwDocumentUrl: z
-  .string()
-  .min(1, { message: 'RTW document is required' })
-  .url({ message: 'Invalid document URL' }),
+    // ✅ Added rtwCheckDate
+    rtwCheckDate: z.date({ 
+      required_error: 'RTW check date is required' 
+    }),
 
     area: z.string().min(1, { message: 'Area is required' }),
     contractHours: z.coerce
@@ -116,13 +104,6 @@ export function GeneralInformation({
   onSave,
   applicantData
 }: GeneralInfoStepProps) {
-  const { id } = useParams();
-
-  // --- Upload State ---
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [fileName, setFileName] = useState<string | null>(null);
 
   const form = useForm<GeneralInfoData>({
     resolver: zodResolver(generalInfoSchema),
@@ -133,7 +114,11 @@ export function GeneralInformation({
       startDate: defaultValues?.startDate
         ? new Date(defaultValues.startDate)
         : undefined,
-      rtwDocumentUrl: defaultValues?.rtwDocumentUrl || '',
+      // ✅ Added default value for rtwCheckDate
+      rtwCheckDate: defaultValues?.rtwCheckDate
+        ? new Date(defaultValues.rtwCheckDate)
+        : undefined,
+        
       area: defaultValues?.area || '',
       contractHours: defaultValues?.contractHours ?? 0,
       carTravelAllowance: defaultValues?.carTravelAllowance ?? undefined,
@@ -149,13 +134,6 @@ export function GeneralInformation({
     }
   });
 
-  const [fileUrl, setFileUrl] = useState<string | null>(
-    typeof defaultValues?.rtwDocumentUrl === 'string' &&
-      defaultValues.rtwDocumentUrl
-      ? defaultValues.rtwDocumentUrl
-      : null
-  );
-
   function onSubmit(data: GeneralInfoData) {
     const processedData = {
       ...data,
@@ -163,83 +141,6 @@ export function GeneralInformation({
     };
     onSaveAndContinue(processedData);
   }
-
-  function handleSave() {
-    const data = form.getValues();
-    onSave(data);
-  }
-
-  // --- Upload Handlers ---
-  const validateFile = (file: File) => {
-    // 5MB Limit
-    if (file.size > 5 * 1024 * 1024) {
-      setUploadError('File size exceeds 5MB limit.');
-      return false;
-    }
-    // Allow PDF and Images
-    const validTypes = [
-      'image/jpeg',
-      'image/png',
-      'image/jpg',
-      'application/pdf'
-    ];
-    if (!validTypes.includes(file.type)) {
-      setUploadError('Please select a valid file (PDF, JPG, PNG).');
-      return false;
-    }
-    return true;
-  };
-
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!validateFile(file)) return;
-
-    setUploadError(null);
-    setIsUploading(true);
-    setFileName(file.name);
-
-    const formData = new FormData();
-    if (id) formData.append('entityId', id);
-    formData.append('file_type', 'rtwDocument');
-    formData.append('file', file);
-
-    try {
-      const res = await axiosInstance.post('/documents', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      });
-
-      const url = res.data?.data?.fileUrl;
-
-      if (!url) throw new Error('No file URL returned from server');
-
-      setFileUrl(url);
-      form.setValue('rtwDocumentUrl', url, { shouldValidate: true });
-    } catch (err) {
-      console.error('Upload failed:', err);
-      setUploadError('Upload failed. Please try again.');
-      setFileName(null);
-    } finally {
-      setIsUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
-  };
-
-  const triggerFileInput = () => {
-    if (!isUploading) {
-      fileInputRef.current?.click();
-    }
-  };
-
-  const handleRemoveFile = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setFileUrl(null);
-    form.setValue('rtwDocumentUrl', '', { shouldValidate: true });
-    setFileName(null);
-  };
 
   // Helper to convert boolean to select option
   const booleanToOption = (value?: boolean): OptionType | null => {
@@ -314,100 +215,29 @@ export function GeneralInformation({
               )}
             />
 
-            {/* RTW Document Upload - Updated UI */}
+            {/* ✅ RTW Check Date - Replaced Upload Field */}
             <FormField
               control={form.control}
-              name="rtwDocumentUrl"
+              name="rtwCheckDate"
               render={({ field }) => (
-                <FormItem className="row-span-2">
-                  <FormLabel>RTW Document <span className="text-red-500">*</span></FormLabel>
+                <FormItem>
+                  <FormLabel>
+                    RTW Check Date <span className="text-red-500">*</span>
+                  </FormLabel>
                   <FormControl>
-                    <div className="space-y-2">
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept=".pdf,.jpg,.jpeg,.png"
-                        onChange={handleFileSelect}
-                        className="hidden"
-                        disabled={isUploading}
-                      />
-
-                      <div
-                        onClick={triggerFileInput}
-                        className={`relative flex min-h-[140px] cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-4 text-center transition-all
-                          ${
-                            isUploading
-                              ? 'cursor-wait border-blue-300 bg-blue-50'
-                              : fileUrl
-                                ? 'border-green-300 bg-green-50'
-                                : 'border-gray-300 bg-gray-50 hover:border-gray-400 hover:bg-gray-100'
-                          }`}
-                      >
-                        {isUploading ? (
-                          <>
-                            <Loader2 className="mb-2 h-8 w-8 animate-spin text-theme" />
-                            <p className="text-xs font-medium text-theme">
-                              Uploading...
-                            </p>
-                          </>
-                        ) : fileUrl ? (
-                          <>
-                            <CheckCircle className="mb-2 h-8 w-8 text-green-500" />
-                            <p className="text-xs font-medium text-green-700">
-                              Document Attached
-                            </p>
-                            {fileName && (
-                              <p className="mt-1 max-w-[150px] truncate text-[10px] text-green-600">
-                                {fileName}
-                              </p>
-                            )}
-
-                            <div className="mt-3 flex gap-2">
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                className="h-7 px-2 text-xs"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  window.open(fileUrl, '_blank');
-                                }}
-                              >
-                                <Eye className="mr-1 h-3 w-3" /> View
-                              </Button>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="destructive"
-                                className="h-7 px-2 text-xs"
-                                onClick={handleRemoveFile}
-                              >
-                                <X className="mr-1 h-3 w-3" /> Remove
-                              </Button>
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <div className="mb-2 rounded-full bg-white p-2 shadow-sm">
-                              <Upload className="h-5 w-5 text-gray-400" />
-                            </div>
-                            <p className="text-xs font-medium text-gray-900">
-                              Click to upload
-                            </p>
-                            <p className="mt-1 text-[10px] text-gray-500">
-                              PDF, JPG, PNG (Max 5MB)
-                            </p>
-                          </>
-                        )}
-                      </div>
-
-                      {uploadError && (
-                        <div className="flex items-center gap-2 rounded-md bg-red-50 p-2 text-xs text-red-600">
-                          <AlertCircle className="h-3 w-3" />
-                          {uploadError}
-                        </div>
-                      )}
-                    </div>
+                    <DatePicker
+                      selected={field.value}
+                      onChange={(date: Date | null) => field.onChange(date)}
+                      minDate={new Date()} // Prevent future dates
+                      dateFormat="dd-MM-yyyy"
+                      placeholderText="Select check date"
+                      className="h-9 w-full rounded-sm border border-gray-300 px-3 py-1 focus:border-theme focus:ring-2 focus:ring-theme"
+                      showMonthDropdown
+                      showYearDropdown
+                      dropdownMode="select"
+                      isClearable
+                      wrapperClassName="w-full"
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

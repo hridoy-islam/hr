@@ -50,7 +50,7 @@ const RecruitApplicantForm = () => {
 
   const handleGeneralInformationSave = (data: any) => {
     setFormData((prev) => ({ ...prev, GeneralInformation: data }));
-    console.log('Saving personal details:', data);
+    // console.log('Saving personal details:', data);
   };
 
   const handleGeneralInformationSaveAndContinue = (data: any) => {
@@ -61,7 +61,7 @@ const RecruitApplicantForm = () => {
 
   const handleEqualityInformationSave = (data: any) => {
     setFormData((prev) => ({ ...prev, EqualityInformation: data }));
-    console.log('Saving equality information:', data);
+    // console.log('Saving equality information:', data);
   };
 
   const handleEqualityInformationSaveAndContinue = (data: any) => {
@@ -73,7 +73,98 @@ const RecruitApplicantForm = () => {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  const handleSubmit = async () => {
+  // const handleSubmit = async () => {
+  //   const requiredSteps = [1, 2];
+  //   const missingSteps = requiredSteps.filter(
+  //     (step) => !completedSteps.includes(step)
+  //   );
+
+  //   if (missingSteps.length > 0) {
+  //     const missingStepNames = missingSteps.map(
+  //       (stepId) =>
+  //         formSteps.find((step) => step.id === stepId)?.label ||
+  //         `Step ${stepId}`
+  //     );
+
+  //     toast({
+  //       title: 'Incomplete Application',
+  //       description: `Please complete the following sections before submitting: ${missingStepNames.join(', ')}`,
+  //       variant: 'destructive'
+  //     });
+
+  //     setCurrentStep(missingSteps[0]);
+  //     return;
+  //   }
+
+  //   try {
+  //     // 1. Prepare User Data
+  //     const flatDataWithStatus = {
+  //       ...formData.GeneralInformation,
+  //       ...formData.EqualityInformation,
+  //       applicantId: id,
+  //       status: 'hired'
+  //     };
+
+  //     await axiosInstance.patch(`/hr/applicant/${id}`, { status: 'hired' });
+
+  //     const { status: _, ...flatData } = flatDataWithStatus;
+  //     const { status: __, ...cleanApplicant } = applicant;
+
+  //     const data = {
+  //       ...cleanApplicant,
+  //       ...flatData,
+  //       role: 'employee',
+  //       company: user?._id
+  //     };
+
+  //     // 2. Create User
+  //     const res = await axiosInstance.post(`/auth/signup`, data);
+  //     const newUser = res.data.data;
+
+     
+
+  //     // 3. Create Right-to-Work Record (Only if duration > 0)
+
+  //     await axiosInstance.post(`/hr/right-to-work`, {
+  //       nextCheckDate: newUser?.rtwCheckDate,
+  //       employeeId: newUser._id,
+  //       updatedBy: user?._id,
+  //       document: newUser?.rightToWork
+  //     });
+
+  //     // 4. Create Passport Record (If passport info exists)
+  //     if (newUser.passportNo || newUser.passportExpiry) {
+  //       await axiosInstance.post(`/passport`, {
+  //           userId: newUser._id,
+  //           passportNumber: newUser.passportNo,
+  //           passportExpiryDate: newUser.passportExpiry,
+  //           document:newUser.passport
+  //       });
+  //     }
+
+  //     toast({
+  //       title: 'Application Submitted',
+  //       description: 'Your application has been successfully submitted.',
+  //       variant: 'default'
+  //     });
+
+  //     navigate('/company/vacancy/recruit-applicant/employee', {
+  //       state: { user: newUser }
+  //     });
+  //     setFormSubmitted(true);
+  //   } catch (error: any) {
+  //     console.error('Error during submission:', error);
+
+  //     toast({
+  //       title: 'Submission Failed',
+  //       description: error?.response?.data?.message || 'Something went wrong!',
+  //       variant: 'destructive'
+  //     });
+  //   }
+  // };
+
+
+ const handleSubmit = async () => {
     const requiredSteps = [1, 2];
     const missingSteps = requiredSteps.filter(
       (step) => !completedSteps.includes(step)
@@ -105,6 +196,8 @@ const RecruitApplicantForm = () => {
         status: 'hired'
       };
 
+      // Update applicant status
+      // We keep this in the main try/catch because if this fails, we probably shouldn't proceed
       await axiosInstance.patch(`/hr/applicant/${id}`, { status: 'hired' });
 
       const { status: _, ...flatData } = flatDataWithStatus;
@@ -117,50 +210,67 @@ const RecruitApplicantForm = () => {
         company: user?._id
       };
 
-      // 2. Create User
+      // 2. Create User (Employee) - CRITICAL STEP
       const res = await axiosInstance.post(`/auth/signup`, data);
       const newUser = res.data.data;
 
-      // 3. Fetch Schedule Settings (to determine RTW duration)
-      let rtwDuration = 0;
+    
       try {
-        const scheduleRes = await axiosInstance.get(
-          `/schedule-check?companyId=${user?._id}`
-        );
-        const scheduleResult = scheduleRes.data?.data?.result;
+        const documentTypes = [
+          { key: 'passport', label: 'Passport' },
+          { key: 'dbs', label: 'DBS Certificate' },
+          { key: 'rightToWork', label: 'Right to Work' },
+          { key: 'immigrationStatus', label: 'Immigration Status' },
+          { key: 'proofOfAddress', label: 'Proof of Address' },
+        ];
 
-        if (scheduleResult && scheduleResult.length > 0) {
-          // Use the fetched duration if available
-          rtwDuration = scheduleResult[0].rtwCheckDate || 0;
+        const documentPromises = documentTypes
+          .filter((doc) => newUser[doc.key])
+          .map((doc) => {
+            return axiosInstance.post('/employee-documents', {
+              employeeId: newUser._id,
+              documentTitle: doc.label,
+              documentUrl: newUser[doc.key]
+            });
+          });
+
+        if (documentPromises.length > 0) {
+          await Promise.all(documentPromises);
         }
-      } catch (scheduleError) {
-        console.log(
-          'Failed to fetch schedule settings, defaulting duration to 0',
-          scheduleError
-        );
+      } catch (docError) {
+        console.error('Failed to create employee documents, skipping step:', docError);
       }
 
-      // 4. Create Right-to-Work Record (Only if duration > 0)
+      // 4. Create Right-to-Work Record
+      try {
+        await axiosInstance.post(`/hr/right-to-work`, {
+          nextCheckDate: newUser?.rtwCheckDate,
+          employeeId: newUser._id,
+          updatedBy: user?._id,
+          document: newUser?.rightToWork
+        });
+      } catch (rtwError) {
+        console.error('Failed to create RTW record, skipping step:', rtwError);
+      }
 
-      await axiosInstance.post(`/hr/right-to-work`, {
-        nextCheckDate: moment().add(rtwDuration, 'days').format('YYYY-MM-DD'),
-        employeeId: newUser._id,
-        updatedBy: user?._id,
-        document: newUser?.rtwDocumentUrl
-      });
+      // 5. Create Passport Record
+      try {
+        if (newUser.passportNo || newUser.passportExpiry) {
+          await axiosInstance.post(`/passport`, {
+            userId: newUser._id,
+            passportNumber: newUser.passportNo,
+            passportExpiryDate: newUser.passportExpiry,
+            document: newUser.passport
+          });
+        }
+      } catch (passportError) {
+        console.error('Failed to create Passport record, skipping step:', passportError);
+      }
 
-      // 5. Create Passport Record (If passport info exists)
-      // if (newUser.passportNo || newUser.passportExpiry) {
-      //   await axiosInstance.post(`/passport`, {
-      //       userId: newUser._id,
-      //       passportNumber: newUser.passportNo,
-      //       passportExpiryDate: newUser.passportExpiry
-      //   });
-      // }
-
+      
       toast({
         title: 'Application Submitted',
-        description: 'Your application has been successfully submitted.',
+        description: 'Employee created successfully.',
         variant: 'default'
       });
 
@@ -168,16 +278,18 @@ const RecruitApplicantForm = () => {
         state: { user: newUser }
       });
       setFormSubmitted(true);
+
     } catch (error: any) {
-      console.error('Error during submission:', error);
+      console.error('Critical Error during submission:', error);
 
       toast({
         title: 'Submission Failed',
-        description: error?.response?.data?.message || 'Something went wrong!',
+        description: error?.response?.data?.message || 'Something went wrong during user creation!',
         variant: 'destructive'
       });
     }
   };
+
 
   const renderStep = () => {
     const handleBack = () => setCurrentStep((prev) => Math.max(1, prev - 1));

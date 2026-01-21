@@ -76,7 +76,7 @@ export default function AddDesignation() {
           title: 'Success!',
           description: 'Designation added successfully.'
         });
-        navigate('/admin/hr/designation');
+        navigate(-1);
       }
     } catch (error) {
       toast({
@@ -98,7 +98,7 @@ export default function AddDesignation() {
          <Button
           onClick={() => navigate(-1)}
         >
-          <MoveLeft />
+          <MoveLeft className='w-4 h-4 mr-2'/>
           Back
         </Button>
         </div>

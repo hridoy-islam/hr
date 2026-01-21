@@ -145,7 +145,7 @@ export function EqualityInfomation({
 
   function onSubmit(data: EqualityInfoData) {
     onSaveAndContinue(data);
-    console.log(data);
+    // console.log(data);
   }
 
   const sameAddress = form.watch("beneficiary.sameAddress");

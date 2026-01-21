@@ -143,12 +143,11 @@ const user = useSelector((state: any) => state.auth.user);
 
                   <TableCell className="text-right">
                     <Button
-                      variant="ghost"
                       className="border-none bg-theme text-white hover:bg-theme/90"
-                      size="icon"
+                      size="sm"
                       onClick={() => handleEdit(d)}
                     >
-                      <Pen className="h-4 w-4" />
+                      Manage Access Control
                     </Button>
                   </TableCell>
                 </TableRow>

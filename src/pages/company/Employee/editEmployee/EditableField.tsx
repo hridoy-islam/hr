@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2, Check, Pencil } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import Select from 'react-select';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
@@ -32,6 +32,7 @@ interface EditableFieldProps {
   max?: string;
   rows?: number;
   multiple?: boolean;
+  disable?: boolean;
 }
 
 export const EditableField: React.FC<EditableFieldProps> = ({
@@ -42,6 +43,7 @@ export const EditableField: React.FC<EditableFieldProps> = ({
   options = [],
   isSaving = false,
   required = false,
+  disable = false,
   placeholder = '',
   className = '',
   onUpdate,
@@ -90,7 +92,7 @@ export const EditableField: React.FC<EditableFieldProps> = ({
     setFieldValue(e.target.value);
   };
 
-  const handleSelectChange = (value: string) => {
+  const handleSelectChange = (value: string | string[]) => {
     setFieldValue(value);
     onUpdate(value);
     setIsEditing(false);
@@ -101,6 +103,22 @@ export const EditableField: React.FC<EditableFieldProps> = ({
     onUpdate(checked);
   };
 
+  // Render Header only if label is provided (prevents empty space in table layouts)
+  const renderHeader = () => {
+    if (!label) return null;
+    return (
+      <div className="flex items-center justify-between mb-2">
+        <Label htmlFor={id}>
+          {label}
+          {required && <span className="ml-1 text-red-500">*</span>}
+        </Label>
+        {isSaving && (
+          <Loader2 className="h-3 w-3 animate-spin text-gray-500" />
+        )}
+      </div>
+    );
+  };
+
   if (type === 'checkbox') {
     return (
       <div className={`flex items-center space-x-2 ${className}`}>
@@ -108,17 +126,20 @@ export const EditableField: React.FC<EditableFieldProps> = ({
           id={id}
           checked={fieldValue as boolean}
           onCheckedChange={handleCheckboxChange}
-          disabled={isSaving}
+          disabled={isSaving || disable}
         />
-        <Label htmlFor={id} className={`${isSaving ? 'opacity-70' : ''}`}>
-          {label}
-          {isSaving && <Loader2 className="ml-2 inline h-3 w-3 animate-spin" />}
-        </Label>
+        {/* For checkbox, we typically always want the label next to it if provided */}
+        {label && (
+          <Label htmlFor={id} className={`${isSaving ? 'opacity-70' : ''}`}>
+            {label}
+            {isSaving && <Loader2 className="ml-2 inline h-3 w-3 animate-spin" />}
+          </Label>
+        )}
       </div>
     );
   }
 
-  if (type === 'date') {
+if (type === 'date') {
     return (
       <div className={`space-y-2 ${className}`}>
         <div className="flex items-center justify-between">
@@ -157,36 +178,25 @@ export const EditableField: React.FC<EditableFieldProps> = ({
   if (type === 'select') {
     const isMulti = !!multiple;
 
-    // Format options for react-select
     const formattedOptions = options.map((opt) => ({
       label: opt.label,
       value: opt.value
     }));
 
-    // Format value for react-select
     const selectValue = isMulti
       ? formattedOptions.filter(
-          (opt) => Array.isArray(fieldValue) && fieldValue.includes(opt.value)
+          (opt) => Array.isArray(fieldValue) && (fieldValue as string[]).includes(opt.value)
         )
       : formattedOptions.find((opt) => opt.value === fieldValue) || null;
 
     return (
-      <div className={`space-y-2 ${className}`}>
-        <div className="flex items-center justify-between">
-          <Label htmlFor={id}>
-            {label}
-            {required && <span className="ml-1 text-red-500">*</span>}
-          </Label>
-          {isSaving && (
-            <Loader2 className="h-3 w-3 animate-spin text-gray-500" />
-          )}
-        </div>
-
+      <div className={`${className}`}>
+        {renderHeader()}
         {isEditing ? (
           <Select
             inputId={id}
             isMulti={isMulti}
-            isDisabled={isSaving}
+            isDisabled={isSaving || disable}
             value={selectValue}
             onChange={(selected) => {
               if (isMulti) {
@@ -197,17 +207,19 @@ export const EditableField: React.FC<EditableFieldProps> = ({
               }
             }}
             options={formattedOptions}
-            placeholder={placeholder || `Select ${label}`}
-            className="react-select-container"
+            placeholder={placeholder || `Select`}
+            className="react-select-container text-sm"
             classNamePrefix="react-select"
+            autoFocus
+            onBlur={() => setIsEditing(false)}
           />
         ) : (
           <div
-            className="flex min-h-[38px] cursor-pointer items-center rounded-md border border-transparent p-2 transition-all hover:border-gray-200 hover:bg-gray-50"
-            onClick={() => setIsEditing(true)}
+            className="flex min-h-[38px] cursor-pointer items-center rounded-md border border-transparent px-2 py-1 transition-all hover:border-gray-200 hover:bg-gray-50"
+            onClick={() => !disable && setIsEditing(true)}
           >
             <span
-              className={`${!fieldValue || (Array.isArray(fieldValue) && fieldValue.length === 0) ? 'italic text-gray-400' : ''}`}
+              className={`text-sm ${!fieldValue || (Array.isArray(fieldValue) && fieldValue.length === 0) ? 'italic text-gray-400' : ''}`}
             >
               {Array.isArray(fieldValue)
                 ? fieldValue.length === 0
@@ -227,27 +239,10 @@ export const EditableField: React.FC<EditableFieldProps> = ({
     );
   }
 
+  // Text / Number / Email / Textarea
   return (
-    <div className={`space-y-2 ${className}`}>
-      <div className="flex items-center justify-between">
-        <Label htmlFor={id}>
-          {label}
-          {required && <span className="ml-1 text-red-500">*</span>}
-        </Label>
-        {/* {isEditing ? (
-          isSaving ? (
-            <Loader2 className="h-3 w-3 animate-spin text-gray-500" />
-          ) : (
-            <Check className="h-4 w-4 text-green-500 cursor-pointer" onClick={handleBlur} />
-          )
-        ) : (
-          <Pencil 
-            className="h-4 w-4 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" 
-            onClick={() => setIsEditing(true)}
-          />
-        )} */}
-      </div>
-
+    <div className={`${className}`}>
+      {renderHeader()}
       {isEditing ? (
         type === 'textarea' ? (
           <Textarea
@@ -258,11 +253,11 @@ export const EditableField: React.FC<EditableFieldProps> = ({
             onBlur={handleBlur}
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
-            disabled={isSaving}
+            disabled={isSaving || disable}
             required={required}
             maxLength={maxLength}
             rows={rows}
-            className="w-full"
+            className="w-full text-sm"
           />
         ) : (
           <Input
@@ -274,25 +269,21 @@ export const EditableField: React.FC<EditableFieldProps> = ({
             onBlur={handleBlur}
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
-            disabled={isSaving}
+            disabled={isSaving || disable}
             required={required}
             maxLength={maxLength}
             max={max}
-            className="w-full"
+            className="w-full text-sm h-9"
           />
         )
       ) : (
         <div
-          className="flex min-h-[38px] cursor-pointer items-center rounded-md border border-transparent p-2 transition-all hover:border-gray-200 hover:bg-gray-50"
-          onClick={() => setIsEditing(true)}
+          className="flex min-h-[38px] cursor-pointer items-center rounded-md border border-transparent px-2 py-1 transition-all hover:border-gray-200 hover:bg-gray-50"
+          onClick={() => !disable && setIsEditing(true)}
         >
-          {type === 'checkbox' ? (
-            <span>{(fieldValue as boolean) ? 'Yes' : 'No'}</span>
-          ) : (
-            <span className={`${!fieldValue ? 'italic text-gray-400' : ''}`}>
-              {fieldValue || 'Click to edit'}
-            </span>
-          )}
+          <span className={`text-sm ${!fieldValue ? 'italic text-gray-400' : ''}`}>
+            {fieldValue || 'Click to edit'}
+          </span>
         </div>
       )}
     </div>

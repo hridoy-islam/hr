@@ -1,9 +1,11 @@
 import React from 'react';
+import { ChevronRight } from 'lucide-react';
 
 interface Tab {
   id: string;
   label: string;
   component: React.ReactNode;
+  count?: number; // Optional badge count
 }
 
 interface TabsProps {
@@ -14,27 +16,53 @@ interface TabsProps {
 
 export const Tabs: React.FC<TabsProps> = ({ tabs, activeTab, onChange }) => {
   return (
-    <div className="mb-8">
-      <div className="mb-6 border-b border-gray-200 bg-white rounded-t-lg">
-        <div className="flex flex-wrap -mb-px overflow-x-auto px-6">
-          {tabs.map((tab) => (
+    <div className="flex flex-col md:flex-row gap-6 w-full items-start">
+      
+      {/* 1. Tab List (Sidebar) - Left Side */}
+      <div className="w-full md:w-72 flex-shrink-0 space-y-3 bg-white p-4 shadow-md rounded-xl border border-gray-200">
+        {tabs.map((tab) => {
+          const isActive = activeTab === tab.id;
+          
+          return (
             <button
               key={tab.id}
               onClick={() => onChange(tab.id)}
-              className={`inline-block px-6 py-4 text-sm font-medium border-b-2 transition-all duration-200 ease-in-out whitespace-nowrap hover:text-blue-600
+              className={`
+                group flex w-full items-center justify-between rounded-lg border-2 px-4 py-3 text-sm font-medium transition-all duration-200 ease-in-out outline-none
                 ${
-                  activeTab === tab.id
-                    ? 'border-blue-600 text-blue-600 bg-blue-50'
-                    : 'border-transparent text-gray-500 hover:border-gray-300'
-                }`}
-              aria-current={activeTab === tab.id ? 'page' : undefined}
+                  isActive
+                    ? 'border-theme bg-blue-50 text-theme ring-1 ring-theme shadow-sm' 
+                    : 'border-transparent hover:border-gray-300 bg-gray-50 text-gray-600 hover:bg-gray-100'
+                }
+              `}
+              aria-current={isActive ? 'page' : undefined}
             >
-              {tab.label}
+              {/* Label */}
+              <span className="truncate">{tab.label}</span>
+              
+              {/* Right Side: Badge + Icon */}
+              <div className="flex items-center gap-3">
+                {/* Badge (Red Counter) */}
+                {tab.count !== undefined && tab.count > 0 && (
+                  <span className="flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white shadow-sm">
+                    {tab.count}
+                  </span>
+                )}
+                
+                {/* Chevron Icon */}
+                <ChevronRight 
+                  className={`h-4 w-4 transition-transform duration-200 ${
+                    isActive ? 'text-theme' : 'text-gray-400 group-hover:text-gray-600'
+                  }`} 
+                />
+              </div>
             </button>
-          ))}
-        </div>
+          );
+        })}
       </div>
-      <div className="tab-content">
+
+      {/* 2. Tab Content - Right Side */}
+      <div className="flex-1 min-w-0 w-full bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         {tabs.find((tab) => tab.id === activeTab)?.component}
       </div>
     </div>

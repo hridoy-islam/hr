@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import moment from 'moment';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,8 @@ import {
   HeartHandshake, 
   CreditCard, 
   Users,
-  CheckCircle2
+  CheckCircle2,
+  Loader2 // Imported Loader2
 } from 'lucide-react';
 
 // --- Reusable "Individual Table" Components ---
@@ -43,9 +44,27 @@ const TableRow = ({ label, value }) => (
 
 const ReviewStep = ({ formData, onSubmit, onBack, applicantData }) => {
   const navigate = useNavigate();
+  // ✅ 1. Add local state for loading
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleBack = () => {
-    onBack();
+    if (!isSubmitting) {
+      onBack();
+    }
+  };
+
+  const handleConfirm = async () => {
+    if (isSubmitting) return;
+
+    setIsSubmitting(true);
+    try {
+      await onSubmit();
+    } catch (error) {
+      console.error("Submission failed", error);
+    } finally {
+      
+      setIsSubmitting(false);
+    }
   };
 
   const formatDate = (date) =>
@@ -65,8 +84,6 @@ const ReviewStep = ({ formData, onSubmit, onBack, applicantData }) => {
           <TableRow label="Initial" value={applicantData?.initial} />
           <TableRow label="Last Name" value={applicantData?.lastName} />
           
-          {/* <div className="my-1 border-t border-dashed border-gray-100" /> */}
-          
           <TableRow label="Email" value={applicantData?.email} />
           <TableRow label="Mobile" value={applicantData?.mobilePhone} />
           <TableRow label="DOB" value={formatDate(applicantData?.dateOfBirth)} />
@@ -74,6 +91,7 @@ const ReviewStep = ({ formData, onSubmit, onBack, applicantData }) => {
           <TableRow label="Marital Status" value={applicantData?.maritalStatus} />
           <TableRow label="NI Number" value={applicantData?.nationalInsuranceNumber} />
           <TableRow label="NHS Number" value={applicantData?.nhsNumber} />
+          <TableRow label="RTW Check Date" value={formatDate(formData?.GeneralInformation?.rtwCheckDate)} />
           <TableRow label="Contract Hours" value={formData.GeneralInformation?.contractHours} />
         </TableContainer>
 
@@ -168,6 +186,7 @@ const ReviewStep = ({ formData, onSubmit, onBack, applicantData }) => {
           size={'sm'}
           variant="outline"
           onClick={handleBack}
+          disabled={isSubmitting} // Disable back button too
           className="w-full sm:w-auto h-9 text-xs"
         >
           Back
@@ -175,11 +194,22 @@ const ReviewStep = ({ formData, onSubmit, onBack, applicantData }) => {
         <Button
           type="button"
           size={'sm'}
-          onClick={onSubmit}
+          onClick={handleConfirm} // ✅ 3. Use wrapper handler
+          disabled={isSubmitting} // ✅ 4. Disable when submitting
           className="w-full bg-theme hover:bg-theme/90 sm:w-auto sm:px-6 h-9 text-xs"
         >
-          <CheckCircle2 className="mr-2 h-3.5 w-3.5" />
-          Confirm Recruitment
+          {/* ✅ 5. Show Loading State */}
+          {isSubmitting ? (
+            <>
+              <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+              Processing...
+            </>
+          ) : (
+            <>
+              <CheckCircle2 className="mr-2 h-3.5 w-3.5" />
+              Confirm Recruitment
+            </>
+          )}
         </Button>
       </div>
     </div>

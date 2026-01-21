@@ -6,90 +6,103 @@ import PersonalInfoTab from './tabs/PersonalInfoTab';
 import AddressTab from './tabs/AddressTab';
 import MiscellaneousTab from './tabs/MiscellaneousTab';
 import { useEditApplicant } from './hooks/useEditApplicant';
+import { BlinkingDots } from '@/components/shared/blinking-dots';
+import { useParams } from 'react-router-dom';
+import DocumentsTab from './tabs/DocumentTab';
 
 const ApplicantDetailPage = () => {
-  const { 
-    loading, 
-    activeTab, 
+  const {
+    loading,
+    activeTab,
     setActiveTab,
     formData,
     handleFieldUpdate,
     handleDateChange,
     handleSelectChange,
     handleCheckboxChange,
-    isFieldSaving
+    isFieldSaving,
+    fetchApplicant
   } = useEditApplicant();
-
+  const { id } = useParams();
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-gray-50">
+      <div className="flex  items-center justify-center ">
         <div className="text-center">
-          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-theme border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]"></div>
-          <p className="mt-4 text-gray-600 font-medium">Loading applicant data...</p>
+          <BlinkingDots size="large" color="bg-theme" />
         </div>
       </div>
     );
   }
 
   const tabs = [
-    { 
-      id: 'personal', 
-      label: 'Personal Info', 
+    {
+      id: 'personal',
+      label: 'Personal Info',
       component: (
-        <PersonalInfoTab 
-          formData={formData} 
-          onUpdate={handleFieldUpdate} 
-          onDateChange={handleDateChange} 
-          onSelectChange={handleSelectChange} 
-          isFieldSaving={isFieldSaving} 
+        <PersonalInfoTab
+          formData={formData}
+          onUpdate={handleFieldUpdate}
+          onDateChange={handleDateChange}
+          onSelectChange={handleSelectChange}
+          isFieldSaving={isFieldSaving}
         />
       )
     },
-    { 
-      id: 'address', 
-      label: 'Address & Contact', 
+    {
+      id: 'address',
+      label: 'Address & Contact',
       component: (
-        <AddressTab 
-          formData={formData} 
-          onUpdate={handleFieldUpdate} 
-          onSelectChange={handleSelectChange} 
-          isFieldSaving={isFieldSaving} 
+        <AddressTab
+          formData={formData}
+          onUpdate={handleFieldUpdate}
+          onSelectChange={handleSelectChange}
+          isFieldSaving={isFieldSaving}
         />
       )
     },
-    { 
-      id: 'miscellaneous', 
-      label: 'Application Details', 
+    {
+      id: 'miscellaneous',
+      label: 'Application Details',
       component: (
-        <MiscellaneousTab 
-          formData={formData} 
-          onUpdate={handleFieldUpdate} 
-          onDateChange={handleDateChange} 
-          onSelectChange={handleSelectChange} 
+        <MiscellaneousTab
+          formData={formData}
+          onUpdate={handleFieldUpdate}
+          onDateChange={handleDateChange}
+          onSelectChange={handleSelectChange}
           onCheckboxChange={handleCheckboxChange}
-          isFieldSaving={isFieldSaving} 
+          isFieldSaving={isFieldSaving}
         />
       )
     },
-   
+    {
+      id: 'documents',
+      label: 'Documents',
+      component: (
+        <DocumentsTab
+          formData={formData}
+          applicantId={id || ''}
+          onRefresh={fetchApplicant}
+        />
+      )
+    }
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className=" mx-auto py-8">
+    <div className=" rounded-md bg-white p-4 shadow-sm">
+      <div className=" mx-auto">
         <div className="mb-8 flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Applicant</h1>
-            <p className="mt-2 text-gray-600">
-              {formData.firstName && formData.lastName 
+          <div className="flex flex-row items-center gap-2 text-xl font-bold">
+            <h1 className="">Applicant:</h1>
+            <p className=" ">
+              {formData.firstName && formData.lastName
                 ? `${formData.title || ''} ${formData.firstName} ${formData.lastName}`.trim()
-                : 'Manage applicant information'
-              }
+                : 'Manage applicant information'}
             </p>
           </div>
           <Button
             variant="outline"
-            className="bg-theme text-white border-theme hover:bg-theme/90 hover:border-theme"
+            size={'sm'}
+            className="border-theme bg-theme text-white hover:border-theme hover:bg-theme/90"
             onClick={() => window.history.back()}
           >
             <MoveLeft className="mr-2 h-4 w-4" />
@@ -97,11 +110,7 @@ const ApplicantDetailPage = () => {
           </Button>
         </div>
 
-        <Tabs
-          tabs={tabs}
-          activeTab={activeTab}
-          onChange={setActiveTab}
-        />
+        <Tabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
       </div>
     </div>
   );

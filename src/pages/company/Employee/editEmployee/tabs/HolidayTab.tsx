@@ -72,7 +72,8 @@ interface HolidayAllowanceAPI {
   updatedAt?: Date;
 }
 
-const HolidayTab: React.FC = () => {
+const HolidayTab: React.FC = ({  formData
+}) => {
   const getCurrentHolidayYear = () => {
     const year = moment().year();
     return `${year}-${year + 1}`;
@@ -338,7 +339,7 @@ const HolidayTab: React.FC = () => {
   const holidayYears = generateHolidayYears(20, 50);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="">
       <div className="">
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
           {/* My Holidays Section */}
@@ -347,7 +348,7 @@ const HolidayTab: React.FC = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <CalendarDays className="h-5 w-5 text-blue-600" />
-                  My Leave Requests
+                  {`${formData?.firstName}${" "}${formData?.lastName}'s`} Leave Requests
                 </CardTitle>
               </CardHeader>
               <CardContent>

@@ -266,12 +266,6 @@ const navItems = [
 
       {
         icon: UsersIcon,
-        label: 'Users & Permissions',
-        href: '#',
-        roles: ['company']
-      },
-      {
-        icon: UsersIcon,
         label: 'Schedule',
         href: 'schedule-check',
         roles: ['company']
