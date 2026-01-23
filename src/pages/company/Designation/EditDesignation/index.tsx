@@ -149,7 +149,7 @@ export default function EditDesignation() {
         description: "Designation updated successfully.",
       });
   
-      navigate("/admin/hr/designation");
+      navigate(-1);
     } catch (error) {
       toast({
         title: "Error",

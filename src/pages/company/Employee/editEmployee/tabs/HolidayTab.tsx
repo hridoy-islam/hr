@@ -455,7 +455,7 @@ const HolidayTab: React.FC = ({  formData
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Users className="h-5 w-5 text-green-600" />
-                  My Leave Allowance
+                  {`${formData?.firstName}${" "}${formData?.lastName}'s`} Leave Allowance
                 </CardTitle>
               </CardHeader>
               <CardContent>

@@ -31,7 +31,7 @@ interface Employee {
   training?: LocalTraining[];
 }
 
-const TrainingExpiryPage = () => {
+const TrainingExpiryStatusPage = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [entriesPerPage, setEntriesPerPage] = useState(10);

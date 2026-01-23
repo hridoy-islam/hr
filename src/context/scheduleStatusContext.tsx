@@ -17,6 +17,12 @@ export interface ScheduleStatus {
   immigration: number;
   appraisal: number;
   rtw: number;
+  spot: number;
+  supervision: number;
+  training: number;
+  induction: number;
+  disciplinary: number;
+  qa: number;
 }
 
 interface ScheduleStatusContextType {
@@ -33,6 +39,13 @@ const defaultStatus: ScheduleStatus = {
   immigration: 0,
   appraisal: 0,
   rtw: 0,
+  spot: 0,
+  supervision: 0,
+  training: 0,
+  induction: 0,
+  disciplinary: 0,
+  qa: 0,
+
 
 };
 

@@ -22,8 +22,6 @@ import HrLayout from '@/components/layout/hr-layout';
 import Department from '@/pages/company/Department';
 import Shift from '@/pages/company/Shift';
 import Designation from '@/pages/company/Designation';
-import Training from '@/pages/company/Training';
-import AttendanceReport from '@/pages/Hr/Attendance/Attendance-Report';
 import CompanyDetails from '@/pages/company/Company-Details';
 import EmailSetup from '@/pages/company/Email-Setup';
 import CreateVacancy from '@/pages/company/Vacancy/CreateVacancy';
@@ -45,7 +43,6 @@ import EntryAttendance from '@/pages/Hr/Attendance/entry-attendance';
 import ApplicantDetailPage from '@/pages/company/Vacancy/viewApplicant';
 import LeaveApprovalPage from '@/pages/Hr/LeaveApproval';
 
-import TrainingExpiryPage from '@/pages/Hr/Dashboard/components/trainingExprity';
 import RightToWorkExpiryPage from '@/pages/Hr/Dashboard/components/rightToWork';
 import PassportExpiryPage from '@/pages/company/ExpiryPage/passportExpiray';
 import RtwPage from '@/pages/company/Employee/rightToWorkEmployee';
@@ -71,6 +68,15 @@ import RtwExpiryPage from '@/pages/company/ExpiryPage/rtwExpiryPage';
 import ImmigrationExpiryPage from '@/pages/company/ExpiryPage/immigrationExpiryPage';
 import AppraisalExpiryPage from '@/pages/company/ExpiryPage/appraisalExpiryPage';
 import TrainingDetailsPage from '@/pages/company/Employee/employeeTraining/employeeTrainingDetails';
+import SpotCheckExpiryPage from '@/pages/company/ExpiryPage/spotCheckExpiryPage';
+import SupervisionExpiryPage from '@/pages/company/ExpiryPage/supervisionExpiryPage';
+import TrainingExpiryPage from '@/pages/company/ExpiryPage/trainingExpiryPage';
+import CompanyBranch from '@/pages/company/companyBranch';
+import InductionExpiryPage from '@/pages/company/ExpiryPage/InductionExpiryPage';
+import DisciplinaryExpiryPage from '@/pages/company/ExpiryPage/disciplinaryExpiryPage';
+import AttendancePage from '@/pages/company/Attendance/AttendanceList';
+import AttendanceReport from '@/pages/company/Attendance/Attendance-Report';
+import QAExpiryPage from '@/pages/company/ExpiryPage/QAExpiryPage';
 
 const SignInPage = lazy(() => import('@/pages/auth/signin'));
 
@@ -127,11 +133,18 @@ export default function AppRouter() {
         { path: 'expiry/visa', element: <VisaExpiryPage /> },
         { path: 'expiry/appraisal', element: <AppraisalExpiryPage /> },
         { path: 'expiry/immigration', element: <ImmigrationExpiryPage /> },
+        { path: 'expiry/spot-check', element: <SpotCheckExpiryPage /> },
+        { path: 'expiry/supervision', element: <SupervisionExpiryPage /> },
+        { path: 'expiry/training', element: <TrainingExpiryPage /> },
+        { path: 'expiry/induction', element: <InductionExpiryPage /> },
+        { path: 'expiry/disciplinary', element: <DisciplinaryExpiryPage /> },
+        { path: 'expiry/qa', element: <QAExpiryPage /> },
         {
           path: 'expiry/rtw',
           element: <RtwExpiryPage />
         },
 
+        { path: 'company-branch', element: <CompanyBranch /> },
         { path: 'profile', element: <Profile /> },
         { path: 'holiday', element: <Holiday /> },
         { path: 'my-staff', element: <MyStaff /> },
@@ -156,7 +169,7 @@ export default function AppRouter() {
         { path: 'create-training', element: <CreateTraining /> },
         { path: 'edit-training/:id', element: <EditTraining /> },
 
-        { path: 'attendance', element: <Attendance /> },
+        { path: 'attendance', element: <AttendancePage /> },
         { path: 'attendance/attendance-list', element: <AttendanceList /> },
         { path: 'attendance/attendance-entry', element: <EntryAttendance /> },
 

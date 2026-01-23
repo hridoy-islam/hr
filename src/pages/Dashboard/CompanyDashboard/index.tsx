@@ -1,16 +1,20 @@
 import { useState, useEffect } from 'react';
 import {
   Users,
-  FileCheck, // For RTW (Immigration)
-  Globe, // For Visa
-  Award, // For Appraisal
-  ShieldCheck, // For DBS
-  BookOpen // For Passport
+  FileCheck,
+  Globe,
+  Award,
+  ShieldCheck,
+  BookOpen,
+  ClipboardCheck,
+  UserCheck,
+  GraduationCap,
+  UserPlus,
+  AlertTriangle
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import axiosInstance from '@/lib/axios';
 import { useSelector } from 'react-redux';
-// 1. Import the Context Hook
 import { useScheduleStatus } from '@/context/scheduleStatusContext';
 
 const CompanyDashboardPage = () => {
@@ -18,13 +22,13 @@ const CompanyDashboardPage = () => {
   const [totalEmployees, setTotalEmployees] = useState(0);
 
   const navigate = useNavigate();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const user = useSelector((state: any) => state.auth.user);
 
-  // 2. Consume the Schedule Status Context
-  // This gives us the global stats (passport, visa, etc.) and the refresh function
+  // Consume the Schedule Status Context
   const { status, loading: loadingStats, refetchStatus } = useScheduleStatus();
 
-  // Fetch Total Employees (Keep this local as it's specific to this page)
+  // Fetch Total Employees
   useEffect(() => {
     const fetchEmployees = async () => {
       if (!user?._id) return;
@@ -39,7 +43,6 @@ const CompanyDashboardPage = () => {
           }
         });
 
-        // Handle different API response structures for count
         const total =
           response.data.data?.meta?.total ||
           response.data.data?.result?.length ||
@@ -55,7 +58,6 @@ const CompanyDashboardPage = () => {
 
     fetchEmployees();
 
-    // Optional: Refresh context stats when dashboard mounts to ensure data is fresh
     if (user?._id) {
       refetchStatus();
     }
@@ -108,6 +110,26 @@ const CompanyDashboardPage = () => {
       isWarning: status.visa > 0
     },
     {
+      title: 'DBS CHECK',
+      main: loadingStats ? '...' : status.dbs,
+      sub: getSubText(status.dbs),
+      icon: <ShieldCheck className="h-6 w-6" />,
+      onClick: () => navigate('/company/expiry/dbs'),
+      gradient: 'from-indigo-600 to-indigo-800',
+      functional: true,
+      isWarning: status.dbs > 0
+    },
+    {
+      title: 'IMMIGRATION',
+      main: loadingStats ? '...' : status.immigration,
+      sub: getSubText(status.immigration),
+      icon: <FileCheck className="h-6 w-6" />,
+      onClick: () => navigate('/company/expiry/immigration'),
+      gradient: 'from-pink-600 to-pink-800',
+      functional: true,
+      isWarning: status.immigration > 0
+    },
+    {
       title: 'APPRAISAL',
       main: loadingStats ? '...' : status.appraisal,
       sub: getSubText(status.appraisal),
@@ -118,24 +140,65 @@ const CompanyDashboardPage = () => {
       isWarning: status.appraisal > 0
     },
     {
-      title: 'Immigration',
-      main: loadingStats ? '...' : status.immigration,
-      sub: getSubText(status.immigration),
-      icon: <FileCheck className="h-6 w-6" />,
-      onClick: () => navigate('/company/expiry/immigration'),
-      gradient: 'from-purple-600 to-purple-800',
+      title: 'SPOT CHECKS',
+      main: loadingStats ? '...' : status.spot,
+      sub: getSubText(status.spot),
+      icon: <ClipboardCheck className="h-6 w-6" />,
+      gradient: 'from-teal-600 to-teal-800',
+      onClick: () => navigate('/company/expiry/spot-check'),
       functional: true,
-      isWarning: status.immigration > 0
+      isWarning: status.spot > 0
     },
     {
-      title: 'DBS CHECK',
-      main: loadingStats ? '...' : status.dbs,
-      sub: getSubText(status.dbs),
-      icon: <ShieldCheck className="h-6 w-6" />,
-      onClick: () => navigate('/company/expiry/dbs'),
-      gradient: 'from-indigo-600 to-indigo-800',
+      title: 'SUPERVISION',
+      main: loadingStats ? '...' : status.supervision,
+      sub: getSubText(status.supervision),
+      icon: <UserCheck className="h-6 w-6" />,
+      gradient: 'from-cyan-600 to-cyan-800',
+      onClick: () => navigate('/company/expiry/supervision'),
       functional: true,
-      isWarning: status.dbs > 0
+      isWarning: status.supervision > 0
+    },
+    {
+      title: 'TRAINING',
+      main: loadingStats ? '...' : status.training,
+      sub: getSubText(status.training),
+      icon: <GraduationCap className="h-6 w-6" />,
+      gradient: 'from-rose-600 to-rose-800',
+      onClick: () => navigate('/company/expiry/training'),
+      functional: true,
+      isWarning: status.training > 0
+    },
+    // --- NEW CARDS ---
+    {
+      title: 'INDUCTION',
+      main: loadingStats ? '...' : status.induction,
+      sub: getSubText(status.induction),
+      icon: <UserPlus className="h-6 w-6" />,
+      gradient: 'from-lime-600 to-lime-800',
+      onClick: () => navigate('/company/expiry/induction'),
+      functional: true,
+      isWarning: status.induction > 0
+    },
+    {
+      title: 'DISCIPLINARY',
+      main: loadingStats ? '...' : status.disciplinary,
+      sub: getSubText(status.disciplinary),
+      icon: <AlertTriangle className="h-6 w-6" />,
+      gradient: 'from-red-500 to-red-700', // Distinct red shade for alerts
+      onClick: () => navigate('/company/expiry/disciplinary'),
+      functional: true,
+      isWarning: status.disciplinary > 0
+    },
+    {
+      title: 'QUALITY ASSURANCE',
+      main: loadingStats ? '...' : status.qa,
+      sub: getSubText(status.qa),
+      icon: <ClipboardCheck className="h-6 w-6" />, // Reuse or pick new (see note below)
+      gradient: 'from-violet-600 to-violet-800', // Distinct from Spot Check (teal)
+      onClick: () => navigate('/company/expiry/qa'),
+      functional: true,
+      isWarning: status.qa > 0
     }
   ];
 

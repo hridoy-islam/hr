@@ -19,11 +19,12 @@ import {
   FormField,
   FormItem,
   FormLabel,
-  FormMessage
+  FormMessage,
+  FormDescription
 } from '@/components/ui/form';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 
-// Interface for the form data
+// Interface for the form data — now includes ALL fields from the schema
 interface ScheduleCheckValues {
   dbsCheckDate: number;
   rtwCheckDate: number;
@@ -31,8 +32,13 @@ interface ScheduleCheckValues {
   visaCheckDate: number;
   appraisalCheckDate: number;
   immigrationCheckDate: number;
-  spotCheckDate: number;        // Added
-  supervisionCheckDate: number; // Added
+  spotCheckDate: number;
+  supervisionCheckDate: number;
+  disciplinaryCheckDate: number;
+  qaCheckDate: number; // ← added
+  spotCheckDuration: number;
+  supervisionDuration: number;
+  qaCheckDuration: number; // ← added
 }
 
 export default function CompanyScheduleCheckPage() {
@@ -43,7 +49,6 @@ export default function CompanyScheduleCheckPage() {
   const [submitting, setSubmitting] = useState(false);
   const [existingId, setExistingId] = useState<string | null>(null);
 
-  // Initialize form without Zod resolver
   const form = useForm<ScheduleCheckValues>({
     defaultValues: {
       dbsCheckDate: 0,
@@ -52,8 +57,13 @@ export default function CompanyScheduleCheckPage() {
       visaCheckDate: 0,
       appraisalCheckDate: 0,
       immigrationCheckDate: 0,
-      spotCheckDate: 0,       // Added
-      supervisionCheckDate: 0 // Added
+      spotCheckDate: 0,
+      supervisionCheckDate: 0,
+      disciplinaryCheckDate: 0,
+      qaCheckDate: 0, // ← added
+      spotCheckDuration: 0,
+      supervisionDuration: 0,
+      qaCheckDuration: 0 // ← added
     }
   });
 
@@ -64,28 +74,27 @@ export default function CompanyScheduleCheckPage() {
 
       try {
         setLoading(true);
-        // Fetch data filtering by companyId
-        const response = await axiosInstance.get(
-          `/schedule-check?companyId=${user._id}`
-        );
-        
+        const response = await axiosInstance.get(`/schedule-check?companyId=${user._id}`);
         const results = response.data?.data?.result;
 
-        // Check if data exists (taking the first result as per requirement)
         if (results && results.length > 0) {
           const data = results[0];
           setExistingId(data._id);
           
-          // Populate form with existing data
           form.reset({
-            dbsCheckDate: data.dbsCheckDate,
-            rtwCheckDate: data.rtwCheckDate,
-            passportCheckDate: data.passportCheckDate,
+            dbsCheckDate: data.dbsCheckDate || 0,
+            rtwCheckDate: data.rtwCheckDate || 0,
+            passportCheckDate: data.passportCheckDate || 0,
             visaCheckDate: data.visaCheckDate || 0,
             appraisalCheckDate: data.appraisalCheckDate || 0,
             immigrationCheckDate: data.immigrationCheckDate || 0,
-            spotCheckDate: data.spotCheckDate || 0,              // Added
-            supervisionCheckDate: data.supervisionCheckDate || 0 // Added
+            spotCheckDate: data.spotCheckDate || 0,
+            supervisionCheckDate: data.supervisionCheckDate || 0,
+            disciplinaryCheckDate: data.disciplinaryCheckDate || 0,
+            qaCheckDate: data.qaCheckDate || 0, // ← added
+            spotCheckDuration: data.spotCheckDuration || 0,
+            supervisionDuration: data.supervisionDuration || 0,
+            qaCheckDuration: data.qaDuration || 0 // ← added
           });
         }
       } catch (error: any) {
@@ -103,29 +112,21 @@ export default function CompanyScheduleCheckPage() {
     fetchData();
   }, [user._id, form, toast]);
 
-  // Handle Submit (Create or Update)
   const onSubmit = async (data: ScheduleCheckValues) => {
     try {
       setSubmitting(true);
       let response;
 
       if (existingId) {
-        // --- UPDATE (PATCH) ---
-        response = await axiosInstance.patch(
-          `/schedule-check/${existingId}`,
-          {
-            ...data,
-            companyId: user._id
-          }
-        );
+        response = await axiosInstance.patch(`/schedule-check/${existingId}`, {
+          ...data,
+          companyId: user._id
+        });
       } else {
-        // --- CREATE (POST) ---
         response = await axiosInstance.post(`/schedule-check`, {
           ...data,
           companyId: user._id
         });
-        
-        // If created successfully, set the new ID so future saves are updates
         if (response.data?.data?._id) {
           setExistingId(response.data.data._id);
         }
@@ -158,14 +159,17 @@ export default function CompanyScheduleCheckPage() {
     );
   }
 
+  const reminderDesc = "Number of days before expiry when the company will receive a reminder.";
+  const durationDesc = "Total duration (in days) until the next check is expire";
+
   return (
     <div className="mx-auto space-y-6">
       <Card className="border-gray-200 bg-white shadow-sm">
         <CardHeader>
-          <CardTitle>Check Intervals</CardTitle>
+          <CardTitle>Compliance & Activity Reminders</CardTitle>
           <CardDescription>
-            Define the validity period (in days) for mandatory compliance checks.
-            System will schedule checks based on these intervals.
+            Set how many days in advance you’d like to be reminded about expiring checks, 
+            and define how long each activity should last.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -173,174 +177,21 @@ export default function CompanyScheduleCheckPage() {
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
               <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
                 
-                {/* DBS Check Date */}
+                {/* DBS */}
                 <FormField
                   control={form.control}
                   name="dbsCheckDate"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>DBS Check Interval (Days)</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          placeholder="e.g. 365"
-                          {...field}
-                          value={field.value === 0 ? '' : field.value}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            field.onChange(val === '' ? 0 : Number(val));
-                          }}
-                          className="mt-1"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {/* RTW Check Date */}
-                <FormField
-                  control={form.control}
-                  name="rtwCheckDate"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>RTW Check Interval (Days)</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          placeholder="e.g. 180"
-                          {...field}
-                          value={field.value === 0 ? '' : field.value}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            field.onChange(val === '' ? 0 : Number(val));
-                          }}
-                          className="mt-1"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {/* Passport Check Date */}
-                <FormField
-                  control={form.control}
-                  name="passportCheckDate"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Passport Check Interval (Days)</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          placeholder="e.g. 365"
-                          {...field}
-                          value={field.value === 0 ? '' : field.value}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            field.onChange(val === '' ? 0 : Number(val));
-                          }}
-                          className="mt-1"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {/* Visa Check Date */}
-                <FormField
-                  control={form.control}
-                  name="visaCheckDate"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Visa Check Interval (Days)</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          placeholder="e.g. 365"
-                          {...field}
-                          value={field.value === 0 ? '' : field.value}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            field.onChange(val === '' ? 0 : Number(val));
-                          }}
-                          className="mt-1"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {/* Appraisal Check Date */}
-                <FormField
-                  control={form.control}
-                  name="appraisalCheckDate"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Appraisal Interval (Days)</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          placeholder="e.g. 90"
-                          {...field}
-                          value={field.value === 0 ? '' : field.value}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            field.onChange(val === '' ? 0 : Number(val));
-                          }}
-                          className="mt-1"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {/* Immigration Check Date */}
-                <FormField
-                  control={form.control}
-                  name="immigrationCheckDate"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Immigration Check Interval (Days)</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          placeholder="e.g. 365"
-                          {...field}
-                          value={field.value === 0 ? '' : field.value}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            field.onChange(val === '' ? 0 : Number(val));
-                          }}
-                          className="mt-1"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {/* Spot Check Date - Added */}
-                <FormField
-                  control={form.control}
-                  name="spotCheckDate"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Spot Check Interval (Days)</FormLabel>
+                      <FormLabel>DBS Check Reminder (Days)</FormLabel>
+                      <FormDescription>{reminderDesc}</FormDescription>
                       <FormControl>
                         <Input
                           type="number"
                           placeholder="e.g. 30"
                           {...field}
                           value={field.value === 0 ? '' : field.value}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            field.onChange(val === '' ? 0 : Number(val));
-                          }}
-                          className="mt-1"
+                          onChange={(e) => field.onChange(Number(e.target.value))}
                         />
                       </FormControl>
                       <FormMessage />
@@ -348,30 +199,231 @@ export default function CompanyScheduleCheckPage() {
                   )}
                 />
 
-                {/* Supervision Check Date - Added */}
+                {/* RTW */}
                 <FormField
                   control={form.control}
-                  name="supervisionCheckDate"
+                  name="rtwCheckDate"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Supervision Check Interval (Days)</FormLabel>
+                      <FormLabel>Right to Work (RTW) Reminder (Days)</FormLabel>
+                      <FormDescription>{reminderDesc}</FormDescription>
                       <FormControl>
                         <Input
                           type="number"
-                          placeholder="e.g. 60"
+                          placeholder="e.g. 30"
                           {...field}
                           value={field.value === 0 ? '' : field.value}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            field.onChange(val === '' ? 0 : Number(val));
-                          }}
-                          className="mt-1"
+                          onChange={(e) => field.onChange(Number(e.target.value))}
                         />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+
+                {/* Passport */}
+                <FormField
+                  control={form.control}
+                  name="passportCheckDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Passport Expiry Reminder (Days)</FormLabel>
+                      <FormDescription>{reminderDesc}</FormDescription>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="e.g. 60"
+                          {...field}
+                          value={field.value === 0 ? '' : field.value}
+                          onChange={(e) => field.onChange(Number(e.target.value))}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Visa */}
+                <FormField
+                  control={form.control}
+                  name="visaCheckDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Visa Expiry Reminder (Days)</FormLabel>
+                      <FormDescription>{reminderDesc}</FormDescription>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="e.g. 60"
+                          {...field}
+                          value={field.value === 0 ? '' : field.value}
+                          onChange={(e) => field.onChange(Number(e.target.value))}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Appraisal */}
+                <FormField
+                  control={form.control}
+                  name="appraisalCheckDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Appraisal Due Reminder (Days)</FormLabel>
+                      <FormDescription>{reminderDesc}</FormDescription>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="e.g. 14"
+                          {...field}
+                          value={field.value === 0 ? '' : field.value}
+                          onChange={(e) => field.onChange(Number(e.target.value))}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Immigration */}
+                <FormField
+                  control={form.control}
+                  name="immigrationCheckDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Immigration Status Reminder (Days)</FormLabel>
+                      <FormDescription>{reminderDesc}</FormDescription>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="e.g. 45"
+                          {...field}
+                          value={field.value === 0 ? '' : field.value}
+                          onChange={(e) => field.onChange(Number(e.target.value))}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Disciplinary */}
+                <FormField
+                  control={form.control}
+                  name="disciplinaryCheckDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Disciplinary Review Reminder (Days)</FormLabel>
+                      <FormDescription>{reminderDesc}</FormDescription>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="e.g. 90"
+                          {...field}
+                          value={field.value === 0 ? '' : field.value}
+                          onChange={(e) => field.onChange(Number(e.target.value))}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* QA Check */}
+                <FormField
+                  control={form.control}
+                  name="qaCheckDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Quality Assurance (QA) Reminder (Days)</FormLabel>
+                      <FormDescription>{reminderDesc}</FormDescription>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="e.g. 30"
+                          {...field}
+                          value={field.value === 0 ? '' : field.value}
+                          onChange={(e) => field.onChange(Number(e.target.value))}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Divider */}
+                <div className="col-span-full my-4 border-t border-gray-100"></div>
+
+                {/* Spot Check Duration */}
+                <FormField
+                  control={form.control}
+                  name="spotCheckDuration"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Spot Check Frequency (Days)</FormLabel>
+                      <FormDescription>{durationDesc}</FormDescription>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="e.g. 7"
+                          {...field}
+                          value={field.value === 0 ? '' : field.value}
+                          onChange={(e) => field.onChange(Number(e.target.value))}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Supervision Duration */}
+                <FormField
+                  control={form.control}
+                  name="supervisionDuration"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Supervision Frequency (Days)</FormLabel>
+                      <FormDescription>{durationDesc}</FormDescription>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="e.g. 30"
+                          {...field}
+                          value={field.value === 0 ? '' : field.value}
+                          onChange={(e) => field.onChange(Number(e.target.value))}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* QA Duration */}
+                <FormField
+                  control={form.control}
+                  name="qaCheckDuration"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Quality Assurance Frequency (Days)</FormLabel>
+                      <FormDescription>{durationDesc}</FormDescription>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="e.g. 14"
+                          {...field}
+                          value={field.value === 0 ? '' : field.value}
+                          onChange={(e) => field.onChange(Number(e.target.value))}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Optional: Add spot/supervision reminder fields if needed later */}
+                {/* For now, only durations are used per your schema usage pattern */}
 
               </div>
 

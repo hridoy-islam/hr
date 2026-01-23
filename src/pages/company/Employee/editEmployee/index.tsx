@@ -25,6 +25,11 @@ import DbsTab from './tabs/DbsTab';
 import PassportTab from './tabs/passportTab';
 import ImmigrationTab from './tabs/ImmigrationTab';
 import AppraisalTab from './tabs/AppraisalTab';
+import SpotCheckTab from './tabs/SpotCheckTab';
+import SupervisionTab from './tabs/superVisionCheckTab';
+import InductionTab from './tabs/InductionTab';
+import DisciplinaryTab from './tabs/DisciplinaryTab';
+import QACheckTab from './tabs/QATab';
 const EditEmployee = () => {
   const navigate = useNavigate();
   const {
@@ -162,6 +167,71 @@ const EditEmployee = () => {
       label: 'Appraisal',
       component: (
         <AppraisalTab
+          formData={formData}
+          onUpdate={handleNestedFieldUpdate}
+          onCheckboxChange={handleCheckboxChange}
+          onDateChange={handleDateChange}
+          isFieldSaving={isFieldSaving}
+        />
+      )
+    },
+    {
+      id: 'spotcheck',
+      label: 'Spot Check',
+      component: (
+        <SpotCheckTab
+          formData={formData}
+          onUpdate={handleNestedFieldUpdate}
+          onCheckboxChange={handleCheckboxChange}
+          onDateChange={handleDateChange}
+          isFieldSaving={isFieldSaving}
+        />
+      )
+    },
+    {
+      id: 'induction',
+      label: 'Induction',
+      component: (
+        <InductionTab
+          formData={formData}
+          onUpdate={handleNestedFieldUpdate}
+          onCheckboxChange={handleCheckboxChange}
+          onDateChange={handleDateChange}
+          isFieldSaving={isFieldSaving}
+        />
+      )
+    },
+    {
+      id: 'qa',
+      label: 'Quality Assurance',
+      component: (
+        <QACheckTab
+          formData={formData}
+          onUpdate={handleNestedFieldUpdate}
+          onCheckboxChange={handleCheckboxChange}
+          onDateChange={handleDateChange}
+          isFieldSaving={isFieldSaving}
+        />
+      )
+    },
+    {
+      id: 'disciplinary',
+      label: 'Disciplinary',
+      component: (
+        <DisciplinaryTab
+          formData={formData}
+          onUpdate={handleNestedFieldUpdate}
+          onCheckboxChange={handleCheckboxChange}
+          onDateChange={handleDateChange}
+          isFieldSaving={isFieldSaving}
+        />
+      )
+    },
+    {
+      id: 'supervision',
+      label: 'Super Vision Check',
+      component: (
+        <SupervisionTab
           formData={formData}
           onUpdate={handleNestedFieldUpdate}
           onCheckboxChange={handleCheckboxChange}

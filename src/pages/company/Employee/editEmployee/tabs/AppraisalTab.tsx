@@ -293,7 +293,7 @@ function AppraisalTab() {
       <div className="grid grid-cols-1 gap-2 lg:grid-cols-3">
         {/* Left Column: Status & Action */}
         <div className="lg:col-span-1">
-          <div className="h-full rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+          <div className="h-auto rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
             <h2 className="mb-6 flex items-center gap-2 text-xl font-semibold text-gray-900">
               <Award className="text-theme h-5 w-5" />
               Appraisal Status

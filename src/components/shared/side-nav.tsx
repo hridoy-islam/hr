@@ -38,7 +38,9 @@ import {
   GraduationCap,
   BadgeCheck,
   FileCheck,
-  BookUser
+  BookUser,
+  UserCheck,
+  ClipboardCheck
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
@@ -103,50 +105,87 @@ const navItems = [
     label: 'Right to Work',
     href: 'expiry/rtw',
     roles: ['company'],
-    badgeKey: 'rtw' // Added Key
+    badgeKey: 'rtw'
   },
   {
     icon: ShieldCheck,
     label: 'DBS',
     href: 'expiry/dbs',
     roles: ['company'],
-    badgeKey: 'dbs' // Added Key
+    badgeKey: 'dbs'
   },
   {
     icon: BarChart3,
     label: 'Appraisal',
     href: 'expiry/appraisal',
     roles: ['company'],
-    badgeKey: 'appraisal' // Added Key
+    badgeKey: 'appraisal'
   },
   {
     icon: BookUser,
     label: 'Passport',
     href: 'expiry/passport',
     roles: ['company'],
-    badgeKey: 'passport' // Added Key
+    badgeKey: 'passport'
   },
   {
     icon: BadgeCheck,
     label: 'Visa Status',
     href: 'expiry/visa',
     roles: ['company'],
-    badgeKey: 'visa' // Added Key
+    badgeKey: 'visa'
   },
   {
     icon: FileCheck,
     label: 'Immigration Status',
     href: 'expiry/immigration',
     roles: ['company'],
-    badgeKey: 'immigration' // Added Key
+    badgeKey: 'immigration'
   },
-  // --- BADGE ITEMS END ---
+  {
+    icon: FileCheck,
+    label: 'Induction',
+    href: 'expiry/induction',
+    roles: ['company'],
+    badgeKey: 'induction'
+  },
+  {
+    icon: FileCheck,
+    label: 'Disciplinary',
+    href: 'expiry/disciplinary',
+    roles: ['company'],
+    badgeKey: 'disciplinary'
+  },
+
   {
     icon: GraduationCap,
     label: 'Training Status',
-    href: '#',
-    roles: ['company']
+    href: 'expiry/training',
+    roles: ['company'],
+    badgeKey: 'training' 
   },
+  {
+    icon: ClipboardCheck,
+    label: 'Spot Check',
+    href: 'expiry/spot-check',
+    roles: ['company'],
+    badgeKey: 'spot' // Added badgeKey
+  },
+  {
+    icon: UserCheck,
+    label: 'Supervision',
+    href: 'expiry/supervision', // Fixed href (was duplicate spot-check)
+    roles: ['company'],
+    badgeKey: 'supervision' // Added badgeKey
+  },
+  {
+    icon: FileCheck,
+    label: 'Quality Assurance',
+    href: 'expiry/qa',
+    roles: ['company'],
+    badgeKey: 'qa' 
+  },
+  // --- END UPDATED ITEMS ---
   {
     icon: Calendar,
     label: 'Leave Management',
@@ -273,7 +312,7 @@ const navItems = [
       {
         icon: MapPin,
         label: 'Branches / Locations',
-        href: '#',
+        href: 'company-branch',
         roles: ['company']
       }
     ]
@@ -441,7 +480,8 @@ const navItems = [
 ];
 
 // Filter navigation items based on user role
-const filterNavItemsByRole = (items, userRole) => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const filterNavItemsByRole = (items: any[], userRole: string) => {
   return items
     .filter((item) => !item.roles || item.roles.includes(userRole))
     .map((item) => {
@@ -462,6 +502,7 @@ const filterNavItemsByRole = (items, userRole) => {
 };
 
 // 1. Updated NavItem to accept basePath AND status
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const NavItem = ({
   item,
   expandedItems,
@@ -469,7 +510,8 @@ const NavItem = ({
   depth = 0,
   basePath,
   status // Receive status prop
-}) => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+}: any) => {
   const location = useLocation();
   const isExpanded = expandedItems[item.label];
 
@@ -522,7 +564,8 @@ const NavItem = ({
           )}
         >
           <div className="ml-4 space-y-1 border-l-2 border-gray-300">
-            {item.subItems.map((subItem) => (
+            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+            {item.subItems.map((subItem: any) => (
               <NavItem
                 key={subItem.label}
                 item={subItem}
@@ -566,11 +609,13 @@ export function SideNav() {
   const navigate = useNavigate();
   const location = useLocation();
   const dispatch = useDispatch<AppDispatch>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const user = useSelector((state: any) => state.auth?.user) || null;
   const userRole = user?.role;
   const [expandedItems, setExpandedItems] = useState({});
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [companyThemeColor, setCompanyThemeColor] = useState<string>('');
 
    useEffect(() => {
@@ -630,15 +675,18 @@ export function SideNav() {
 
   // Auto-expand parents based on pathname
   useEffect(() => {
-    const expandParents = (items) => {
-      for (let item of items) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const expandParents = (items: any[]) => {
+      for (const item of items) {
         if (item.subItems) {
           if (
             item.subItems.some(
-              (subItem) =>
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              (subItem: any) =>
                 location.pathname.includes(subItem.href) ||
                 (subItem.subItems &&
-                  subItem.subItems.some((s) =>
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  subItem.subItems.some((s: any) =>
                     location.pathname.includes(s.href)
                   ))
             )
@@ -652,8 +700,9 @@ export function SideNav() {
     expandParents(navItems);
   }, [location.pathname]);
 
-  const toggleExpanded = (label) => {
-    setExpandedItems((prev) => ({
+  const toggleExpanded = (label: string) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    setExpandedItems((prev: any) => ({
       ...prev,
       [label]: !prev[label]
     }));
