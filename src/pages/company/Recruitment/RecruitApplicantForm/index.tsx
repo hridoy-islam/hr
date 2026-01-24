@@ -121,8 +121,6 @@ const RecruitApplicantForm = () => {
   //     const res = await axiosInstance.post(`/auth/signup`, data);
   //     const newUser = res.data.data;
 
-     
-
   //     // 3. Create Right-to-Work Record (Only if duration > 0)
 
   //     await axiosInstance.post(`/hr/right-to-work`, {
@@ -163,8 +161,7 @@ const RecruitApplicantForm = () => {
   //   }
   // };
 
-
- const handleSubmit = async () => {
+  const handleSubmit = async () => {
     const requiredSteps = [1, 2];
     const missingSteps = requiredSteps.filter(
       (step) => !completedSteps.includes(step)
@@ -196,10 +193,6 @@ const RecruitApplicantForm = () => {
         status: 'hired'
       };
 
-      // Update applicant status
-      // We keep this in the main try/catch because if this fails, we probably shouldn't proceed
-      await axiosInstance.patch(`/hr/applicant/${id}`, { status: 'hired' });
-
       const { status: _, ...flatData } = flatDataWithStatus;
       const { status: __, ...cleanApplicant } = applicant;
 
@@ -213,15 +206,17 @@ const RecruitApplicantForm = () => {
       // 2. Create User (Employee) - CRITICAL STEP
       const res = await axiosInstance.post(`/auth/signup`, data);
       const newUser = res.data.data;
+      // Update applicant status
+      // We keep this in the main try/catch because if this fails, we probably shouldn't proceed
 
-    
+      await axiosInstance.patch(`/hr/applicant/${id}`, { status: 'hired' });
       try {
         const documentTypes = [
           { key: 'passport', label: 'Passport' },
           { key: 'dbs', label: 'DBS Certificate' },
           { key: 'rightToWork', label: 'Right to Work' },
           { key: 'immigrationStatus', label: 'Immigration Status' },
-          { key: 'proofOfAddress', label: 'Proof of Address' },
+          { key: 'proofOfAddress', label: 'Proof of Address' }
         ];
 
         const documentPromises = documentTypes
@@ -238,7 +233,10 @@ const RecruitApplicantForm = () => {
           await Promise.all(documentPromises);
         }
       } catch (docError) {
-        console.error('Failed to create employee documents, skipping step:', docError);
+        console.error(
+          'Failed to create employee documents, skipping step:',
+          docError
+        );
       }
 
       // 4. Create Right-to-Work Record
@@ -264,10 +262,12 @@ const RecruitApplicantForm = () => {
           });
         }
       } catch (passportError) {
-        console.error('Failed to create Passport record, skipping step:', passportError);
+        console.error(
+          'Failed to create Passport record, skipping step:',
+          passportError
+        );
       }
 
-      
       toast({
         title: 'Application Submitted',
         description: 'Employee created successfully.',
@@ -278,18 +278,18 @@ const RecruitApplicantForm = () => {
         state: { user: newUser }
       });
       setFormSubmitted(true);
-
     } catch (error: any) {
       console.error('Critical Error during submission:', error);
 
       toast({
         title: 'Submission Failed',
-        description: error?.response?.data?.message || 'Something went wrong during user creation!',
+        description:
+          error?.response?.data?.message ||
+          'Something went wrong during user creation!',
         variant: 'destructive'
       });
     }
   };
-
 
   const renderStep = () => {
     const handleBack = () => setCurrentStep((prev) => Math.max(1, prev - 1));
