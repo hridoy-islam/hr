@@ -26,10 +26,10 @@ import PassportTab from './tabs/passportTab';
 import ImmigrationTab from './tabs/ImmigrationTab';
 import AppraisalTab from './tabs/AppraisalTab';
 import SpotCheckTab from './tabs/SpotCheckTab';
-import SupervisionTab from './tabs/superVisionCheckTab';
 import InductionTab from './tabs/InductionTab';
 import DisciplinaryTab from './tabs/DisciplinaryTab';
 import QACheckTab from './tabs/QATab';
+import SupervisionTab from './tabs/SuperVisionCheckTab';
 const EditEmployee = () => {
   const navigate = useNavigate();
   const {
