@@ -248,12 +248,12 @@ const navItems = [
       //   href: 'attendance-approve',
       //   roles: ['company']
       // },
-      {
-        icon: BetweenVerticalStart,
-        label: 'Manual Attendance',
-        href: 'attendance-entry',
-        roles: ['company']
-      },
+      // {
+      //   icon: BetweenVerticalStart,
+      //   label: 'Manual Attendance',
+      //   href: 'attendance-entry',
+      //   roles: ['company']
+      // },
       // {
       //   icon: Calendar,
       //   label: 'Attendance Report',
