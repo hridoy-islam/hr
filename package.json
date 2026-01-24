@@ -70,6 +70,7 @@
     "moment": "^2.30.1",
     "moment-timezone": "^0.5.47",
     "next-themes": "^0.3.0",
+    "papaparse": "^5.5.3",
     "pdf-lib": "^1.17.1",
     "react": "^18.2.0",
     "react-date-range": "^2.0.1",

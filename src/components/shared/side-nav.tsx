@@ -40,7 +40,8 @@ import {
   FileCheck,
   BookUser,
   UserCheck,
-  ClipboardCheck
+  ClipboardCheck,
+  FileJsonIcon
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
@@ -236,23 +237,29 @@ const navItems = [
         roles: ['company']
       },
       {
-        icon: CircleCheckBig,
-        label: 'Attendance Approve',
-        href: 'attendance-approve',
+        icon: FileJsonIcon,
+        label: 'Upload Attendance',
+        href: 'csv-attendance',
         roles: ['company']
       },
+      // {
+      //   icon: CircleCheckBig,
+      //   label: 'Attendance Approve',
+      //   href: 'attendance-approve',
+      //   roles: ['company']
+      // },
       {
         icon: BetweenVerticalStart,
-        label: 'Attendance Entry',
-        href: 'attendance/attendance-entry',
+        label: 'Manual Attendance',
+        href: 'attendance-entry',
         roles: ['company']
       },
-      {
-        icon: Calendar,
-        label: 'Attendance Report',
-        href: 'attendance-report',
-        roles: ['company']
-      }
+      // {
+      //   icon: Calendar,
+      //   label: 'Attendance Report',
+      //   href: 'attendance-report',
+      //   roles: ['company']
+      // }
     ]
   },
   {
@@ -588,7 +595,7 @@ const NavItem = ({
       className={cn(
         'group flex w-full items-center space-x-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 hover:bg-theme hover:text-white',
         isActiveLeaf && 'bg-blue-50 text-theme shadow-sm',
-        depth > 0 && 'pl-6'
+        depth > 0 && 'pl-3'
       )}
     >
       <item.icon className="h-4 w-4 text-theme group-hover:text-white" />

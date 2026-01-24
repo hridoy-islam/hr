@@ -77,6 +77,7 @@ import DisciplinaryExpiryPage from '@/pages/company/ExpiryPage/disciplinaryExpir
 import AttendancePage from '@/pages/company/Attendance/AttendanceList';
 import AttendanceReport from '@/pages/company/Attendance/Attendance-Report';
 import QAExpiryPage from '@/pages/company/ExpiryPage/QAExpiryPage';
+import BulkAttendancePage from '@/pages/company/Attendance/csvAttendance';
 
 const SignInPage = lazy(() => import('@/pages/auth/signin'));
 
@@ -170,8 +171,9 @@ export default function AppRouter() {
         { path: 'edit-training/:id', element: <EditTraining /> },
 
         { path: 'attendance', element: <AttendancePage /> },
-        { path: 'attendance/attendance-list', element: <AttendanceList /> },
-        { path: 'attendance/attendance-entry', element: <EntryAttendance /> },
+        { path: 'attendance-list', element: <AttendanceList /> },
+        { path: 'csv-attendance', element: <BulkAttendancePage /> },
+        { path: 'attendance-entry', element: <EntryAttendance /> },
 
         { path: 'attendance-approve', element: <AttendanceApprovalPage /> },
         {

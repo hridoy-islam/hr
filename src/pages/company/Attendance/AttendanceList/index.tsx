@@ -14,18 +14,14 @@ import {
   History,
   Pencil,
   Check,
-  X as XIcon
+  X as XIcon,
+  Loader2,
+  RotateCcw
 } from 'lucide-react';
 
 // Shadcn UI Imports
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
   Table,
@@ -35,7 +31,7 @@ import {
   TableHeader,
   TableRow
 } from '@/components/ui/table';
-import { Input } from "@/components/ui/input";
+import { Input } from '@/components/ui/input';
 
 // Custom Imports
 import axiosInstance from '@/lib/axios';
@@ -43,50 +39,145 @@ import CSVExporter from './components/CSVExporter';
 import { useNavigate } from 'react-router-dom';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 
+// --- Types ---
 interface RootState {
   auth: {
     user: {
       _id: string;
       companyId: string;
       role: string;
-     } | null;
+    } | null;
   };
 }
+
+interface EditFormState {
+  startDate: string;
+  startTime: string; // HH:mm
+  endDate: string;
+  endTime: string; // HH:mm
+}
+
+// --- Helpers ---
+
+/**
+ * Robust Duration Calculator
+ */
+const calculateDuration = (
+  sDate: string,
+  sTime: string,
+  eDate: string,
+  eTime: string
+) => {
+  // Normalize Time to "HH:mm"
+  const normalizeTime = (t: string) => {
+    if (!t || t === '--') return null;
+    if (t.includes('T')) return moment(t).format('HH:mm');
+    // Handle cases like "0930" -> "09:30"
+    if (!t.includes(':') && t.length >= 3) {
+       const m = moment(t, ['HHmm', 'Hmm']);
+       if(m.isValid()) return m.format('HH:mm');
+    }
+    if (t.includes(':')) return t.substring(0, 5);
+    return t;
+  };
+
+  const cleanSTime = normalizeTime(sTime);
+  const cleanETime = normalizeTime(eTime);
+
+  if (!cleanSTime || !cleanETime || cleanSTime.length !== 5 || cleanETime.length !== 5) {
+    return { display: '--', minutes: 0 };
+  }
+
+  const start = moment(
+    `${moment(sDate).format('YYYY-MM-DD')} ${cleanSTime}`,
+    'YYYY-MM-DD HH:mm'
+  );
+  const end = moment(
+    `${moment(eDate).format('YYYY-MM-DD')} ${cleanETime}`,
+    'YYYY-MM-DD HH:mm'
+  );
+
+  if (!start.isValid() || !end.isValid()) {
+    return { display: '--', minutes: 0 };
+  }
+
+  const diffMs = end.diff(start);
+  const duration = moment.duration(diffMs);
+
+  const hours = Math.floor(duration.asHours());
+  const mins = duration.minutes();
+
+  const display = `${hours}h ${mins}m`;
+  return { display, minutes: duration.asMinutes() };
+};
 
 const AttendancePage = () => {
   const user = useSelector((state: RootState) => state.auth?.user) || null;
   const navigate = useNavigate();
-  
-  // State
-  const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([new Date(), new Date()]);
+
+  // State: Default range is Current Month Start -> Current Day
+  const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([
+    moment().startOf('month').toDate(),
+    new Date()
+  ]);
   const [startDate, endDate] = dateRange;
-  const [activeTab, setActiveTab] = useState('attendance');
   const [attendanceData, setAttendanceData] = useState<any[]>([]);
+
+  // Options State
   const [designationsOptions, setDesignationsOptions] = useState<any[]>([]);
+  const [departmentsOptions, setDepartmentsOptions] = useState<any[]>([]);
   const [usersOptions, setUsersOptions] = useState<any[]>([]);
+
   const [stats, setStats] = useState({ present: 0, absent: 0, pending: 0 });
 
   // Filters State
   const [selectedDesignation, setSelectedDesignation] = useState<any>(null);
+  const [selectedDepartment, setSelectedDepartment] = useState<any>(null);
   const [selectedUser, setSelectedUser] = useState<any>(null);
 
   // Inline Edit State
   const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({ clockIn: '', clockOut: '' });
+  const [editForm, setEditForm] = useState<EditFormState>({
+    startDate: '',
+    startTime: '',
+    endDate: '',
+    endTime: ''
+  });
   const [editError, setEditError] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
-const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
   // Fetch Meta Data
   useEffect(() => {
     if (!user?._id) return;
     const fetchMetaData = async () => {
       try {
         const companyId = user._id;
-        const desRes = await axiosInstance.get(`/hr/designation?companyId=${companyId}&limit=all`);
-        setDesignationsOptions((desRes.data?.data?.result || []).map((d: any) => ({ value: d._id, label: d.title })));
 
-        const usersRes = await axiosInstance.get(`/users?company=${companyId}&limit=all`);
-        setUsersOptions((usersRes.data?.data?.result || []).map((u: any) => ({ value: u._id, label: `${u.firstName} ${u.lastName}` })));
+        const [desRes, deptRes, usersRes] = await Promise.all([
+          axiosInstance.get(`/hr/designation?companyId=${companyId}&limit=all`),
+          axiosInstance.get(`/hr/department?companyId=${companyId}&limit=all`),
+          axiosInstance.get(`/users?company=${companyId}&limit=all`)
+        ]);
+
+        setDesignationsOptions(
+          (desRes.data?.data?.result || []).map((d: any) => ({
+            value: d._id,
+            label: d.title
+          }))
+        );
+        setDepartmentsOptions(
+          (deptRes.data?.data?.result || []).map((d: any) => ({
+            value: d._id,
+            label: d.departmentName
+          }))
+        );
+        setUsersOptions(
+          (usersRes.data?.data?.result || []).map((u: any) => ({
+            value: u._id,
+            label: `${u.firstName} ${u.lastName}`
+          }))
+        );
       } catch (error) {
         console.error('Failed to fetch meta data', error);
       }
@@ -94,126 +185,158 @@ const [isLoading, setIsLoading] = useState(false);
     fetchMetaData();
   }, [user]);
 
-  // Fetch Attendance & Stats
+  // Fetch Attendance Data
   const fetchAttendance = async () => {
-  if (!user?._id) return;
+    if (!user?._id) return;
 
-  setIsLoading(true);
-  try {
-    const params = {
-      companyId: user._id,
-      limit: 'all',
-      fromDate: startDate ? moment(startDate).format('YYYY-MM-DD') : undefined,
-      toDate: endDate ? moment(endDate).format('YYYY-MM-DD') : undefined,
-      designationId: selectedDesignation?.value,
-      userId: selectedUser?.value,
-      approvalStatus: activeTab === 'pending' ? 'pending' : undefined
-    };
+    setIsLoading(true);
+    try {
+      const params = {
+        companyId: user._id,
+        limit: 'all',
+        fromDate: startDate
+          ? moment(startDate).format('YYYY-MM-DD')
+          : undefined,
+        toDate: endDate ? moment(endDate).format('YYYY-MM-DD') : undefined,
+        designationId: selectedDesignation?.value,
+        departmentId: selectedDepartment?.value,
+        userId: selectedUser?.value,
+      };
 
-    const res = await axiosInstance.get(`/hr/attendance`, { params });
-    const apiResponse = res.data;
+      const res = await axiosInstance.get(`/hr/attendance`, { params });
+      const apiResponse = res.data;
 
-    if (apiResponse.success && apiResponse.data) {
-      setAttendanceData(apiResponse.data.result || []);
-      if (apiResponse.data.meta?.stats) {
-        setStats(apiResponse.data.meta.stats);
+      if (apiResponse.success && apiResponse.data) {
+        setAttendanceData(apiResponse.data.result || []);
+        if (apiResponse.data.meta?.stats) {
+          setStats(apiResponse.data.meta.stats);
+        }
       }
+    } catch (error) {
+      console.error('Error fetching attendance:', error);
+    } finally {
+      setIsLoading(false);
     }
-  } catch (error) {
-    console.error('Error fetching attendance:', error);
-  } finally {
-    setIsLoading(false);
-  }
-};
-
+  };
 
   useEffect(() => {
     fetchAttendance();
-  }, [startDate, endDate, selectedDesignation, selectedUser, activeTab, user]);
+  }, [user]);
 
-  // Handle Edit Click
+  // Reset Filters
+  const handleReset = () => {
+    setSelectedUser(null);
+    setSelectedDesignation(null);
+    setSelectedDepartment(null);
+    setDateRange([moment().startOf('month').toDate(), new Date()]);
+  };
+
+  // --- Edit Handlers ---
+
   const handleEditClick = (record: any) => {
     setEditingRecordId(record._id);
+
+    const extractDate = (val: string, fallback: string) =>
+      val ? moment(val).format('YYYY-MM-DD') : fallback;
+      
+    const extractTime = (val: string) => {
+      if (!val) return '';
+      if (val.includes('T')) return moment(val).format('HH:mm');
+      if (val.length >= 5) return val.substring(0, 5);
+      return val;
+    };
+
     setEditForm({
-      clockIn: record.clockIn || '',
-      clockOut: record.clockOut || ''
+      startDate: extractDate(
+        record.startDate,
+        moment(record.createdAt || record.date).format('YYYY-MM-DD')
+      ),
+      startTime: extractTime(record.startTime || record.clockIn),
+      endDate: extractDate(
+        record.endDate,
+        moment(record.createdAt || record.date).format('YYYY-MM-DD')
+      ),
+      endTime: extractTime(record.endTime || record.clockOut)
     });
     setEditError(null);
   };
 
-  // Handle Cancel Edit
   const handleCancelEdit = () => {
     setEditingRecordId(null);
-    setEditForm({ clockIn: '', clockOut: '' });
+    setEditForm({ startDate: '', startTime: '', endDate: '', endTime: '' });
     setEditError(null);
   };
 
-  // Format time input as user types
-  const formatTimeInput = (value: string): string => {
-    // Remove all non-digits
-    const digits = value.replace(/\D/g, '');
-    
-    // Format based on length
-    if (digits.length === 0) return '';
-    if (digits.length <= 2) return digits;
-    if (digits.length <= 4) return `${digits.slice(0, 2)}:${digits.slice(2)}`;
-    return `${digits.slice(0, 2)}:${digits.slice(2, 4)}`;
-  };
+  const handleFormChange = (field: keyof EditFormState, value: string) => {
+    let processedValue = value;
 
-  // Handle time input change
-  const handleTimeChange = (field: 'clockIn' | 'clockOut', value: string) => {
-    const formatted = formatTimeInput(value);
-    setEditForm({ ...editForm, [field]: formatted });
-    setEditError(null);
-  };
+    if (field === 'startTime' || field === 'endTime') {
+      // 1. Sanitize: Allow only digits and colons, max 5 chars
+      processedValue = processedValue.replace(/[^0-9:]/g, '').slice(0, 5);
 
-  // Validate and Save
-  const handleSaveEdit = async () => {
-    // Validation regex for HH:mm (24-hour format)
-    const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
-
-    if (!editForm.clockIn || !timeRegex.test(editForm.clockIn)) {
-      setEditError("Clock In must be in HH:mm format (e.g., 09:00)");
-      return;
-    }
-    if (editForm.clockOut && !timeRegex.test(editForm.clockOut)) {
-      setEditError("Clock Out must be in HH:mm format (e.g., 17:00)");
-      return;
-    }
-
-    // Validate hours and minutes
-    const [inHour, inMin] = editForm.clockIn.split(':').map(Number);
-    if (inHour > 23 || inMin > 59) {
-      setEditError("Invalid Clock In time");
-      return;
-    }
-
-    if (editForm.clockOut) {
-      const [outHour, outMin] = editForm.clockOut.split(':').map(Number);
-      if (outHour > 23 || outMin > 59) {
-        setEditError("Invalid Clock Out time");
-        return;
+      // 2. Smart Auto-Colon:
+      // If we went from 1 character to 2 characters, and neither is a colon, append the colon.
+      // This detects "typing" vs "backspacing".
+      if (
+        processedValue.length === 2 && 
+        editForm[field].length === 1 && 
+        !processedValue.includes(':')
+      ) {
+         processedValue += ':';
       }
     }
 
+    setEditForm({ ...editForm, [field]: processedValue });
+    setEditError(null);
+  };
+
+  const handleTimeBlur = (field: keyof EditFormState, value: string) => {
+    let cleanValue = value.trim();
+    if (cleanValue) {
+      // Parse whatever exists to HH:mm (e.g. "9" -> "09:00", "9:30" -> "09:30")
+      const m = moment(cleanValue, ['HH:mm', 'H:mm', 'HHmm', 'Hmm', 'H']);
+      if(m.isValid()) {
+         cleanValue = m.format('HH:mm');
+      }
+    }
+    setEditForm((prev) => ({ ...prev, [field]: cleanValue }));
+  };
+
+  const handleSaveEdit = async () => {
     setIsUpdating(true);
     try {
+      const { minutes } = calculateDuration(
+        editForm.startDate,
+        editForm.startTime,
+        editForm.endDate,
+        editForm.endTime
+      );
+
+      const formatForBackend = (t: string) => {
+          if(t && t.length === 5 && t.includes(':')) return `${t}:00.000`;
+          return t;
+      };
+
       await axiosInstance.patch(`/hr/attendance/${editingRecordId}`, {
-        clockIn: editForm.clockIn,
-        clockOut: editForm.clockOut
+        startDate: editForm.startDate,
+        startTime: formatForBackend(editForm.startTime),
+        endDate: editForm.endDate,
+        endTime: formatForBackend(editForm.endTime),
+        duration: minutes,
+        clockIn: formatForBackend(editForm.startTime),
+        clockOut: formatForBackend(editForm.endTime)
       });
-      
+
       await fetchAttendance();
       handleCancelEdit();
     } catch (error) {
-      console.error("Failed to update attendance", error);
-      setEditError("Failed to update record. Please try again.");
+      console.error('Failed to update attendance', error);
+      setEditError('Failed to update record. Please try again.');
     } finally {
       setIsUpdating(false);
     }
   };
 
-  // Handle Approve
   const handleApprove = async (recordId: string) => {
     try {
       await axiosInstance.patch(`/hr/attendance/${recordId}`, {
@@ -221,7 +344,7 @@ const [isLoading, setIsLoading] = useState(false);
       });
       await fetchAttendance();
     } catch (error) {
-      console.error("Failed to approve attendance", error);
+      console.error('Failed to approve attendance', error);
     }
   };
 
@@ -230,7 +353,9 @@ const [isLoading, setIsLoading] = useState(false);
       <Card className="w-full bg-white shadow-md">
         <CardHeader className="flex flex-row items-center justify-between pb-4">
           <div>
-            <CardTitle className="text-xl font-bold">Attendance Overview</CardTitle>
+            <CardTitle className="text-xl font-bold">
+              Attendance Overview
+            </CardTitle>
           </div>
           <CSVExporter
             data={attendanceData}
@@ -243,8 +368,12 @@ const [isLoading, setIsLoading] = useState(false);
           <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
             <div className="flex items-center justify-between rounded-xl bg-blue-50/50 p-4">
               <div>
-                <p className="text-sm font-medium text-blue-600">Present Today</p>
-                <h3 className="text-2xl font-bold text-blue-900">{stats.present}</h3>
+                <p className="text-sm font-medium text-blue-600">
+                  Present Today
+                </p>
+                <h3 className="text-2xl font-bold text-blue-900">
+                  {stats.present}
+                </h3>
               </div>
               <div className="rounded-full bg-blue-100 p-3 text-blue-600">
                 <CheckCircle2 className="h-6 w-6" />
@@ -254,7 +383,9 @@ const [isLoading, setIsLoading] = useState(false);
             <div className="flex items-center justify-between rounded-xl border border-red-100 bg-red-50/50 p-4">
               <div>
                 <p className="text-sm font-medium text-red-600">Absent</p>
-                <h3 className="text-2xl font-bold text-red-900">{stats.absent}</h3>
+                <h3 className="text-2xl font-bold text-red-900">
+                  {stats.absent}
+                </h3>
               </div>
               <div className="rounded-full bg-red-100 p-3 text-red-600">
                 <XCircle className="h-6 w-6" />
@@ -263,8 +394,12 @@ const [isLoading, setIsLoading] = useState(false);
 
             <div className="flex items-center justify-between rounded-xl border border-amber-100 bg-amber-50/50 p-4">
               <div>
-                <p className="text-sm font-medium text-amber-600">Pending Actions</p>
-                <h3 className="text-2xl font-bold text-amber-900">{stats.pending}</h3>
+                <p className="text-sm font-medium text-amber-600">
+                  Pending Actions
+                </p>
+                <h3 className="text-2xl font-bold text-amber-900">
+                  {stats.pending}
+                </h3>
               </div>
               <div className="rounded-full bg-amber-100 p-3 text-amber-600">
                 <AlertCircle className="h-6 w-6" />
@@ -276,7 +411,9 @@ const [isLoading, setIsLoading] = useState(false);
               className="flex cursor-pointer items-center justify-between rounded-xl border border-indigo-100 bg-indigo-50/50 p-4 transition hover:bg-indigo-100"
             >
               <div>
-                <p className="text-sm font-medium text-indigo-600">View Reports</p>
+                <p className="text-sm font-medium text-indigo-600">
+                  View Reports
+                </p>
               </div>
               <div className="rounded-full bg-indigo-100 p-3 text-indigo-600">
                 <History className="h-6 w-6" />
@@ -285,33 +422,57 @@ const [isLoading, setIsLoading] = useState(false);
           </div>
 
           {/* Filters Row */}
-          <div className="grid grid-cols-1 items-end gap-4 lg:grid-cols-12">
-            <div className="lg:col-span-3">
-              <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-gray-500">Employee</label>
+          <div className="grid grid-cols-1 items-end gap-3 lg:grid-cols-5 ">
+            {/* Employee Filter */}
+            <div className="">
+              <label className="mb-2 block text-xs font-semibold uppercase tracking-wider ">
+                Employee
+              </label>
               <Select
                 options={usersOptions}
                 value={selectedUser}
                 onChange={setSelectedUser}
-                placeholder="Search Employee..."
+                placeholder="Select..."
                 isClearable
                 className="text-sm"
               />
             </div>
 
-            <div className="lg:col-span-3">
-              <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-gray-500">Designation</label>
+            {/* Department Filter */}
+            <div className="">
+              <label className="mb-2 block text-xs font-semibold uppercase tracking-wider ">
+                Department
+              </label>
+              <Select
+                options={departmentsOptions}
+                value={selectedDepartment}
+                onChange={setSelectedDepartment}
+                placeholder="Select..."
+                isClearable
+                className="text-sm"
+              />
+            </div>
+
+            {/* Designation Filter */}
+            <div className="">
+              <label className="mb-2 block text-xs font-semibold uppercase tracking-wider ">
+                Designation
+              </label>
               <Select
                 options={designationsOptions}
                 value={selectedDesignation}
                 onChange={setSelectedDesignation}
-                placeholder="All Designations"
+                placeholder="Select..."
                 isClearable
                 className="text-sm"
               />
             </div>
 
-            <div className="lg:col-span-4">
-              <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-gray-500">Date Range</label>
+            {/* Date Range */}
+            <div className="w-full">
+              <label className="mb-2 block text-xs font-semibold uppercase tracking-wider ">
+                Date Range
+              </label>
               <div className="relative w-full">
                 <DatePicker
                   selectsRange={true}
@@ -319,70 +480,60 @@ const [isLoading, setIsLoading] = useState(false);
                   endDate={endDate}
                   onChange={(update) => setDateRange(update)}
                   isClearable={true}
-                  className="flex h-10 w-full rounded-md border border-gray-300 px-3 py-2 pl-10 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholderText="Select dates"
+                  className="flex w-full h-10 rounded-md border border-gray-300 px-3 py-2 pl-8 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholderText="Select range"
+                  wrapperClassName="w-full"
                   maxDate={new Date()}
                 />
                 <CalendarIcon className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-gray-400" />
               </div>
             </div>
+
+            {/* Search & Reset Buttons */}
+            <div className=" flex gap-2">
+              <Button onClick={fetchAttendance} disabled={isLoading} className="h-10">
+                {isLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Search className="mr-2 h-4 w-4" />
+                )}
+                Search
+              </Button>
+
+              <Button
+                variant="outline"
+                onClick={handleReset}
+                title="Reset Filters"
+                className="h-10"
+              >
+                <RotateCcw className="mr-2 h-4 w-4" /> Reset
+              </Button>
+            </div>
           </div>
 
-          {/* Tabs & Data Table */}
-          <Tabs
-            defaultValue="attendance"
-            value={activeTab}
-            onValueChange={setActiveTab}
-            className="w-full"
-          >
-            <TabsList className="mb-4 grid w-full max-w-[400px] grid-cols-2">
-              <TabsTrigger value="attendance">Attendance List</TabsTrigger>
-              <TabsTrigger value="pending">
-                Pendings
-                {stats.pending > 0 && (
-                  <span className="ml-2 flex h-5 w-5 items-center justify-center rounded-full bg-red-100 text-[10px] font-bold text-red-600">
-                    {stats.pending}
-                  </span>
-                )}
-              </TabsTrigger>
-            </TabsList>
+          {/* SINGLE TABLE VIEW */}
+          <div className="mt-2 text-sm font-semibold text-gray-600">
+              Records for: <span className="text-gray-900">{startDate ? moment(startDate).format("MMM DD, YYYY") : '...'}</span> 
+              {endDate && <span className="text-gray-900"> - {moment(endDate).format("MMM DD, YYYY")}</span>}
+          </div>
 
-            <div className="rounded-md">
-              <TabsContent value="attendance" className="m-0">
-                <TableSection
-  data={attendanceData.filter(d => d.approvalStatus === 'approved')}
-  loading={isLoading}
-  editingRecordId={editingRecordId}
-  editForm={editForm}
-  editError={editError}
-  isUpdating={isUpdating}
-  onEditClick={handleEditClick}
-  onCancelEdit={handleCancelEdit}
-  onSaveEdit={handleSaveEdit}
-  onTimeChange={handleTimeChange}
-  showApprove={false}
-  onApprove={handleApprove}
-/>
+          <div className="rounded-md">
+            <TableSection
+              data={attendanceData}
+              loading={isLoading}
+              editingRecordId={editingRecordId}
+              editForm={editForm}
+              editError={editError}
+              isUpdating={isUpdating}
+              onEditClick={handleEditClick}
+              onCancelEdit={handleCancelEdit}
+              onSaveEdit={handleSaveEdit}
+              onFormChange={handleFormChange}
+              onTimeBlur={handleTimeBlur}
+              onApprove={handleApprove}
+            />
+          </div>
 
-              </TabsContent>
-              <TabsContent value="pending" className="m-0">
-                <TableSection 
-                  data={attendanceData}
-                  // loading
-                  editingRecordId={editingRecordId}
-                  editForm={editForm}
-                  editError={editError}
-                  isUpdating={isUpdating}
-                  onEditClick={handleEditClick}
-                  onCancelEdit={handleCancelEdit}
-                  onSaveEdit={handleSaveEdit}
-                  onTimeChange={handleTimeChange}
-                  showApprove={true}
-                  onApprove={handleApprove}
-                />
-              </TabsContent>
-            </div>
-          </Tabs>
         </CardContent>
       </Card>
     </div>
@@ -390,8 +541,8 @@ const [isLoading, setIsLoading] = useState(false);
 };
 
 // Reusable Table Section
-const TableSection = ({ 
- data,
+const TableSection = ({
+  data,
   loading,
   editingRecordId,
   editForm,
@@ -400,55 +551,60 @@ const TableSection = ({
   onEditClick,
   onCancelEdit,
   onSaveEdit,
-  onTimeChange,
-  showApprove,
+  onFormChange,
+  onTimeBlur,
   onApprove
-}: { 
+}: {
   data: any[];
-    loading: boolean;
+  loading: boolean;
   editingRecordId: string | null;
-  editForm: { clockIn: string; clockOut: string };
+  editForm: EditFormState;
   editError: string | null;
   isUpdating: boolean;
   onEditClick: (rec: any) => void;
   onCancelEdit: () => void;
   onSaveEdit: () => void;
-  onTimeChange: (field: 'clockIn' | 'clockOut', value: string) => void;
-  showApprove: boolean;
+  onFormChange: (field: keyof EditFormState, value: string) => void;
+  onTimeBlur: (field: keyof EditFormState, value: string) => void;
   onApprove: (recordId: string) => void;
 }) => {
-    if (loading) {
-  return (
-    <div className="flex items-center justify-center py-16">
-      <BlinkingDots size="large" color="bg-theme" />
-    </div>
-  );
-}
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <BlinkingDots size="large" color="bg-theme" />
+      </div>
+    );
+  }
   if (!data || data.length === 0) {
     return (
       <div className="flex flex-col items-center py-12 text-center">
         <div className="mb-4 rounded-full bg-gray-50 p-4">
           <Search className="h-8 w-8 text-gray-400" />
         </div>
-        <h3 className="text-lg font-semibold text-gray-900">No records found</h3>
-        <p className="max-w-[250px] text-sm text-gray-500">
+        <h3 className="text-lg font-semibold text-gray-900">
+          No records found
+        </h3>
+        <p className="max-w-[250px] text-sm ">
           Try adjusting your filters or date range.
         </p>
       </div>
     );
   }
 
+  const datePickerClass =
+    'flex h-8 max-w-[120px] rounded-md border border-gray-300 px-3 py-2 text-xs ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50';
+
   return (
     <div className="space-y-2">
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="w-[250px]">Employee</TableHead>
-            <TableHead>Date</TableHead>
-            <TableHead>Clock In</TableHead>
-            <TableHead>Clock Out</TableHead>
+            <TableHead>Employee</TableHead>
+            <TableHead >Start Date</TableHead>
+            <TableHead>Start Time</TableHead>
+            <TableHead >End Date</TableHead>
+            <TableHead>End Time</TableHead>
             <TableHead>Duration</TableHead>
-            <TableHead>Status</TableHead>
             <TableHead className="text-right">Action</TableHead>
           </TableRow>
         </TableHeader>
@@ -458,113 +614,186 @@ const TableSection = ({
             const lastName = record.userId?.lastName || '';
             const fullName = `${firstName} ${lastName}`.trim() || 'Unknown';
             const email = record.userId?.email || '';
+            const phone = record.userId?.phone || '';
             const isEditing = editingRecordId === record._id;
 
-            // Calculate Duration
-            let durationStr = '--';
-            if (record.clockIn && record.clockOut && record.createdAt) {
-              const dateBase = moment(record.createdAt).format('YYYY-MM-DD');
-              const start = moment(`${dateBase} ${record.clockIn}`, 'YYYY-MM-DD HH:mm');
-              const end = moment(`${dateBase} ${record.clockOut}`, 'YYYY-MM-DD HH:mm');
-              if (start.isValid() && end.isValid()) {
-                const diff = moment.duration(end.diff(start));
-                durationStr = `${diff.hours()}h ${diff.minutes()}m`;
-              }
-            }
+            const rStartDate = record.startDate
+              ? moment(record.startDate).format('YYYY-MM-DD')
+              : moment(record.createdAt).format('YYYY-MM-DD');
+            const rStartTime = record.startTime || record.clockIn || '--';
+            const rEndDate = record.endDate
+              ? moment(record.endDate).format('YYYY-MM-DD')
+              : rStartDate;
+            const rEndTime = record.endTime || record.clockOut || '--';
+
+            const displayTime = (t: string) => {
+               if(!t || t === '--') return '--';
+               if(t.includes('T')) return moment(t).format('HH:mm');
+               if(t.length >= 5) return t.substring(0, 5);
+               return t;
+            };
+
+            const dCalc = isEditing
+              ? calculateDuration(
+                  editForm.startDate,
+                  editForm.startTime,
+                  editForm.endDate,
+                  editForm.endTime
+                )
+              : calculateDuration(rStartDate, rStartTime, rEndDate, rEndTime);
+
+            const isDurationValid = dCalc.minutes > 0;
 
             return (
               <TableRow key={record._id}>
                 <TableCell>
-                  <div className="flex items-center gap-3">
-                    <div>
-                      <div className="text-sm font-medium">{fullName}</div>
-                      <div className="text-xs text-gray-500">{email}</div>
-                    </div>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-sm font-medium">{fullName}</span>
+                    <span className="text-xs ">{email}</span>
+                    {phone && (
+                      <span className="text-xs text-gray-400">{phone}</span>
+                    )}
                   </div>
                 </TableCell>
-                <TableCell className="text-sm text-gray-600">
-                  {moment(record.createdAt).format('MMM DD, YYYY')}
-                </TableCell>
-                <TableCell className="text-sm font-medium">
-                  {isEditing ? (
-                    <Input
-                      value={editForm.clockIn}
-                      onChange={(e) => onTimeChange('clockIn', e.target.value)}
-                      placeholder="09:00"
-                      className="w-24 h-8"
-                      maxLength={5}
-                    />
-                  ) : (
-                    record.clockIn || '--'
-                  )}
-                </TableCell>
-                <TableCell className="text-sm font-medium">
-                  {isEditing ? (
-                    <Input
-                      value={editForm.clockOut}
-                      onChange={(e) => onTimeChange('clockOut', e.target.value)}
-                      placeholder="18:00"
-                      className="w-24 h-8"
-                      maxLength={5}
-                    />
-                  ) : (
-                    record.clockOut || '--'
-                  )}
-                </TableCell>
+
                 <TableCell className="text-sm">
-                  {record.clockOut ? (
-                    <div className="flex items-center gap-1 text-gray-600">
-                      <Clock className="h-3 w-3" />
-                      {durationStr}
+                  {isEditing ? (
+                    <div className="relative w-full">
+                      <DatePicker
+                        selected={
+                          editForm.startDate
+                            ? moment(editForm.startDate).toDate()
+                            : null
+                        }
+                        onChange={(date: Date) => {
+                          const val = date
+                            ? moment(date).format('YYYY-MM-DD')
+                            : '';
+                          onFormChange('startDate', val);
+                        }}
+                        dateFormat="dd-MM-yyyy"
+                        className={datePickerClass}
+                        placeholderText="Select Date"
+                        portalId="root"
+                      />
                     </div>
                   ) : (
-                    <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700">
-                      Active
-                    </Badge>
+                    moment(rStartDate).format('DD-MM-YYYY')
                   )}
                 </TableCell>
-                <TableCell>
-                  <StatusBadge status={record.approvalStatus} />
+
+                <TableCell className="font-mono text-sm">
+                  {isEditing ? (
+                    <Input
+                      value={editForm.startTime}
+                      onChange={(e) =>
+                        onFormChange('startTime', e.target.value)
+                      }
+                      onBlur={(e) => onTimeBlur('startTime', e.target.value)}
+                      placeholder="09:00"
+                      className="h-8 w-20 font-mono text-xs"
+                      maxLength={5}
+                    />
+                  ) : (
+                    displayTime(rStartTime)
+                  )}
                 </TableCell>
+
+                <TableCell className="text-sm">
+                  {isEditing ? (
+                    <div className="relative w-full">
+                      <DatePicker
+                        selected={
+                          editForm.endDate
+                            ? moment(editForm.endDate).toDate()
+                            : null
+                        }
+                        onChange={(date: Date) => {
+                          const val = date
+                            ? moment(date).format('YYYY-MM-DD')
+                            : '';
+                          onFormChange('endDate', val);
+                        }}
+                        dateFormat="dd-MM-yyyy"
+                        className={datePickerClass}
+                        placeholderText="Select Date"
+                        portalId="root"
+                      />
+                    </div>
+                  ) : (
+                    moment(rEndDate).format('DD-MM-YYYY')
+                  )}
+                </TableCell>
+
+                <TableCell className="font-mono text-sm">
+                  {isEditing ? (
+                    <Input
+                      value={editForm.endTime}
+                      onChange={(e) => onFormChange('endTime', e.target.value)}
+                      onBlur={(e) => onTimeBlur('endTime', e.target.value)}
+                      placeholder="18:00"
+                      className="h-8 w-20 font-mono text-xs"
+                      maxLength={5}
+                    />
+                  ) : (
+                    displayTime(rEndTime)
+                  )}
+                </TableCell>
+
+                <TableCell className="text-sm">
+                  <div
+                    className={`flex items-center gap-1 font-mono text-sm ${!isDurationValid && isEditing ? 'font-bold text-red-500' : 'text-black'}`}
+                  >
+                    {dCalc.display}
+                  </div>
+                </TableCell>
+
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-2">
                     {isEditing ? (
                       <>
-                        <Button 
-                          size="sm" 
+                        <Button
+                          size="sm"
                           variant="outline"
                           onClick={onCancelEdit}
                           disabled={isUpdating}
+                          className="h-8 px-2"
                         >
-                          <XIcon className="w-3 h-3 mr-1" />
+                          <XIcon className="mr-1 h-3 w-3" />
                           Cancel
                         </Button>
-                        <Button 
-                          size="sm" 
+                        <Button
+                          size="sm"
                           onClick={onSaveEdit}
-                          disabled={isUpdating}
+                          disabled={isUpdating || !isDurationValid}
+                          className="h-8 px-2"
                         >
-                          <Check className="w-3 h-3 mr-1" />
-                          {isUpdating ? 'Saving...' : 'Save'}
+                          {isUpdating ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <Check className="mr-1 h-3 w-3" />
+                          )}
+                          Save
                         </Button>
                       </>
                     ) : (
                       <>
-                        <Button 
-                          size="sm" 
+                        <Button
+                          size="sm"
                           variant="outline"
                           onClick={() => onEditClick(record)}
+                          className="h-8 px-2"
                         >
-                          <Pencil className="w-3 h-3 mr-1" />
+                          <Pencil className="mr-1 h-3 w-3" />
                           Reconcile
                         </Button>
-                        {showApprove && record.approvalStatus === 'pending' && (
-                          <Button 
-                            size="sm" 
+                        {record.approvalStatus === 'pending' && (
+                          <Button
+                            size="sm"
                             onClick={() => onApprove(record._id)}
-                            className="bg-green-600 hover:bg-green-700"
+                            className="h-8 bg-green-600 px-2 hover:bg-green-700"
                           >
-                            <CheckCircle2 className="w-3 h-3 mr-1" />
+                            <CheckCircle2 className="mr-1 h-3 w-3" />
                             Approve
                           </Button>
                         )}
@@ -578,25 +807,11 @@ const TableSection = ({
         </TableBody>
       </Table>
       {editError && (
-        <div className="text-sm text-red-500 font-medium bg-red-50 p-3 rounded border border-red-200">
+        <div className="rounded border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-500">
           {editError}
         </div>
       )}
     </div>
-  );
-};
-
-const StatusBadge = ({ status }: { status: string }) => {
-  const styles: any = {
-    approved: 'bg-green-100 text-green-700 border-green-200',
-    pending: 'bg-amber-100 text-amber-700 border-amber-200',
-    rejected: 'bg-red-100 text-red-700 border-red-200'
-  };
-
-  return (
-    <Badge className={`capitalize shadow-none hover:bg-opacity-80 ${styles[status] || 'bg-gray-100 text-gray-700'}`}>
-      {status}
-    </Badge>
   );
 };
 
