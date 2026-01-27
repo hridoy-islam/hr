@@ -15,7 +15,7 @@ import axiosInstance from '@/lib/axios';
 import { useToast } from '@/components/ui/use-toast';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 import { DynamicPagination } from '@/components/shared/DynamicPagination';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 
 type Permission = {
@@ -41,7 +41,7 @@ export default function Designation() {
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [searchTerm, setSearchTerm] = useState('');
 const user = useSelector((state: any) => state.auth.user);
-
+  const{id} = useParams()
   const fetchData = async (page: number, limit: number, search = '') => {
     try {
       setInitialLoading(true);
@@ -49,7 +49,7 @@ const user = useSelector((state: any) => state.auth.user);
         params: {
           page,
           limit,
-           companyId:user?._id,
+           companyId:id,
           ...(search ? { searchTerm: search } : {})
         }
       });
@@ -74,11 +74,11 @@ const user = useSelector((state: any) => state.auth.user);
   const navigate = useNavigate();
 
   const handleNewDesignationClick = () => {
-    navigate('/company/designation/create');
+    navigate(`/company/${id}/designation/create`);
   };
 
   const handleEdit = (item: Designation) => {
-    navigate(`/company/designation/edit/${item._id}`);
+    navigate(`/company/${id}/designation/edit/${item._id}`);
   };
 
   return (

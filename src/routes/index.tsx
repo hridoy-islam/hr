@@ -47,7 +47,7 @@ import RightToWorkExpiryPage from '@/pages/Hr/Dashboard/components/rightToWork';
 import PassportExpiryPage from '@/pages/company/ExpiryPage/passportExpiray';
 import RtwPage from '@/pages/company/Employee/rightToWorkEmployee';
 import RightToWorkStatusPage from '@/pages/Hr/Dashboard/components/rightToWorkStatus';
-import BankHolidayPage from '@/pages/Hr/Bank-Holiday';
+import BankHolidayPage from '@/pages/company/Bank-Holiday';
 import RequestDocumentPage from '@/pages/Hr/Request-Documents';
 import StaffAttendancePage from '@/pages/Hr/StaffAttendance';
 import AdminDashboardPage from '@/pages/Dashboard/AdminDashboard';
@@ -80,6 +80,7 @@ import QAExpiryPage from '@/pages/company/ExpiryPage/QAExpiryPage';
 import BulkAttendancePage from '@/pages/company/Attendance/csvAttendance';
 import AdminPayRoll from '@/pages/company/Payroll';
 import ViewPayroll from '@/pages/company/Payroll/view-payroll';
+import { ScheduleStatusProvider } from '@/context/scheduleStatusContext';
 
 const SignInPage = lazy(() => import('@/pages/auth/signin'));
 
@@ -91,7 +92,10 @@ export default function AppRouter() {
       path: '/admin',
       element: (
         <ProtectedRoute>
+            <ScheduleStatusProvider>
+
           <HrLayout />
+            </ScheduleStatusProvider>
         </ProtectedRoute>
       ),
       children: [
@@ -114,10 +118,12 @@ export default function AppRouter() {
 
   const companyRoutes = [
     {
-      path: '/company',
+      path: '/company/:id',
       element: (
         <ProtectedRoute>
-          <HrLayout />
+          <ScheduleStatusProvider>
+            <HrLayout />
+          </ScheduleStatusProvider>
         </ProtectedRoute>
       ),
       children: [
@@ -129,7 +135,6 @@ export default function AppRouter() {
             </Suspense>
           )
         },
-    
 
         { path: 'expiry/passport', element: <PassportExpiryPage /> },
         { path: 'expiry/dbs', element: <DbsExpiryPage /> },
@@ -153,24 +158,27 @@ export default function AppRouter() {
         { path: 'my-staff', element: <MyStaff /> },
 
         { path: 'employee', element: <Employee /> },
-        { path: 'employee/:id', element: <EditEmployee /> },
-        { path: 'employee/:id/training-details/:tid', element: <TrainingDetailsPage /> },
-        { path: 'employee/:id/employee-rate', element: <EmployeeRate /> },
-        { path: 'employee/:id/rtw', element: <RtwPage /> },
+        { path: 'employee/:eid', element: <EditEmployee /> },
+        {
+          path: 'employee/:eid/training-details/:tid',
+          element: <TrainingDetailsPage />
+        },
+        { path: 'employee/:eid/employee-rate', element: <EmployeeRate /> },
+        { path: 'employee/:eid/rtw', element: <RtwPage /> },
 
         { path: 'department', element: <Department /> },
 
         { path: 'shift', element: <Shift /> },
-        { path: 'create-shift', element: <CreateShift /> },
-        { path: 'edit-shift/:id', element: <EditShift /> },
+        { path: 'shift/create-shift', element: <CreateShift /> },
+        { path: 'shift/edit-shift/:sid', element: <EditShift /> },
 
         { path: 'designation', element: <Designation /> },
         { path: 'designation/create', element: <AddDesignation /> },
-        { path: 'designation/edit/:id', element: <EditDesignation /> },
+        { path: 'designation/edit/:did', element: <EditDesignation /> },
 
         { path: 'training', element: <CompanyTrainingPage /> },
         { path: 'create-training', element: <CreateTraining /> },
-        { path: 'edit-training/:id', element: <EditTraining /> },
+        { path: 'edit-training/:tid', element: <EditTraining /> },
 
         { path: 'attendance', element: <AttendancePage /> },
         { path: 'attendance-list', element: <AttendanceList /> },
@@ -187,7 +195,7 @@ export default function AppRouter() {
         { path: 'attendance-report', element: <AttendanceReport /> },
 
         { path: 'payroll', element: <AdminPayRoll /> },
-        { path: 'payroll/:id', element: <ViewPayroll /> },
+        { path: 'payroll/:pid', element: <ViewPayroll /> },
 
         { path: 'leave-approve', element: <LeaveApprovalPage /> },
 
@@ -195,14 +203,23 @@ export default function AppRouter() {
 
         { path: 'vacancy', element: <Vacancy /> },
         { path: 'vacancy/create-vacancy', element: <CreateVacancy /> },
-        { path: 'vacancy/edit-vacancy/:id', element: <EditVacancy /> },
+        { path: 'vacancy/edit-vacancy/:vid', element: <EditVacancy /> },
 
-        { path: 'vacancy/add-applicant/:id', element: <AddApplicant /> },
-        { path: 'vacancy/view-applicants/:id', element: <ViewApplicant /> },
-        { path: 'vacancy/view-applicant/:id', element: <ApplicantDetailPage /> },
+        { path: 'vacancy/add-applicant/:vid', element: <AddApplicant /> },
+        { path: 'vacancy/view-applicants/:vid', element: <ViewApplicant /> },
+        {
+          path: 'vacancy/view-applicant/:aid',
+          element: <ApplicantDetailPage />
+        },
 
-        { path: 'vacancy/recruit-applicant/:id', element: <RecruitApplicantForm /> },
-        { path: 'vacancy/recruit-applicant/employee', element: <EmployeeForm /> },
+        {
+          path: 'vacancy/recruit-applicant/:aid',
+          element: <RecruitApplicantForm />
+        },
+        {
+          path: 'vacancy/recruit-applicant/employee',
+          element: <EmployeeForm />
+        },
 
         { path: 'recruitment', element: <Recruitment /> },
         { path: 'candidate-list', element: <Recruitment /> },

@@ -59,7 +59,7 @@ type EmployeeTrainingRecord = {
 
 const TrainingTab: React.FC = () => {
   const navigate = useNavigate();
-  const { id: employeeId } = useParams();
+  const { id,eid: employeeId } = useParams();
   const { user } = useSelector((state: any) => state.auth);
 
   // State
@@ -89,7 +89,7 @@ const TrainingTab: React.FC = () => {
     const fetchOptions = async () => {
       try {
         const res = await axiosInstance.get(
-          `/hr/training?companyId=${user?._id}&limit=all`
+          `/hr/training?companyId=${id}&limit=all`
         );
         const options = res.data.data.result.map((t: any) => ({
           value: t._id,
@@ -102,7 +102,7 @@ const TrainingTab: React.FC = () => {
       }
     };
     fetchOptions();
-  }, [user?._id]);
+  }, [id]);
 
   const fetchEmployeeData = async () => {
     if (!employeeId) return;

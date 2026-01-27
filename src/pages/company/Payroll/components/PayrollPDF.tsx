@@ -200,7 +200,8 @@ const PayrollPDF: React.FC<PayrollPDFProps> = ({ payroll, isDetailed = false }) 
     }
   };
 
-  const renderTableRow = (item: any, index: number) => {
+ const renderTableRow = (item: any, index: number) => {
+    // Calculate duration logic remains the same
     const durationStr = calculateDurationHHmm(item.startTime, item.endTime);
     const [h, m] = durationStr.split(':').map(Number);
     const decimalHours = h + (m / 60);
@@ -209,6 +210,14 @@ const PayrollPDF: React.FC<PayrollPDFProps> = ({ payroll, isDetailed = false }) 
     const noteText = item.note || '-';
     const holidayText = item.bankHoliday ? (item.bankHolidayId?.title || 'Bank Holiday') : '-';
     const isHoliday = !!item.bankHoliday;
+
+    // --- HELPER FOR TIME FORMATTING ---
+    // This ensures inputs like "09:00:00.000" become "09:00"
+    const formatTime = (timeStr: string) => {
+      if (!timeStr) return '-';
+      // parsing using multiple formats to be safe
+      return moment(timeStr, ['HH:mm', 'HH:mm:ss', 'HH:mm:ss.SSS']).format('HH:mm');
+    };
 
     if (isDetailed) {
       return (
@@ -219,12 +228,17 @@ const PayrollPDF: React.FC<PayrollPDFProps> = ({ payroll, isDetailed = false }) 
           <Text style={[styles.tableCellText, { width: '11%' }]}>
              {moment(item.endDate).format('DD/MM/YYYY')}
           </Text>
+          
+          {/* --- FIXED START TIME --- */}
           <Text style={[styles.tableCellText, { width: '8%' }]}>
-            {item.startTime}
+            {formatTime(item.startTime)}
           </Text>
+          
+          {/* --- FIXED END TIME --- */}
           <Text style={[styles.tableCellText, { width: '8%' }]}>
-            {item.endTime}
+            {formatTime(item.endTime)}
           </Text>
+
           <Text style={[styles.tableCellText, { width: '8%' }]}>
             {durationStr}
           </Text>
@@ -243,6 +257,7 @@ const PayrollPDF: React.FC<PayrollPDFProps> = ({ payroll, isDetailed = false }) 
         </View>
       );
     } else {
+      // Summary View (unchanged)
       return (
         <View key={index} style={styles.tableRow}>
           <Text style={[styles.tableCellText, { width: '20%' }]}>

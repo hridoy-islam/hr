@@ -26,7 +26,7 @@ import { BlinkingDots } from '@/components/shared/blinking-dots';
 import { Input } from '@/components/ui/input';
 import moment from 'moment';
 import { DynamicPagination } from '@/components/shared/DynamicPagination';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 
 export default function Shift() {
@@ -40,7 +40,7 @@ export default function Shift() {
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
   const [shiftToDelete, setShiftToDelete] = useState<string | null>(null);
 const user = useSelector((state: any) => state.auth.user);
-
+  const {id} = useParams()
   const fetchData = async (
     page: number,
     entriesPerPage: number,
@@ -52,7 +52,7 @@ const user = useSelector((state: any) => state.auth.user);
         params: {
           page,
           limit: entriesPerPage,
-           companyId:user?._id,
+           companyId:id,
           ...(searchTerm ? { searchTerm } : {})
         }
       });
@@ -146,7 +146,7 @@ const user = useSelector((state: any) => state.auth.user);
         <Button
           className="bg-theme text-white hover:bg-theme/90"
           size={'sm'}
-          onClick={() => navigate('/company/create-shift')}
+          onClick={() => navigate(`/company/${id}/shift/create-shift`)}
         >
           <Plus className="mr-2 h-4 w-4" />
           New Shift
@@ -184,7 +184,7 @@ const user = useSelector((state: any) => state.auth.user);
                         variant="ghost"
                         className="h-8 w-8 bg-theme p-0 text-primary hover:bg-theme/90"
                         onClick={() =>
-                          navigate(`/company/edit-shift/${shift._id}`)
+                          navigate(`edit-shift/${shift._id}`)
                         }
                       >
                         <Pen className="h-4 w-4" />

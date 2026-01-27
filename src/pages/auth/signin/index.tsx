@@ -15,7 +15,7 @@ export default function SignInPage() {
   if (user?.role === 'admin') {
     navigate('/admin');
   } else if (user?.role === 'company') {
-    navigate('/company');  
+    navigate(`/company/${user?._id}`);  
   } else {
     navigate('/'); 
   }

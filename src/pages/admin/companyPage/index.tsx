@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Plus, Search, Eye, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -389,7 +389,16 @@ export function CompanyPage() {
                         </AvatarFallback>
                       </Avatar>
                     </TableCell>
-                    <TableCell>{company.name}</TableCell>
+                    <TableCell>
+                      <Link
+                        to={`/company/${company._id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline"
+                      >
+                        {company.name}
+                      </Link>
+                    </TableCell>
                     <TableCell>{company.email}</TableCell>
                     <TableCell>{company.phone}</TableCell>
 
@@ -558,7 +567,7 @@ export function CompanyPage() {
                     <Input id="address2" {...register('address2')} />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
-                     <div>
+                    <div>
                       <Label htmlFor="country">Country</Label>
                       <Controller
                         control={control}
@@ -614,10 +623,9 @@ export function CompanyPage() {
                       <Label htmlFor="cityOrTown">City/Town</Label>
                       <Input id="cityOrTown" {...register('cityOrTown')} />
                     </div>
-                   
                   </div>
                   <div className="grid grid-cols-2 gap-4">
-                     <div>
+                    <div>
                       <Label htmlFor="stateOrProvince">State/Province</Label>
                       <Input
                         id="stateOrProvince"
@@ -628,8 +636,6 @@ export function CompanyPage() {
                       <Label htmlFor="postcode">Postcode</Label>
                       <Input id="postcode" {...register('postcode')} />
                     </div>
-
-                    
                   </div>
                 </div>
               </div>

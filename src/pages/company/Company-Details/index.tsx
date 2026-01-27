@@ -27,6 +27,7 @@ import { Camera, Save, Lock, KeyRound, RotateCcw } from 'lucide-react';
 import { ImageUploader } from './Components/userImage-uploader';
 import Select from 'react-select'; // Import React Select
 import { countries } from '@/types'; // Import countries data
+import { useParams } from 'react-router-dom';
 
 // --- Schema 1: Company Profile Data ---
 const companyFormSchema = z.object({
@@ -66,7 +67,7 @@ export default function CompanyDetails() {
   const { user } = useSelector((state: any) => state.auth);
   const [companyImage, setCompanyImage] = useState<string | null>(null);
   const { toast } = useToast();
-
+  const {id} = useParams()
   // Prepare Country Options
   // Assuming 'countries' from @/types is an array of objects like { name: 'USA', ... }
   // We map it to { value, label } for react-select
@@ -110,7 +111,7 @@ export default function CompanyDetails() {
   // Fetch Data
   const fetchProfileData = async () => {
     try {
-      const response = await axiosInstance.get(`/users/${user._id}`);
+      const response = await axiosInstance.get(`/users/${id}`);
       const data = response.data.data;
 
       setCompanyImage(data.image);
@@ -140,17 +141,16 @@ export default function CompanyDetails() {
   };
 
   useEffect(() => {
-    if (user?._id) fetchProfileData();
-  }, [user?._id]);
+    if (id) fetchProfileData();
+  }, [id]);
 
   // Handle Profile Update
   const onProfileSubmit = async (data: CompanyFormValues) => {
     try {
-      await axiosInstance.patch(`/users/${user._id}`, data);
+      await axiosInstance.patch(`/users/${id}`, data);
       toast({
         title: 'Success',
         description: 'Company details updated successfully.',
-        className: 'bg-green-600 border-none text-white'
       });
       fetchProfileData();
     } catch (error) {
@@ -165,7 +165,7 @@ export default function CompanyDetails() {
   // Handle Password Reset
   const onPasswordSubmit = async (data: PasswordFormValues) => {
     try {
-      await axiosInstance.patch(`/users/${user._id}`, {
+      await axiosInstance.patch(`/users/${id}`, {
         password: data.password
       });
       toast({
@@ -547,7 +547,6 @@ export default function CompanyDetails() {
                           
                           <Button
                             type="submit"
-                            className="bg-slate-900 text-white hover:bg-slate-800"
                           >
                             <Save className="mr-2 h-4 w-4" />
                             Save Details
@@ -568,7 +567,7 @@ export default function CompanyDetails() {
         open={uploadOpen}
         onOpenChange={setUploadOpen}
         onUploadComplete={handleUploadComplete}
-        entityId={user._id}
+        entityId={id}
       />
     </div>
   );

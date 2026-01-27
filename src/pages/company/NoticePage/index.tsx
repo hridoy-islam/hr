@@ -8,6 +8,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { DynamicPagination } from "@/components/shared/DynamicPagination"
 import { Badge } from "@/components/ui/badge"
 import { useSelector } from "react-redux"
+import { useParams } from "react-router-dom"
 
 // Updated Interface based on new Schema
 interface Notice {
@@ -34,7 +35,7 @@ export default function CompanyNoticeBoard() {
   // robustly get user ID
   const authUser = useSelector((state: any) => state.auth?.user)
   const userId = authUser?._id || authUser?.id
-
+  const {id} = useParams()
   const [entriesPerPage, setEntriesPerPage] = useState(10)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
@@ -68,7 +69,7 @@ export default function CompanyNoticeBoard() {
 
   // Filter Logic based on new Schema
   useEffect(() => {
-    if (!userId || notices.length === 0) {
+    if (!id || notices.length === 0) {
         setFilteredNotices([])
         return
     }
@@ -81,8 +82,8 @@ export default function CompanyNoticeBoard() {
       if (notice.noticeSetting === "individual") {
         return notice.users.some((user: any) => {
              // Handle if users are populated objects or just ID strings
-             const idToCheck = typeof user === 'string' ? user : userId
-             return idToCheck === userId
+             const idToCheck = typeof user === 'string' ? user : id
+             return idToCheck === id
         })
       }
 
@@ -97,14 +98,14 @@ export default function CompanyNoticeBoard() {
     const loadData = async () => {
       await fetchNotices()
     }
-    if (userId) {
+    if (id) {
         loadData()
     }
-  }, [userId, currentPage, entriesPerPage])
+  }, [id, currentPage, entriesPerPage])
 
 
   return (
-    <div className="min-h-screen bg-white p-6 rounded-xl shadow-lg">
+    <div className=" bg-white p-6 rounded-xl shadow-lg">
       <div className="">
         {/* Header */}
         <div className="mb-8 flex items-center gap-4">

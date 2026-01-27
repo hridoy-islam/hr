@@ -12,7 +12,7 @@ import {
   UserPlus,
   AlertTriangle
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import axiosInstance from '@/lib/axios';
 import { useSelector } from 'react-redux';
 import { useScheduleStatus } from '@/context/scheduleStatusContext';
@@ -24,21 +24,21 @@ const CompanyDashboardPage = () => {
   const navigate = useNavigate();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const user = useSelector((state: any) => state.auth.user);
-
+  const {id}= useParams()
   // Consume the Schedule Status Context
   const { status, loading: loadingStats, refetchStatus } = useScheduleStatus();
 
   // Fetch Total Employees
   useEffect(() => {
     const fetchEmployees = async () => {
-      if (!user?._id) return;
+      if (!id) return;
 
       setLoadingEmployees(true);
       try {
         const response = await axiosInstance.get('/users', {
           params: {
             role: 'employee',
-            company: user?._id,
+            company: id,
             limit: '1' // Optimization: Only get count metadata
           }
         });
@@ -58,10 +58,10 @@ const CompanyDashboardPage = () => {
 
     fetchEmployees();
 
-    if (user?._id) {
+    if (id) {
       refetchStatus();
     }
-  }, [user?._id, refetchStatus]);
+  }, [id, refetchStatus]);
 
   // Helper to generate sub-text based on count
   const getSubText = (count: number) =>
@@ -75,7 +75,7 @@ const CompanyDashboardPage = () => {
       sub: 'View All',
       icon: <Users className="h-6 w-6" />,
       gradient: 'from-blue-600 to-blue-800',
-      onClick: () => navigate('/company/employee'),
+      onClick: () => navigate(`/company/${id}/employee`),
       functional: true,
       isWarning: false
     },
@@ -85,7 +85,7 @@ const CompanyDashboardPage = () => {
       sub: getSubText(status.passport),
       icon: <BookOpen className="h-6 w-6" />,
       gradient: 'from-red-600 to-red-800',
-      onClick: () => navigate('/company/expiry/passport'),
+      onClick: () => navigate(`/company/${id}/expiry/passport`),
       functional: true,
       isWarning: status.passport > 0
     },
@@ -94,7 +94,7 @@ const CompanyDashboardPage = () => {
       main: loadingStats ? '...' : status.rtw,
       sub: getSubText(status.rtw),
       icon: <FileCheck className="h-6 w-6" />,
-      onClick: () => navigate('/company/expiry/rtw'),
+      onClick: () => navigate(`/company/${id}/expiry/rtw`),
       gradient: 'from-purple-600 to-purple-800',
       functional: true,
       isWarning: status.rtw > 0
@@ -104,7 +104,7 @@ const CompanyDashboardPage = () => {
       main: loadingStats ? '...' : status.visa,
       sub: getSubText(status.visa),
       icon: <Globe className="h-6 w-6" />,
-      onClick: () => navigate('/company/expiry/visa'),
+      onClick: () => navigate(`/company/${id}/expiry/visa`),
       gradient: 'from-emerald-600 to-emerald-800',
       functional: true,
       isWarning: status.visa > 0
@@ -114,7 +114,7 @@ const CompanyDashboardPage = () => {
       main: loadingStats ? '...' : status.dbs,
       sub: getSubText(status.dbs),
       icon: <ShieldCheck className="h-6 w-6" />,
-      onClick: () => navigate('/company/expiry/dbs'),
+      onClick: () => navigate(`/company/${id}/expiry/dbs`),
       gradient: 'from-indigo-600 to-indigo-800',
       functional: true,
       isWarning: status.dbs > 0
@@ -124,7 +124,7 @@ const CompanyDashboardPage = () => {
       main: loadingStats ? '...' : status.immigration,
       sub: getSubText(status.immigration),
       icon: <FileCheck className="h-6 w-6" />,
-      onClick: () => navigate('/company/expiry/immigration'),
+      onClick: () => navigate(`/company/${id}/expiry/immigration`),
       gradient: 'from-pink-600 to-pink-800',
       functional: true,
       isWarning: status.immigration > 0
@@ -135,7 +135,7 @@ const CompanyDashboardPage = () => {
       sub: getSubText(status.appraisal),
       icon: <Award className="h-6 w-6" />,
       gradient: 'from-orange-600 to-orange-800',
-      onClick: () => navigate('/company/expiry/appraisal'),
+      onClick: () => navigate(`/company/${id}/expiry/appraisal`),
       functional: true,
       isWarning: status.appraisal > 0
     },
@@ -145,7 +145,7 @@ const CompanyDashboardPage = () => {
       sub: getSubText(status.spot),
       icon: <ClipboardCheck className="h-6 w-6" />,
       gradient: 'from-teal-600 to-teal-800',
-      onClick: () => navigate('/company/expiry/spot-check'),
+      onClick: () => navigate(`/company/${id}/expiry/spot-check`),
       functional: true,
       isWarning: status.spot > 0
     },
@@ -155,7 +155,7 @@ const CompanyDashboardPage = () => {
       sub: getSubText(status.supervision),
       icon: <UserCheck className="h-6 w-6" />,
       gradient: 'from-cyan-600 to-cyan-800',
-      onClick: () => navigate('/company/expiry/supervision'),
+      onClick: () => navigate(`/company/${id}/expiry/supervision`),
       functional: true,
       isWarning: status.supervision > 0
     },
@@ -165,7 +165,7 @@ const CompanyDashboardPage = () => {
       sub: getSubText(status.training),
       icon: <GraduationCap className="h-6 w-6" />,
       gradient: 'from-rose-600 to-rose-800',
-      onClick: () => navigate('/company/expiry/training'),
+      onClick: () => navigate(`/company/${id}/expiry/training`),
       functional: true,
       isWarning: status.training > 0
     },
@@ -176,7 +176,7 @@ const CompanyDashboardPage = () => {
       sub: getSubText(status.induction),
       icon: <UserPlus className="h-6 w-6" />,
       gradient: 'from-lime-600 to-lime-800',
-      onClick: () => navigate('/company/expiry/induction'),
+      onClick: () => navigate(`/company/${id}/expiry/induction`),
       functional: true,
       isWarning: status.induction > 0
     },
@@ -186,7 +186,7 @@ const CompanyDashboardPage = () => {
       sub: getSubText(status.disciplinary),
       icon: <AlertTriangle className="h-6 w-6" />,
       gradient: 'from-red-500 to-red-700', // Distinct red shade for alerts
-      onClick: () => navigate('/company/expiry/disciplinary'),
+      onClick: () => navigate(`/company/${id}/expiry/disciplinary`),
       functional: true,
       isWarning: status.disciplinary > 0
     },
@@ -196,7 +196,7 @@ const CompanyDashboardPage = () => {
       sub: getSubText(status.qa),
       icon: <ClipboardCheck className="h-6 w-6" />, // Reuse or pick new (see note below)
       gradient: 'from-violet-600 to-violet-800', // Distinct from Spot Check (teal)
-      onClick: () => navigate('/company/expiry/qa'),
+      onClick: () => navigate(`/company/${id}/expiry/qa`),
       functional: true,
       isWarning: status.qa > 0
     }

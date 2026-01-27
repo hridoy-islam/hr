@@ -70,7 +70,7 @@ const RecruitApplicantForm = () => {
     setCurrentStep(3);
   };
 
-  const { id } = useParams();
+  const { id,aid } = useParams();
   const navigate = useNavigate();
 
   // const handleSubmit = async () => {
@@ -189,18 +189,18 @@ const RecruitApplicantForm = () => {
       const flatDataWithStatus = {
         ...formData.GeneralInformation,
         ...formData.EqualityInformation,
-        applicantId: id,
+        applicantId: aid,
         status: 'hired'
       };
 
       const { status: _, ...flatData } = flatDataWithStatus;
-      const { status: __, ...cleanApplicant } = applicant;
+      const { status: __,_id:applicantId, ...cleanApplicant } = applicant;
 
       const data = {
         ...cleanApplicant,
         ...flatData,
         role: 'employee',
-        company: user?._id
+        company: id
       };
 
       // 2. Create User (Employee) - CRITICAL STEP
@@ -209,7 +209,7 @@ const RecruitApplicantForm = () => {
       // Update applicant status
       // We keep this in the main try/catch because if this fails, we probably shouldn't proceed
 
-      await axiosInstance.patch(`/hr/applicant/${id}`, { status: 'hired' });
+      await axiosInstance.patch(`/hr/applicant/${aid}`, { status: 'hired' });
       try {
         const documentTypes = [
           { key: 'passport', label: 'Passport' },
@@ -274,7 +274,7 @@ const RecruitApplicantForm = () => {
         variant: 'default'
       });
 
-      navigate('/company/vacancy/recruit-applicant/employee', {
+      navigate(`/company/${id}/vacancy/recruit-applicant/employee`, {
         state: { user: newUser }
       });
       setFormSubmitted(true);

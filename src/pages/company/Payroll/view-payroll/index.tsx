@@ -1,24 +1,22 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import moment from 'moment';
 import Select from 'react-select';
+
 import {
   ArrowLeft,
   Save,
-  User,
   Mail,
   CalendarCheck,
   ChevronDown,
-  CheckCircle,
-  Clock,
-  FileText,
   Download,
-  Eye
+  Eye,
+  RefreshCw
 } from 'lucide-react';
-// UI Components
+
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -30,7 +28,6 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/use-toast';
 import {
   DropdownMenu,
@@ -51,7 +48,6 @@ import {
   DialogTitle
 } from '@/components/ui/dialog';
 
-// --- Types ---
 interface TShiftDetails {
   _id: string;
   name: string;
@@ -111,12 +107,13 @@ interface TPayrollData {
 }
 
 const ViewPayroll = () => {
-  const { id } = useParams();
+  const { id,pid } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useSelector((state: any) => state.auth);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
   const [payroll, setPayroll] = useState<TPayrollData | null>(null);
   const [attendanceItems, setAttendanceItems] = useState<TAttendanceItem[]>([]);
   const [employeeRates, setEmployeeRates] = useState<TEmployeeRateDoc[]>([]);
@@ -124,10 +121,8 @@ const ViewPayroll = () => {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewDetailed, setPreviewDetailed] = useState(false);
-  // Check if payroll is approved (disable editing)
   const isApproved = payroll?.status === 'approved';
 
-  // --- Helper: Robust Time Formatter ---
   const formatTime = (timeStr: string) => {
     if (!timeStr) return '00:00';
     const parts = timeStr.split(':');
@@ -137,65 +132,167 @@ const ViewPayroll = () => {
     return '00:00';
   };
 
-  // --- Helper: Convert minutes to HH:mm format for display ---
   const formatDurationToHHmm = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
     const mins = Math.round(minutes % 60);
     return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
   };
 
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!id) return;
-      setLoading(true);
-      try {
-        const payrollRes = await axiosInstance.get(`/hr/payroll/${id}`);
-        const data = payrollRes.data.data;
-        setPayroll(data);
+  // Helper function to convert time string to minutes
+  const timeToMinutes = (timeStr: string) => {
+    if (!timeStr) return 0;
+    const parts = timeStr.split(':');
+    const hours = parseInt(parts[0], 10);
+    const minutes = parseInt(parts[1], 10);
+    return hours * 60 + minutes;
+  };
 
-        const formattedList = (data.attendanceList || []).map((item: any) => ({
-          ...item,
-          startDate: moment(item.startDate).format('YYYY-MM-DD'),
-          endDate: moment(item.endDate).format('YYYY-MM-DD'),
-          startTime: formatTime(item.startTime),
-          endTime: formatTime(item.endTime),
-          bankHoliday: item.bankHoliday || false,
-          note: item.note || '',
-          payRate: item.payRate || 0,
-          employementRateId: item.employementRateId || '',
-          shiftId: item.shiftId || ''
-        }));
-        setAttendanceItems(formattedList);
+  // NEW: Calculate duration based on overlap between shift and attendance
+  const calculateDurationInMinutes = (item: TAttendanceItem) => {
+    if (!item.startDate || !item.startTime || !item.endDate || !item.endTime || !item.shiftId) {
+      return 0;
+    }
 
-        if (data.userId?._id) {
-          const rateRes = await axiosInstance.get('/hr/employeerate', {
-            params: { employeeId: data.userId._id, limit: 'all' }
-          });
-          setEmployeeRates(rateRes.data.data.result || []);
-        }
-
-        const payrollYear = moment(data.fromDate).year();
-        const companyId = user?.companyId || user?._id;
-
-        if (companyId) {
-          const holidayRes = await axiosInstance.get('/hr/bank-holiday', {
-            params: { companyId, year: payrollYear, limit: 'all' }
-          });
-          setBankHolidays(holidayRes.data.data.result || []);
-        }
-      } catch (error: any) {
-        toast({
-          title: 'Error',
-          description: 'Failed to load details.',
-          variant: 'destructive'
-        });
-      } finally {
-        setLoading(false);
+    // Find the shift details
+    let shiftDetails: TShiftDetails | null = null;
+    for (const rateDoc of employeeRates) {
+      const shift = rateDoc.shiftId?.find((s) => s._id === item.shiftId);
+      if (shift) {
+        shiftDetails = shift;
+        break;
       }
-    };
+    }
 
-    fetchData();
-  }, [id, user, toast]);
+    // If no shift found, calculate regular duration
+    if (!shiftDetails) {
+      const attStart = moment(item.startTime, 'HH:mm');
+      const attEnd = moment(item.endTime, 'HH:mm');
+      return moment.duration(attEnd.diff(attStart)).asMinutes();
+    }
+
+    // Convert times to minutes
+    let attendanceStart = timeToMinutes(item.startTime);
+    let attendanceEnd = timeToMinutes(item.endTime);
+    let shiftStart = timeToMinutes(shiftDetails.startTime);
+    let shiftEnd = timeToMinutes(shiftDetails.endTime);
+
+    // Normalize times to handle overnight scenarios
+    // If attendance crosses midnight (end < start), add 24 hours to end
+    if (attendanceEnd < attendanceStart) {
+      attendanceEnd += 24 * 60;
+    }
+
+    // If shift crosses midnight (end < start), add 24 hours to end
+    if (shiftEnd < shiftStart) {
+      shiftEnd += 24 * 60;
+    }
+
+    // Try multiple scenarios to find overlap
+    let overlapMinutes = 0;
+
+    // Scenario 1: Both on same day (no adjustment needed)
+    const overlap1Start = Math.max(attendanceStart, shiftStart);
+    const overlap1End = Math.min(attendanceEnd, shiftEnd);
+    const overlap1 = Math.max(0, overlap1End - overlap1Start);
+    overlapMinutes = Math.max(overlapMinutes, overlap1);
+
+    // Scenario 2: Shift is 24 hours ahead (for overnight shifts that start late previous day)
+    const shiftStart24 = shiftStart + 24 * 60;
+    const shiftEnd24 = shiftEnd + 24 * 60;
+    const overlap2Start = Math.max(attendanceStart, shiftStart24);
+    const overlap2End = Math.min(attendanceEnd, shiftEnd24);
+    const overlap2 = Math.max(0, overlap2End - overlap2Start);
+    overlapMinutes = Math.max(overlapMinutes, overlap2);
+
+    // Scenario 3: Attendance is 24 hours ahead
+    const attendanceStart24 = attendanceStart + 24 * 60;
+    const attendanceEnd24 = attendanceEnd + 24 * 60;
+    const overlap3Start = Math.max(attendanceStart24, shiftStart);
+    const overlap3End = Math.min(attendanceEnd24, shiftEnd);
+    const overlap3 = Math.max(0, overlap3End - overlap3Start);
+    overlapMinutes = Math.max(overlapMinutes, overlap3);
+
+    return overlapMinutes;
+  };
+
+  const fetchPayrollDetails = useCallback(async () => {
+    if (!pid) return;
+    try {
+      if (!payroll) setLoading(true);
+
+      const payrollRes = await axiosInstance.get(`/hr/payroll/${pid}`);
+      const data = payrollRes.data.data;
+      setPayroll(data);
+
+      const formattedList = (data.attendanceList || []).map((item: any) => ({
+        ...item,
+        startDate: moment(item.startDate).format('YYYY-MM-DD'),
+        endDate: moment(item.endDate).format('YYYY-MM-DD'),
+        startTime: formatTime(item.startTime),
+        endTime: formatTime(item.endTime),
+        bankHoliday: item.bankHoliday || false,
+        note: item.note || '',
+        payRate: item.payRate || 0,
+        employementRateId: item.employementRateId || '',
+        shiftId: item.shiftId || ''
+      }));
+      setAttendanceItems(formattedList);
+
+      if (data.userId?._id) {
+        const rateRes = await axiosInstance.get('/hr/employeerate', {
+          params: { employeeId: data.userId._id, limit: 'all' }
+        });
+        setEmployeeRates(rateRes.data.data.result || []);
+      }
+
+      const payrollYear = moment(data.fromDate).year();
+      const companyId = user?.companyId || user?._id;
+
+      if (companyId) {
+        const holidayRes = await axiosInstance.get('/hr/bank-holiday', {
+          params: { companyId, year: payrollYear, limit: 'all' }
+        });
+        setBankHolidays(holidayRes.data.data.result || []);
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: 'Failed to load details.',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [pid]);
+
+  useEffect(() => {
+    fetchPayrollDetails();
+  }, [fetchPayrollDetails]);
+
+  const handleRegenerate = async () => {
+    if (!pid) return;
+    setRegenerating(true);
+    try {
+      await axiosInstance.get(`/hr/payroll/regenerate/${pid}`);
+
+      toast({
+        title: 'Success',
+        description: 'Payroll regenerated successfully. Refreshing data...'
+      });
+
+      await fetchPayrollDetails();
+    } catch (error: any) {
+      console.error(error);
+      toast({
+        title: 'Error',
+        description:
+          error?.response?.data?.message || 'Failed to regenerate payroll.',
+        variant: 'destructive'
+      });
+    } finally {
+      setRegenerating(false);
+    }
+  };
 
   const getShiftSchedule = (shiftId: string) => {
     if (!employeeRates.length || !shiftId) return '';
@@ -216,21 +313,12 @@ const ViewPayroll = () => {
     return dayRate ? dayRate.rate : 0;
   };
 
-  // Calculate duration in minutes for accuracy
-  const calculateDurationInMinutes = (item: TAttendanceItem) => {
-    if (!item.startDate || !item.startTime || !item.endDate || !item.endTime)
-      return 0;
-    const attStart = moment(`${item.startTime}`, 'HH:mm:ss:SSS');
-    const attEnd = moment(`${item.endTime}`, 'HH:mm:ss:SSS');
-    return moment.duration(attEnd.diff(attStart)).asMinutes();
-  };
-
   const updateRow = (
     index: number,
     field: keyof TAttendanceItem,
     value: any
   ) => {
-    if (isApproved) return; // Prevent editing if approved
+    if (isApproved) return;
     const newItems = [...attendanceItems];
     const currentRow = { ...newItems[index], [field]: value };
 
@@ -279,13 +367,15 @@ const ViewPayroll = () => {
       });
     }
   };
+
   useEffect(() => {
     return () => {
       if (previewUrl) URL.revokeObjectURL(previewUrl);
     };
   }, [previewUrl]);
+
   const handleSaveWithStatus = async (newStatus: 'pending' | 'approved') => {
-    if (!id) return;
+    if (!pid) return;
     setSaving(true);
     try {
       let totalMinutesAccum = 0;
@@ -309,7 +399,7 @@ const ViewPayroll = () => {
         status: newStatus
       };
 
-      await axiosInstance.patch(`/hr/payroll/${id}`, payload);
+      await axiosInstance.patch(`/hr/payroll/${pid}`, payload);
 
       toast({
         title: 'Success',
@@ -372,12 +462,10 @@ const ViewPayroll = () => {
     }))
   );
 
-  // --- Calculate Totals for Display ---
   const totalMinutes = attendanceItems.reduce(
     (acc, item) => acc + calculateDurationInMinutes(item),
     0
   );
-  const totalHoursForDisplay = totalMinutes / 60;
   const totalAmount = attendanceItems.reduce((acc, item) => {
     const mins = calculateDurationInMinutes(item);
     return acc + (mins / 60) * (item.payRate || 0);
@@ -387,16 +475,27 @@ const ViewPayroll = () => {
     <div className="space-y-3 rounded-md bg-white p-5 shadow-sm">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Payroll Details</h1>
+        <h1 className="text-2xl font-bold">Payroll Details</h1>
         <div className="flex flex-row items-center gap-2">
           <Button variant="outline" onClick={() => navigate(-1)}>
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back
           </Button>
+          {!isApproved && (
+            <Button
+              onClick={handleRegenerate}
+              disabled={regenerating || saving}
+            >
+              <RefreshCw
+                className={`mr-2 h-4 w-4 ${regenerating ? 'animate-spin' : ''}`}
+              />
+              {regenerating ? 'Regenerating...' : 'Regenerate'}
+            </Button>
+          )}
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="border-gray-300">
+              <Button>
                 <Eye className="mr-2 h-4 w-4" />
                 Preview
                 <ChevronDown className="ml-2 h-4 w-4" />
@@ -417,6 +516,7 @@ const ViewPayroll = () => {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+
           <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
             <DialogContent className="flex h-[90vh] max-w-4xl flex-col gap-0 p-0">
               <DialogHeader className="border-b px-6 py-4">
@@ -457,33 +557,14 @@ const ViewPayroll = () => {
               </div>
             </DialogContent>
           </Dialog>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button>
-                <Download className="mr-2 h-4 w-4" />
-                Download PDF
-                <ChevronDown className="ml-2 h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                onClick={() => downloadPayrollPDF(payroll, false)}
-                className="cursor-pointer"
-              >
-                Normal PDF (Summary)
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => downloadPayrollPDF(payroll, true)}
-                className="cursor-pointer"
-              >
-                Detailed PDF (Full)
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+
           {!isApproved ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button disabled={saving} className="bg-theme text-white">
+                <Button
+                  disabled={saving || regenerating}
+                  className="bg-theme text-white"
+                >
                   <Save className="mr-2 h-4 w-4" />
                   {saving ? '⏳ Saving...' : 'Save Changes'}
                   <ChevronDown className="ml-2 h-4 w-4" />
@@ -544,7 +625,6 @@ const ViewPayroll = () => {
         </div>
       </div>
 
-      {/* Table */}
       <Card className="overflow-hidden shadow-none">
         <div className="overflow-x-auto">
           <Table>
@@ -596,37 +676,30 @@ const ViewPayroll = () => {
                       )}
                     </TableCell>
 
-                    {/* Schedule */}
                     <TableCell className="text-xs font-medium">
                       {getShiftSchedule(item.shiftId || '')}
                     </TableCell>
 
-                    {/* Start Date */}
                     <TableCell>
                       {moment(item.startDate).format('DD-MM-YYYY')}
                     </TableCell>
 
-                    {/* Start Time */}
                     <TableCell className="font-medium">
                       {item.startTime}
                     </TableCell>
 
-                    {/* End Date */}
                     <TableCell>
                       {moment(item.endDate).format('DD-MM-YYYY')}
                     </TableCell>
 
-                    {/* End Time */}
                     <TableCell className="font-medium">
                       {item.endTime}
                     </TableCell>
 
-                    {/* DURATION - Display in HH:mm format */}
                     <TableCell className="font-bold text-theme">
                       {formatDurationToHHmm(durationMinutes)}
                     </TableCell>
 
-                    {/* Pay Rate */}
                     <TableCell>
                       {item.bankHoliday ? (
                         <Input
@@ -649,12 +722,10 @@ const ViewPayroll = () => {
                       )}
                     </TableCell>
 
-                    {/* Total */}
                     <TableCell className="text-right font-bold ">
                       £{lineTotal.toFixed(2)}
                     </TableCell>
 
-                    {/* Note */}
                     <TableCell>
                       {isApproved ? (
                         <span className="">{item.note || '-'}</span>
@@ -671,7 +742,6 @@ const ViewPayroll = () => {
                       )}
                     </TableCell>
 
-                    {/* Bank Holiday */}
                     <TableCell>
                       <div className="flex items-center space-x-2">
                         <Checkbox
@@ -730,7 +800,6 @@ const ViewPayroll = () => {
                 );
               })}
 
-              {/* TOTALS ROW */}
               <TableRow className="border-t-2 font-bold">
                 <TableCell colSpan={6} className="text-right ">
                   TOTALS:

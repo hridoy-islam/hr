@@ -47,12 +47,12 @@ const EditEmployee = () => {
 
   const location = useLocation();
 
-  const { id } = useParams();
+  const { id,eid } = useParams();
 
   const [user, setUser] = useState(null);
   const fetchEmployee = async () => {
     try {
-      const response = await axiosInstance.get(`/users/${id}`);
+      const response = await axiosInstance.get(`/users/${eid}`);
 
       setUser(response.data.data);
     } catch (error) {
@@ -69,7 +69,7 @@ const EditEmployee = () => {
 
   useEffect(() => {
     fetchEmployee();
-  }, [id]);
+  }, [eid]);
 
   if (loading) {
     return (

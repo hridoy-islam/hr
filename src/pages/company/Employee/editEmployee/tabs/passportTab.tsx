@@ -48,7 +48,7 @@ interface PassportData {
 }
 
 function PassportTab() {
-  const { id } = useParams();
+  const { id,eid } = useParams();
   const { user } = useSelector((state: any) => state.auth);
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -86,10 +86,10 @@ function PassportTab() {
 
   // 1. Fetch Schedule Settings
   const fetchScheduleSettings = async () => {
-    if (!user?._id) return;
+    if (!id) return;
     try {
       const res = await axiosInstance.get(
-        `/schedule-check?companyId=${user._id}`
+        `/schedule-check?companyId=${id}`
       );
       const result = res.data?.data?.result;
       if (result && result.length > 0) {
@@ -102,9 +102,9 @@ function PassportTab() {
 
   // 2. Fetch Passport Data
   const fetchPassportData = async () => {
-    if (!id) return;
+    if (!eid) return;
     try {
-      const res = await axiosInstance.get(`/passport?userId=${id}`);
+      const res = await axiosInstance.get(`/passport?userId=${eid}`);
       const result: PassportData[] = res.data?.data?.result || [];
 
       if (result.length > 0) {
@@ -136,7 +136,7 @@ function PassportTab() {
       setIsLoading(false);
     };
     loadData();
-  }, [id, user?._id]);
+  }, [eid, id]);
 
   // 3. Status Calculation (Days Logic)
   useEffect(() => {
@@ -190,7 +190,7 @@ function PassportTab() {
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = event.target.files?.[0];
-    if (!file || !user?._id) return;
+    if (!file || !id) return;
 
     const validTypes = ['application/pdf', 'image/jpeg', 'image/png'];
     if (!validTypes.includes(file.type)) {
@@ -243,7 +243,7 @@ function PassportTab() {
 
   const handleSubmitUpdate = async () => {
     if (
-      !user?._id || 
+      !id || 
       !uploadedFileUrl || 
       !newExpiryDate || 
       !newPassportNumber
@@ -259,8 +259,8 @@ function PassportTab() {
       passportExpiryDate: moment(newExpiryDate).toISOString(),
     };
 
-    if (!passportId && id) {
-      payload.userId = id;
+    if (!passportId && eid) {
+      payload.userId = eid;
     }
 
     try {

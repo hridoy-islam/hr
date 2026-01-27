@@ -45,7 +45,7 @@ export default function EditDesignation() {
   } = useForm<Inputs>();
 
   const [loading, setLoading] = useState<boolean>(true);
-  const { id: designationId } = useParams();
+  const { id,did: designationId } = useParams();
   const navigate = useNavigate();
   const { user } = useSelector((state: any) => state.auth);
 

@@ -47,7 +47,7 @@ interface VisaData {
 }
 
 function VisaTab() {
-  const { id } = useParams();
+  const { id,eid } = useParams();
   const { user } = useSelector((state: any) => state.auth);
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -84,10 +84,10 @@ function VisaTab() {
 
   // 1. Fetch Schedule Settings (Visa Interval)
   const fetchScheduleSettings = async () => {
-    if (!user?._id) return;
+    if (!id) return;
     try {
       const res = await axiosInstance.get(
-        `/schedule-check?companyId=${user._id}`
+        `/schedule-check?companyId=${id}`
       );
       const result = res.data?.data?.result;
       if (result && result.length > 0) {
@@ -100,9 +100,9 @@ function VisaTab() {
 
   // 2. Fetch Visa Data
   const fetchVisaData = async () => {
-    if (!id) return;
+    if (!eid) return;
     try {
-      const res = await axiosInstance.get(`/visa?employeeId=${id}`);
+      const res = await axiosInstance.get(`/visa?employeeId=${eid}`);
       const visaList: VisaData[] = res.data.data.result;
 
       if (visaList.length > 0) {
@@ -139,7 +139,7 @@ function VisaTab() {
     };
 
     loadData();
-  }, [id, user?._id]);
+  }, [eid, id]);
 
   // 3. Status Calculation
   useEffect(() => {
@@ -166,7 +166,7 @@ function VisaTab() {
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = event.target.files?.[0];
-    if (!file || !user?._id) return;
+    if (!file || !id) return;
 
     const validTypes = ['application/pdf', 'image/jpeg', 'image/png'];
     if (!validTypes.includes(file.type)) {
@@ -232,7 +232,7 @@ function VisaTab() {
 
   // Submit Logic
   const handleSubmitUpdate = async () => {
-    if (!user?._id || !uploadedFileUrl || !newExpiryDate || !newStartDate) return;
+    if (!id || !uploadedFileUrl || !newExpiryDate || !newStartDate) return;
 
     setIsSubmitting(true);
 
@@ -244,8 +244,8 @@ function VisaTab() {
       expiryDate: moment(newExpiryDate).toISOString()
     };
 
-    if (!visaId && id) {
-      payload.employeeId = id;
+    if (!visaId && eid) {
+      payload.employeeId = eid;
     }
 
     try {

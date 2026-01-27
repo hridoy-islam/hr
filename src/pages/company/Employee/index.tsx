@@ -15,7 +15,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 import { Input } from '@/components/ui/input';
 import { DynamicPagination } from '@/components/shared/DynamicPagination';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import Select from 'react-select';
 import { Badge } from '@/components/ui/badge';
 import { useSelector } from 'react-redux';
@@ -32,7 +32,7 @@ export default function Employee() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [entriesPerPage, setEntriesPerPage] = useState(100);
-
+  const {id} = useParams()
   const [searchInput, setSearchInput] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -58,7 +58,7 @@ export default function Employee() {
         page: currentPage,
         limit: entriesPerPage,
         role: 'employee',
-        company:user?._id
+        company:id
       };
 
       if (searchTerm) params.searchTerm = searchTerm;
@@ -88,9 +88,9 @@ export default function Employee() {
     const fetchOptions = async () => {
       try {
         const [deptRes, desigRes, trainingRes] = await Promise.all([
-          axiosInstance.get('/hr/department?limit=all'),
-          axiosInstance.get('/hr/designation?limit=all'),
-          axiosInstance.get('/hr/training?limit=all')
+          axiosInstance.get(`/hr/department?companyId=${id}&limit=all`),
+          axiosInstance.get(`/hr/designation?companyId=${id}&limit=all`),
+          axiosInstance.get(`/hr/training?companyId=${id}&limit=all`)
         ]);
 
         setDepartments(

@@ -19,7 +19,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 import axiosInstance from '@/lib/axios';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
   Dialog,
   DialogContent,
@@ -55,7 +55,7 @@ const AppraisalExpiryPage = () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { user } = useSelector((state: any) => state.auth);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+  const {id} = useParams()
   const { refetchStatus } = useScheduleStatus();
 
   const [loading, setLoading] = useState(true);
@@ -79,10 +79,10 @@ const AppraisalExpiryPage = () => {
 
   // --- 1. Fetch Schedule Settings ---
   const fetchScheduleSettings = async () => {
-    if (!user?._id) return;
+    if (!id) return;
     try {
       const res = await axiosInstance.get(
-        `/schedule-check?companyId=${user._id}`
+        `/schedule-check?companyId=${id}`
       );
       const result = res.data?.data?.result;
       if (result && result.length > 0) {
@@ -113,7 +113,7 @@ const AppraisalExpiryPage = () => {
 
   // --- 3. Fetch Employees ---
   const fetchEmployees = async () => {
-    const companyId = user?.company || user?._id;
+    const companyId = user?.company || id;
     if (!companyId) return;
 
     setLoading(true);
@@ -198,7 +198,7 @@ const AppraisalExpiryPage = () => {
 
     // If missing, redirect to profile (activates appraisal tab logic)
     if (!employee.appraisalRecordId || currentStatus === 'missing') {
-      navigate(`/company/employee/${employee._id}`, {
+      navigate(`/company/${id}/employee/${employee._id}`, {
         state: { activeTab: 'appraisal' } 
       });
       return;
@@ -219,7 +219,7 @@ const AppraisalExpiryPage = () => {
   };
 
   const handleEmployeeClick = (employeeId: string) => {
-    navigate(`/company/employee/${employeeId}`, {
+    navigate(`/company/${id}/employee/${employeeId}`, {
       state: { activeTab: 'appraisal' }
     });
   };
@@ -229,7 +229,7 @@ const AppraisalExpiryPage = () => {
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = event.target.files?.[0];
-    if (!file || !user?._id) return;
+    if (!file || !id) return;
 
     const validTypes = ['application/pdf', 'image/jpeg', 'image/png'];
     if (!validTypes.includes(file.type)) {

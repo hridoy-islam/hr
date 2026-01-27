@@ -5,7 +5,7 @@ import moment from 'moment';
 import { useToast } from '@/components/ui/use-toast';
 
 export const useEditEmployee = () => {
-  const { id } = useParams<{ id: string }>();
+  const { id,eid } = useParams();
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('personal');
   const [isFieldSaving, setIsFieldSaving] = useState<Record<string, boolean>>(
@@ -118,7 +118,7 @@ export const useEditEmployee = () => {
     const fetchEmployee = async () => {
       try {
         setLoading(true);
-        const response = await axiosInstance.get(`/users/${id}`);
+        const response = await axiosInstance.get(`/users/${eid}`);
         const data = response.data.data;
 
         // Set form data
@@ -241,7 +241,7 @@ export const useEditEmployee = () => {
     };
 
     fetchEmployee();
-  }, [id, toast]);
+  }, [eid, toast]);
 
   const serializeMoments = (obj: any): any => {
     if (moment.isMoment(obj)) {
@@ -288,7 +288,7 @@ export const useEditEmployee = () => {
           updateData = { [fieldName]: serializeMoments(value) };
         }
 
-        await axiosInstance.patch(`/users/${id}`, updateData);
+        await axiosInstance.patch(`/users/${eid}`, updateData);
 
         setFormData((prev) => ({
           ...prev,
@@ -314,7 +314,7 @@ export const useEditEmployee = () => {
         setIsFieldSaving((prev) => ({ ...prev, [fieldName]: false }));
       }
     },
-    [id, toast, formData]
+    [eid, toast, formData]
   );
 
   const handleFieldUpdate = useCallback(

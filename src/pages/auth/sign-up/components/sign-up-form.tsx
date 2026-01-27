@@ -1,6 +1,6 @@
 import { HTMLAttributes } from 'react';
 import { useForm } from 'react-hook-form';
-import axiosInstance from '../../../lib/axios';
+import axiosInstance from '@/lib/axios';
 import {
   Form,
   FormControl,

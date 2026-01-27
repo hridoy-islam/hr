@@ -63,7 +63,7 @@ interface SupervisionData {
 // --- Main Component ---
 
 function SupervisionTab() {
-  const { id } = useParams(); // employeeId
+  const { id,eid } = useParams(); // employeeId
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { user } = useSelector((state: any) => state.auth); // companyId/userId
   const { toast } = useToast();
@@ -100,9 +100,9 @@ function SupervisionTab() {
   // --- Fetch Data ---
 
   const fetchSettings = async () => {
-    if (!user?._id) return;
+    if (!id) return;
     try {
-      const res = await axiosInstance.get(`/schedule-check?companyId=${user._id}`);
+      const res = await axiosInstance.get(`/schedule-check?companyId=${id}`);
       const result = res.data?.data?.result;
       if (result && result.length > 0) {
         setScheduleInterval(result[0].supervisionCheckDate || 30);
@@ -113,9 +113,9 @@ function SupervisionTab() {
   };
 
   const fetchSupervisionData = async () => {
-    if (!id) return;
+    if (!eid) return;
     try {
-      const res = await axiosInstance.get(`/supervision?employeeId=${id}`);
+      const res = await axiosInstance.get(`/supervision?employeeId=${eid}`);
       const result: SupervisionData[] = res.data?.data?.result || [];
 
       if (result.length > 0) {
@@ -144,7 +144,7 @@ function SupervisionTab() {
       setIsLoading(false);
     };
     loadData();
-  }, [id, user?._id]);
+  }, [eid, id]);
 
   // --- Status Logic ---
 
@@ -195,7 +195,7 @@ function SupervisionTab() {
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !user?._id) return;
+    if (!file || !id) return;
 
     if (file.size > 5 * 1024 * 1024) {
       setUploadError('File must be less than 5MB.');
@@ -253,7 +253,7 @@ function SupervisionTab() {
 
   // Submit: Schedule (Create/Update)
   const submitSchedule = async () => {
-    if (!inputDate || !user?._id) return;
+    if (!inputDate || !id) return;
     setIsSubmitting(true);
 
     try {
@@ -268,7 +268,7 @@ function SupervisionTab() {
         // Create new
         await axiosInstance.post('/supervision', {
             ...payload,
-            employeeId: id,
+            employeeId: eid,
         });
       } else {
         // Update existing schedule
@@ -292,7 +292,7 @@ function SupervisionTab() {
 
   // Submit: Complete
   const submitCompletion = async () => {
-    if (!inputDate || !uploadedFileUrl || !supervisionId || !user?._id) return;
+    if (!inputDate || !uploadedFileUrl || !supervisionId || !id) return;
     setIsSubmitting(true);
 
     try {

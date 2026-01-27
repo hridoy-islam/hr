@@ -40,7 +40,7 @@ type Inputs = {
 };
 
 export default function EditVacancy() {
-  const { id } = useParams();
+  const { vid } = useParams();
   const navigate = useNavigate();
   const [editVacancy, setEditVacancy] = useState<Inputs | null>(null);
   const { user } = useSelector((state: any) => state.auth);
@@ -58,7 +58,7 @@ export default function EditVacancy() {
   useEffect(() => {
     const fetchVacancy = async () => {
       try {
-        const response = await axiosInstance.get(`/hr/vacancy/${id}`);
+        const response = await axiosInstance.get(`/hr/vacancy/${vid}`);
         const data = response.data.data;
 
         setEditVacancy(data);
@@ -88,12 +88,12 @@ export default function EditVacancy() {
     };
 
     fetchVacancy();
-  }, [id, setValue]);
+  }, [vid, setValue]);
 
   const onSubmit: SubmitHandler<Inputs> = async (data) => {
     data.postedBy = user._id;
     try {
-      const response = await axiosInstance.patch(`/hr/vacancy/${id}`, data);
+      const response = await axiosInstance.patch(`/hr/vacancy/${vid}`, data);
       if (response) {
         toast({
           title: 'Success!',

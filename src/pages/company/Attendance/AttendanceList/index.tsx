@@ -36,7 +36,7 @@ import { Input } from '@/components/ui/input';
 // Custom Imports
 import axiosInstance from '@/lib/axios';
 import CSVExporter from './components/CSVExporter';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 
 // --- Types ---
@@ -114,7 +114,7 @@ const calculateDuration = (
 const AttendancePage = () => {
   const user = useSelector((state: RootState) => state.auth?.user) || null;
   const navigate = useNavigate();
-
+  const {id, aid} = useParams();
   // State: Default range is Current Month Start -> Current Day
   const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([
     moment().startOf('month').toDate(),
@@ -149,10 +149,10 @@ const AttendancePage = () => {
 
   // Fetch Meta Data
   useEffect(() => {
-    if (!user?._id) return;
+    if (!id) return;
     const fetchMetaData = async () => {
       try {
-        const companyId = user._id;
+        const companyId = id;
 
         const [desRes, deptRes, usersRes] = await Promise.all([
           axiosInstance.get(`/hr/designation?companyId=${companyId}&limit=all`),
@@ -187,12 +187,12 @@ const AttendancePage = () => {
 
   // Fetch Attendance Data
   const fetchAttendance = async () => {
-    if (!user?._id) return;
+    if (!id) return;
 
     setIsLoading(true);
     try {
       const params = {
-        companyId: user._id,
+        companyId: id,
         limit: 'all',
         fromDate: startDate
           ? moment(startDate).format('YYYY-MM-DD')

@@ -20,7 +20,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 import axiosInstance from '@/lib/axios';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
   Dialog,
   DialogContent,
@@ -54,37 +54,32 @@ interface ComplianceRow {
 const PassportExpiryPage = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { user } = useSelector((state: any) => state.auth);
   const fileInputRef = useRef<HTMLInputElement>(null);
 const { status, loading: loadingStats, refetchStatus } = useScheduleStatus();
+  const{id}= useParams()
 
-  // --- State ---
   const [loading, setLoading] = useState(true);
   const [employees, setEmployees] = useState<ComplianceRow[]>([]);
 
-  // Schedule Settings - Default to 0 as per user snippet logic ( > 0 check)
   const [passportCheckInterval, setPassportCheckInterval] = useState<number>(0);
 
-  // Modal & Form State
   const [selectedEmployee, setSelectedEmployee] =
     useState<ComplianceRow | null>(null);
   const [newPassportNumber, setNewPassportNumber] = useState('');
   const [newExpiryDate, setNewExpiryDate] = useState<Date | null>(null);
 
-  // File Upload State
   const [uploadedFileUrl, setUploadedFileUrl] = useState<string | null>(null);
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
-  // --- 1. Fetch Schedule Settings ---
   const fetchScheduleSettings = async () => {
-    if (!user?._id) return;
+    if (!id) return;
     try {
       const res = await axiosInstance.get(
-        `/schedule-check?companyId=${user._id}`
+        `/schedule-check?companyId=${id}`
       );
       const result = res.data?.data?.result;
       if (result && result.length > 0) {
@@ -114,7 +109,7 @@ const { status, loading: loadingStats, refetchStatus } = useScheduleStatus();
 
   // --- 3. Fetch Employees ---
   const fetchEmployees = async () => {
-    const companyId = user?.company || user?._id;
+    const companyId = user?.company || id;
     if (!companyId) return;
 
     setLoading(true);
@@ -199,7 +194,7 @@ const { status, loading: loadingStats, refetchStatus } = useScheduleStatus();
 
     // If missing, redirect to profile
     if (!employee.passportRecordId || currentStatus === 'missing') {
-      navigate(`/company/employee/${employee._id}`, {
+      navigate(`/company/${id}/employee/${employee._id}`, {
         state: { activeTab: 'passport' }
       });
       return;
@@ -219,7 +214,7 @@ const { status, loading: loadingStats, refetchStatus } = useScheduleStatus();
   };
 
   const handleEmployeeClick = (employeeId: string) => {
-    navigate(`/company/employee/${employeeId}`, {
+    navigate(`/company/${id}/employee/${employeeId}`, {
       state: { activeTab: 'passport' }
     });
   };
@@ -229,7 +224,7 @@ const { status, loading: loadingStats, refetchStatus } = useScheduleStatus();
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = event.target.files?.[0];
-    if (!file || !user?._id) return;
+    if (!file || !id) return;
 
     const validTypes = ['application/pdf', 'image/jpeg', 'image/png'];
     if (!validTypes.includes(file.type)) {
@@ -246,7 +241,7 @@ const { status, loading: loadingStats, refetchStatus } = useScheduleStatus();
     setSelectedFileName(file.name);
 
     const formData = new FormData();
-    formData.append('entityId', user._id);
+    formData.append('entityId', id);
     formData.append('file_type', 'document');
     formData.append('file', file);
 

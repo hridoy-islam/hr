@@ -21,6 +21,7 @@ import { DynamicPagination } from '@/components/shared/DynamicPagination';
 import { DepartmentDialog } from './Components/departmentDialog';
 import { Badge } from '@/components/ui/badge';
 import { useSelector } from 'react-redux';
+import { useParams } from 'react-router-dom';
 
 export default function Department() {
   const [department, setDepartment] = useState<any>([]);
@@ -33,6 +34,7 @@ export default function Department() {
   const [entriesPerPage, setEntriesPerPage] = useState(100);
   const [searchTerm, setSearchTerm] = useState('');
 const user = useSelector((state: any) => state.auth.user);
+const {id} = useParams()
   const fetchData = async (page, entriesPerPage, searchTerm = '') => {
     try {
       if (initialLoading) setInitialLoading(true);
@@ -40,7 +42,7 @@ const user = useSelector((state: any) => state.auth.user);
         params: {
           page,
           limit: entriesPerPage,
-          companyId:user?._id,
+          companyId:id,
           ...(searchTerm ? { searchTerm } : {})
         }
       });
@@ -67,7 +69,7 @@ const user = useSelector((state: any) => state.auth.user);
 
         response = await axiosInstance.post(`/hr/department`, {
         ...data,
-        companyId: user?._id
+        companyId: id
       });
       }
 

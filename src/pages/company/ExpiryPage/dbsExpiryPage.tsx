@@ -20,7 +20,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 import axiosInstance from '@/lib/axios';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
   Dialog,
   DialogContent,
@@ -58,10 +58,9 @@ const DbsExpiryPage = () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { user } = useSelector((state: any) => state.auth);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   const { refetchStatus } = useScheduleStatus();
 
-  
   const [loading, setLoading] = useState(true);
   const [employees, setEmployees] = useState<ComplianceRow[]>([]);
 
@@ -71,7 +70,7 @@ const DbsExpiryPage = () => {
   // Modal & Form State
   const [selectedEmployee, setSelectedEmployee] =
     useState<ComplianceRow | null>(null);
-  
+
   const [newDisclosureNumber, setNewDisclosureNumber] = useState('');
   const [newDateOfIssue, setNewDateOfIssue] = useState<Date | null>(null);
   const [newExpiryDate, setNewExpiryDate] = useState<Date | null>(null);
@@ -82,14 +81,12 @@ const DbsExpiryPage = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
-
+  const { id } = useParams();
   // --- 1. Fetch Schedule Settings ---
   const fetchScheduleSettings = async () => {
-    if (!user?._id) return;
+    if (!id) return;
     try {
-      const res = await axiosInstance.get(
-        `/schedule-check?companyId=${user._id}`
-      );
+      const res = await axiosInstance.get(`/schedule-check?companyId=${id}`);
       const result = res.data?.data?.result;
       if (result && result.length > 0) {
         setDbsCheckInterval(result[0].dbsCheckDate || 0);
@@ -118,7 +115,7 @@ const DbsExpiryPage = () => {
 
   // --- 3. Fetch Employees ---
   const fetchEmployees = async () => {
-    const companyId = user?.company || user?._id;
+    const companyId = user?.company || id;
     if (!companyId) return;
 
     setLoading(true);
@@ -204,7 +201,7 @@ const DbsExpiryPage = () => {
 
     // If missing, redirect to profile
     if (!employee.dbsRecordId || currentStatus === 'missing') {
-      navigate(`/company/employee/${employee._id}`, {
+      navigate(`/company/${id}/employee/${employee._id}`, {
         state: { activeTab: 'dbs' }
       });
       return;
@@ -216,9 +213,7 @@ const DbsExpiryPage = () => {
     setNewDateOfIssue(
       employee.dateOfIssue ? new Date(employee.dateOfIssue) : null
     );
-    setNewExpiryDate(
-      employee.dbsExpiry ? new Date(employee.dbsExpiry) : null
-    );
+    setNewExpiryDate(employee.dbsExpiry ? new Date(employee.dbsExpiry) : null);
 
     // Reset file state
     setUploadedFileUrl(null);
@@ -227,7 +222,7 @@ const DbsExpiryPage = () => {
   };
 
   const handleEmployeeClick = (employeeId: string) => {
-    navigate(`/company/employee/${employeeId}`, {
+    navigate(`/company/${id}/employee/${employeeId}`, {
       state: { activeTab: 'dbs' }
     });
   };
@@ -235,7 +230,6 @@ const DbsExpiryPage = () => {
   // Helper: Auto-calculate expiry when issue date changes (Optional UX improvement)
   const handleIssueDateChange = (date: Date | null) => {
     setNewDateOfIssue(date);
-  
   };
 
   // --- File Upload Logic ---
@@ -243,7 +237,7 @@ const DbsExpiryPage = () => {
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = event.target.files?.[0];
-    if (!file || !user?._id) return;
+    if (!file || !id) return;
 
     const validTypes = ['application/pdf', 'image/jpeg', 'image/png'];
     if (!validTypes.includes(file.type)) {
@@ -343,16 +337,14 @@ const DbsExpiryPage = () => {
                 <ShieldCheck className="h-6 w-6 text-blue-600" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">
-                  DBS Status
-                </h1>
+                <h1 className="text-2xl font-bold text-gray-900">DBS Status</h1>
               </div>
             </div>
             <Button
               variant="outline"
               size="sm"
               onClick={() => navigate(-1)}
-              className="bg-theme hover:bg-theme/90 flex items-center space-x-2 border-none text-white"
+              className="flex items-center space-x-2 border-none bg-theme text-white hover:bg-theme/90"
             >
               <ArrowLeft className="h-4 w-4" />
               <span>Back</span>
@@ -407,7 +399,7 @@ const DbsExpiryPage = () => {
                             {emp.disclosureNumber || '-'}
                           </TableCell>
                           <TableCell className="font-medium text-gray-600">
-                             {formatDate(emp.dateOfIssue)}
+                            {formatDate(emp.dateOfIssue)}
                           </TableCell>
                           <TableCell className="font-medium">
                             {formatDate(emp.dbsExpiry)}
@@ -417,7 +409,7 @@ const DbsExpiryPage = () => {
                             <Button
                               size="sm"
                               onClick={(e) => handleUpdateClick(e, emp, status)}
-                              className="bg-theme hover:bg-theme/90 text-white"
+                              className="bg-theme text-white hover:bg-theme/90"
                             >
                               Update
                             </Button>
@@ -434,7 +426,7 @@ const DbsExpiryPage = () => {
       </div>
 
       {/* Update Dialog */}
-     <Dialog
+      <Dialog
         open={!!selectedEmployee}
         onOpenChange={() => setSelectedEmployee(null)}
       >
@@ -496,8 +488,7 @@ const DbsExpiryPage = () => {
                       ? new Date(selectedEmployee.dbsExpiry)
                       : undefined
                   }
-                 
-                  className="focus:ring-theme w-full rounded-md border border-gray-300 p-2.5 outline-none focus:border-transparent focus:ring-2"
+                  className="w-full rounded-md border border-gray-300 p-2.5 outline-none focus:border-transparent focus:ring-2 focus:ring-theme"
                   preventOpenOnFocus
                 />
                 {/* LOGIC APPLIED: Helper Text */}
@@ -524,7 +515,7 @@ const DbsExpiryPage = () => {
                   showMonthDropdown
                   dropdownMode="select"
                   minDate={newDateOfIssue || undefined}
-                  className="focus:ring-theme w-full rounded-md border border-gray-300 p-2.5 outline-none focus:border-transparent focus:ring-2"
+                  className="w-full rounded-md border border-gray-300 p-2.5 outline-none focus:border-transparent focus:ring-2 focus:ring-theme"
                   preventOpenOnFocus
                 />
               </div>
@@ -619,7 +610,7 @@ const DbsExpiryPage = () => {
                 !newDisclosureNumber ||
                 !uploadedFileUrl
               }
-              className="bg-theme hover:bg-theme/90 text-white"
+              className="bg-theme text-white hover:bg-theme/90"
             >
               {isSubmitting ? 'Updating...' : 'Save Changes'}
             </Button>

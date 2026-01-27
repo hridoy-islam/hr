@@ -16,7 +16,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 import axiosInstance from '@/lib/axios';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import moment from 'moment';
 
@@ -44,13 +44,13 @@ const TrainingExpiryPage = () => {
   const navigate = useNavigate();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { user } = useSelector((state: any) => state.auth);
-  
+  const {id} = useParams()
   const [loading, setLoading] = useState(true);
   const [records, setRecords] = useState<TrainingComplianceRow[]>([]);
 
   // --- 1. Fetch Training Status ---
   const fetchTrainingStatus = async () => {
-    const companyId = user?._id || user?.company;
+    const companyId = id || user?.company;
     if (!companyId) return;
 
     setLoading(true);
@@ -97,7 +97,7 @@ const TrainingExpiryPage = () => {
 
   const handleNavigateToEmployee = (employeeId: string) => {
     // Navigate to employee profile with the 'training' tab active
-    navigate(`/company/employee/${employeeId}`, {
+    navigate(`/company/${id}/employee/${employeeId}`, {
       state: { activeTab: 'training' }
     });
   };

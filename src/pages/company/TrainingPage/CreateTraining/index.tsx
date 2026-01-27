@@ -16,7 +16,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import axiosInstance from '@/lib/axios';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { MoveLeft } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { useSelector } from 'react-redux';
@@ -48,7 +48,7 @@ type TrainingFormData = z.infer<typeof trainingFormSchema>;
 export default function CreateTraining() {
   const { toast } = useToast();
   const user = useSelector((state: any) => state.auth.user);
-
+  const {id} = useParams()
   const form = useForm<TrainingFormData>({
     resolver: zodResolver(trainingFormSchema),
     defaultValues: {
@@ -66,7 +66,7 @@ export default function CreateTraining() {
     try {
       await axiosInstance.post(`/hr/training`, {
         ...data,
-        companyId: user?._id
+        companyId: id
       });
 
       toast({

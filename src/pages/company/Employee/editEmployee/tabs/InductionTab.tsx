@@ -59,7 +59,7 @@ interface InductionData {
 // --- Main Component ---
 
 function InductionTab() {
-  const { id } = useParams(); // employeeId
+  const { id,eid } = useParams(); // employeeId
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { user } = useSelector((state: any) => state.auth);
   const { toast } = useToast();
@@ -97,9 +97,9 @@ function InductionTab() {
   // --- Fetch Data ---
 
   const fetchInductionData = async () => {
-    if (!id) return;
+    if (!eid) return;
     try {
-      const res = await axiosInstance.get(`/induction?employeeId=${id}`);
+      const res = await axiosInstance.get(`/induction?employeeId=${eid}`);
       const result: InductionData[] = res.data?.data?.result || [];
 
       if (result.length > 0) {
@@ -126,13 +126,13 @@ function InductionTab() {
       setIsLoading(false);
     };
     loadData();
-  }, [id]);
+  }, [eid]);
 
   // --- Handlers ---
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !user?._id) return;
+    if (!file || !id) return;
 
     if (file.size > 5 * 1024 * 1024) {
       setUploadError('File must be less than 5MB.');
@@ -188,7 +188,7 @@ function InductionTab() {
 
   // Submit: Schedule (Create ONLY)
   const submitSchedule = async () => {
-    if (!inputDate || !user?._id || !uploadedFileUrl) return;
+    if (!inputDate || !id || !uploadedFileUrl) return;
     setIsSubmitting(true);
 
     try {
@@ -202,7 +202,7 @@ function InductionTab() {
       if (!inductionId) {
         await axiosInstance.post('/induction', {
           ...payload,
-          employeeId: id
+          employeeId: eid
         });
       }
 
@@ -225,7 +225,7 @@ function InductionTab() {
 
   // Submit: Promotion Logic
   const submitPromotion = async () => {
-    if (!inductionId || !user?._id || !promotionChoice) return;
+    if (!inductionId || !id || !promotionChoice) return;
 
     if (promotionChoice === 'yes' && (!inputDate || !uploadedFileUrl)) return;
 

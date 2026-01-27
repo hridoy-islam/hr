@@ -18,7 +18,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 import axiosInstance from '@/lib/axios';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import moment from 'moment';
 
@@ -38,19 +38,19 @@ const QAExpiryPage = () => {
   const navigate = useNavigate();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { user } = useSelector((state: any) => state.auth);
-
+  const {id} = useParams()
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<QAComplianceRow[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!user?._id) return;
+      if (!id) return;
 
       try {
         setLoading(true);
         // Fetch from the QA status endpoint (you'll need to ensure this route exists in your backend)
         const response = await axiosInstance.get(
-          `/schedule-status/${user._id}/qa`
+          `/schedule-status/${id}/qa`
         );
 
         // Map backend response
@@ -73,14 +73,14 @@ const QAExpiryPage = () => {
     };
 
     fetchData();
-  }, [user?._id]);
+  }, [id]);
 
   const handleBack = () => {
     navigate(-1);
   };
 
   const handleEmployeeClick = (employeeId: string) => {
-    navigate(`/company/employee/${employeeId}`, {
+    navigate(`/company/${id}/employee/${employeeId}`, {
       state: { activeTab: 'qa' }
     });
   };

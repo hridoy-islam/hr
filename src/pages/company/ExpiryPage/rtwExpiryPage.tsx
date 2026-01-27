@@ -19,7 +19,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 import axiosInstance from '@/lib/axios';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
   Dialog,
   DialogContent,
@@ -76,13 +76,13 @@ const RtwExpiryPage = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
-
+  const {id} = useParams()
   // --- 1. Fetch Schedule Settings ---
   const fetchScheduleSettings = async () => {
-    if (!user?._id) return;
+    if (!id) return;
     try {
       const res = await axiosInstance.get(
-        `/schedule-check?companyId=${user._id}`
+        `/schedule-check?companyId=${id}`
       );
       const result = res.data?.data?.result;
       if (result && result.length > 0) {
@@ -113,7 +113,7 @@ const RtwExpiryPage = () => {
 
   // --- 3. Fetch Employees ---
   const fetchEmployees = async () => {
-    const companyId = user?.company || user?._id;
+    const companyId = user?.company || id;
     if (!companyId) return;
 
     setLoading(true);
@@ -198,7 +198,7 @@ const RtwExpiryPage = () => {
 
     // If missing, redirect to profile (activates RTW tab logic)
     if (!employee.rtwRecordId || currentStatus === 'missing') {
-      navigate(`/company/employee/${employee._id}`, {
+      navigate(`/company/${id}/employee/${employee._id}`, {
         state: { activeTab: 'rightToWork' } // Assuming 'rtw' is the tab key in profile
       });
       return;
@@ -219,7 +219,7 @@ const RtwExpiryPage = () => {
   };
 
   const handleEmployeeClick = (employeeId: string) => {
-    navigate(`/company/employee/${employeeId}`, {
+    navigate(`/company/${id}/employee/${employeeId}`, {
       state: { activeTab: 'rightToWork' }
     });
   };
@@ -229,7 +229,7 @@ const RtwExpiryPage = () => {
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = event.target.files?.[0];
-    if (!file || !user?._id) return;
+    if (!file || !id) return;
 
     const validTypes = ['application/pdf', 'image/jpeg', 'image/png'];
     if (!validTypes.includes(file.type)) {

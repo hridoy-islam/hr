@@ -62,7 +62,7 @@ interface QACheckData {
 // --- Main Component ---
 
 function QACheckTab() {
-  const { id } = useParams(); // employeeId
+  const { id,eid } = useParams(); // employeeId
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { user } = useSelector((state: any) => state.auth); 
   const { toast } = useToast();
@@ -99,9 +99,9 @@ function QACheckTab() {
   // --- Fetch Data ---
 
   const fetchSettings = async () => {
-    if (!user?._id) return;
+    if (!id) return;
     try {
-      const res = await axiosInstance.get(`/schedule-check?companyId=${user._id}`);
+      const res = await axiosInstance.get(`/schedule-check?companyId=${id}`);
       const result = res.data?.data?.result;
       if (result && result.length > 0) {
         // Using qaCheckDate or qaCheckDuration based on your ScheduleCheck model
@@ -113,9 +113,9 @@ function QACheckTab() {
   };
 
   const fetchQACheckData = async () => {
-    if (!id) return;
+    if (!eid) return;
     try {
-      const res = await axiosInstance.get(`/qa?employeeId=${id}`);
+      const res = await axiosInstance.get(`/qa?employeeId=${eid}`);
       const result: QACheckData[] = res.data?.data?.result || [];
 
       if (result.length > 0) {
@@ -144,7 +144,7 @@ function QACheckTab() {
       setIsLoading(false);
     };
     loadData();
-  }, [id, user?._id]);
+  }, [eid, id]);
 
   // --- Status Logic ---
 
@@ -195,7 +195,7 @@ function QACheckTab() {
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !user?._id) return;
+    if (!file || !id) return;
 
     if (file.size > 5 * 1024 * 1024) {
       setUploadError('File must be less than 5MB.');
@@ -250,7 +250,7 @@ function QACheckTab() {
   };
 
   const submitSchedule = async () => {
-    if (!inputDate || !user?._id) return;
+    if (!inputDate || !id) return;
     setIsSubmitting(true);
 
     try {
@@ -264,7 +264,7 @@ function QACheckTab() {
       if (!qaCheckId) {
         await axiosInstance.post('/qa', {
             ...payload,
-            employeeId: id,
+            employeeId: eid,
         });
       } else {
         await axiosInstance.patch(`/qa/${qaCheckId}`, {
@@ -285,7 +285,7 @@ function QACheckTab() {
   };
 
   const submitCompletion = async () => {
-    if (!inputDate || !uploadedFileUrl || !qaCheckId || !user?._id) return;
+    if (!inputDate || !uploadedFileUrl || !qaCheckId || !id) return;
     setIsSubmitting(true);
 
     try {

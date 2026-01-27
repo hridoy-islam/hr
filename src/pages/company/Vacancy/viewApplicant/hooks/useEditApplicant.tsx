@@ -11,7 +11,7 @@ const useToast = () => ({
 });
 
 export const useEditApplicant = () => {
-  const { id } = useParams<{ id: string }>();
+  const { id,aid } = useParams();
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('personal');
   const [isFieldSaving, setIsFieldSaving] = useState<Record<string, boolean>>({});
@@ -69,7 +69,7 @@ export const useEditApplicant = () => {
     // setLoading(true); 
     
     try {
-      const response = await axiosInstance.get(`/hr/applicant/${id}`);
+      const response = await axiosInstance.get(`/hr/applicant/${aid}`);
       const data = response.data.data;
 
       setFormData({
@@ -123,7 +123,7 @@ export const useEditApplicant = () => {
     } finally {
       setLoading(false);
     }
-  }, [id, toast]);
+  }, [aid, toast]);
 
   // ✅ 2. Call the function in useEffect
   useEffect(() => {
@@ -138,7 +138,7 @@ export const useEditApplicant = () => {
         const serializedValue = moment.isMoment(value) ? value.toISOString() : value;
         const updateData = { [fieldName]: serializedValue };
 
-        await axiosInstance.patch(`/hr/applicant/${id}`, updateData);
+        await axiosInstance.patch(`/hr/applicant/${aid}`, updateData);
 
         setFormData((prev) => ({
           ...prev,
@@ -160,7 +160,7 @@ export const useEditApplicant = () => {
         setIsFieldSaving((prev) => ({ ...prev, [fieldName]: false }));
       }
     },
-    [id, toast]
+    [aid, toast]
   );
 
   const handleFieldUpdate = useCallback(

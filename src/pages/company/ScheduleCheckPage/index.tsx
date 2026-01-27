@@ -23,6 +23,7 @@ import {
   FormDescription
 } from '@/components/ui/form';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
+import { useParams } from 'react-router-dom';
 
 // Interface for the form data — now includes ALL fields from the schema
 interface ScheduleCheckValues {
@@ -44,7 +45,7 @@ interface ScheduleCheckValues {
 export default function CompanyScheduleCheckPage() {
   const { user } = useSelector((state: any) => state.auth);
   const { toast } = useToast();
-  
+  const {id} = useParams()
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [existingId, setExistingId] = useState<string | null>(null);
@@ -70,11 +71,11 @@ export default function CompanyScheduleCheckPage() {
   // Fetch Data
   useEffect(() => {
     const fetchData = async () => {
-      if (!user?._id) return;
+      if (!id) return;
 
       try {
         setLoading(true);
-        const response = await axiosInstance.get(`/schedule-check?companyId=${user._id}`);
+        const response = await axiosInstance.get(`/schedule-check?companyId=${id}`);
         const results = response.data?.data?.result;
 
         if (results && results.length > 0) {
@@ -110,7 +111,7 @@ export default function CompanyScheduleCheckPage() {
     };
 
     fetchData();
-  }, [user._id, form, toast]);
+  }, [id, form, toast]);
 
   const onSubmit = async (data: ScheduleCheckValues) => {
     try {
@@ -120,12 +121,12 @@ export default function CompanyScheduleCheckPage() {
       if (existingId) {
         response = await axiosInstance.patch(`/schedule-check/${existingId}`, {
           ...data,
-          companyId: user._id
+          companyId: id
         });
       } else {
         response = await axiosInstance.post(`/schedule-check`, {
           ...data,
-          companyId: user._id
+          companyId: id
         });
         if (response.data?.data?._id) {
           setExistingId(response.data.data._id);

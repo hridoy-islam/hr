@@ -18,7 +18,7 @@ import { BlinkingDots } from '@/components/shared/blinking-dots';
 import { Input } from '@/components/ui/input';
 import moment from 'moment';
 import { DynamicPagination } from '@/components/shared/DynamicPagination';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 
 export default function CompanyTrainingPage() {
@@ -32,7 +32,7 @@ export default function CompanyTrainingPage() {
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [searchTerm, setSearchTerm] = useState('');
   const user = useSelector((state: any) => state.auth.user);
-
+  const {id} = useParams()
   const fetchData = async (page, entriesPerPage, searchTerm = '') => {
     try {
       if (initialLoading) setInitialLoading(true);
@@ -40,7 +40,7 @@ export default function CompanyTrainingPage() {
         params: {
           page,
           limit: entriesPerPage,
-          companyId: user?._id,
+          companyId: id,
           ...(searchTerm ? { searchTerm } : {})
         }
       });
@@ -92,7 +92,7 @@ export default function CompanyTrainingPage() {
           className="bg-theme hover:bg-theme/90 text-white"
           size={'sm'}
           onClick={() => {
-            navigate(`/company/create-training`);
+            navigate(`/company/${id}/create-training`);
           }}
         >
           <Plus className="mr-2 h-4 w-4" />
@@ -134,7 +134,7 @@ export default function CompanyTrainingPage() {
                       className="bg-theme hover:bg-theme/90 border-none text-white"
                       size="icon"
                       onClick={() => {
-                        navigate(`/company/edit-training/${training._id}`);
+                        navigate(`/company/${id}/edit-training/${training._id}`);
                       }}
                     >
                       <Pen className="h-4 w-4" />

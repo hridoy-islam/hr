@@ -33,7 +33,7 @@ export default function AddApplicant() {
   const [formSubmitted, setFormSubmitted] = useState(false);
 
   const { toast } = useToast();
-  const { id } = useParams();
+  const { id,vid } = useParams();
   const navigate = useNavigate();
   const location = useLocation(); // ✅ Added hook for location state
   const { vacancyTitle } = location.state || {};
@@ -129,7 +129,7 @@ export default function AddApplicant() {
       ...formData.contact,
       ...formData.demography,
       ...formData.documents, // ✅ Added documents to payload
-      vacancyId: id,
+      vacancyId: vid,
       vacancyTitle: vacancyTitle,
       status: 'applied'
     };
@@ -137,7 +137,11 @@ export default function AddApplicant() {
     try {
       await axiosInstance.post(`/hr/applicant`, flatData);
       setFormSubmitted(true);
-      navigate(-1); 
+      navigate(-1);
+       toast({
+        title: 'Applicant Created Successfully',
+       
+      }); 
     } catch (error) {
       console.error('Submission error:', error);
       toast({

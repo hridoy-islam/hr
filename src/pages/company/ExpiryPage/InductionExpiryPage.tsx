@@ -18,7 +18,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 import axiosInstance from '@/lib/axios';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 
 // --- Interfaces ---
@@ -36,19 +36,19 @@ const InductionExpiryPage = () => {
   const navigate = useNavigate();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { user } = useSelector((state: any) => state.auth);
-
+  const {id} = useParams()
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<InductionComplianceRow[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!user?._id) return;
+      if (!id) return;
 
       try {
         setLoading(true);
         // Fetch from the new induction status endpoint
         const response = await axiosInstance.get(
-          `/schedule-status/${user._id}/induction`
+          `/schedule-status/${id}/induction`
         );
 
         // Map the backend response structure { employeeId: User, status: ... } to flat rows
@@ -71,14 +71,14 @@ const InductionExpiryPage = () => {
     };
 
     fetchData();
-  }, [user?._id]);
+  }, [id]);
 
   const handleBack = () => {
     navigate(-1);
   };
 
   const handleEmployeeClick = (employeeId: string) => {
-    navigate(`/company/employee/${employeeId}`, {
+    navigate(`/company/${id}/employee/${employeeId}`, {
       state: { activeTab: 'induction' }
     });
   };

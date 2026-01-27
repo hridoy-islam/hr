@@ -45,7 +45,7 @@ interface TEmployeeDocument {
 }
 
 export default function EmployeeDocumentTab() {
-  const { id } = useParams<{ id: string }>();
+  const { id,eid } = useParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // --- State ---
@@ -73,11 +73,11 @@ export default function EmployeeDocumentTab() {
   // --- Fetch Documents ---
   useEffect(() => {
     const fetchDocuments = async () => {
-      if (!id) return;
+      if (!eid) return;
       try {
         setIsLoading(true);
         const res = await axiosInstance.get(`/employee-documents?limit=all`, {
-          params: { employeeId: id }
+          params: { employeeId: eid }
         });
         setDocuments(res.data?.data?.result || []);
       } catch (error) {
@@ -87,7 +87,7 @@ export default function EmployeeDocumentTab() {
       }
     };
     fetchDocuments();
-  }, [id]);
+  }, [eid]);
 
   // --- File Validation Helper ---
   const validateFile = (file: File) => {
@@ -120,7 +120,7 @@ export default function EmployeeDocumentTab() {
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !id) return;
+    if (!file || !eid) return;
 
     if (!validateFile(file)) return;
 
@@ -129,7 +129,7 @@ export default function EmployeeDocumentTab() {
     setIsUploading(true);
 
     const formData = new FormData();
-    formData.append('entityId', id);
+    formData.append('entityId', eid);
     formData.append('file_type', 'employeeDoc');
     formData.append('file', file);
 
@@ -167,7 +167,7 @@ export default function EmployeeDocumentTab() {
   // Handle Final Form Submission (Create or Update)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!id || !uploadedDocUrl || !documentTitle) {
+    if (!eid || !uploadedDocUrl || !documentTitle) {
       setUploadError('Please complete all fields.');
       return;
     }
@@ -175,7 +175,7 @@ export default function EmployeeDocumentTab() {
     setIsSubmitting(true);
     try {
       const payload = {
-        employeeId: id,
+        employeeId: eid,
         documentTitle: documentTitle,
         documentUrl: uploadedDocUrl
       };

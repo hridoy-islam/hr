@@ -41,7 +41,7 @@ const timeOnlySchema = z.object({
 type TimeOnlyFormData = z.infer<typeof timeOnlySchema>;
 
 export default function EditShift() {
-  const { id } = useParams<{ id: string }>();
+  const { id,sid } = useParams();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
 
@@ -61,7 +61,7 @@ export default function EditShift() {
   useEffect(() => {
     const fetchShiftData = async () => {
       try {
-        const response = await axiosInstance.get(`/hr/shift/${id}`);
+        const response = await axiosInstance.get(`/hr/shift/${sid}`);
         const shiftData = response.data.data;
         
         form.reset({
@@ -76,16 +76,16 @@ export default function EditShift() {
           description: 'Failed to fetch shift data',
           variant: 'destructive'
         });
-        navigate('/admin/hr/shift');
+        navigate(-1);
       } finally {
         setIsLoading(false);
       }
     };
 
-    if (id) {
+    if (sid) {
       fetchShiftData();
     }
-  }, [id, form, navigate]);
+  }, [sid, form, navigate]);
 
   const handleTimeClick = (type: 'start' | 'end') => {
     const [hour, minute] = form
@@ -118,13 +118,13 @@ export default function EditShift() {
         endTime: data.endTime
       };
 
-      const response = await axiosInstance.patch(`/hr/shift/${id}`, payload);
+      const response = await axiosInstance.patch(`/hr/shift/${sid}`, payload);
       if (response) {
         toast({
           title: 'Success',
           description: 'Shift updated successfully',
         });
-        navigate('/admin/hr/shift');
+        navigate(-1);
       }
     } catch (error) {
       console.error('Error updating shift:', error);

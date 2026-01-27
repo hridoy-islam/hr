@@ -68,7 +68,7 @@ export default function ViewApplicant() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedToReject, setSelectedToReject] = useState<string | null>(null);
   const rejectButtonRef = useRef<HTMLButtonElement>(null); // For focus restoration
-  const { id } = useParams();
+  const { id,vid } = useParams();
   const location = useLocation();
   const [vacancy, setVacancy] = useState<any>({});
   const navigate = useNavigate();
@@ -81,7 +81,7 @@ export default function ViewApplicant() {
     try {
       if (initialLoading) setInitialLoading(true);
       const response = await axiosInstance.get(
-        `/hr/applicant?vacancyId=${id}`,
+        `/hr/applicant?vacancyId=${vid}`,
         {
           params: {
             page,
@@ -106,7 +106,7 @@ export default function ViewApplicant() {
 
   const fetchVacancyDetails = async () => {
     try {
-      const response = await axiosInstance.get(`/hr/vacancy/${id}`);
+      const response = await axiosInstance.get(`/hr/vacancy/${vid}`);
       setVacancy(response?.data?.data);
     } catch (error) {
       console.error('Error fetching vacancy details:', error);
@@ -306,7 +306,7 @@ export default function ViewApplicant() {
           </div>
           <Button
             onClick={() => {
-              navigate(`/company/vacancy/add-applicant/${id}`);
+              navigate(`/company/${id}/vacancy/add-applicant/${vid}`);
             }}
             className="h-8 bg-theme text-white hover:bg-theme/90"
           >
@@ -344,7 +344,7 @@ export default function ViewApplicant() {
                     <TableCell
                       className="cursor-pointer"
                       onClick={() =>
-                        navigate(`/company/vacancy/view-applicant/${app._id}`)
+                        navigate(`/company/${id}/vacancy/view-applicant/${app._id}`)
                       }
                     >
                       {app.firstName} {app.lastName}
@@ -360,7 +360,7 @@ export default function ViewApplicant() {
                     <TableCell
                       className="cursor-pointer"
                       onClick={() =>
-                        navigate(`/company/vacancy/view-applicant/${app._id}`)
+                        navigate(`/company/${id}/vacancy/view-applicant/${app._id}`)
                       }
                     >
                       {app.email}
@@ -368,7 +368,7 @@ export default function ViewApplicant() {
                     <TableCell
                       className="cursor-pointer"
                       onClick={() =>
-                        navigate(`/company/vacancy/view-applicant/${app._id}`)
+                        navigate(`/company/${id}/vacancy/view-applicant/${app._id}`)
                       }
                     >
                       {app.position}
@@ -376,7 +376,7 @@ export default function ViewApplicant() {
                     <TableCell
                       className="cursor-pointer"
                       onClick={() =>
-                        navigate(`/company/vacancy/view-applicant/${app._id}`)
+                        navigate(`/company/${id}/vacancy/view-applicant/${app._id}`)
                       }
                     >
                       {app.employmentType}
@@ -408,7 +408,7 @@ export default function ViewApplicant() {
                             <DropdownMenuItem
                               onClick={() =>
                                 navigate(
-                                  `/company/vacancy/recruit-applicant/${app._id}`,
+                                  `/company/${id}/vacancy/recruit-applicant/${app._id}`,
                                   { state: { applicant: app } }
                                 )
                               }

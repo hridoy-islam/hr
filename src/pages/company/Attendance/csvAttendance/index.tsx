@@ -37,6 +37,7 @@ import moment from 'moment';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
+import { useParams } from 'react-router-dom';
 
 // --- Interfaces ---
 interface AttendanceStagedItem {
@@ -121,6 +122,7 @@ export default function BulkAttendancePage() {
   const [processingId, setProcessingId] = useState<string | null>(null);
 
   const { user } = useSelector((state: any) => state.auth);
+  const {id}=useParams()
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -129,7 +131,7 @@ export default function BulkAttendancePage() {
   const fetchStagedData = async () => {
     try {
       setIsLoading(true);
-      const response = await axiosInstance.get(`/csv?companyId=${user?._id}`);
+      const response = await axiosInstance.get(`/csv?companyId=${id}`);
       const result = response.data?.data?.result || [];
 
       if (result.length > 0) {
@@ -181,7 +183,7 @@ export default function BulkAttendancePage() {
   const saveToStaging = async (rows: AttendanceStagedItem[]) => {
     try {
       const payload = {
-        companyId: user?._id,
+        companyId: id,
         attendances: rows.map((r) => ({
           name: r.name,
           email: r.email,

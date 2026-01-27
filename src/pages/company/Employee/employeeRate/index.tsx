@@ -61,7 +61,7 @@ const daysOfWeek = [
 ];
 
 export default function EmployeeRate() {
-  const { id: employeeId } = useParams();
+  const { id,eid: employeeId } = useParams();
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [selectedShifts, setSelectedShifts] = useState<Shift[]>([]);
   const [employeeRates, setEmployeeRates] = useState<
@@ -89,7 +89,7 @@ export default function EmployeeRate() {
 
         // Fetch shifts
         const shiftsResponse = await axiosInstance.get(
-          `/hr/shift?companyId=${user?._id}`
+          `/hr/shift?companyId=${id}`
         );
         setShifts(shiftsResponse.data.data?.result || []);
 

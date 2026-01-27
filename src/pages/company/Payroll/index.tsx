@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  FileText, 
-  Calculator, 
-  Check, 
-  X, 
-  Plus, 
+import {
+  FileText,
+  Calculator,
+  Check,
+  X,
+  Plus,
   Eye, // Added
   ChevronDown, // Added
   Download // Added
@@ -23,25 +23,25 @@ import {
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 import 'react-datepicker/dist/react-datepicker.css';
 import { DynamicPagination } from '@/components/shared/DynamicPagination';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogFooter, 
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
   DialogHeader, // Added
-  DialogTitle   // Added
+  DialogTitle // Added
 } from '@/components/ui/dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger,
+  DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'; // Added imports
 import moment from 'moment';
 import { useToast } from '@/components/ui/use-toast';
 import axiosInstance from '@/lib/axios';
 import { Label } from '@/components/ui/label';
 import { useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { downloadPayrollPDF, getPayrollPDFBlob } from './components/PayrollPDF';
 // Import the PDF logic
 
@@ -74,15 +74,14 @@ export interface TPayroll {
   createdAt: Date;
   updatedAt: Date;
   // Note: Ensure your backend sends attendanceList if you want the Detailed PDF to populate the table
-  attendanceList?: any[]; 
+  attendanceList?: any[];
 }
 
 const AdminPayRoll = () => {
-  
   const { user } = useSelector((state: any) => state.auth);
   const { toast } = useToast();
-  const navigate = useNavigate()
-  
+  const navigate = useNavigate();
+  const{id} = useParams()
   const [payrollList, setPayrollList] = useState<TPayroll[]>([]);
   const [users, setUsers] = useState<TUser[]>([]);
   const [userOptions, setUserOptions] = useState<
@@ -104,26 +103,24 @@ const AdminPayRoll = () => {
     label: string;
   } | null>(null);
 
-  
   const [showPayloadDialog, setShowPayloadDialog] = useState(false);
   const [showRejectDialog, setShowRejectDialog] = useState(false);
 
   const [payrollToReject, setPayrollToReject] = useState<string | null>(null);
-  const [selectedUser, setSelectedUser] = useState<TUser | null>(null);
-  const [payloadFromDate, setPayloadFromDate] = useState<Date | null>(null);
+const [selectedUsers, setSelectedUsers] = useState<TUser[]>([]);  const [payloadFromDate, setPayloadFromDate] = useState<Date | null>(null);
   const [payloadToDate, setPayloadToDate] = useState<Date | null>(null);
 
   // --- PREVIEW STATE ---
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewDetailed, setPreviewDetailed] = useState(false);
-  const [selectedPreviewPayroll, setSelectedPreviewPayroll] = useState<TPayroll | null>(null);
+  const [selectedPreviewPayroll, setSelectedPreviewPayroll] =
+    useState<TPayroll | null>(null);
 
- 
   const fetchUsers = async () => {
     try {
       const res = await axiosInstance.get('/users', {
-        params: { limit: 'all', company: user?._id, role: 'employee' }
+        params: { limit: 'all', company: id, role: 'employee' }
       });
       const userList = res.data.data.result || [];
       setUsers(userList);
@@ -175,7 +172,6 @@ const AdminPayRoll = () => {
     }
   };
 
-
   useEffect(() => {
     fetchUsers();
   }, []);
@@ -196,9 +192,8 @@ const AdminPayRoll = () => {
     };
   }, [previewUrl]);
 
-
   const handleApproveClick = async (payroll: TPayroll) => {
-    navigate(payroll._id)
+    navigate(payroll._id);
   };
 
   // --- PREVIEW HANDLER ---
@@ -206,7 +201,7 @@ const AdminPayRoll = () => {
     try {
       const blob = await getPayrollPDFBlob(payroll, detailed);
       if (previewUrl) URL.revokeObjectURL(previewUrl);
-      
+
       const url = URL.createObjectURL(blob);
       setPreviewUrl(url);
       setPreviewDetailed(detailed);
@@ -214,7 +209,11 @@ const AdminPayRoll = () => {
       setPreviewOpen(true);
     } catch (e) {
       console.error(e);
-      toast({ title: "Error", description: "Could not generate preview", variant: "destructive" });
+      toast({
+        title: 'Error',
+        description: 'Could not generate preview',
+        variant: 'destructive'
+      });
     }
   };
 
@@ -242,11 +241,12 @@ const AdminPayRoll = () => {
     }
   };
 
-  const handleSavePayroll = async () => {
-    if (!selectedUser || !payloadFromDate || !payloadToDate) {
+const handleSavePayroll = async () => {
+    // Check if array is empty
+    if (selectedUsers.length === 0 || !payloadFromDate || !payloadToDate) {
       toast({
         title: 'Warning',
-        description: 'Please select all fields.',
+        description: 'Please select at least one employee and the date range.',
         variant: 'default'
       });
       return;
@@ -254,13 +254,17 @@ const AdminPayRoll = () => {
 
     setLoading(true);
     try {
-      
+      // Create array of IDs
+      const userIds = selectedUsers.map((u) => u._id);
+
       await axiosInstance.post('/hr/payroll', {
-        userId: selectedUser._id,
-        companyId: user?.companyId || user?._id,
+        userIds: userIds, // Sending array instead of single userId
+        companyId: id,
         fromDate: payloadFromDate.toISOString(),
         toDate: payloadToDate.toISOString()
       });
+
+      console.log(userIds)
 
       toast({
         title: 'Success',
@@ -269,7 +273,7 @@ const AdminPayRoll = () => {
 
       // Cleanup
       setShowPayloadDialog(false);
-      setSelectedUser(null);
+      setSelectedUsers([]); // Reset array
       setPayloadFromDate(null);
       setPayloadToDate(null);
 
@@ -278,7 +282,6 @@ const AdminPayRoll = () => {
       console.error('Create Payroll Error:', err);
       toast({
         title: 'Error',
-        
         description:
           err.response?.data?.message || 'Failed to generate payroll.',
         variant: 'destructive'
@@ -289,7 +292,7 @@ const AdminPayRoll = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="">
       <div className="space-y-4">
         {/* --- HEADER & TABLE SECTION --- */}
         <div className="rounded-xl bg-white p-6 shadow-sm">
@@ -365,9 +368,12 @@ const AdminPayRoll = () => {
                         {payroll.totalHour != null
                           ? (() => {
                               const totalMinutes = Number(payroll.totalHour);
+
                               const hours = Math.floor(totalMinutes / 60);
-                              const minutes = totalMinutes % 60;
-                              return `${hours}:${minutes}`;
+
+                              const minutes = Math.floor(totalMinutes % 60);
+
+                              return `${hours}:${String(minutes).padStart(2, '0')}`;
                             })()
                           : '—'}
                       </TableCell>
@@ -391,42 +397,40 @@ const AdminPayRoll = () => {
                           {payroll.status}
                         </span>
                       </TableCell>
-                      <TableCell className="flex justify-end items-center space-x-2 text-right">
-                        
-                          <div className="flex flex-row gap-2">
-                             {/* --- PREVIEW DROPDOWN ADDED HERE --- */}
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                <Button  size="sm" className="border-gray-300">
-                                    <Eye className="mr-2 h-4 w-4" />
-                                    Preview
-                                    <ChevronDown className="ml-2 h-4 w-4" />
-                                </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                <DropdownMenuItem
-                                    onClick={() => handlePreview(payroll, false)}
-                                    className="cursor-pointer"
-                                >
-                                    Normal Preview (Summary)
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                    onClick={() => handlePreview(payroll, true)}
-                                    className="cursor-pointer"
-                                >
-                                    Detailed Preview (Full)
-                                </DropdownMenuItem>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
+                      <TableCell className="flex items-center justify-end space-x-2 text-right">
+                        <div className="flex flex-row gap-2">
+                          {/* --- PREVIEW DROPDOWN ADDED HERE --- */}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button size="sm" className="border-gray-300">
+                                <Eye className="mr-2 h-4 w-4" />
+                                Preview
+                                <ChevronDown className="ml-2 h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={() => handlePreview(payroll, false)}
+                                className="cursor-pointer"
+                              >
+                                Normal Preview (Summary)
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handlePreview(payroll, true)}
+                                className="cursor-pointer"
+                              >
+                                Detailed Preview (Full)
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
 
-                            <Button
-                              size="sm"
-                              onClick={() => handleApproveClick(payroll)}
-                            >
-                              View
-                            </Button>
-                          </div>
-                      
+                          <Button
+                            size="sm"
+                            onClick={() => handleApproveClick(payroll)}
+                          >
+                            View
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -458,25 +462,26 @@ const AdminPayRoll = () => {
         >
           <DialogContent className="overflow-visible border-gray-300">
             <h1 className="text-xl font-semibold">Generate Payroll</h1>
-            <div className="space-y-4">
-              {/* Employee Select */}
-              <div>
-                <Label>Select Employee</Label>
+          <div>
+                <Label>Select Employees</Label>
                 <Select
+                  isMulti // Enables multiple selection
                   options={userOptions}
-                  value={
-                    selectedUser
-                      ? {
-                          value: selectedUser._id,
-                          label: `${selectedUser.firstName} ${selectedUser.lastName}`
-                        }
-                      : null
-                  }
-                  onChange={(option) => {
-                    const u = users.find((u) => u._id === option?.value);
-                    setSelectedUser(u || null);
+                  // Map selectedUsers state back to React-Select format {value, label}
+                  value={selectedUsers.map((u) => ({
+                    value: u._id,
+                    label: `${u.firstName} ${u.lastName}`
+                  }))}
+                  onChange={(selectedOptions) => {
+                    // selectedOptions is an array of {value, label}
+                    // Filter the original 'users' list to match selected IDs
+                    const selectedIds = selectedOptions.map((opt) => opt.value);
+                    const newSelectedUsers = users.filter((u) =>
+                      selectedIds.includes(u._id)
+                    );
+                    setSelectedUsers(newSelectedUsers);
                   }}
-                  placeholder="Select an employee..."
+                  placeholder="Select employees..."
                   menuPortalTarget={document.body}
                   className="mt-1"
                   styles={{
@@ -485,9 +490,7 @@ const AdminPayRoll = () => {
                   }}
                 />
               </div>
-
-              {/* Date Range */}
-              <div className="grid grid-cols-2 gap-4">
+<div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>From Date</Label>
                   <DatePicker
@@ -516,9 +519,7 @@ const AdminPayRoll = () => {
                     portalId="root"
                   />
                 </div>
-              </div>
-            </div>
-
+                </div>
             <DialogFooter className="mt-6">
               <Button
                 variant="secondary"
@@ -530,7 +531,7 @@ const AdminPayRoll = () => {
               <Button
                 onClick={handleSavePayroll}
                 disabled={
-                  loading || !selectedUser || !payloadFromDate || !payloadToDate
+                  loading || selectedUsers.length === 0 || !payloadFromDate || !payloadToDate
                 }
                 className="bg-theme text-white hover:bg-theme/90"
               >
@@ -568,42 +569,47 @@ const AdminPayRoll = () => {
 
         {/* --- PREVIEW PDF DIALOG --- */}
         <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-        <DialogContent className="max-w-6xl h-[96vh] flex flex-col p-0 gap-0">
-            <DialogHeader className="px-6 py-4 border-b">
-                <DialogTitle>Payroll Preview ({previewDetailed ? 'Detailed' : 'Summary'})</DialogTitle>
+          <DialogContent className="flex h-[96vh] max-w-6xl flex-col gap-0 p-0">
+            <DialogHeader className="border-b px-6 py-4">
+              <DialogTitle>
+                Payroll Preview ({previewDetailed ? 'Detailed' : 'Summary'})
+              </DialogTitle>
             </DialogHeader>
-            
-            <div className="flex-1 w-full bg-gray-100 relative">
-               {previewUrl ? (
-                   <embed 
-                      // Hides toolbar
-                      src={`${previewUrl}#toolbar=0&navpanes=0&scrollbar=0`}
-                      type="application/pdf"
-                      width="100%" 
-                      height="100%" 
-                      className="absolute inset-0"
-                   />
-               ) : (
-                  <div className="flex items-center justify-center h-full text-gray-500">
-                    Loading Preview...
-                  </div>
-               )}
-            </div>
-            
-            <div className="flex justify-end gap-2 p-4 border-t bg-white">
-                 <Button variant="secondary" onClick={() => setPreviewOpen(false)}>
-                    Close
-                 </Button>
-                 {selectedPreviewPayroll && (
-                    <Button onClick={() => downloadPayrollPDF(selectedPreviewPayroll, previewDetailed)}>
-                        <Download className="h-4 w-4 mr-2" />
-                        Download PDF
-                    </Button>
-                 )}
-            </div>
-        </DialogContent>
-      </Dialog>
 
+            <div className="relative w-full flex-1 bg-gray-100">
+              {previewUrl ? (
+                <embed
+                  // Hides toolbar
+                  src={`${previewUrl}#toolbar=0&navpanes=0&scrollbar=0`}
+                  type="application/pdf"
+                  width="100%"
+                  height="100%"
+                  className="absolute inset-0"
+                />
+              ) : (
+                <div className="flex h-full items-center justify-center text-gray-500">
+                  Loading Preview...
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 border-t bg-white p-4">
+              <Button variant="secondary" onClick={() => setPreviewOpen(false)}>
+                Close
+              </Button>
+              {selectedPreviewPayroll && (
+                <Button
+                  onClick={() =>
+                    downloadPayrollPDF(selectedPreviewPayroll, previewDetailed)
+                  }
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  Download PDF
+                </Button>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

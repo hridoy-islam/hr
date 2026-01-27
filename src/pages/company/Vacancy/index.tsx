@@ -16,7 +16,7 @@ import { BlinkingDots } from '@/components/shared/blinking-dots';
 import { Input } from '@/components/ui/input';
 import moment from 'moment';
 import { DynamicPagination } from '@/components/shared/DynamicPagination';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
   Tooltip,
   TooltipTrigger,
@@ -34,14 +34,14 @@ export default function Vacancy() {
   const { toast } = useToast();
   const navigate = useNavigate();
   const user = useSelector((state: any) => state.auth?.user) || null;
-
+  const {id} = useParams()
   const fetchData = async (page: number, limit: number, search = '') => {
     try {
       setInitialLoading(true);
       const response = await axiosInstance.get('/hr/vacancy', {
         params: {
           page,
-          companyId:user?._id,
+          companyId:id,
           limit,
           ...(search ? { searchTerm: search } : {})
         }

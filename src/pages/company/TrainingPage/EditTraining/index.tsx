@@ -46,7 +46,7 @@ const trainingFormSchema = z.object({
 type TrainingFormData = z.infer<typeof trainingFormSchema>;
 
 export default function EditTraining() {
-  const { id } = useParams();
+  const { id,tid } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
   const form = useForm<TrainingFormData>({
@@ -65,7 +65,7 @@ export default function EditTraining() {
   useEffect(() => {
     const fetchTraining = async () => {
       try {
-        const response = await axiosInstance.get(`/hr/training/${id}`);
+        const response = await axiosInstance.get(`/hr/training/${tid}`);
         const data = response.data.data;
 
         // Prefill the form with existing data
@@ -83,7 +83,7 @@ export default function EditTraining() {
 
   const onSubmit = async (data: TrainingFormData) => {
     try {
-      await axiosInstance.patch(`/hr/training/${id}`, data);
+      await axiosInstance.patch(`/hr/training/${tid}`, data);
 
       // Check if update was successful
 

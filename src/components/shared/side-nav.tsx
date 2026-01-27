@@ -44,7 +44,7 @@ import {
   FileJsonIcon
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { useEffect, useState } from 'react';
 import { logout } from '@/redux/features/authSlice';
@@ -163,28 +163,28 @@ const navItems = [
     label: 'Training Status',
     href: 'expiry/training',
     roles: ['company'],
-    badgeKey: 'training' 
+    badgeKey: 'training'
   },
   {
     icon: ClipboardCheck,
     label: 'Spot Check',
     href: 'expiry/spot-check',
     roles: ['company'],
-    badgeKey: 'spot' // Added badgeKey
+    badgeKey: 'spot'
   },
   {
     icon: UserCheck,
     label: 'Supervision',
-    href: 'expiry/supervision', // Fixed href (was duplicate spot-check)
+    href: 'expiry/supervision',
     roles: ['company'],
-    badgeKey: 'supervision' // Added badgeKey
+    badgeKey: 'supervision'
   },
   {
     icon: FileCheck,
     label: 'Quality Assurance',
     href: 'expiry/qa',
     roles: ['company'],
-    badgeKey: 'qa' 
+    badgeKey: 'qa'
   },
   // --- END UPDATED ITEMS ---
   {
@@ -213,7 +213,7 @@ const navItems = [
     href: '#',
     roles: ['company']
   },
- {
+  {
     icon: CircleDollarSign,
     label: 'Payroll',
     href: 'payroll',
@@ -241,28 +241,10 @@ const navItems = [
         label: 'Upload Attendance',
         href: 'csv-attendance',
         roles: ['company']
-      },
-      // {
-      //   icon: CircleCheckBig,
-      //   label: 'Attendance Approve',
-      //   href: 'attendance-approve',
-      //   roles: ['company']
-      // },
-      // {
-      //   icon: BetweenVerticalStart,
-      //   label: 'Manual Attendance',
-      //   href: 'attendance-entry',
-      //   roles: ['company']
-      // },
-      // {
-      //   icon: Calendar,
-      //   label: 'Attendance Report',
-      //   href: 'attendance-report',
-      //   roles: ['company']
-      // }
+      }
     ]
   },
-  {
+ {
     icon: Settings,
     label: 'Settings',
     roles: ['company'],
@@ -324,208 +306,69 @@ const navItems = [
       }
     ]
   },
-
-  // --- Employee Specific ---
-  {
-    icon: Box,
-    label: 'My Holidays',
-    href: 'holiday',
-    roles: ['employee']
-  },
-  {
-    icon: PencilRuler,
-    label: 'My Staff',
-    href: 'my-staff',
-    roles: []
-  },
-  {
-    icon: FileTextIcon,
-    label: 'Notice',
-    href: 'notice',
-    roles: ['employee']
-  },
-  {
-    icon: DoorOpen,
-    label: 'Vacancy',
-    href: 'vacancy',
-    roles: []
-  },
-  {
-    icon: BookText,
-    label: 'Training',
-    href: 'training',
-    roles: ['employee']
-  },
-
-  // --- Legacy / Admin Sub-menus ---
-  {
-    icon: UsersIcon,
-    label: 'Employee Management',
-    roles: [],
-    subItems: [
-      {
-        icon: Users,
-        label: 'Employee List',
-        href: 'employee',
-        roles: []
-      },
-      {
-        icon: LayoutPanelTop,
-        label: 'Department',
-        href: 'department',
-        roles: []
-      },
-      {
-        icon: ArrowBigUp,
-        label: 'Shift',
-        href: 'shift',
-        roles: []
-      },
-      {
-        icon: Award,
-        label: 'Designation',
-        href: 'designation',
-        roles: []
-      },
-      {
-        icon: BookText,
-        label: 'Training',
-        href: 'training',
-        roles: []
-      }
-    ]
-  },
-  {
-    icon: FileCheck2,
-    label: 'Attendance',
-    roles: [],
-    subItems: [
-      {
-        icon: FileCheck2,
-        label: 'Attendance List',
-        href: 'attendance',
-        roles: []
-      },
-      {
-        icon: CircleCheckBig,
-        label: 'Attendance Approve',
-        href: 'attendance-approve',
-        roles: []
-      },
-      {
-        icon: BetweenVerticalStart,
-        label: 'Attendance Entry',
-        href: 'attendance/attendance-entry',
-        roles: []
-      },
-      {
-        icon: Calendar,
-        label: 'Attendance Report',
-        href: 'attendance-report',
-        roles: []
-      }
-    ]
-  },
-  {
-    icon: Clock4,
-    label: 'My Attendance',
-    href: 'staff-attendance',
-    roles: ['employee']
-  },
- 
-  {
-    icon: CircleGauge,
-    label: 'Leave',
-    href: 'leave-approve',
-    roles: []
-  },
-  {
-    icon: FileSpreadsheet,
-    label: 'My Documents',
-    href: 'documents',
-    roles: ['employee']
-  },
-  {
-    icon: FileSpreadsheet,
-    label: 'Document Requests',
-    href: 'document-request',
-    roles: []
-  },
-
-  // --- Settings ---
-
-  {
-    icon: Settings,
-    label: 'System Settings',
-    roles: [],
-    subItems: [
-      {
-        icon: ReceiptText,
-        label: 'Company Details',
-        href: 'company-details',
-        roles: []
-      },
-      {
-        icon: Mails,
-        label: 'Email Setup',
-        href: 'email-setup',
-        roles: []
-      },
-      {
-        icon: Calendar,
-        label: 'Bank Holiday',
-        href: 'bank-holiday',
-        roles: []
-      }
-    ]
-  }
 ];
 
-// Filter navigation items based on user role
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const filterNavItemsByRole = (items: any[], userRole: string) => {
-  return items
-    .filter((item) => !item.roles || item.roles.includes(userRole))
-    .map((item) => {
-      if (item.subItems) {
-        return {
-          ...item,
-          subItems: filterNavItemsByRole(item.subItems, userRole)
-        };
-      }
-      return item;
-    })
-    .filter((item) => {
-      if (item.subItems && item.subItems.length === 0) {
-        return false;
-      }
-      return true;
-    });
+const filterNavItemsByRole = (items: any[], role: string) => {
+  return items.filter((item) => item.roles?.includes(role));
 };
 
-// 1. Updated NavItem to accept basePath AND status
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const NavItem = ({
   item,
   expandedItems,
   toggleExpanded,
   depth = 0,
   basePath,
-  status // Receive status prop
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-}: any) => {
+  status,
+  companyId
+}: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  item: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  expandedItems: any;
+  toggleExpanded: (label: string) => void;
+  depth?: number;
+  basePath: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  status?: any;
+  companyId?: string | null;
+}) => {
   const location = useLocation();
   const isExpanded = expandedItems[item.label];
 
-  // Construct the full path based on the dynamic basePath
-  const targetPath = item.href ? `${basePath}/${item.href}` : basePath;
+  // Build target path with companyId if it's a company route
+  let targetPath = '#';
+  
+  // Check if href exists and is not '#'
+  if (item.href !== undefined && item.href !== '#') {
+    if (item.roles?.includes('company') && companyId) {
+      // For company routes, include companyId
+      if (item.href === '') {
+        // Dashboard route for company: /company/:companyId
+        targetPath = `/company/${companyId}`;
+      } else {
+        // Other company routes: /company/:companyId/:href
+        targetPath = `/company/${companyId}/${item.href}`;
+      }
+    } else {
+      // For admin routes or when no companyId
+      if (item.href === '') {
+        // Dashboard route for admin: /admin
+        targetPath = basePath;
+      } else {
+        // Other admin routes: /admin/:href
+        targetPath = `${basePath}/${item.href}`;
+      }
+    }
+  }
 
   const isActiveLeaf =
-    !item.subItems &&
-    (item.href === ''
-      ? location.pathname === basePath || location.pathname === `${basePath}/`
-      : location.pathname === targetPath ||
-        location.pathname.startsWith(`${targetPath}/`));
+    item.href !== undefined && item.href !== '#'
+      ? depth === 0
+        ? location.pathname === targetPath
+        : location.pathname === targetPath ||
+          location.pathname.startsWith(`${targetPath}/`)
+      : false;
 
   // Logic to determine badge count
   const badgeCount = item.badgeKey && status ? status[item.badgeKey] : 0;
@@ -545,7 +388,6 @@ const NavItem = ({
             <span className="text-black group-hover:text-white">
               {item.label}
             </span>
-            {/* Show Badge on Parent items if needed (optional, usually on leaf) */}
             {badgeCount > 0 && (
               <span className="ml-2 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1 text-xs font-bold text-white">
                 {badgeCount}
@@ -575,7 +417,8 @@ const NavItem = ({
                 toggleExpanded={toggleExpanded}
                 depth={depth + 1}
                 basePath={basePath}
-                status={status} // Pass status recursively
+                status={status}
+                companyId={companyId}
               />
             ))}
           </div>
@@ -597,7 +440,6 @@ const NavItem = ({
       <span className="flex-1 text-black group-hover:text-white">
         {item.label}
       </span>
-      {/* RENDER BADGE HERE */}
       {badgeCount > 0 && (
         <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1 text-xs font-bold text-white group-hover:bg-red-400 group-hover:text-white">
           {badgeCount}
@@ -616,52 +458,85 @@ export function SideNav() {
   const userRole = user?.role;
   const [expandedItems, setExpandedItems] = useState({});
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [userData, setUserData] = useState(null);
   const [companyThemeColor, setCompanyThemeColor] = useState<string>('');
+  const {id} = useParams();
 
-   useEffect(() => {
-    const savedTheme = localStorage.getItem("themeColor");
+  // Detect if admin is viewing company layout
+  const isAdminViewingCompany =
+    userRole === 'admin' && location.pathname.startsWith('/company/');
+
+  // Get company ID from URL if admin is viewing company
+  const getCompanyIdFromUrl = () => {
+    if (isAdminViewingCompany) {
+      const pathParts = location.pathname.split('/');
+      return pathParts[2] || null;
+    }
+    return null;
+  };
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('themeColor');
     if (savedTheme) {
-      document.documentElement.style.setProperty("--theme", savedTheme);
-      setCompanyThemeColor(savedTheme); // Set the theme color from localStorage
+      document.documentElement.style.setProperty('--theme', savedTheme);
+      setCompanyThemeColor(savedTheme);
     }
   }, []);
-
 
   useEffect(() => {
     if (user) {
       const fetchCompanyData = async () => {
         try {
-          const response = await axiosInstance.get(`/users/${user?._id}`);
-          const themeColor = response.data.data.themeColor || '#38bdf8'; // Fallback theme color
+          let userId = user?._id;
+
+          // If admin is viewing company layout, fetch that company's data
+          if (isAdminViewingCompany) {
+            const companyId = getCompanyIdFromUrl();
+            if (companyId) {
+              userId = companyId;
+            }
+          }
+
+          const response = await axiosInstance.get(`/users/${userId}`);
+          const themeColor = response.data.data.themeColor || '#38bdf8';
           setCompanyThemeColor(themeColor);
-          localStorage.setItem("themeColor", themeColor); // Store it in localStorage
-          document.documentElement.style.setProperty("--theme", themeColor); // Apply the new theme
+          setUserData(response.data.data);
+          const storageKey = isAdminViewingCompany
+            ? `themeColor_company_${userId}`
+            : 'themeColor';
+          localStorage.setItem(storageKey, themeColor);
+
+          document.documentElement.style.setProperty('--theme', themeColor);
         } catch (error) {
           console.error('Error fetching company data:', error);
-          // Fallback theme color in case of an error
           const fallbackColor = '#38bdf8';
           setCompanyThemeColor(fallbackColor);
-          localStorage.setItem("themeColor", fallbackColor); // Store fallback in localStorage
-          document.documentElement.style.setProperty("--theme", fallbackColor); // Apply fallback theme
+          localStorage.setItem('themeColor', fallbackColor);
+          document.documentElement.style.setProperty('--theme', fallbackColor);
         }
       };
       fetchCompanyData();
     } else {
-      // If id is undefined, apply default theme color
       const fallbackColor = '#38bdf8';
       setCompanyThemeColor(fallbackColor);
-      localStorage.setItem("themeColor", fallbackColor); // Store fallback in localStorage
-      document.documentElement.style.setProperty("--theme", fallbackColor); // Apply fallback theme
+      localStorage.setItem('themeColor', fallbackColor);
+      document.documentElement.style.setProperty('--theme', fallbackColor);
     }
-  }, [user]);
-
+  }, [user, isAdminViewingCompany, location.pathname]);
 
   // Use the Context Hook
-  const { status } = useScheduleStatus(); 
+  const { status } = useScheduleStatus();
 
-  const basePath = userRole === 'company' ? '/company' : '/admin';
+  // Get company ID for building routes
+  const companyId = isAdminViewingCompany
+    ? getCompanyIdFromUrl()
+    : userRole === 'company'
+      ? user?._id
+      : null;
+
+  // Determine basePath - if admin is viewing company, use /company
+  const basePath =
+    userRole === 'company' || isAdminViewingCompany ? '/company' : '/admin';
 
   const handleLogout = async () => {
     await dispatch(logout());
@@ -675,7 +550,6 @@ export function SideNav() {
     }
   }, [user, dispatch, navigate]);
 
-  // Auto-expand parents based on pathname
   useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const expandParents = (items: any[]) => {
@@ -710,7 +584,9 @@ export function SideNav() {
     }));
   };
 
-  const filteredNavItems = filterNavItemsByRole(navItems, userRole);
+  // Filter nav items - if admin is viewing company, show company items
+  const effectiveRole = isAdminViewingCompany ? 'company' : userRole;
+  const filteredNavItems = filterNavItemsByRole(navItems, effectiveRole);
 
   const sidebarContent = (
     <div className="flex h-full flex-col">
@@ -727,7 +603,7 @@ export function SideNav() {
       {/* User Profile */}
       <div className="flex flex-col items-center px-4 ">
         <img
-          src={user?.image || '/placeholder.jpg'}
+          src={userData?.image || '/placeholder.jpg'}
           alt="User avatar"
           className="h-24 w-24 rounded-full object-cover"
         />
@@ -745,8 +621,13 @@ export function SideNav() {
         : 'cursor-pointer underline'
     }`}
           >
-            {user ? user.name : 'User'}
+            {userData ? userData?.name : 'User'}
           </div>
+          {isAdminViewingCompany && (
+            <div className="text-xs text-theme bg-theme/10 px-2 py-1 rounded">
+              Viewing as Admin
+            </div>
+          )}
         </div>
       </div>
 
@@ -759,7 +640,8 @@ export function SideNav() {
             expandedItems={expandedItems}
             toggleExpanded={toggleExpanded}
             basePath={basePath}
-            status={status} // Pass status props down
+            status={status}
+            companyId={companyId}
           />
         ))}
       </nav>

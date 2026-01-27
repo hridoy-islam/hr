@@ -26,6 +26,7 @@ import { Input } from '@/components/ui/input';
 import { DynamicPagination } from '@/components/shared/DynamicPagination';
 import { useSelector } from 'react-redux';
 import { BranchDialog } from './components/BranchDialog';
+import { useParams } from 'react-router-dom';
 
 export default function CompanyBranch() {
   const [branches, setBranches] = useState<any>([]);
@@ -42,7 +43,7 @@ export default function CompanyBranch() {
   const [totalPages, setTotalPages] = useState(1);
   const [entriesPerPage, setEntriesPerPage] = useState(100);
   const [searchTerm, setSearchTerm] = useState('');
-
+  const {id} = useParams()
   const user = useSelector((state: any) => state.auth.user);
 
   const fetchData = async (page, entriesPerPage, searchTerm = '') => {
@@ -52,7 +53,7 @@ export default function CompanyBranch() {
         params: {
           page,
           limit: entriesPerPage,
-          companyId: user?._id,
+          companyId: id,
           ...(searchTerm ? { searchTerm } : {})
         }
       });
@@ -76,7 +77,7 @@ export default function CompanyBranch() {
       } else {
         response = await axiosInstance.post(`/company-branch`, {
           ...data,
-          companyId: user?._id
+          companyId: id
         });
       }
 

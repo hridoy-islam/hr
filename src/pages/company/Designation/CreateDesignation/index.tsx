@@ -6,7 +6,7 @@ import { toast } from '@/components/ui/use-toast';
 import axiosInstance from '@/lib/axios';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { MoveLeft } from 'lucide-react';
 
@@ -46,7 +46,7 @@ export default function AddDesignation() {
 
   const navigate = useNavigate();
   const { user } = useSelector((state: any) => state.auth);
-
+  const {id} = useParams()
   const onSubmit: SubmitHandler<Inputs> = async (data) => {
     // Normalize permissions for each module
     const permissionsPayload = modules.reduce(
@@ -65,7 +65,7 @@ export default function AddDesignation() {
     const payload: Inputs = {
       ...data,
       permissions: permissionsPayload,
-       companyId:user?._id
+       companyId:id
       
     };
 

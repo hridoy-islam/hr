@@ -54,7 +54,7 @@ interface AppraisalData {
 }
 
 function AppraisalTab() {
-  const { id } = useParams();
+  const { id ,eid} = useParams();
   const { user } = useSelector((state: any) => state.auth);
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -88,10 +88,10 @@ function AppraisalTab() {
 
   // 1. Fetch Schedule Settings (Get Appraisal Interval)
   const fetchScheduleSettings = async () => {
-    if (!user?._id) return;
+    if (!id) return;
     try {
       const res = await axiosInstance.get(
-        `/schedule-check?companyId=${user._id}`
+        `/schedule-check?companyId=${id}`
       );
       const result = res.data?.data?.result;
       if (result && result.length > 0) {
@@ -105,9 +105,9 @@ function AppraisalTab() {
 
   // 2. Fetch Appraisal Data
   const fetchAppraisalData = async () => {
-    if (!id) return;
+    if (!eid) return;
     try {
-      const res = await axiosInstance.get(`/appraisal?employeeId=${id}`);
+      const res = await axiosInstance.get(`/appraisal?employeeId=${eid}`);
       const dataList: AppraisalData[] = res.data.data.result;
 
       if (dataList.length > 0) {
@@ -137,7 +137,7 @@ function AppraisalTab() {
       setIsLoading(false);
     };
     loadData();
-  }, [id, user?._id]);
+  }, [eid, id]);
 
   // 3. Status Calculation (Exact logic from ImmigrationTab)
   useEffect(() => {
@@ -190,7 +190,7 @@ function AppraisalTab() {
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = event.target.files?.[0];
-    if (!file || !user?._id) return;
+    if (!file || !id) return;
 
     const validTypes = ['application/pdf', 'image/jpeg', 'image/png'];
     if (!validTypes.includes(file.type)) {
@@ -242,7 +242,7 @@ function AppraisalTab() {
 
   // Submit Logic
   const handleSubmitUpdate = async () => {
-    if (!user?._id || !uploadedFileUrl || !newCheckDate) return;
+    if (!id || !uploadedFileUrl || !newCheckDate) return;
 
     setIsSubmitting(true);
 
@@ -253,8 +253,8 @@ function AppraisalTab() {
       nextCheckDate: moment(newCheckDate).toISOString()
     };
 
-    if (!appraisalId && id) {
-      payload.employeeId = id;
+    if (!appraisalId && eid) {
+      payload.employeeId = eid;
     }
 
     try {

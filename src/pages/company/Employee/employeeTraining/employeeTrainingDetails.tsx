@@ -77,7 +77,7 @@ type TEmployeeTraining = {
 };
 
 const TrainingDetailsPage: React.FC = () => {
-  const { tid } = useParams<{ tid: string }>();
+  const { id,eid,tid } = useParams<{ tid: string }>();
   const navigate = useNavigate();
 
   // Refs for file inputs
@@ -241,7 +241,7 @@ const TrainingDetailsPage: React.FC = () => {
   };
 
   const handleEmployeeClick = (employeeId: string) => {
-    navigate(`/company/employee/${employeeId}`, {
+    navigate(`/company/${id}/employee/${employeeId}`, {
       state: { activeTab: 'training' }
     });
   };

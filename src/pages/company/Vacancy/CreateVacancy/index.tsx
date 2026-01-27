@@ -15,7 +15,7 @@ import {
 import { useForm, SubmitHandler, Controller } from 'react-hook-form';
 import { useState } from 'react';
 import { useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { MoveLeft } from 'lucide-react';
 import ReactQuill from 'react-quill';
@@ -50,10 +50,10 @@ export default function CreateVacancy() {
   } = useForm<Inputs>();
   const navigate = useNavigate();
   const { user } = useSelector((state: any) => state.auth);
-
+  const {id} = useParams()
   const onSubmit: SubmitHandler<Inputs> = async (data) => {
     data.postedBy = user._id;
-    data.companyId= user?._id;
+    data.companyId= id;
     data.status = 'active';
     try {
       const response = await axiosInstance.post(`/hr/vacancy`, data);
@@ -62,7 +62,7 @@ export default function CreateVacancy() {
           title: 'Success!',
           description: 'Vacancy created successfully.'
         });
-        navigate(`/company/vacancy`);
+        navigate(-1);
       }
     } catch (error) {
       toast({

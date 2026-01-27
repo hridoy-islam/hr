@@ -63,7 +63,7 @@ interface DisciplinaryData {
 // --- Main Component ---
 
 function DisciplinaryTab() {
-  const { id } = useParams(); // employeeId
+  const { id ,eid} = useParams(); // employeeId
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { user } = useSelector((state: any) => state.auth);
   const { toast } = useToast();
@@ -98,9 +98,9 @@ function DisciplinaryTab() {
   // --- Fetch Data ---
 
   const fetchSettings = async () => {
-    if (!user?._id) return;
+    if (!id) return;
     try {
-      const res = await axiosInstance.get(`/schedule-check?companyId=${user._id}`);
+      const res = await axiosInstance.get(`/schedule-check?companyId=${id}`);
       const result = res.data?.data?.result;
       if (result && result.length > 0) {
         setCheckInterval(result[0].disciplinaryCheckDate || 30);
@@ -111,9 +111,9 @@ function DisciplinaryTab() {
   };
 
   const fetchDisciplinaryData = async () => {
-    if (!id) return;
+    if (!eid) return;
     try {
-      const res = await axiosInstance.get(`/disciplinary?employeeId=${id}`);
+      const res = await axiosInstance.get(`/disciplinary?employeeId=${eid}`);
       const result: DisciplinaryData[] = res.data?.data?.result || [];
 
       if (result.length > 0) {
@@ -143,7 +143,7 @@ function DisciplinaryTab() {
       setIsLoading(false);
     };
     loadData();
-  }, [id, user?._id]);
+  }, [eid, id]);
 
   // --- Status Logic ---
 
@@ -183,7 +183,7 @@ function DisciplinaryTab() {
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !user?._id) return;
+    if (!file || !id) return;
 
     if (file.size > 5 * 1024 * 1024) {
       setUploadError('File must be less than 5MB.');
@@ -245,7 +245,7 @@ function DisciplinaryTab() {
 
   // --- Submit: Create Issue ---
   const submitCreate = async () => {
-    if (!inputDate || !user?._id) return; // Note/Doc are optional now
+    if (!inputDate || !id) return; // Note/Doc are optional now
     setIsSubmitting(true);
 
     try {
@@ -264,7 +264,7 @@ function DisciplinaryTab() {
       } else {
         await axiosInstance.post('/disciplinary', {
           ...payload,
-          employeeId: id
+          employeeId: eid
         });
       }
 
@@ -281,7 +281,7 @@ function DisciplinaryTab() {
 
   // --- Submit: Extend Deadline ---
   const submitExtend = async () => {
-    if (!inputDate || !disciplinaryId || !user?._id) return;
+    if (!inputDate || !disciplinaryId || !id) return;
     setIsSubmitting(true);
 
     try {
@@ -306,7 +306,7 @@ function DisciplinaryTab() {
 
   // --- Submit: Resolve Issue ---
   const submitResolve = async () => {
-    if (!disciplinaryId || !user?._id) return;
+    if (!disciplinaryId || !id) return;
     setIsSubmitting(true);
 
     try {

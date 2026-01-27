@@ -54,7 +54,7 @@ interface RTWData {
 }
 
 function RightToWorkTab() {
-  const { id } = useParams();
+  const { id,eid } = useParams();
   const { user } = useSelector((state: any) => state.auth);
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -86,10 +86,10 @@ function RightToWorkTab() {
 
   // 1. Fetch Schedule Settings
   const fetchScheduleSettings = async () => {
-    if (!user?._id) return;
+    if (!id) return;
     try {
       const res = await axiosInstance.get(
-        `/schedule-check?companyId=${user._id}`
+        `/schedule-check?companyId=${id}`
       );
       const result = res.data?.data?.result;
       if (result && result.length > 0) {
@@ -102,10 +102,10 @@ function RightToWorkTab() {
 
   // 2. Fetch RTW Data
   const fetchRTWData = async () => {
-    if (!id) return;
+    if (!eid) return;
     try {
       const rtwRes = await axiosInstance.get(
-        `/hr/right-to-work?employeeId=${id}`
+        `/hr/right-to-work?employeeId=${eid}`
       );
       const rtwList: RTWData[] = rtwRes.data.data.result;
 
@@ -141,7 +141,7 @@ function RightToWorkTab() {
     };
 
     loadData();
-  }, [id, user?._id]);
+  }, [id, eid]);
 
   // 3. Status Calculation (Warning threshold = checkInterval)
   useEffect(() => {
@@ -198,7 +198,7 @@ function RightToWorkTab() {
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = event.target.files?.[0];
-    if (!file || !user?._id) return;
+    if (!file || !eid) return;
 
     const validTypes = ['application/pdf', 'image/jpeg', 'image/png'];
     if (!validTypes.includes(file.type)) {
@@ -249,7 +249,7 @@ function RightToWorkTab() {
 
   // Submit Logic
   const handleSubmitUpdate = async () => {
-    if (!user?._id || !uploadedFileUrl || !newCheckDate) return;
+    if (!eid || !uploadedFileUrl || !newCheckDate) return;
 
     setIsSubmitting(true);
 
@@ -260,8 +260,8 @@ function RightToWorkTab() {
       nextCheckDate: moment(newCheckDate).toISOString()
     };
 
-    if (!rtwId && id) {
-      payload.employeeId = id;
+    if (!rtwId && eid) {
+      payload.employeeId = eid;
     }
 
     try {

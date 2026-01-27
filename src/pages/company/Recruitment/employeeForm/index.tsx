@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
 import Select from 'react-select';
 import { Trash } from 'lucide-react';
@@ -28,7 +28,7 @@ function EmployeeForm() {
   const location = useLocation();
   const navigate = useNavigate();
   const userId = location.state?.user?._id || '';
-
+  const {id} = useParams()
   // --- State: General ---
   const [step, setStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
@@ -51,10 +51,10 @@ function EmployeeForm() {
   const fetchData = async () => {
     try {
       const [designationRes, departmentRes, shiftsRes, ratesRes] = await Promise.all([
-        axiosInstance(`/hr/designation?employeeId=${userId}&limit=all`),
-        axiosInstance(`/hr/department?employeeId=${userId}&limit=all`),
-        axiosInstance(`/hr/shift?employeeId=${userId}&limit=all`),
-        axiosInstance(`/hr/employeeRate?employeeId=${userId}&limit=all`)
+        axiosInstance(`/hr/designation?companyId=${id}&limit=all`),
+        axiosInstance(`/hr/department?companyId=${id}&limit=all`),
+        axiosInstance(`/hr/shift?companyId=${id}&limit=all`),
+        axiosInstance(`/hr/employeeRate?companyId=${id}&limit=all`)
       ]);
 
       // 1. Setup Designations & Departments for React Select
@@ -102,7 +102,7 @@ function EmployeeForm() {
       title: 'Employee Created Successfully',
       className: 'bg-theme text-white border-none' // Optional styling
     });
-    navigate('/company/employee');
+    navigate(`/company/${id}/employee`);
   };
 
   // --- Handlers: Step 1 & 2 ---

@@ -8,6 +8,7 @@ import React, {
 } from 'react';
 import { useSelector } from 'react-redux';
 import axiosInstance from '@/lib/axios';
+import { useParams } from 'react-router-dom';
 
 // 1. Define the shape of the data
 export interface ScheduleStatus {
@@ -57,12 +58,12 @@ export const ScheduleStatusProvider = ({ children }: { children: ReactNode }) =>
   const { user } = useSelector((state: any) => state.auth); // Get logged-in company
   const [status, setStatus] = useState<ScheduleStatus>(defaultStatus);
   const [loading, setLoading] = useState<boolean>(true);
-
+  const{id} = useParams()
   const fetchStatus = useCallback(async () => {
-    if (!user?._id) return;
+    if (!id) return;
 
     try {
-      const response = await axiosInstance.get(`/schedule-status/${user._id}`);
+      const response = await axiosInstance.get(`/schedule-status/${id}`);
       
       if (response.data?.data) {
         setStatus(response.data.data);
@@ -72,7 +73,7 @@ export const ScheduleStatusProvider = ({ children }: { children: ReactNode }) =>
     } finally {
       setLoading(false);
     }
-  }, [user?._id]);
+  }, [id]);
 
   // Initial Fetch
   useEffect(() => {

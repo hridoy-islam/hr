@@ -23,7 +23,7 @@ const ApplicantDetailPage = () => {
     isFieldSaving,
     fetchApplicant
   } = useEditApplicant();
-  const { id } = useParams();
+  const { id ,aid} = useParams();
   if (loading) {
     return (
       <div className="flex  items-center justify-center ">
@@ -80,7 +80,7 @@ const ApplicantDetailPage = () => {
       component: (
         <DocumentsTab
           formData={formData}
-          applicantId={id || ''}
+          applicantId={aid || ''}
           onRefresh={fetchApplicant}
         />
       )

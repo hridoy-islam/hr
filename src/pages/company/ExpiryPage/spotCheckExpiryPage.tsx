@@ -17,7 +17,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 import axiosInstance from '@/lib/axios';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 
 import 'react-datepicker/dist/react-datepicker.css';
 import { useSelector } from 'react-redux';
@@ -40,7 +40,7 @@ const SpotCheckExpiryPage = () => {
   const navigate = useNavigate();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { user } = useSelector((state: any) => state.auth);
-  
+  const {id} = useParams()
   
   const [loading, setLoading] = useState(true);
   const [employees, setEmployees] = useState<ComplianceRow[]>([]);
@@ -51,10 +51,10 @@ const SpotCheckExpiryPage = () => {
 
   // --- 1. Fetch Schedule Settings ---
   const fetchScheduleSettings = async () => {
-    if (!user?._id) return;
+    if (!id) return;
     try {
       const res = await axiosInstance.get(
-        `/schedule-check?companyId=${user._id}`
+        `/schedule-check?companyId=${id}`
       );
       const result = res.data?.data?.result;
       if (result && result.length > 0) {
@@ -85,7 +85,7 @@ const SpotCheckExpiryPage = () => {
 
   // --- 3. Fetch Employees ---
   const fetchEmployees = async () => {
-    const companyId = user?._id || user?.company;
+    const companyId = id || user?.company;
     if (!companyId) return;
 
     setLoading(true);
@@ -158,27 +158,25 @@ const SpotCheckExpiryPage = () => {
 
     // If missing record, redirect to profile to create first one
     if (!employee.spotCheckRecordId) {
-      navigate(`/company/employee/${employee._id}`, {
+      navigate(`/company/${id}/employee/${employee._id}`, {
         state: { activeTab: 'spotcheck' }
       });
       return;
     }
 
     // Otherwise open modal to Reschedule
-    setSelectedEmployee(employee);
-    setNewScheduledDate(null); // Force user to pick new date
-    setScheduleNote('');
+    
   };
 
   const handleEmployeeClick = (employeeId: string) => {
-    navigate(`/company/employee/${employeeId}`, {
+    navigate(`/company/${id}/employee/${employeeId}`, {
       state: { activeTab: 'spotcheck' }
     });
   };
 
   // --- Submit Update (Reschedule) ---
 //   const handleSubmitUpdate = async () => {
-//     if (!selectedEmployee || !newScheduledDate || !user?._id) return;
+//     if (!selectedEmployee || !newScheduledDate || !id) return;
 
 //     setIsSubmitting(true);
 //     try {
