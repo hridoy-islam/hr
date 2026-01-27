@@ -107,7 +107,7 @@ const calculateDuration = (
   const hours = Math.floor(duration.asHours());
   const mins = duration.minutes();
 
-  const display = `${hours}h ${mins}m`;
+  const display = `${hours}:${mins}`;
   return { display, minutes: duration.asMinutes() };
 };
 
@@ -349,77 +349,13 @@ const AttendancePage = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <Card className="w-full bg-white shadow-md">
-        <CardHeader className="flex flex-row items-center justify-between pb-4">
-          <div>
-            <CardTitle className="text-xl font-bold">
-              Attendance Overview
-            </CardTitle>
-          </div>
-          <CSVExporter
-            data={attendanceData}
-            filename={`attendance_${moment().format('YYYY-MM-DD')}.csv`}
-          />
-        </CardHeader>
+       
 
-        <CardContent className="space-y-8 pt-6">
-          {/* Stats Section */}
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-            <div className="flex items-center justify-between rounded-xl bg-blue-50/50 p-4">
-              <div>
-                <p className="text-sm font-medium text-blue-600">
-                  Present Today
-                </p>
-                <h3 className="text-2xl font-bold text-blue-900">
-                  {stats.present}
-                </h3>
-              </div>
-              <div className="rounded-full bg-blue-100 p-3 text-blue-600">
-                <CheckCircle2 className="h-6 w-6" />
-              </div>
-            </div>
+        <CardContent className="space-y-3 pt-4">
 
-            <div className="flex items-center justify-between rounded-xl border border-red-100 bg-red-50/50 p-4">
-              <div>
-                <p className="text-sm font-medium text-red-600">Absent</p>
-                <h3 className="text-2xl font-bold text-red-900">
-                  {stats.absent}
-                </h3>
-              </div>
-              <div className="rounded-full bg-red-100 p-3 text-red-600">
-                <XCircle className="h-6 w-6" />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between rounded-xl border border-amber-100 bg-amber-50/50 p-4">
-              <div>
-                <p className="text-sm font-medium text-amber-600">
-                  Pending Actions
-                </p>
-                <h3 className="text-2xl font-bold text-amber-900">
-                  {stats.pending}
-                </h3>
-              </div>
-              <div className="rounded-full bg-amber-100 p-3 text-amber-600">
-                <AlertCircle className="h-6 w-6" />
-              </div>
-            </div>
-
-            <div
-              onClick={() => navigate('/company/attendance-report')}
-              className="flex cursor-pointer items-center justify-between rounded-xl border border-indigo-100 bg-indigo-50/50 p-4 transition hover:bg-indigo-100"
-            >
-              <div>
-                <p className="text-sm font-medium text-indigo-600">
-                  View Reports
-                </p>
-              </div>
-              <div className="rounded-full bg-indigo-100 p-3 text-indigo-600">
-                <History className="h-6 w-6" />
-              </div>
-            </div>
-          </div>
+        
 
           {/* Filters Row */}
           <div className="grid grid-cols-1 items-end gap-3 lg:grid-cols-5 ">
@@ -512,9 +448,9 @@ const AttendancePage = () => {
           </div>
 
           {/* SINGLE TABLE VIEW */}
-          <div className="mt-2 text-sm font-semibold text-gray-600">
-              Records for: <span className="text-gray-900">{startDate ? moment(startDate).format("MMM DD, YYYY") : '...'}</span> 
-              {endDate && <span className="text-gray-900"> - {moment(endDate).format("MMM DD, YYYY")}</span>}
+          <div className="mt-2 text-lg font-semibold text-gray-600">
+              Attendance: <span className="">{startDate ? moment(startDate).format("MMM DD, YYYY") : '...'}</span> 
+              {endDate && <span > - {moment(endDate).format("MMM DD, YYYY")}</span>}
           </div>
 
           <div className="rounded-md">
@@ -600,6 +536,7 @@ const TableSection = ({
         <TableHeader>
           <TableRow>
             <TableHead>Employee</TableHead>
+            <TableHead>Email</TableHead>
             <TableHead >Start Date</TableHead>
             <TableHead>Start Time</TableHead>
             <TableHead >End Date</TableHead>
@@ -649,10 +586,13 @@ const TableSection = ({
                 <TableCell>
                   <div className="flex flex-col gap-1">
                     <span className="text-sm font-medium">{fullName}</span>
-                    <span className="text-xs ">{email}</span>
-                    {phone && (
-                      <span className="text-xs text-gray-400">{phone}</span>
-                    )}
+                   
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-sm ">{email}</span>
+                  
                   </div>
                 </TableCell>
 

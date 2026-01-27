@@ -15,7 +15,7 @@ import Holiday from '@/pages/Hr/Holidays';
 import MyStaff from '@/pages/Hr/MyStaff';
 import Employee from '@/pages/company/Employee';
 import Attendance from '@/pages/Hr/Attendance';
-import PayRoll from '@/pages/Hr/Payroll';
+import PayRoll from '@/pages/company/Payroll';
 import Recruitment from '@/pages/company/Recruitment';
 import Settings from '@/pages/Hr/Settings';
 import HrLayout from '@/components/layout/hr-layout';
@@ -78,6 +78,8 @@ import AttendancePage from '@/pages/company/Attendance/AttendanceList';
 import AttendanceReport from '@/pages/company/Attendance/Attendance-Report';
 import QAExpiryPage from '@/pages/company/ExpiryPage/QAExpiryPage';
 import BulkAttendancePage from '@/pages/company/Attendance/csvAttendance';
+import AdminPayRoll from '@/pages/company/Payroll';
+import ViewPayroll from '@/pages/company/Payroll/view-payroll';
 
 const SignInPage = lazy(() => import('@/pages/auth/signin'));
 
@@ -184,7 +186,8 @@ export default function AppRouter() {
         { path: 'staff-attendance', element: <StaffAttendancePage /> },
         { path: 'attendance-report', element: <AttendanceReport /> },
 
-        { path: 'payroll', element: <PayRoll /> },
+        { path: 'payroll', element: <AdminPayRoll /> },
+        { path: 'payroll/:id', element: <ViewPayroll /> },
 
         { path: 'leave-approve', element: <LeaveApprovalPage /> },
 

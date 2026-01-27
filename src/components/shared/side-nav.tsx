@@ -213,10 +213,10 @@ const navItems = [
     href: '#',
     roles: ['company']
   },
-  {
-    icon: Receipt,
-    label: 'Billing',
-    href: '#',
+ {
+    icon: CircleDollarSign,
+    label: 'Payroll',
+    href: 'payroll',
     roles: ['company']
   },
   {
@@ -432,12 +432,7 @@ const navItems = [
     href: 'staff-attendance',
     roles: ['employee']
   },
-  {
-    icon: CircleDollarSign,
-    label: 'Payroll',
-    href: 'payroll',
-    roles: ['employee']
-  },
+ 
   {
     icon: CircleGauge,
     label: 'Leave',

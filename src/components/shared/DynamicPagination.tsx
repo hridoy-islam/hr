@@ -40,7 +40,7 @@ export function DynamicPagination({
             )}
           </SelectTrigger>
           <SelectContent side="top">
-            {[10, 20, 30, 40, 50, 100].map((size) => (
+            {[100, 200, 300, 400, 500, 1000].map((size) => (
               <SelectItem key={size} value={size.toString()}>
                 {size}
               </SelectItem>

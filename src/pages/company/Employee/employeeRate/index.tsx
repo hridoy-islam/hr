@@ -1,5 +1,3 @@
-
-
 import { useEffect, useState } from 'react';
 import Select from 'react-select';
 import axiosInstance from '@/lib/axios';
@@ -28,6 +26,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@/components/ui/alert-dialog';
+import { useSelector } from 'react-redux';
 
 interface Shift {
   _id: string;
@@ -81,6 +80,7 @@ export default function EmployeeRate() {
   const navigate = useNavigate();
   const location = useLocation();
   const employee = location.state || {};
+  const user = useSelector((state: any) => state.auth.user);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -88,7 +88,9 @@ export default function EmployeeRate() {
         setLoading(true);
 
         // Fetch shifts
-        const shiftsResponse = await axiosInstance.get('/hr/shift');
+        const shiftsResponse = await axiosInstance.get(
+          `/hr/shift?companyId=${user?._id}`
+        );
         setShifts(shiftsResponse.data.data?.result || []);
 
         // Fetch employee rates if employeeId exists
@@ -140,8 +142,6 @@ export default function EmployeeRate() {
 
     fetchData();
   }, [employeeId]);
-
-
 
   const handleAddShift = async (shift: Shift) => {
     if (selectedShifts.some((s) => s._id === shift._id)) return;
@@ -470,21 +470,24 @@ export default function EmployeeRate() {
                             inputMode="decimal"
                             value={rate === 0 ? '' : rate}
                             onChange={(e) => {
-                                const value = e.target.value;
-                                // Allow empty input or numbers with up to 2 decimal places
-                                if (value === "" || /^\d*\.?\d{0,2}$/.test(value)) {
-                                  handleRateChange(
-                                    shift._id,
-                                    day,
-                                    parseFloat(value) || 0
-                                  );
-                                }
-                              }}
-                              onFocus={(e) => {
-                                if (parseFloat(e.target.value) === 0) {
-                                  e.target.value = "";
-                                }
-                              }}
+                              const value = e.target.value;
+                              // Allow empty input or numbers with up to 2 decimal places
+                              if (
+                                value === '' ||
+                                /^\d*\.?\d{0,2}$/.test(value)
+                              ) {
+                                handleRateChange(
+                                  shift._id,
+                                  day,
+                                  parseFloat(value) || 0
+                                );
+                              }
+                            }}
+                            onFocus={(e) => {
+                              if (parseFloat(e.target.value) === 0) {
+                                e.target.value = '';
+                              }
+                            }}
                             onBlur={() => saveRates(shift._id)}
                             onKeyDown={(e) =>
                               e.key === 'Enter' && saveRates(shift._id)
