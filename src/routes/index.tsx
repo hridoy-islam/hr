@@ -39,7 +39,6 @@ import EmployeeRate from '@/pages/company/Employee/employeeRate';
 import AttendanceList from '@/pages/Hr/Attendance/attendaceList';
 import AttendanceApprovalPage from '@/pages/Hr/Attendance/Attendance-Approve';
 import AttendanceApproveList from '@/pages/Hr/Attendance/Attendance-Approve/attendance-list';
-import EntryAttendance from '@/pages/Hr/Attendance/entry-attendance';
 import ApplicantDetailPage from '@/pages/company/Vacancy/viewApplicant';
 import LeaveApprovalPage from '@/pages/Hr/LeaveApproval';
 
@@ -81,6 +80,7 @@ import BulkAttendancePage from '@/pages/company/Attendance/csvAttendance';
 import AdminPayRoll from '@/pages/company/Payroll';
 import ViewPayroll from '@/pages/company/Payroll/view-payroll';
 import { ScheduleStatusProvider } from '@/context/scheduleStatusContext';
+import EntryAttendance from '@/pages/company/Attendance/entry-attendance';
 
 const SignInPage = lazy(() => import('@/pages/auth/signin'));
 

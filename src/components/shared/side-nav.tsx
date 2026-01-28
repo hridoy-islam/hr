@@ -41,7 +41,8 @@ import {
   BookUser,
   UserCheck,
   ClipboardCheck,
-  FileJsonIcon
+  FileJsonIcon,
+  PenBox
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Link, useNavigate, useLocation, useParams } from 'react-router-dom';
@@ -240,6 +241,12 @@ const navItems = [
         icon: FileJsonIcon,
         label: 'Upload Attendance',
         href: 'csv-attendance',
+        roles: ['company']
+      },
+      {
+        icon: PenBox,
+        label: 'Manual Attendance',
+        href: 'attendance-entry',
         roles: ['company']
       }
     ]

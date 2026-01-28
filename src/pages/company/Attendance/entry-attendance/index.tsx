@@ -1,28 +1,33 @@
 import { useState, useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
 import axiosInstance from '@/lib/axios';
 import Select from 'react-select';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle
-} from '@/components/ui/dialog';
-import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
-import { cn } from '@/lib/utils';
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage
+} from '@/components/ui/form';
 import { useToast } from '@/components/ui/use-toast';
 import { Input } from '@/components/ui/input';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import moment from 'moment';
-import { CalendarFold } from 'lucide-react';
+import { CalendarFold, Clock, User, Briefcase } from 'lucide-react';
+import { useParams } from 'react-router-dom';
+import { Textarea } from '@/components/ui/textarea';
 
+// --- Types ---
 interface Employee {
   _id: string;
-  title?: string;
   firstName: string;
   lastName: string;
-  initial?: string;
 }
 
 interface Shift {
@@ -30,462 +35,506 @@ interface Shift {
   name: string;
   startTime: string;
   endTime: string;
-  __v?: number;
 }
 
-interface AttendanceData {
-  userId: string;
-  clockIn: Date | null;
-  clockOut: Date | null;
-  clockType: 'manual';
-  createdAt?: Date;
-}
+// --- Zod Schema ---
+// Helper for React Select options that allows null (when cleared) but fails validation if empty
+const selectOptionSchema = z.object({
+  value: z.string(),
+  label: z.string()
+}).nullable();
+
+const attendanceSchema = z
+  .object({
+    employee: selectOptionSchema.refine((val) => val !== null, {
+      message: 'Employee is required'
+    }),
+    shift: selectOptionSchema.refine((val) => val !== null, {
+      message: 'Shift is required'
+    }),
+    startDate: z.date({ required_error: 'Start Date is required' }),
+    clockIn: z
+      .string()
+      .min(5, 'Format HH:MM')
+      .regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Invalid time (HH:MM)'),
+    endDate: z.date({ required_error: 'End Date is required' }),
+    clockOut: z
+      .string()
+      .min(5, 'Format HH:MM')
+      .regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Invalid time (HH:MM)'),
+    notes: z.string().optional()
+  })
+  .refine(
+    (data) => {
+      // Guard: If basic fields are missing, don't trigger this error yet
+      if (!data.startDate || !data.clockIn || !data.endDate || !data.clockOut) {
+        return true;
+      }
+
+      // Combine Date and Time
+      const start = moment(
+        `${moment(data.startDate).format('YYYY-MM-DD')} ${data.clockIn}`,
+        'YYYY-MM-DD HH:mm'
+      );
+      const end = moment(
+        `${moment(data.endDate).format('YYYY-MM-DD')} ${data.clockOut}`,
+        'YYYY-MM-DD HH:mm'
+      );
+
+      return end.isAfter(start);
+    },
+    {
+      message: 'End time must be after start time',
+      path: ['clockOut'] // Shows error under the Clock Out field
+    }
+  );
+
+type AttendanceFormValues = z.infer<typeof attendanceSchema>;
 
 export default function EntryAttendance() {
   const { toast } = useToast();
+  const { id } = useParams();
+
+  // --- State ---
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [shifts, setShifts] = useState<Shift[]>([]);
-  const [loading, setLoading] = useState({
-    employees: false,
-    shifts: false,
-    submitting: false
+  const [isLoadingShifts, setIsLoadingShifts] = useState(false);
+
+  // --- React Hook Form Setup ---
+  const form = useForm<AttendanceFormValues>({
+    resolver: zodResolver(attendanceSchema),
+    defaultValues: {
+      startDate: undefined,
+      endDate: undefined,
+      clockIn: '',
+      clockOut: '',
+      notes: ''
+      // employee and shift start as undefined
+    }
   });
 
-  // Main attendance data
-  const [attendanceData, setAttendanceData] = useState<AttendanceData>({
-    userId: '',
-    clockIn: null,
-    clockOut: null,
-    clockType: 'manual',
-    createdAt: undefined // Default to today
-  });
+  // Watch employee change to trigger shift fetch
+  const selectedEmployee = form.watch('employee');
 
-  // Replace inputTimes with modifiedAttendance-like structure (single entry)
-  const [modifiedAttendance, setModifiedAttendance] = useState<{
-    [id: string]: { clockIn: string; clockOut: string };
-  }>({
-    single: { clockIn: '', clockOut: '' }
-  });
-
-  // Fetch employees
+  // --- Fetch Employees on Mount ---
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchEmployees = async () => {
       try {
-        setLoading((prev) => ({ ...prev, employees: true }));
         const empRes = await axiosInstance.get(
-          '/users?role=employee&limit=all'
+          `/users?company=${id}&role=employee&limit=all`
         );
-        setEmployees(empRes?.data?.data?.result || []);
-      } catch (error: any) {
+        setEmployees(empRes.data.data.result || []);
+      } catch (error) {
+        console.error('Error fetching employees:', error);
         toast({
-          variant: 'destructive',
-          title: 'Error fetching employees',
-          description:
-            error.response?.data?.message || 'Failed to fetch employees'
+          title: 'Error',
+          description: 'Failed to load employees.',
+          variant: 'destructive'
         });
-      } finally {
-        setLoading((prev) => ({ ...prev, employees: false }));
       }
     };
-    fetchData();
-  }, [toast]);
+    fetchEmployees();
+  }, [id, toast]);
 
-  // Sync modifiedAttendance when clockIn/clockOut change externally (e.g. date change)
+  // --- Fetch Shifts when Employee Changes ---
   useEffect(() => {
-    if (attendanceData.clockIn) {
-      setModifiedAttendance((prev) => ({
-        ...prev,
-        single: {
-          ...prev.single,
-          clockIn: moment(attendanceData.clockIn).format('HH:mm')
-        }
-      }));
-    }
-    if (attendanceData.clockOut) {
-      setModifiedAttendance((prev) => ({
-        ...prev,
-        single: {
-          ...prev.single,
-          clockOut: moment(attendanceData.clockOut).format('HH:mm')
-        }
-      }));
-    }
-  }, [attendanceData.clockIn, attendanceData.clockOut]);
-
-  // Handle employee change
-  const handleEmployeeChange = async (
-    selectedOption: { value: string; label: string } | null
-  ) => {
-    if (!selectedOption) {
-      setAttendanceData((prev) => ({ ...prev, userId: '' }));
+    const fetchShifts = async () => {
       setShifts([]);
-      setModifiedAttendance((prev) => ({
-        ...prev,
-        single: { clockIn: '', clockOut: '' }
-      }));
-      return;
-    }
+      form.setValue('shift', null); // Set to null safely
 
-    setAttendanceData((prev) => ({
-      ...prev,
-      userId: selectedOption.value
-    }));
+      if (!selectedEmployee?.value) return;
 
-    try {
-      const rateRes = await axiosInstance.get(
-        `/hr/employeeRate?employeeId=${selectedOption.value}`
-      );
-      const shiftData = rateRes?.data?.data?.result?.[0]?.shiftId || [];
-      setShifts(
-        Array.isArray(shiftData) ? shiftData : [shiftData].filter(Boolean)
-      );
+      setIsLoadingShifts(true);
+      try {
+        const rateRes = await axiosInstance.get(
+          `/hr/employeeRate?employeeId=${selectedEmployee.value}`
+        );
 
-      if (Array.isArray(shiftData) && shiftData.length === 0) {
+        const rates = rateRes?.data?.data?.result || [];
+        const collectedShifts: Shift[] = [];
+        const seenShiftIds = new Set<string>();
+
+        rates.forEach((rate: any) => {
+          const rawShift = rate.shiftId || rate.shifts;
+          let shiftsInRate: Shift[] = [];
+          if (Array.isArray(rawShift)) {
+            shiftsInRate = rawShift;
+          } else if (rawShift && typeof rawShift === 'object') {
+            shiftsInRate = [rawShift];
+          }
+
+          shiftsInRate.forEach((s) => {
+            if (s._id && !seenShiftIds.has(s._id)) {
+              seenShiftIds.add(s._id);
+              collectedShifts.push(s);
+            }
+          });
+        });
+
+        setShifts(collectedShifts);
+
+        if (collectedShifts.length === 0) {
+          toast({
+            variant: 'destructive',
+            title: 'No Shifts Found',
+            description: 'This employee has no active rates with assigned shifts.'
+          });
+        }
+      } catch (error) {
+        console.error(error);
         toast({
           variant: 'destructive',
-          title: 'No Shift Found',
-          description: 'This employee has no assigned shift.'
+          title: 'Error',
+          description: 'Failed to load shifts.'
         });
+      } finally {
+        setIsLoadingShifts(false);
       }
-    } catch (error: any) {
-      toast({
-        variant: 'destructive',
-        title: 'Error fetching shift',
-        description:
-          error.response?.data?.message ||
-          'Failed to load shift from employee rate'
-      });
-      setShifts([]);
-    }
-  };
+    };
 
-  // Enhanced time input handler (your provided logic)
-  const handleTimeChange = (
-    id: string,
-    type: 'clockIn' | 'clockOut',
-    value: string
+    fetchShifts();
+  }, [selectedEmployee?.value, form, toast]);
+
+  // --- Time Input Handler ---
+  const handleTimeInput = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    onChange: (val: string) => void
   ) => {
-    const previous = modifiedAttendance[id]?.[type] || '';
-
-    // Allow clearing the field
-    if (value === '') {
-      setModifiedAttendance((prev) => ({
-        ...prev,
-        [id]: {
-          ...prev[id],
-          [type]: ''
-        }
-      }));
+    const inputValue = e.target.value;
+    
+    // 1. Allow clearing
+    if (inputValue === '') {
+      onChange('');
       return;
     }
 
-    // Detect backspacing — allow free form typing
-    if (value.length < previous.length) {
-      setModifiedAttendance((prev) => ({
-        ...prev,
-        [id]: {
-          ...prev[id],
-          [type]: value
-        }
-      }));
-      return;
+    // 2. Only allow numbers and colon
+    if (!/^[0-9:]*$/.test(inputValue)) return;
+
+    // 3. Remove existing colon to process logic
+    const rawNums = inputValue.replace(':', '');
+
+    // 4. Prevent typing more than 4 numbers
+    if (rawNums.length > 4) return;
+
+    let newValue = inputValue;
+
+    // 5. Auto-insert colon if typing the 3rd number
+    if (rawNums.length === 3 && !inputValue.includes(':')) {
+       newValue = `${rawNums.slice(0, 2)}:${rawNums.slice(2)}`;
     }
 
-    // Clean input (keep digits only for auto-format)
-    const sanitized = value.replace(/[^0-9]/g, '');
+    // 6. Strict Limit Validations (HH max 23, MM max 59)
+    const parts = newValue.split(':');
+    
+    // Check Hours
+    if (parts[0] && parseInt(parts[0]) > 23) return; 
+    
+    // Check Minutes
+    if (parts[1] && parseInt(parts[1]) > 59) return;
 
-    let formatted = value;
+    // 7. Max length check (5 chars: HH:MM)
+    if (newValue.length > 5) return;
 
-    if (value.includes(':')) {
-      // Manual typing with colon
+    onChange(newValue);
+  };
+
+  const handleTimeBlur = (value: string, onChange: (val: string) => void) => {
+    if (!value) return;
+    
+    // Auto-format simple numbers
+    if (!value.includes(':')) {
+      if (value.length === 1) onChange(`0${value}:00`);
+      else if (value.length === 2) onChange(`${value}:00`);
+      else if (value.length === 3) onChange(`${value.slice(0, 2)}:0${value.slice(2)}`);
+      else if (value.length === 4) onChange(`${value.slice(0, 2)}:${value.slice(2)}`);
+    } else {
+      // Ensure padding
       const [h, m] = value.split(':');
-      const hours = h?.slice(0, 2) ?? '';
-      const minutes = m?.slice(0, 2) ?? '';
-      formatted = minutes ? `${hours}:${minutes}` : hours;
-    } else {
-      // Auto-format from digits
-      if (sanitized.length <= 2) {
-        formatted = sanitized; // '2' or '19'
-      } else if (sanitized.length === 3) {
-        formatted = `${sanitized.slice(0, 2)}:${sanitized.slice(2)}`;
-      } else if (sanitized.length >= 4) {
-        formatted = `${sanitized.slice(0, 2)}:${sanitized.slice(2, 4)}`;
-      } else {
-        formatted = previous; // fallback
-      }
-    }
-
-    // Prevent invalid times like 25:00
-    const [hh, mm] = formatted.split(':').map(Number);
-    if (!isNaN(hh) && (hh < 0 || hh > 23)) {
-      toast({
-        variant: 'destructive',
-        title: 'Invalid Hour',
-        description: 'Hour must be between 00 and 23.'
-      });
-      return;
-    }
-    if (!isNaN(mm) && (mm < 0 || mm > 59)) {
-      toast({
-        variant: 'destructive',
-        title: 'Invalid Minute',
-        description: 'Minute must be between 00 and 59.'
-      });
-      return;
-    }
-
-    setModifiedAttendance((prev) => ({
-      ...prev,
-      [id]: {
-        ...prev[id],
-        [type]: formatted
-      }
-    }));
-  };
-
-  // Convert HH:mm string + date to Date object
-  const parseTimeToDate = (timeStr: string, baseDate: Date): Date | null => {
-    if (!timeStr || !moment(timeStr, 'HH:mm', true).isValid()) return null;
-    const [hours, minutes] = timeStr.split(':').map(Number);
-    const newDate = new Date(baseDate);
-    newDate.setHours(hours, minutes, 0, 0);
-    return newDate;
-  };
-
-  // On blur: validate and update attendanceData
-  const handleTimeBlur = (id: string, type: 'clockIn' | 'clockOut') => {
-    const timeStr = modifiedAttendance[id]?.[type];
-    const baseDate = attendanceData.createdAt || new Date();
-
-    if (!timeStr) {
-      setAttendanceData((prev) => ({ ...prev, [type]: null }));
-      return;
-    }
-
-    const parsedDate = parseTimeToDate(timeStr, baseDate);
-    if (parsedDate) {
-      setAttendanceData((prev) => ({ ...prev, [type]: parsedDate }));
-    } else {
-      toast({
-        variant: 'destructive',
-        title: 'Invalid Time',
-        description: `Please enter a valid time in HH:mm format (e.g. 09:30).`
-      });
+      const formatted = `${h.padStart(2, '0')}:${(m || '00').padEnd(2, '0')}`;
+      onChange(formatted);
     }
   };
 
-  // Handle date change via DatePicker
-  const handleDateChange = (date: Date | null) => {
-    if (!date) return;
-    setAttendanceData((prev) => ({ ...prev, createdAt: date }));
-
-    // Re-parse times with new date
-    if (modifiedAttendance.single.clockIn) {
-      const newClockIn = parseTimeToDate(
-        modifiedAttendance.single.clockIn,
-        date
-      );
-      setAttendanceData((prev) => ({ ...prev, clockIn: newClockIn }));
-    }
-    if (modifiedAttendance.single.clockOut) {
-      const newClockOut = parseTimeToDate(
-        modifiedAttendance.single.clockOut,
-        date
-      );
-      setAttendanceData((prev) => ({ ...prev, clockOut: newClockOut }));
-    }
-  };
-
-  // Submit attendance
-  const handleSubmit = async () => {
-    if (!attendanceData.userId || !attendanceData.clockIn) {
-      toast({
-        variant: 'destructive',
-        title: 'Validation Error',
-        description:
-          'Please select an employee and provide a valid clock-in time.'
-      });
-      return;
-    }
+  // --- Submit Handler ---
+  const onSubmit = async (data: AttendanceFormValues) => {
+    if (!data.employee || !data.shift) return;
 
     try {
-      setLoading((prev) => ({ ...prev, submitting: true }));
+      const fStartDate = moment(data.startDate).format('YYYY-MM-DD');
+      const fStartTime = `${data.clockIn}:00.000`;
+      const fEndDate = moment(data.endDate).format('YYYY-MM-DD');
+      const fEndTime = `${data.clockOut}:00.000`;
+
+      const startDateTime = moment(`${fStartDate} ${fStartTime}`);
+      const endDateTime = moment(`${fEndDate} ${fEndTime}`);
+      const durationInMinutes = endDateTime.diff(startDateTime, 'minutes');
 
       const payload = {
-        userId: attendanceData.userId,
-        clockIn: attendanceData.clockIn,
-        clockOut: attendanceData.clockOut,
-        clockType: 'manual',
+        userId: data.employee.value,
+        shiftId: data.shift.value,
+        startDate: fStartDate,
+        startTime: fStartTime,
+        endDate: fEndDate,
+        endTime: fEndTime,
         eventType: 'manual',
-        timestamp: new Date().toISOString()
+        clockType: 'manual',
+        approvalStatus: 'approved',
+        notes: data.notes,
+        duration: durationInMinutes
       };
 
       await axiosInstance.post('/hr/attendance/clock-event', payload);
 
       toast({
         title: 'Success',
-        description: 'Attendance recorded successfully'
+        description: 'Attendance created successfully.'
       });
 
-      // Reset form
-      setAttendanceData({
-        userId: '',
-        clockIn: null,
-        clockOut: null,
-        clockType: 'manual',
-        createdAt: undefined
+      // --- FULL RESET ---
+      // Explicitly set employee and shift to null to clear the Select components
+      form.reset({
+        startDate: undefined,
+        endDate: undefined,
+        clockIn: '',
+        clockOut: '',
+        notes: '',
+        employee: null, 
+        shift: null
       });
-      setModifiedAttendance({ single: { clockIn: '', clockOut: '' } });
-      setShifts([]);
+
     } catch (error: any) {
+      console.error('Submit Error:', error);
       toast({
         variant: 'destructive',
         title: 'Error',
-        description:
-          error.response?.data?.message || 'Failed to record attendance'
+        description: error.response?.data?.message || 'Failed to create attendance.'
       });
-    } finally {
-      setLoading((prev) => ({ ...prev, submitting: false }));
     }
   };
 
+  // --- Options ---
   const employeeOptions = employees.map((emp) => ({
     value: emp._id,
-    label:
-      `${emp.title || ''} ${emp.firstName} ${emp.initial || ''} ${emp.lastName}`.trim()
+    label: `${emp.firstName} ${emp.lastName}`
+  }));
+
+  const shiftOptions = shifts.map((shift) => ({
+    value: shift._id,
+    label: `${shift.name} (${shift.startTime} - ${shift.endTime})`
   }));
 
   return (
-    <div className="space-y-3 rounded-lg bg-white px-6 py-4 shadow-md">
-      <h2 className="flex items-center gap-2 text-2xl font-bold text-gray-900">
-        <CalendarFold className="h-6 w-6" />
-        Attendance Entry
-      </h2>{' '}
-      {/* Employee Selection */}
-      <div>
-        <h2 className="text-lg font-semibold text-gray-700">Select Employee</h2>
-        <div className="flex flex-col gap-4">
-          <div>
-            <Select
-              options={employeeOptions}
-              isLoading={loading.employees}
-              onChange={handleEmployeeChange}
-              placeholder="Search and select an employee..."
-              value={
-                employeeOptions.find(
-                  (opt) => opt.value === attendanceData.userId
-                ) || null
-              }
-              className="w-[30vw]"
-              styles={{
-                control: (base) => ({
-                  ...base,
-                  borderColor: '#D1D5DB',
-                  borderRadius: '0.5rem',
-                  padding: '2px',
-                  boxShadow: 'none',
-                  '&:hover': { borderColor: '#9CA3AF' }
-                })
-              }}
-            />
-          </div>
+    <div className="">
+      <Card className="bg-white shadow-md">
+        <CardHeader className="pb-4">
+          <CardTitle className="flex items-center gap-2 text-xl text-theme">
+            <Clock className="h-5 w-5" />
+            Manual Attendance Entry
+          </CardTitle>
+        </CardHeader>
 
-          {/* Show Assigned Shifts only if employee is selected and has shifts */}
-          {attendanceData.userId && shifts.length > 0 && (
-            <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 shadow-sm">
-              <h2 className="mb-4 text-lg font-semibold text-gray-700">
-                Assigned Shifts
-              </h2>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {shifts.map((shift) => (
-                  <div
-                    key={shift._id}
-                    className="rounded-lg border border-gray-300 bg-white p-4 shadow-sm transition hover:shadow-md"
-                  >
-                    <h3 className="font-medium text-gray-800">{shift.name}</h3>
-                    <p className="mt-1 text-sm text-gray-500">
-                      {shift.startTime} - {shift.endTime}
-                    </p>
-                  </div>
-                ))}
+        <CardContent className="pt-6">
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              {/* Row 1: Employee & Shift */}
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="employee"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-2">
+                        <User className="h-4 w-4 text-theme" /> Employee{' '}
+                        <span className="text-red-500">*</span>
+                      </FormLabel>
+                      <FormControl>
+                        <Select
+                          {...field}
+                          options={employeeOptions}
+                          classNamePrefix="select"
+                          placeholder="Select Employee..."
+                          isClearable
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="shift"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-2">
+                        <Briefcase className="h-4 w-4 text-theme" /> Shift{' '}
+                        <span className="text-red-500">*</span>
+                      </FormLabel>
+                      <FormControl>
+                        <Select
+                          {...field}
+                          options={shiftOptions}
+                          classNamePrefix="select"
+                          placeholder={
+                            isLoadingShifts
+                              ? 'Loading shifts...'
+                              : 'Select Shift...'
+                          }
+                          isLoading={isLoadingShifts}
+                          isDisabled={!selectedEmployee?.value || shifts.length === 0}
+                          noOptionsMessage={() => 'No shifts found for this employee'}
+                          isClearable
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
-            </div>
-          )}
-        </div>
-      </div>
-      {/* Attendance Details */}
-      <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 shadow-sm">
-        <h2 className="mb-2 text-lg font-semibold text-gray-700">
-          Attendance Details
-        </h2>
 
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-          {/* Date Picker */}
-          <div>
-            <label className="mb-2 block text-sm font-medium text-gray-600">
-              Date
-            </label>
-            <DatePicker
-              selected={attendanceData.createdAt}
-              onChange={handleDateChange}
-              dateFormat="dd-MM-yyyy"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black"
-              placeholderText="Select date"
-              wrapperClassName="w-full"
-              showMonthDropdown
-              showYearDropdown
-              dropdownMode="select"
-            />
-          </div>
+              {/* Row 2: Start Date & Time */}
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="startDate"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel className="flex items-center gap-2">
+                        <CalendarFold className="h-4 w-4 text-green-600" />{' '}
+                        Start Date <span className="text-red-500">*</span>
+                      </FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <DatePicker
+                            selected={field.value}
+                            onChange={(date) => field.onChange(date)}
+                            dateFormat="dd/MM/yyyy"
+                            className="w-full rounded-md border border-gray-300 px-3 py-2 pl-10 text-sm focus:border-theme focus:ring-1 focus:ring-theme"
+                            wrapperClassName="w-full"
+                            placeholderText="DD/MM/YYYY"
+                          />
+                          <CalendarFold className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-          {/* Clock In Input */}
-          <div>
-            <label className="mb-2 block text-sm font-medium text-gray-600">
-              Clock In
-            </label>
-            <Input
-              type="text"
-              placeholder="HH:mm"
-              value={modifiedAttendance.single.clockIn}
-              onChange={(e) =>
-                handleTimeChange('single', 'clockIn', e.target.value)
-              }
-              onBlur={() => handleTimeBlur('single', 'clockIn')}
-              maxLength={5}
-              className="text-center font-mono bg-white"
-            />
-          </div>
+                <FormField
+                  control={form.control}
+                  name="clockIn"
+                  render={({ field }) => (
+                    <FormItem className="-mt-2">
+                      <FormLabel>
+                        Start Time (HH:MM) <span className="text-red-500">*</span>
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          placeholder="09:00"
+                          maxLength={5}
+                          className="text-lg tracking-wide"
+                          onChange={(e) => handleTimeInput(e, field.onChange)}
+                          onBlur={() => handleTimeBlur(field.value, field.onChange)}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
-          {/* Clock Out Input */}
-          <div>
-            <label className="mb-2 block text-sm font-medium text-gray-600">
-              Clock Out
-            </label>
-            <Input
-              type="text"
-              placeholder="HH:mm"
-              value={modifiedAttendance.single.clockOut}
-              onChange={(e) =>
-                handleTimeChange('single', 'clockOut', e.target.value)
-              }
-              onBlur={() => handleTimeBlur('single', 'clockOut')}
-              maxLength={5}
-              className="text-center font-mono bg-white"
-            />
-          </div>
-        </div>
+              {/* Row 3: End Date & Time */}
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="endDate"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel className="flex items-center gap-2">
+                        <CalendarFold className="h-4 w-4 text-red-600" /> End
+                        Date <span className="text-red-500">*</span>
+                      </FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <DatePicker
+                            selected={field.value}
+                            onChange={(date) => field.onChange(date)}
+                            dateFormat="dd/MM/yyyy"
+                            className="w-full rounded-md border border-gray-300 px-3 py-2 pl-10 text-sm focus:border-theme focus:ring-1 focus:ring-theme"
+                            wrapperClassName="w-full"
+                            minDate={form.watch('startDate')}
+                            placeholderText="DD/MM/YYYY"
+                          />
+                          <CalendarFold className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-        {/* Submit Button */}
-        <div className="mt-8 flex justify-end">
-          <Button
-            onClick={handleSubmit}
-            disabled={loading.submitting || !attendanceData.clockIn}
-            className="bg-theme px-6 py-2 text-white hover:bg-theme/90 disabled:cursor-not-allowed disabled:bg-gray-400"
-          >
-            {loading.submitting ? 'Submitting...' : 'Submit Attendance'}
-          </Button>
-        </div>
-      </div>
+                <FormField
+                  control={form.control}
+                  name="clockOut"
+                  render={({ field }) => (
+                    <FormItem className="-mt-2">
+                      <FormLabel>
+                        End Time (HH:MM) <span className="text-red-500">*</span>
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          placeholder="18:00"
+                          maxLength={5}
+                          className="text-lg tracking-wide"
+                          onChange={(e) => handleTimeInput(e, field.onChange)}
+                          onBlur={() => handleTimeBlur(field.value, field.onChange)}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Notes */}
+              <FormField
+                control={form.control}
+                name="notes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Notes</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        {...field}
+                        placeholder="Optional reason..."
+                        className="border-gray-300"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Submit */}
+              <div className="flex justify-end pt-4">
+                <Button
+                  type="submit"
+                  className="bg-theme px-8 text-white hover:bg-theme/90"
+                  disabled={form.formState.isSubmitting}
+                >
+                  {form.formState.isSubmitting
+                    ? 'Saving...'
+                    : 'Save Attendance'}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
     </div>
   );
 }

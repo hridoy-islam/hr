@@ -279,7 +279,6 @@ const handleSavePayroll = async () => {
 
       fetchPayrollData(1);
     } catch (err: any) {
-      console.error('Create Payroll Error:', err);
       toast({
         title: 'Error',
         description:
