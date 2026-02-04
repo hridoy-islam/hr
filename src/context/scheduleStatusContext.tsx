@@ -1,10 +1,10 @@
-import React, { 
-  createContext, 
-  useContext, 
-  useState, 
-  useEffect, 
-  useCallback, 
-  type ReactNode 
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  type ReactNode
 } from 'react';
 import { useSelector } from 'react-redux';
 import axiosInstance from '@/lib/axios';
@@ -24,6 +24,7 @@ export interface ScheduleStatus {
   induction: number;
   disciplinary: number;
   qa: number;
+  employeeDocument: number; 
 }
 
 interface ScheduleStatusContextType {
@@ -32,7 +33,7 @@ interface ScheduleStatusContextType {
   refetchStatus: () => Promise<void>;
 }
 
-// Default state
+// 2. Default state
 const defaultStatus: ScheduleStatus = {
   passport: 0,
   visa: 0,
@@ -46,34 +47,45 @@ const defaultStatus: ScheduleStatus = {
   induction: 0,
   disciplinary: 0,
   qa: 0,
-
-
+  employeeDocument: 0 
 };
 
-// 3. Create the Context
-const ScheduleStatusContext = createContext<ScheduleStatusContextType | undefined>(undefined);
+
+const ScheduleStatusContext = createContext<
+  ScheduleStatusContextType | undefined
+>(undefined);
 
 // 4. Create the Provider Component
-export const ScheduleStatusProvider = ({ children }: { children: ReactNode }) => {
-  const { user } = useSelector((state: any) => state.auth); // Get logged-in company
+export const ScheduleStatusProvider = ({
+  children
+}: {
+  children: ReactNode;
+}) => {
+  const { user } = useSelector((state: any) => state.auth);
   const [status, setStatus] = useState<ScheduleStatus>(defaultStatus);
   const [loading, setLoading] = useState<boolean>(true);
-  const{id} = useParams()
+
+  // Assuming the route is something like /dashboard/:id
+  const { id } = useParams();
+
   const fetchStatus = useCallback(async () => {
-    if (!id) return;
+    const targetId = id || user?.company;
+
+    if (!targetId) return;
 
     try {
-      const response = await axiosInstance.get(`/schedule-status/${id}`);
-      
+      setLoading(true);
+      const response = await axiosInstance.get(`/schedule-status/${targetId}`);
+
       if (response.data?.data) {
         setStatus(response.data.data);
       }
     } catch (error) {
-      console.error("Failed to fetch schedule status:", error);
+      console.error('Failed to fetch schedule status:', error);
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, user?.company]);
 
   // Initial Fetch
   useEffect(() => {
@@ -97,7 +109,9 @@ export const ScheduleStatusProvider = ({ children }: { children: ReactNode }) =>
 export const useScheduleStatus = () => {
   const context = useContext(ScheduleStatusContext);
   if (context === undefined) {
-    throw new Error('useScheduleStatus must be used within a ScheduleStatusProvider');
+    throw new Error(
+      'useScheduleStatus must be used within a ScheduleStatusProvider'
+    );
   }
   return context;
 };

@@ -10,7 +10,8 @@ import {
   UserCheck,
   GraduationCap,
   UserPlus,
-  AlertTriangle
+  AlertTriangle,
+  FolderOpen
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import axiosInstance from '@/lib/axios';
@@ -24,7 +25,8 @@ const CompanyDashboardPage = () => {
   const navigate = useNavigate();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const user = useSelector((state: any) => state.auth.user);
-  const {id}= useParams()
+  const { id } = useParams();
+
   // Consume the Schedule Status Context
   const { status, loading: loadingStats, refetchStatus } = useScheduleStatus();
 
@@ -169,7 +171,6 @@ const CompanyDashboardPage = () => {
       functional: true,
       isWarning: status.training > 0
     },
-    // --- NEW CARDS ---
     {
       title: 'INDUCTION',
       main: loadingStats ? '...' : status.induction,
@@ -185,7 +186,7 @@ const CompanyDashboardPage = () => {
       main: loadingStats ? '...' : status.disciplinary,
       sub: getSubText(status.disciplinary),
       icon: <AlertTriangle className="h-6 w-6" />,
-      gradient: 'from-red-500 to-red-700', // Distinct red shade for alerts
+      gradient: 'from-red-500 to-red-700',
       onClick: () => navigate(`/company/${id}/expiry/disciplinary`),
       functional: true,
       isWarning: status.disciplinary > 0
@@ -194,11 +195,22 @@ const CompanyDashboardPage = () => {
       title: 'QUALITY ASSURANCE',
       main: loadingStats ? '...' : status.qa,
       sub: getSubText(status.qa),
-      icon: <ClipboardCheck className="h-6 w-6" />, // Reuse or pick new (see note below)
-      gradient: 'from-violet-600 to-violet-800', // Distinct from Spot Check (teal)
+      icon: <ClipboardCheck className="h-6 w-6" />,
+      gradient: 'from-violet-600 to-violet-800',
       onClick: () => navigate(`/company/${id}/expiry/qa`),
       functional: true,
       isWarning: status.qa > 0
+    },
+    // --- NEW CARD: EMPLOYEE DOCUMENTS ---
+    {
+      title: 'REQUIRED EMPLOYEE DOCUMENTS',
+      main: loadingStats ? '...' : status.employeeDocument,
+      sub: getSubText(status.employeeDocument),
+      icon: <FolderOpen className="h-6 w-6" />,
+      gradient: 'from-sky-600 to-sky-800', // Distinct Sky Blue
+      onClick: () => navigate(`/company/${id}/required-employee-documents`),
+      functional: true,
+      isWarning: status.employeeDocument > 0
     }
   ];
 

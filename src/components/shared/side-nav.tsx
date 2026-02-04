@@ -42,7 +42,8 @@ import {
   UserCheck,
   ClipboardCheck,
   FileJsonIcon,
-  PenBox
+  PenBox,
+  FileBadge
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Link, useNavigate, useLocation, useParams } from 'react-router-dom';
@@ -108,6 +109,13 @@ const navItems = [
     href: 'expiry/rtw',
     roles: ['company'],
     badgeKey: 'rtw'
+  },
+  {
+    icon: FileBadge,
+    label: 'Employee Document',
+    href: 'required-employee-documents',
+    roles: ['company'],
+    badgeKey: 'employeeDocument'
   },
   {
     icon: ShieldCheck,
@@ -251,7 +259,7 @@ const navItems = [
       }
     ]
   },
- {
+  {
     icon: Settings,
     label: 'Settings',
     roles: ['company'],
@@ -312,7 +320,7 @@ const navItems = [
         roles: ['company']
       }
     ]
-  },
+  }
 ];
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

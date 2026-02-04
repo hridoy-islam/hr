@@ -81,6 +81,7 @@ import AdminPayRoll from '@/pages/company/Payroll';
 import ViewPayroll from '@/pages/company/Payroll/view-payroll';
 import { ScheduleStatusProvider } from '@/context/scheduleStatusContext';
 import EntryAttendance from '@/pages/company/Attendance/entry-attendance';
+import EmployeeRequiredDocumentPage from '@/pages/company/ExpiryPage/EmployeeRequiredDocumentPage';
 
 const SignInPage = lazy(() => import('@/pages/auth/signin'));
 
@@ -150,6 +151,10 @@ export default function AppRouter() {
         {
           path: 'expiry/rtw',
           element: <RtwExpiryPage />
+        },
+        {
+          path: 'required-employee-documents',
+          element: <EmployeeRequiredDocumentPage />
         },
 
         { path: 'company-branch', element: <CompanyBranch /> },

@@ -366,7 +366,7 @@ const EditEmployee = () => {
     <div className="mx-auto rounded-md bg-white p-4 shadow-sm">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold">
-          {user?.title} {user?.firstName} {user?.initial} {user?.lastName}
+          {user?.title} {user?.firstName} {user?.lastName}
         </h1>
         <Button
           variant="outline"
