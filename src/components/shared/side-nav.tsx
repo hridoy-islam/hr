@@ -112,7 +112,7 @@ const navItems = [
   },
   {
     icon: FileBadge,
-    label: 'Employee Document',
+    label: 'Required Document',
     href: 'required-employee-documents',
     roles: ['company'],
     badgeKey: 'employeeDocument'

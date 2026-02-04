@@ -203,7 +203,7 @@ const CompanyDashboardPage = () => {
     },
     // --- NEW CARD: EMPLOYEE DOCUMENTS ---
     {
-      title: 'REQUIRED EMPLOYEE DOCUMENTS',
+      title: 'REQUIRED DOCUMENTS',
       main: loadingStats ? '...' : status.employeeDocument,
       sub: getSubText(status.employeeDocument),
       icon: <FolderOpen className="h-6 w-6" />,
