@@ -113,9 +113,9 @@ export default function AddRotaDialog({ isOpen, onClose, users, companyId, onSuc
     }
 
     try {
-      await axiosInstance.post('/rota', payload);
+      const response = await axiosInstance.post('/rota', payload);
       toast({ title: 'Rota created successfully' });
-      onSuccess();
+      if (onSuccess) onSuccess(response.data.data);
       onClose();
     } catch (error) {
       toast({ title: 'Failed to create rota', variant: 'destructive' });

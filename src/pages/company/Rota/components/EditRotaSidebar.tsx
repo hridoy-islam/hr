@@ -59,7 +59,7 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-export default function EditRotaSidebar({ isOpen, onClose, rota, employee, onSuccess }: any) {
+export default function EditRotaSidebar({ isOpen, onClose, rota, employee, onSuccess,onDeleteSuccess }: any) {
   const { toast } = useToast();
 
   const form = useForm<FormValues>({
@@ -134,9 +134,9 @@ export default function EditRotaSidebar({ isOpen, onClose, rota, employee, onSuc
     }
 
     try {
-      await axiosInstance.patch(`/rota/${rota._id}`, payload);
+      const response = await axiosInstance.patch(`/rota/${rota._id}`, payload);
       toast({ title: 'Shift updated successfully' });
-      onSuccess();
+      if (onSuccess) onSuccess(response.data.data);
       onClose();
     } catch (error) {
       toast({ title: 'Failed to update shift', variant: 'destructive' });
@@ -147,7 +147,7 @@ export default function EditRotaSidebar({ isOpen, onClose, rota, employee, onSuc
     try {
       await axiosInstance.delete(`/rota/${rota._id}`);
       toast({ title: 'Shift deleted successfully' });
-      onSuccess();
+      if (onDeleteSuccess) onDeleteSuccess(rota._id);
       onClose();
     } catch (error) {
       toast({ title: 'Failed to delete shift', variant: 'destructive' });

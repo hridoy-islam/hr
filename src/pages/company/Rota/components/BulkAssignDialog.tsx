@@ -122,7 +122,7 @@ const handleSubmit = async () => {
     const res = await axiosInstance.post('/rota/bulk-assign', payload);
     const {meta} = res.data.data;
 
-    onSuccess();
+      if (onSuccess) onSuccess(res.data.data);
     onClose();
 
     if (meta?.hasSkippedRecords) {

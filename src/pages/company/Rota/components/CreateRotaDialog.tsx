@@ -128,9 +128,9 @@ export default function CreateRotaDialog({
     }
 
     try {
-      await axiosInstance.post('/rota', payload);
+     const response = await axiosInstance.post('/rota', payload);
       toast({ title: 'Shift created successfully' });
-      onSuccess();
+      if (onSuccess) onSuccess(response.data.data);
       onClose();
     } catch (error) {
       toast({ title: 'Failed to create shift', variant: 'destructive' });

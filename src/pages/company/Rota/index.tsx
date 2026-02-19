@@ -131,56 +131,54 @@ export default function CompanyRota() {
   const [isAddRotaOpen, setIsAddRotaOpen] = useState(false);
   const [isBulkAssignOpen, setIsBulkAssignOpen] = useState(false);
   const [isCopyRotaOpen, setIsCopyRotaOpen] = useState(false);
-  const fetchUsersAndRotas = useCallback(async () => {
-    if (!companyId) return;
+const fetchUsersAndRotas = useCallback(async (isInitial = false) => {
+  if (!companyId) return;
+
+  // Only show loading if it's explicitly the initial load 
+  // or if we have no data yet
+  if (isInitial || (users.length === 0 && rotas.length === 0)) {
     setIsLoading(true);
-    try {
-      const userRes = await axiosInstance.get(
-        `/users?limit=all&role=employee&company=${companyId}`
-      );
-      const fetchedUsers =
-        userRes.data?.data?.result || userRes.data?.data || [];
-      setUsers(fetchedUsers);
+  }
 
-      const startOfMonth = currentDate
-        .clone()
-        .startOf('month')
-        .format('YYYY-MM-DD');
-      const endOfMonth = currentDate
-        .clone()
-        .endOf('month')
-        .format('YYYY-MM-DD');
+  try {
+    const userRes = await axiosInstance.get(
+      `/users?limit=all&role=employee&company=${companyId}`
+    );
+    const fetchedUsers = userRes.data?.data?.result || userRes.data?.data || [];
+    setUsers(fetchedUsers);
 
-      const rotaRes = await axiosInstance.get(
-        `/rota?companyId=${companyId}&startDate=${startOfMonth}&endDate=${endOfMonth}&limit=all`
-      );
+    const startOfMonth = currentDate.clone().startOf('month').format('YYYY-MM-DD');
+    const endOfMonth = currentDate.clone().endOf('month').format('YYYY-MM-DD');
 
-      setRotas(rotaRes.data?.data?.result || rotaRes.data?.data || []);
-    } catch (err: any) {
-      console.error('Error fetching data:', err);
-      toast({
-        title: err?.response?.data?.message || 'Failed to fetch staff/rotas',
-        variant: 'destructive'
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [companyId, currentDate, toast]);
+    const rotaRes = await axiosInstance.get(
+      `/rota?companyId=${companyId}&startDate=${startOfMonth}&endDate=${endOfMonth}&limit=all`
+    );
 
-  useEffect(() => {
-    fetchUsersAndRotas();
-  }, [fetchUsersAndRotas]);
+    const fetchedRotas = rotaRes.data?.data?.result || rotaRes.data?.data || [];
+    setRotas(fetchedRotas);
+  } catch (err: any) {
+    console.error('Error:', err);
+    toast({ title: 'Failed to fetch data', variant: 'destructive' });
+  } finally {
+    setIsLoading(false);
+  }
+}, [companyId, currentDate, toast, users.length, rotas.length]);
+
+// 2. Ensure the initial fetch happens on mount
+useEffect(() => {
+  fetchUsersAndRotas(true); // Pass true only for the first load
+}, [companyId, currentDate]);
 
   const rotaMap = useMemo(() => {
-    const map: Record<string, Record<string, any>> = {};
-    rotas.forEach((rota) => {
-      const empId = rota.employeeId;
-      const dateKey = moment(rota.startDate).format('YYYY-MM-DD');
-      if (!map[empId]) map[empId] = {};
-      map[empId][dateKey] = rota;
-    });
-    return map;
-  }, [rotas]);
+  const map: Record<string, Record<string, any>> = {};
+  rotas.forEach((rota) => {
+    const empId = rota.employeeId;
+    const dateKey = moment(rota.startDate).format('YYYY-MM-DD');
+    if (!map[empId]) map[empId] = {};
+    map[empId][dateKey] = rota;
+  });
+  return map;
+}, [rotas]);
 
   const getEmployeeColor = (id: string) => {
     let hash = 0;
@@ -231,6 +229,22 @@ export default function CompanyRota() {
     if (date) setCurrentDate(moment(date));
     setPickerOpen(false);
   };
+
+
+  const handleAddRotaSuccess = (newRota: any) => {
+  setRotas((prev) => [...prev, newRota]);
+};
+
+const handleUpdateRotaSuccess = (updatedRota: any) => {
+  setRotas((prev) => 
+    prev.map((r) => (r._id === updatedRota._id ? updatedRota : r))
+  );
+};
+
+const handleDeleteRotaSuccess = (deletedRotaId: string) => {
+  setRotas((prev) => prev.filter((r) => r._id !== deletedRotaId));
+};
+
 
   const handleCellClick = (user: User, day: moment.Moment) => {
     const dateKey = day.format('YYYY-MM-DD');
@@ -434,7 +448,7 @@ export default function CompanyRota() {
                         {day.format('ddd')}
                       </div>
                       <div
-                        className={`text-sm font-black ${isToday ? 'mx-auto flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 text-white' : isWeekend ? 'text-black' : 'text-black'}`}
+                        className={`text-sm font-black ${isToday ? 'mx-auto flex h-6 w-6 items-center justify-center rounded-full bg-theme text-white' : isWeekend ? 'text-black' : 'text-black'}`}
                       >
                         {day.format('D')}
                       </div>
@@ -532,7 +546,7 @@ export default function CompanyRota() {
         employee={selectedContext.employee}
         date={selectedContext.date}
         companyId={companyId}
-        onSuccess={fetchUsersAndRotas}
+        onSuccess={handleAddRotaSuccess}
       />
 
       <EditRotaSidebar
@@ -540,7 +554,8 @@ export default function CompanyRota() {
         onClose={() => setIsEditOpen(false)}
         rota={selectedRota}
         employee={selectedContext.employee}
-        onSuccess={fetchUsersAndRotas}
+        onSuccess={handleUpdateRotaSuccess}
+        onDeleteSuccess={handleDeleteRotaSuccess}
       />
 
       <AddRotaDialog
@@ -548,14 +563,14 @@ export default function CompanyRota() {
         onClose={() => setIsAddRotaOpen(false)}
         users={users}
         companyId={companyId}
-        onSuccess={fetchUsersAndRotas}
+        onSuccess={handleAddRotaSuccess}
       />
       <BulkAssignDialog
         isOpen={isBulkAssignOpen}
         onClose={() => setIsBulkAssignOpen(false)}
         users={users}
         companyId={companyId}
-        onSuccess={fetchUsersAndRotas}
+        onSuccess={handleAddRotaSuccess}
         setGlobalSkippedRecords={setSkippedRecords}
       />
 

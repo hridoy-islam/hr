@@ -64,9 +64,9 @@ export default function CopyRotaDialog({ isOpen, onClose, companyId, onSuccess,s
       // 2. Close dialog
       onClose();
 
-      setTimeout(() => {
+      
         onSuccess();
-      }, 0);
+      
 
       toast({
         title: 'Success',
