@@ -43,7 +43,8 @@ import {
   ClipboardCheck,
   FileJsonIcon,
   PenBox,
-  FileBadge
+  FileBadge,
+  CalendarClock
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Link, useNavigate, useLocation, useParams } from 'react-router-dom';
@@ -88,6 +89,13 @@ const navItems = [
     label: 'Report',
     href: 'report',
     roles: ['admin']
+  },
+
+  {
+    icon: CalendarClock,
+    label: 'Rota',
+    href: 'rota',
+    roles: ['company']
   },
 
   {
