@@ -83,24 +83,29 @@ const ShiftBlock = ({
   shiftName?: string;
   startTime?: string;
   endTime?: string;
-  colors: { bg: string; border: string; text: string };
+  colors: 'theme' | { bg: string; border: string; text: string };
 }) => {
-  const title = leaveType || shiftName || '';
   const durationMins = calculateDurationMinutes(startTime, endTime, leaveType);
   const duration = formatDuration(durationMins);
+  const isTheme = colors === 'theme';
 
   return (
     <div
-      style={{
-        backgroundColor: colors.bg,
-        borderColor: colors.border,
-        color: colors.text
-      }}
-      className="
+      style={
+        !isTheme
+          ? {
+              backgroundColor: colors.bg,
+              borderColor: colors.border,
+              color: colors.text
+            }
+          : undefined
+      }
+      className={`
         group/shift relative mx-auto flex min-h-[44px] w-full min-w-[50px] cursor-pointer
         flex-col items-center justify-center rounded-md border p-1 shadow-sm
         transition-all duration-200 hover:scale-105 hover:brightness-105
-      "
+        ${isTheme ? 'bg-theme border-theme text-white' : ''}
+      `}
     >
       <div className="pointer-events-none absolute inset-0 rounded-md bg-white/40 opacity-0 transition-opacity group-hover/shift:opacity-100" />
 
@@ -227,18 +232,6 @@ export default function CompanyRotaReport() {
     return totals;
   }, [rotas]);
 
-  const getEmployeeColor = (id: string) => {
-    let hash = 0;
-    for (let i = 0; i < id.length; i++)
-      hash = id.charCodeAt(i) + ((hash << 5) - hash);
-    const h = Math.abs(hash) % 360;
-    return {
-      bg: `hsl(${h}, 70%, 92%)`,
-      border: `hsl(${h}, 70%, 80%)`,
-      text: `hsl(${h}, 70%, 30%)`
-    };
-  };
-
   const groupedUsers = useMemo(() => {
     const groups: Record<string, User[]> = {};
     users.forEach((user) => {
@@ -313,8 +306,6 @@ export default function CompanyRotaReport() {
         .custom-scrollbar::-webkit-scrollbar-corner { background: #F8FAFC; }
         .scrollbar-top-wrapper { transform: rotateX(180deg); }
         .scrollbar-top-wrapper > table { transform: rotateX(180deg); }
-
-        
       `}</style>
 
       {/* ── Header ── */}
@@ -496,7 +487,6 @@ export default function CompanyRotaReport() {
                   {groupUsers.map((user) => {
                     const totalMins = employeeTotalDuration[user._id] || 0;
                     const totalLabel = formatDuration(totalMins);
-                    const userColors = getEmployeeColor(user._id);
 
                     return (
                       <tr
@@ -531,18 +521,10 @@ export default function CompanyRotaReport() {
                                 <p className="text-[10px] font-medium text-gray-500">
                                   {user?.designationId?.title}
                                 </p>
-                                {/* Total duration badge — reflects fetched date range */}
-                               <div
-  style={{
-    backgroundColor: userColors.bg,
-    color: userColors.text,
-    borderColor: userColors.border
-  }}
-  className="flex-shrink-0 rounded-md border px-1.5 py-0.5 text-xs font-semibold tracking-wider"
->
-  Total: {totalLabel}
-</div>
-
+                                {/* Total duration badge — styled to match default theme */}
+                                <div className="flex-shrink-0 rounded-md border border-theme bg-theme px-1.5 py-0.5 text-xs font-semibold tracking-wider text-white">
+                                  Total: {totalLabel}
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -551,6 +533,19 @@ export default function CompanyRotaReport() {
                         {daysArray.map((day, idx) => {
                           const dateKey = day.format('YYYY-MM-DD');
                           const rota = rotaMap[user._id]?.[dateKey];
+
+                          // --- THEME COLOR LOGIC ---
+                          let shiftColors: any = 'theme'; // Default to Tailwind theme
+
+                          if (rota) {
+                            if (rota.leaveType && leaveTypeColors[rota.leaveType]) {
+                              shiftColors = leaveTypeColors[rota.leaveType];
+                            } else if (rota.color) {
+                              shiftColors = typeof rota.color === 'string' 
+                                ? { bg: rota.color, border: rota.color, text: '#FFFFFF' } 
+                                : rota.color;
+                            }
+                          }
 
                           return (
                             <td
@@ -564,12 +559,7 @@ export default function CompanyRotaReport() {
                                   shiftName={rota.shiftName}
                                   startTime={rota.startTime}
                                   endTime={rota.endTime}
-                                  colors={
-                                    rota.leaveType
-                                      ? leaveTypeColors[rota.leaveType] ||
-                                        userColors
-                                      : userColors
-                                  }
+                                  colors={shiftColors}
                                 />
                               ) : (
                                 <div className="mx-auto flex h-9 w-full min-w-[50px] items-center justify-center rounded-lg border border-dashed border-transparent text-gray-300 opacity-0 transition-all group-hover:border-gray-300 group-hover:bg-gray-50 group-hover:opacity-100">

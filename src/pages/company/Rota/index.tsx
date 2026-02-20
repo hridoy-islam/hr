@@ -12,10 +12,6 @@ import {
   ChevronRight,
   CalendarDays,
   Plus,
-  Moon,
-  Sun,
-  Sunset,
-  Leaf,
   Copy,
   Users,
   MoveLeft,
@@ -54,7 +50,6 @@ const getInitials = (firstName?: string, lastName?: string, name?: string) => {
     return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
   }
   if (firstName) {
-    // Has firstName but no lastName: return first 2 chars
     return firstName.substring(0, 2).toUpperCase();
   }
   if (name) {
@@ -77,23 +72,29 @@ const ShiftBlock = ({
   shiftName?: string;
   startTime?: string;
   endTime?: string;
-  colors: { bg: string; border: string; text: string };
+  colors: 'theme' | { bg: string; border: string; text: string };
 }) => {
   const title = leaveType || shiftName || '';
   const hasTime = startTime && endTime && !leaveType;
+  const isTheme = colors === 'theme';
 
   return (
     <div
-      style={{
-        backgroundColor: colors.bg,
-        borderColor: colors.border,
-        color: colors.text
-      }}
-      className="
+      style={
+        !isTheme
+          ? {
+              backgroundColor: colors.bg,
+              borderColor: colors.border,
+              color: colors.text
+            }
+          : undefined
+      }
+      className={`
         group/shift relative mx-auto flex min-h-[44px] w-full min-w-[50px] cursor-pointer 
         flex-col items-center justify-center rounded-md border p-1 shadow-sm 
         transition-all duration-200 hover:scale-105 hover:brightness-105
-      "
+        ${isTheme ? 'bg-theme border-theme text-white' : ''}
+      `}
     >
       <div className="pointer-events-none absolute inset-0 rounded-md bg-white/40 opacity-0 transition-opacity group-hover/shift:opacity-100" />
       <span className="text-md w-full truncate text-center font-bold uppercase leading-tight tracking-widest">
@@ -119,6 +120,7 @@ export default function CompanyRota() {
   const pickerAnchorRef = useRef<HTMLButtonElement>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
+  
   // Interaction States
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -131,78 +133,65 @@ export default function CompanyRota() {
   const [isAddRotaOpen, setIsAddRotaOpen] = useState(false);
   const [isBulkAssignOpen, setIsBulkAssignOpen] = useState(false);
   const [isCopyRotaOpen, setIsCopyRotaOpen] = useState(false);
-const fetchUsersAndRotas = useCallback(async (isInitial = false) => {
-  if (!companyId) return;
+const [companyColor,setCompanyColor] = useState(null)
+  const fetchUsersAndRotas = useCallback(async (isInitial = false) => {
+    if (!companyId) return;
 
-  // Only show loading if it's explicitly the initial load 
-  // or if we have no data yet
-  if (isInitial || (users.length === 0 && rotas.length === 0)) {
-    setIsLoading(true);
-  }
-
-  try {
-    const userRes = await axiosInstance.get(
-      `/users?limit=all&role=employee&company=${companyId}`
-    );
-    const fetchedUsers = userRes.data?.data?.result || userRes.data?.data || [];
-    setUsers(fetchedUsers);
-
-    const startOfMonth = currentDate.clone().startOf('month').format('YYYY-MM-DD');
-    const endOfMonth = currentDate.clone().endOf('month').format('YYYY-MM-DD');
-
-    const rotaRes = await axiosInstance.get(
-      `/rota?companyId=${companyId}&startDate=${startOfMonth}&endDate=${endOfMonth}&limit=all`
-    );
-
-    const fetchedRotas = rotaRes.data?.data?.result || rotaRes.data?.data || [];
-    setRotas(fetchedRotas);
-  } catch (err: any) {
-    console.error('Error:', err);
-    toast({ title: 'Failed to fetch data', variant: 'destructive' });
-  } finally {
-    setIsLoading(false);
-  }
-}, [companyId, currentDate, toast, users.length, rotas.length]);
-
-// 2. Ensure the initial fetch happens on mount
-useEffect(() => {
-  fetchUsersAndRotas(true); // Pass true only for the first load
-}, [companyId, currentDate]);
-
-  const rotaMap = useMemo(() => {
-  const map: Record<string, Record<string, any>> = {};
-  rotas.forEach((rota) => {
-    const empId = rota.employeeId;
-    const dateKey = moment(rota.startDate).format('YYYY-MM-DD');
-    if (!map[empId]) map[empId] = {};
-    map[empId][dateKey] = rota;
-  });
-  return map;
-}, [rotas]);
-
-  const getEmployeeColor = (id: string) => {
-    let hash = 0;
-    for (let i = 0; i < id.length; i++) {
-      hash = id.charCodeAt(i) + ((hash << 5) - hash);
+    if (isInitial || (users.length === 0 && rotas.length === 0)) {
+      setIsLoading(true);
     }
 
-    const h = Math.abs(hash) % 360;
-    return {
-      bg: `hsl(${h}, 70%, 92%)`,
-      border: `hsl(${h}, 70%, 80%)`,
-      text: `hsl(${h}, 70%, 30%)`
-    };
-  };
+    try {
+      const userRes = await axiosInstance.get(
+        `/users?limit=all&role=employee&company=${companyId}`
+      );
+      const fetchedUsers = userRes.data?.data?.result || userRes.data?.data || [];
+      setUsers(fetchedUsers);
+
+      const startOfMonth = currentDate.clone().startOf('month').format('YYYY-MM-DD');
+      const endOfMonth = currentDate.clone().endOf('month').format('YYYY-MM-DD');
+
+      const rotaRes = await axiosInstance.get(
+        `/rota?companyId=${companyId}&startDate=${startOfMonth}&endDate=${endOfMonth}&limit=all`
+      );
+      const fetchedRotas = rotaRes.data?.data?.result || rotaRes.data?.data || [];
+      setRotas(fetchedRotas);
+      const companyRes = await axiosInstance.get(
+        `/users/${companyId}`
+      );
+      setCompanyColor(companyRes.data?.data?.themeColor)
+    } catch (err: any) {
+      console.error('Error:', err);
+      toast({ title: 'Failed to fetch data', variant: 'destructive' });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [companyId, currentDate, toast, users.length, rotas.length]);
+
+  useEffect(() => {
+    fetchUsersAndRotas(true);
+  }, [companyId, currentDate]);
+
+  const rotaMap = useMemo(() => {
+    const map: Record<string, Record<string, any>> = {};
+    rotas.forEach((rota) => {
+      const empId = rota.employeeId;
+      const dateKey = moment(rota.startDate).format('YYYY-MM-DD');
+      if (!map[empId]) map[empId] = {};
+      map[empId][dateKey] = rota;
+    });
+    return map;
+  }, [rotas]);
 
   const leaveTypeColors: Record<
     string,
     { bg: string; border: string; text: string }
   > = {
-    DO: { bg: '#E0F7FA', border: '#B2EBF2', text: '#006064' }, // Day Off
-    AL: { bg: '#FFF3E0', border: '#FFE0B2', text: '#E65100' }, // Annual Leave
-    S: { bg: '#FFEBEE', border: '#FFCDD2', text: '#B71C1C' }, // Sick
-    ML: { bg: '#F3E5F5', border: '#E1BEE7', text: '#4A148C' }, // Maternity Leave
-    NT: { bg: '#ECEFF1', border: '#CFD8DC', text: '#37474F' } // No Task
+    DO: { bg: '#E0F7FA', border: '#B2EBF2', text: '#006064' }, 
+    AL: { bg: '#FFF3E0', border: '#FFE0B2', text: '#E65100' }, 
+    S:  { bg: '#FFEBEE', border: '#FFCDD2', text: '#B71C1C' }, 
+    ML: { bg: '#F3E5F5', border: '#E1BEE7', text: '#4A148C' }, 
+    NT: { bg: '#ECEFF1', border: '#CFD8DC', text: '#37474F' } 
   };
 
   const groupedUsers = useMemo(() => {
@@ -230,21 +219,19 @@ useEffect(() => {
     setPickerOpen(false);
   };
 
-
   const handleAddRotaSuccess = (newRota: any) => {
-  setRotas((prev) => [...prev, newRota]);
-};
+    setRotas((prev) => [...prev, newRota]);
+  };
 
-const handleUpdateRotaSuccess = (updatedRota: any) => {
-  setRotas((prev) => 
-    prev.map((r) => (r._id === updatedRota._id ? updatedRota : r))
-  );
-};
+  const handleUpdateRotaSuccess = (updatedRota: any) => {
+    setRotas((prev) => 
+      prev.map((r) => (r._id === updatedRota._id ? updatedRota : r))
+    );
+  };
 
-const handleDeleteRotaSuccess = (deletedRotaId: string) => {
-  setRotas((prev) => prev.filter((r) => r._id !== deletedRotaId));
-};
-
+  const handleDeleteRotaSuccess = (deletedRotaId: string) => {
+    setRotas((prev) => prev.filter((r) => r._id !== deletedRotaId));
+  };
 
   const handleCellClick = (user: User, day: moment.Moment) => {
     const dateKey = day.format('YYYY-MM-DD');
@@ -339,7 +326,6 @@ const handleDeleteRotaSuccess = (deletedRotaId: string) => {
           </Button>
         </div>
 
-        {/* NEW BUTTONS */}
         <div className="flex items-center gap-2">
           <Button
             onClick={() => navigate(-1)}
@@ -374,6 +360,7 @@ const handleDeleteRotaSuccess = (deletedRotaId: string) => {
           </Button>
         </div>
       </div>
+
       {skippedRecords.length > 0 && (
         <div className="relative mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4 shadow-sm animate-in fade-in slide-in-from-top-4">
           <button
@@ -389,12 +376,10 @@ const handleDeleteRotaSuccess = (deletedRotaId: string) => {
             </div>
             <div className="flex-1">
               <h3 className="text-sm font-bold text-amber-900">
-                Action Completed with Warnings ({skippedRecords.length} shifts
-                skipped)
+                Action Completed with Warnings ({skippedRecords.length} shifts skipped)
               </h3>
               <p className="mb-3 mt-1 text-xs font-medium text-amber-700">
-                The following shifts were not created because the staff already
-                had an assignment on those dates:
+                The following shifts were not created because the staff already had an assignment on those dates:
               </p>
 
               <div className="custom-scrollbar grid max-h-48 grid-cols-1 gap-2 overflow-y-auto pr-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
@@ -416,6 +401,7 @@ const handleDeleteRotaSuccess = (deletedRotaId: string) => {
           </div>
         </div>
       )}
+
       {isLoading ? (
         <div className="flex h-[60vh] flex-1 items-center justify-center">
           <div className="flex h-[60vh] justify-center py-6">
@@ -442,14 +428,10 @@ const handleDeleteRotaSuccess = (deletedRotaId: string) => {
                         ${isToday ? 'bg-theme/50 text-white' : isWeekend ? 'bg-theme/5' : ''}
                       `}
                     >
-                      <div
-                        className={`text-xs font-bold uppercase ${isWeekend ? 'text-black' : 'text-black'}`}
-                      >
+                      <div className={`text-xs font-bold uppercase ${isWeekend ? 'text-black' : 'text-black'}`}>
                         {day.format('ddd')}
                       </div>
-                      <div
-                        className={`text-sm font-black ${isToday ? 'mx-auto flex h-6 w-6 items-center justify-center rounded-full bg-theme text-white' : isWeekend ? 'text-black' : 'text-black'}`}
-                      >
+                      <div className={`text-sm font-black ${isToday ? 'mx-auto flex h-6 w-6 items-center justify-center rounded-full bg-theme text-white' : isWeekend ? 'text-black' : 'text-black'}`}>
                         {day.format('D')}
                       </div>
                     </th>
@@ -466,7 +448,6 @@ const handleDeleteRotaSuccess = (deletedRotaId: string) => {
                       key={user._id}
                       className="transition-colors hover:bg-slate-50/60"
                     >
-                      {/* Fixed Staff Name */}
                       <td className="sticky left-0 z-20 border-b border-r border-gray-200 bg-white p-3 shadow-[2px_0_0_0_rgba(0,0,0,0.05)]">
                         <div className="flex items-center gap-3">
                           <Avatar className="h-9 w-9 border border-gray-200">
@@ -500,8 +481,19 @@ const handleDeleteRotaSuccess = (deletedRotaId: string) => {
                         const dateKey = day.format('YYYY-MM-DD');
                         const rota = rotaMap[user._id]?.[dateKey];
 
-                        // Generate the unique color for this specific user
-                        const userColors = getEmployeeColor(user._id);
+                        // --- THEME COLOR LOGIC ---
+                        let shiftColors: any = 'theme'; // Default to Tailwind theme
+                        
+                        if (rota) {
+                          if (rota.leaveType && leaveTypeColors[rota.leaveType]) {
+                            shiftColors = leaveTypeColors[rota.leaveType];
+                          } else if (rota.color) {
+                            // Handles string hex colors, or pre-structured color objects from the DB
+                            shiftColors = typeof rota.color === 'string' 
+                              ? { bg: rota.color, border: rota.color, text: '#FFFFFF' } 
+                              : rota.color;
+                          }
+                        }
 
                         return (
                           <td
@@ -515,12 +507,7 @@ const handleDeleteRotaSuccess = (deletedRotaId: string) => {
                                 shiftName={rota.shiftName}
                                 startTime={rota.startTime}
                                 endTime={rota.endTime}
-                                colors={
-                                  rota.leaveType
-                                    ? leaveTypeColors[rota.leaveType] ||
-                                      userColors
-                                    : userColors
-                                }
+                                colors={shiftColors}
                               />
                             ) : (
                               <div className="mx-auto flex h-9 w-full min-w-[50px] items-center justify-center rounded-lg border border-dashed border-transparent text-gray-300 opacity-0 transition-all group-hover:border-gray-300 group-hover:bg-gray-50 group-hover:opacity-100">
@@ -547,6 +534,7 @@ const handleDeleteRotaSuccess = (deletedRotaId: string) => {
         date={selectedContext.date}
         companyId={companyId}
         onSuccess={handleAddRotaSuccess}
+        companyColor={companyColor}
       />
 
       <EditRotaSidebar
@@ -556,6 +544,8 @@ const handleDeleteRotaSuccess = (deletedRotaId: string) => {
         employee={selectedContext.employee}
         onSuccess={handleUpdateRotaSuccess}
         onDeleteSuccess={handleDeleteRotaSuccess}
+                companyColor={companyColor}
+
       />
 
       <AddRotaDialog
@@ -564,6 +554,7 @@ const handleDeleteRotaSuccess = (deletedRotaId: string) => {
         users={users}
         companyId={companyId}
         onSuccess={handleAddRotaSuccess}
+        companyColor={companyColor}
       />
       <BulkAssignDialog
         isOpen={isBulkAssignOpen}
@@ -572,6 +563,8 @@ const handleDeleteRotaSuccess = (deletedRotaId: string) => {
         companyId={companyId}
         onSuccess={handleAddRotaSuccess}
         setGlobalSkippedRecords={setSkippedRecords}
+                companyColor={companyColor}
+
       />
 
       <CopyRotaDialog
@@ -580,6 +573,8 @@ const handleDeleteRotaSuccess = (deletedRotaId: string) => {
         companyId={companyId}
         onSuccess={fetchUsersAndRotas}
         setGlobalSkippedRecords={setSkippedRecords}
+                companyColor={companyColor}
+
       />
     </div>
   );

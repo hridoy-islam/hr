@@ -37,7 +37,8 @@ const formSchema = z.object({
   leaveType: z.string().optional(),
   startTime: z.string().optional(),
   endTime: z.string().optional(),
-  note: z.string().optional()
+  note: z.string().optional(),
+  color: z.string().optional(),
 }).superRefine((data, ctx) => {
   if (!data.leaveType) {
     
@@ -59,12 +60,12 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-export default function EditRotaSidebar({ isOpen, onClose, rota, employee, onSuccess,onDeleteSuccess }: any) {
+export default function EditRotaSidebar({ isOpen, onClose, rota, employee, onSuccess,onDeleteSuccess,companyColor }: any) {
   const { toast } = useToast();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: { startDate: undefined, shiftName: '', leaveType: '', startTime: '', endTime: '', note: '' }
+    defaultValues: { startDate: undefined, shiftName: '', leaveType: '', startTime: '', endTime: '', note: '',color:companyColor }
   });
 
   const watchLeaveType = form.watch('leaveType');
@@ -93,7 +94,8 @@ export default function EditRotaSidebar({ isOpen, onClose, rota, employee, onSuc
         shiftName: defaultShiftName,
         startTime: rota.startTime || '',
         endTime: rota.endTime || '',
-        note: rota.note || ''
+        note: rota.note || '',
+        color: rota.color || companyColor
       });
     }
   }, [isOpen, rota, form]);
@@ -126,11 +128,13 @@ export default function EditRotaSidebar({ isOpen, onClose, rota, employee, onSuc
       payload.shiftName = values.leaveType;
       payload.startTime = ""; 
       payload.endTime = "";
+      payload.color = "";
     } else {
       payload.leaveType = ""; 
       payload.shiftName = values.shiftName;
       payload.startTime = values.startTime;
       payload.endTime = values.endTime;
+      payload.color = values.color;
     }
 
     try {
@@ -334,6 +338,23 @@ export default function EditRotaSidebar({ isOpen, onClose, rota, employee, onSuc
                             )}
                           />
                         </div>
+                        <FormField
+                    control={form.control}
+                    name="color"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs font-bold uppercase">Shift Color</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="color"
+                            {...field}
+                            className="h-10 w-20 cursor-pointer p-1 rounded-md border border-gray-300"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                       </div>
                     </div>
                   ) : (

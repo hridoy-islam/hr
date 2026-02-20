@@ -26,7 +26,8 @@ const formSchema = z.object({
   leaveType: z.string().optional(),
   startTime: z.string().optional(),
   endTime: z.string().optional(),
-  note: z.string().optional()
+  note: z.string().optional(),
+  color: z.string().optional()
 }).superRefine((data, ctx) => {
   if (!data.leaveType) {
     
@@ -71,7 +72,8 @@ export default function CreateRotaDialog({
   employee,
   date,
   companyId,
-  onSuccess
+  onSuccess,
+          companyColor
 }: any) {
   const { toast } = useToast();
 
@@ -82,9 +84,16 @@ export default function CreateRotaDialog({
       leaveType: '',
       startTime: '',
       endTime: '',
-      note: ''
+      note: '',
+      color:companyColor
     }
   });
+
+ useEffect(() => {
+  if (companyColor) {
+    form.setValue("color", companyColor);
+  }
+}, [companyColor, form]);
 
   const watchLeaveType = form.watch('leaveType');
   const isStandardShift = !watchLeaveType;
@@ -125,6 +134,7 @@ export default function CreateRotaDialog({
       payload.shiftName = values.shiftName;
       payload.startTime = values.startTime;
       payload.endTime = values.endTime;
+      payload.color = values.color;
     }
 
     try {
@@ -174,13 +184,13 @@ export default function CreateRotaDialog({
                 <div className="space-y-6">
                   <div className="grid grid-cols-2 gap-4 rounded-lg border border-slate-100 bg-slate-50/50 p-4">
                     <div>
-                      <p className="text-xs font-bold uppercase text-slate-500">Staff Member</p>
+                      <p className="text-xs font-bold uppercase ">Staff Member</p>
                       <p className="text-sm font-semibold text-slate-900">
                         {employee?.firstName} {employee?.lastName}
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs font-bold uppercase text-slate-500">Schedule Date</p>
+                      <p className="text-xs font-bold uppercase ">Schedule Date</p>
                       <p className="text-sm font-semibold text-slate-900">
                         {moment(date).format('DD MMM, YYYY')}
                       </p>
@@ -328,10 +338,32 @@ export default function CreateRotaDialog({
                             </FormItem>
                           )}
                         />
+
+                        <FormField
+                        control={form.control}
+                        name="color"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs font-bold uppercase ">
+                              Shift Color
+                            </FormLabel>
+                            <FormControl>
+                              <Input
+                                type="color"
+                                {...field}
+                                value={field.value || companyColor}
+
+                                className="h-10 w-20 cursor-pointer p-1 rounded-md border border-gray-300"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                       </div>
                     </div>
                   ) : (
-                    <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-6 sm:p-8 flex items-center justify-center text-center text-sm text-slate-500 animate-in fade-in duration-300">
+                    <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-6 sm:p-8 flex items-center justify-center text-center text-sm  animate-in fade-in duration-300">
                       A leave type is currently selected.
                       <br />
                       Standard shift fields are disabled.

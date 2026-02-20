@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
@@ -43,7 +41,8 @@ export default function BulkAssignDialog({
   users = [],
   companyId,
   onSuccess,
-  setGlobalSkippedRecords
+  setGlobalSkippedRecords,
+  companyColor
 }: any) {
   const { toast } = useToast();
 
@@ -59,9 +58,14 @@ export default function BulkAssignDialog({
   const [shiftName, setShiftName] = useState<string>('');
   const [startTime, setStartTime] = useState<string>('');
   const [endTime, setEndTime] = useState<string>('');
+  const [color, setColor] = useState<string>(companyColor);
 
   const isStandardShift = !leaveType;
-
+useEffect(() => {
+  if (companyColor) {
+    setColor(companyColor);
+  }
+}, [companyColor]);
   useEffect(() => {
     if (!isOpen) {
       resetForm();
@@ -76,6 +80,7 @@ export default function BulkAssignDialog({
     setShiftName('');
     setStartTime('');
     setEndTime('');
+    setColor(companyColor);
   };
 
   const handleTimeBlur = (
@@ -106,52 +111,53 @@ export default function BulkAssignDialog({
   const selectAll = () => setSelectedEmployees(users);
   const clearAll = () => setSelectedEmployees([]);
 
-const handleSubmit = async () => {
-  try {
-    const payload = {
-      companyId,
-      employeeIds: selectedEmployees,
-      startDate: moment(startDate).format('YYYY-MM-DD'),
-      endDate: moment(endDate).format('YYYY-MM-DD'),
-      shiftName: leaveType ? undefined : shiftName,
-      leaveType: leaveType || undefined,
-      startTime,
-      endTime
-    };
+  const handleSubmit = async () => {
+    try {
+      const payload = {
+        companyId,
+        employeeIds: selectedEmployees,
+        startDate: moment(startDate).format('YYYY-MM-DD'),
+        endDate: moment(endDate).format('YYYY-MM-DD'),
+        shiftName: leaveType ? undefined : shiftName,
+        leaveType: leaveType || undefined,
+        startTime,
+        endTime,
+        ...(!leaveType && { color }) // Only attach color for standard shifts
+      };
 
-    const res = await axiosInstance.post('/rota/bulk-assign', payload);
-    const {meta} = res.data.data;
+      const res = await axiosInstance.post('/rota/bulk-assign', payload);
+      const {meta} = res.data.data;
 
       if (onSuccess) onSuccess(res.data.data);
-    onClose();
+      onClose();
 
-    if (meta?.hasSkippedRecords) {
-      setGlobalSkippedRecords(meta.skippedRecords);
+      if (meta?.hasSkippedRecords) {
+        setGlobalSkippedRecords(meta.skippedRecords);
+        toast({
+          title: 'Bulk Assign Result',
+          description: `Assigned ${meta.createdShiftsCount} shifts. Some were skipped.`
+        });
+      } else {
+        setGlobalSkippedRecords([]);
+        toast({
+          title: 'Success',
+          description: 'Bulk assignment completed successfully.'
+        });
+      }
+    } catch (error) {
       toast({
-        title: 'Bulk Assign Result',
-        description: `Assigned ${meta.createdShiftsCount} shifts. Some were skipped.`
-      });
-    } else {
-      setGlobalSkippedRecords([]);
-      toast({
-        title: 'Success',
-        description: 'Bulk assignment completed successfully.'
+        title: 'Error',
+        description: 'Failed to assign shifts',
+        variant: 'destructive'
       });
     }
-  } catch (error) {
-    toast({
-      title: 'Error',
-      description: 'Failed to assign shifts',
-      variant: 'destructive'
-    });
-  }
-};
+  };
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
-      <div className="flex h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl animate-in zoom-in-95">
+      <div className="flex h-[96vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl animate-in zoom-in-95">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-100 p-5">
           <h2 className="text-xl font-bold text-gray-900">
@@ -395,6 +401,18 @@ const handleSubmit = async () => {
                         />
                       </div>
                     </div>
+
+                    <div>
+                      <label className="mb-1.5 block text-xs font-bold uppercase ">
+                        Shift Color
+                      </label>
+                      <Input
+                        type="color"
+                        value={color}
+                        onChange={(e) => setColor(e.target.value)}
+                        className="h-10 w-20 cursor-pointer p-1 rounded-md border border-gray-300"
+                      />
+                    </div>
                   </div>
                 ) : (
                   <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-500 animate-in fade-in">
@@ -405,7 +423,7 @@ const handleSubmit = async () => {
                 )}
 
                 {/* Leave Type Selector */}
-                <div className="space-y-3">
+                <div className="space-y-3 pt-2 border-t border-gray-100">
                   <label className="text-xs font-bold uppercase ">
                     Leave Type
                   </label>

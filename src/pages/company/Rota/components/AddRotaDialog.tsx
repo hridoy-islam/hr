@@ -1,5 +1,3 @@
-
-
 import React, { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,11 +22,10 @@ const formSchema = z.object({
   leaveType: z.string().optional(),
   startTime: z.string().optional(),
   endTime: z.string().optional(),
-  note: z.string().optional()
+  note: z.string().optional(),
+  color: z.string().optional()
 }).superRefine((data, ctx) => {
   if (!data.leaveType) {
-    
-
     const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
 
     if (!data.startTime) {
@@ -63,16 +60,22 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-export default function AddRotaDialog({ isOpen, onClose, users, companyId, onSuccess }: any) {
+export default function AddRotaDialog({ isOpen, onClose, users, companyId, onSuccess,companyColor }: any) {
   const { toast } = useToast();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: { employeeId: '', shiftName: '', leaveType: '', startTime: '', endTime: '', note: '' }
+    defaultValues: { employeeId: '', shiftName: '', leaveType: '', startTime: '', endTime: '', note: '', color: companyColor }
   });
 
   const watchLeaveType = form.watch('leaveType');
   const isStandardShift = !watchLeaveType;
+
+   useEffect(() => {
+    if (companyColor) {
+      form.setValue("color", companyColor);
+    }
+  }, [companyColor, form,isOpen]);
 
   useEffect(() => {
     if (!isOpen) form.reset();
@@ -100,7 +103,7 @@ export default function AddRotaDialog({ isOpen, onClose, users, companyId, onSuc
       employeeId: values.employeeId,
       note: values.note || '',
       startDate,
-      endDate
+      endDate,
     };
 
     if (!isStandardShift) {
@@ -110,6 +113,7 @@ export default function AddRotaDialog({ isOpen, onClose, users, companyId, onSuc
       payload.shiftName = values.shiftName;
       payload.startTime = values.startTime;
       payload.endTime = values.endTime;
+      payload.color = values.color;
     }
 
     try {
@@ -125,7 +129,6 @@ export default function AddRotaDialog({ isOpen, onClose, users, companyId, onSuc
   if (!isOpen) return null;
 
   const leaveOptions = [
-   
     { id: 'DO', label: 'Day Off (DO)' },
     { id: 'AL', label: 'Annual Leave (AL)' },
     { id: 'S', label: 'Sick (S)' },
@@ -283,6 +286,25 @@ export default function AddRotaDialog({ isOpen, onClose, users, companyId, onSuc
                           )}
                         />
                       </div>
+
+                      <FormField
+                        control={form.control}
+                        name="color"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs font-bold uppercase">Shift Color</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="color"
+                                {...field}
+                                value={field.value || companyColor}
+                                className="h-10 w-20 cursor-pointer p-1 rounded-md border border-gray-300"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     </div>
                   ) : (
                     <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-8 flex items-center justify-center text-center text-sm text-slate-500 animate-in fade-in">
