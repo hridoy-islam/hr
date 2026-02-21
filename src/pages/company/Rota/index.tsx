@@ -330,28 +330,28 @@ const [companyColor,setCompanyColor] = useState(null)
           <Button
             onClick={() => navigate(-1)}
             variant="outline"
-            className="h-9 gap-2"
+            className="h-9 gap-2 "
           >
             <MoveLeft className="h-4 w-4" /> Back
           </Button>
           <Button
             onClick={() => setIsCopyRotaOpen(true)}
             variant="outline"
-            className="h-9 gap-2"
+            className="h-9 gap-2 bg-emerald-800 text-white hover:bg-emerald-700 border-none"
           >
             <Copy className="h-4 w-4" /> Copy Rota
           </Button>
           <Button
             onClick={() => navigate('report')}
             variant="outline"
-            className="h-9 gap-2"
+            className="h-9 gap-2 bg-purple-800 text-white hover:bg-purple-700 border-none"
           >
             <File className="h-4 w-4" /> Report
           </Button>
           <Button
             onClick={() => setIsBulkAssignOpen(true)}
             variant="outline"
-            className="h-9 gap-2"
+            className="h-9 gap-2 bg-orange-800 text-white hover:bg-orange-700 border-none"
           >
             <Users className="h-4 w-4" /> Bulk Assign
           </Button>
