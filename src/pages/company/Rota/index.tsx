@@ -561,7 +561,7 @@ const [companyColor,setCompanyColor] = useState(null)
         onClose={() => setIsBulkAssignOpen(false)}
         users={users}
         companyId={companyId}
-        onSuccess={handleAddRotaSuccess}
+        onSuccess={fetchUsersAndRotas}
         setGlobalSkippedRecords={setSkippedRecords}
                 companyColor={companyColor}
 

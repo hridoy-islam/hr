@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,6 +26,7 @@ import * as z from 'zod';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { CirclePicker } from 'react-color'; // Added import
 
 const formSchema = z.object({
   startDate: z.date({
@@ -41,7 +41,6 @@ const formSchema = z.object({
   color: z.string().optional(),
 }).superRefine((data, ctx) => {
   if (!data.leaveType) {
-    
     const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
 
     if (!data.startTime) {
@@ -60,12 +59,12 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-export default function EditRotaSidebar({ isOpen, onClose, rota, employee, onSuccess,onDeleteSuccess,companyColor }: any) {
+export default function EditRotaSidebar({ isOpen, onClose, rota, employee, onSuccess, onDeleteSuccess, companyColor }: any) {
   const { toast } = useToast();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: { startDate: undefined, shiftName: '', leaveType: '', startTime: '', endTime: '', note: '',color:companyColor }
+    defaultValues: { startDate: undefined, shiftName: '', leaveType: '', startTime: '', endTime: '', note: '', color: "#2196f3" }
   });
 
   const watchLeaveType = form.watch('leaveType');
@@ -86,7 +85,7 @@ export default function EditRotaSidebar({ isOpen, onClose, rota, employee, onSuc
     if (isOpen && rota) {
       const existingDate = rota.startDate || rota.scheduleDate;
       const parsedLeaveType = rota.leaveType || '';
-      const defaultShiftName = parsedLeaveType ? '' : (rota.shiftName|| '');
+      const defaultShiftName = parsedLeaveType ? '' : (rota.shiftName || '');
 
       form.reset({
         startDate: existingDate ? new Date(existingDate) : new Date(),
@@ -95,7 +94,7 @@ export default function EditRotaSidebar({ isOpen, onClose, rota, employee, onSuc
         startTime: rota.startTime || '',
         endTime: rota.endTime || '',
         note: rota.note || '',
-        color: rota.color || companyColor
+        color: rota.color || '#2196f3'
       });
     }
   }, [isOpen, rota, form]);
@@ -168,6 +167,14 @@ export default function EditRotaSidebar({ isOpen, onClose, rota, employee, onSuc
     { id: 'NT', label: 'No Task (NT)' },
   ];
 
+  // Define the colors array for the Circle Picker
+  const themeColors = [
+    "#f44336", "#e91e63", "#9c27b0", "#673ab7", "#3f51b5", 
+    "#2196f3", "#03a9f4", "#00bcd4", "#009688", "#4caf50", 
+    "#8bc34a", "#cddc39", "#ffeb3b", "#ffc107", "#ff9800", 
+    "#ff5722", "#795548", "#607d8b"
+  ];
+
   return (
     <>
       <div className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm" onClick={onClose} />
@@ -178,13 +185,13 @@ export default function EditRotaSidebar({ isOpen, onClose, rota, employee, onSuc
         </div>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-1 flex-col overflow-hidden">
-            <div className="flex-1 space-y-3 overflow-y-auto p-5">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-1 flex-col overflow-hidden text-xs">
+            <div className="flex-1 space-y-2 overflow-y-auto p-5">
               
               <div className="flex items-center gap-3 rounded-xl border border-gray-100 bg-gray-50 p-4">
                 <Avatar className="h-12 w-12 border border-gray-200">
                   <AvatarImage src={employee?.image || '/placeholder.png'} alt={`${employee?.firstName || ''} ${employee?.lastName || ''}`} />
-                  <AvatarFallback className="bg-blue-100 font-black text-blue-600">
+                  <AvatarFallback className="bg-blue-100 font-black text-theme">
                     {employee?.firstName?.[0] || ''}{employee?.lastName?.[0] || ''}
                   </AvatarFallback>
                 </Avatar>
@@ -245,7 +252,7 @@ export default function EditRotaSidebar({ isOpen, onClose, rota, employee, onSuc
                     </div>
                   </div>
 
-                  <div className="space-y-3">
+                  <div className="space-y-1">
                     <FormLabel className="text-xs font-bold uppercase">Leave Type</FormLabel>
                     <div className="grid grid-cols-2 gap-y-3 gap-x-4 p-3 border border-gray-100 bg-gray-50/50 rounded-md">
                       {leaveOptions.map((option) => (
@@ -270,7 +277,7 @@ export default function EditRotaSidebar({ isOpen, onClose, rota, employee, onSuc
                   </div>
 
                   {isStandardShift ? (
-                    <div className="space-y-4 pt-2 border-t border-gray-100">
+                    <div className="space-y-3 border-gray-100">
                       <FormField
                         control={form.control}
                         name="shiftName"
@@ -338,24 +345,33 @@ export default function EditRotaSidebar({ isOpen, onClose, rota, employee, onSuc
                             )}
                           />
                         </div>
-                        <FormField
-                    control={form.control}
-                    name="color"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-xs font-bold uppercase">Shift Color</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="color"
-                            {...field}
-                            className="h-10 w-20 cursor-pointer p-1 rounded-md border border-gray-300"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
                       </div>
+
+                      {/* Updated Color Picker Field */}
+                     {/* Updated Color Picker Field */}
+<FormField
+  control={form.control}
+  name="color"
+  render={({ field }) => (
+    <FormItem>
+      <FormLabel className="text-xs font-bold uppercase">Shift Color</FormLabel>
+      <FormControl>
+        <div className="pt-2">
+          <CirclePicker
+            // FIX: Add a fallback hex color here so it never passes null/undefined
+            color={field.value || "#2196f3"} 
+            width="252px"
+            colors={themeColors}
+            circleSize={28}
+            circleSpacing={14}
+            onChangeComplete={(color) => field.onChange(color.hex)}
+          />
+        </div>
+      </FormControl>
+      <FormMessage />
+    </FormItem>
+  )}
+/>
                     </div>
                   ) : (
                     <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 mt-4 text-center text-xs text-slate-500">

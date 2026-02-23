@@ -9,6 +9,7 @@ import 'react-datepicker/dist/react-datepicker.css';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { CalendarIcon, Users, Clock, Check } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
+import { CirclePicker } from 'react-color'; // Added import
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const getInitials = (firstName?: string, lastName?: string, name?: string) => {
@@ -35,6 +36,13 @@ const leaveOptions = [
   { id: 'NT', label: 'No Task (NT)' }
 ];
 
+const themeColors = [
+  "#f44336", "#e91e63", "#9c27b0", "#673ab7", "#3f51b5", 
+  "#2196f3", "#03a9f4", "#00bcd4", "#009688", "#4caf50", 
+  "#8bc34a", "#cddc39", "#ffeb3b", "#ffc107", "#ff9800", 
+  "#ff5722", "#795548", "#607d8b"
+];
+
 export default function BulkAssignDialog({
   isOpen,
   onClose,
@@ -58,14 +66,11 @@ export default function BulkAssignDialog({
   const [shiftName, setShiftName] = useState<string>('');
   const [startTime, setStartTime] = useState<string>('');
   const [endTime, setEndTime] = useState<string>('');
-  const [color, setColor] = useState<string>(companyColor);
+  const [color, setColor] = useState<string>("#2196f3");
 
   const isStandardShift = !leaveType;
-useEffect(() => {
-  if (companyColor) {
-    setColor(companyColor);
-  }
-}, [companyColor]);
+
+
   useEffect(() => {
     if (!isOpen) {
       resetForm();
@@ -80,7 +85,7 @@ useEffect(() => {
     setShiftName('');
     setStartTime('');
     setEndTime('');
-    setColor(companyColor);
+    setColor("#2196f3");
   };
 
   const handleTimeBlur = (
@@ -128,7 +133,8 @@ useEffect(() => {
       const res = await axiosInstance.post('/rota/bulk-assign', payload);
       const {meta} = res.data.data;
 
-      if (onSuccess) onSuccess(res.data.data);
+      if (onSuccess) onSuccess(res.data.data.result);
+      console.log(res.data.data.result)
       onClose();
 
       if (meta?.hasSkippedRecords) {
@@ -402,16 +408,21 @@ useEffect(() => {
                       </div>
                     </div>
 
+                    {/* Updated Color Picker Field */}
                     <div>
                       <label className="mb-1.5 block text-xs font-bold uppercase ">
                         Shift Color
                       </label>
-                      <Input
-                        type="color"
-                        value={color}
-                        onChange={(e) => setColor(e.target.value)}
-                        className="h-10 w-20 cursor-pointer p-1 rounded-md border border-gray-300"
-                      />
+                      <div className="pt-2">
+                        <CirclePicker
+                          color={color || companyColor || "#2196f3"}
+                          width="252px"
+                          colors={themeColors}
+                          circleSize={28}
+                          circleSpacing={14}
+                          onChangeComplete={(color) => setColor(color.hex)}
+                        />
+                      </div>
                     </div>
                   </div>
                 ) : (

@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,6 +18,7 @@ import moment from 'moment';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import { CirclePicker } from 'react-color'; // Added import
 
 // ─── Zod Schema ─────────────────────────────────────────────────────────────
 const formSchema = z.object({
@@ -30,8 +30,6 @@ const formSchema = z.object({
   color: z.string().optional()
 }).superRefine((data, ctx) => {
   if (!data.leaveType) {
-    
-
     const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
 
     if (!data.startTime) {
@@ -73,7 +71,7 @@ export default function CreateRotaDialog({
   date,
   companyId,
   onSuccess,
-          companyColor
+  companyColor
 }: any) {
   const { toast } = useToast();
 
@@ -85,15 +83,9 @@ export default function CreateRotaDialog({
       startTime: '',
       endTime: '',
       note: '',
-      color:companyColor
+      color:  "#2196f3"
     }
   });
-
- useEffect(() => {
-  if (companyColor) {
-    form.setValue("color", companyColor);
-  }
-}, [companyColor, form]);
 
   const watchLeaveType = form.watch('leaveType');
   const isStandardShift = !watchLeaveType;
@@ -150,12 +142,18 @@ export default function CreateRotaDialog({
   if (!isOpen) return null;
 
   const leaveOptions = [
-
     { id: 'DO', label: 'Day Off (DO)' },
     { id: 'AL', label: 'Annual Leave (AL)' },
     { id: 'S', label: 'Sick (S)' },
     { id: 'ML', label: 'Maternity (ML)' },
     { id: 'NT', label: 'No Task (NT)' },
+  ];
+
+  const themeColors = [
+    "#f44336", "#e91e63", "#9c27b0", "#673ab7", "#3f51b5", 
+    "#2196f3", "#03a9f4", "#00bcd4", "#009688", "#4caf50", 
+    "#8bc34a", "#cddc39", "#ffeb3b", "#ffc107", "#ff9800", 
+    "#ff5722", "#795548", "#607d8b"
   ];
 
   return (
@@ -338,8 +336,10 @@ export default function CreateRotaDialog({
                             </FormItem>
                           )}
                         />
-
-                        <FormField
+                      </div>
+                      
+                      {/* Updated Color Picker Field */}
+                      <FormField
                         control={form.control}
                         name="color"
                         render={({ field }) => (
@@ -348,19 +348,22 @@ export default function CreateRotaDialog({
                               Shift Color
                             </FormLabel>
                             <FormControl>
-                              <Input
-                                type="color"
-                                {...field}
-                                value={field.value || companyColor}
-
-                                className="h-10 w-20 cursor-pointer p-1 rounded-md border border-gray-300"
-                              />
+                              <div className="pt-2">
+                                <CirclePicker
+                                  color={field.value || companyColor || "#2196f3"}
+                                  width="252px"
+                                  colors={themeColors}
+                                  circleSize={28}
+                                  circleSpacing={14}
+                                  onChangeComplete={(color) => field.onChange(color.hex)}
+                                />
+                              </div>
                             </FormControl>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
-                      </div>
+
                     </div>
                   ) : (
                     <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-6 sm:p-8 flex items-center justify-center text-center text-sm  animate-in fade-in duration-300">
@@ -417,5 +420,4 @@ export default function CreateRotaDialog({
     </div>
   </div>
 );
-
 }

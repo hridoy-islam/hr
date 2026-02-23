@@ -14,6 +14,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
+import { CirclePicker } from 'react-color'; // Added import
 
 const formSchema = z.object({
   employeeId: z.string().min(1, 'Please select an employee'),
@@ -60,22 +61,18 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-export default function AddRotaDialog({ isOpen, onClose, users, companyId, onSuccess,companyColor }: any) {
+export default function AddRotaDialog({ isOpen, onClose, users, companyId, onSuccess, companyColor }: any) {
   const { toast } = useToast();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: { employeeId: '', shiftName: '', leaveType: '', startTime: '', endTime: '', note: '', color: companyColor }
+    defaultValues: { employeeId: '', shiftName: '', leaveType: '', startTime: '', endTime: '', note: '', color: "#2196f3" }
   });
 
   const watchLeaveType = form.watch('leaveType');
   const isStandardShift = !watchLeaveType;
 
-   useEffect(() => {
-    if (companyColor) {
-      form.setValue("color", companyColor);
-    }
-  }, [companyColor, form,isOpen]);
+
 
   useEffect(() => {
     if (!isOpen) form.reset();
@@ -134,6 +131,13 @@ export default function AddRotaDialog({ isOpen, onClose, users, companyId, onSuc
     { id: 'S', label: 'Sick (S)' },
     { id: 'ML', label: 'Maternity (ML)' },
     { id: 'NT', label: 'No Task (NT)' },
+  ];
+
+  const themeColors = [
+    "#f44336", "#e91e63", "#9c27b0", "#673ab7", "#3f51b5", 
+    "#2196f3", "#03a9f4", "#00bcd4", "#009688", "#4caf50", 
+    "#8bc34a", "#cddc39", "#ffeb3b", "#ffc107", "#ff9800", 
+    "#ff5722", "#795548", "#607d8b"
   ];
 
   return (
@@ -287,6 +291,7 @@ export default function AddRotaDialog({ isOpen, onClose, users, companyId, onSuc
                         />
                       </div>
 
+                      {/* Updated Color Picker Field */}
                       <FormField
                         control={form.control}
                         name="color"
@@ -294,12 +299,16 @@ export default function AddRotaDialog({ isOpen, onClose, users, companyId, onSuc
                           <FormItem>
                             <FormLabel className="text-xs font-bold uppercase">Shift Color</FormLabel>
                             <FormControl>
-                              <Input
-                                type="color"
-                                {...field}
-                                value={field.value || companyColor}
-                                className="h-10 w-20 cursor-pointer p-1 rounded-md border border-gray-300"
-                              />
+                              <div className="pt-2">
+                                <CirclePicker
+                                  color={field.value || companyColor || "#2196f3"}
+                                  width="252px"
+                                  colors={themeColors}
+                                  circleSize={28}
+                                  circleSpacing={14}
+                                  onChangeComplete={(color) => field.onChange(color.hex)}
+                                />
+                              </div>
                             </FormControl>
                             <FormMessage />
                           </FormItem>
