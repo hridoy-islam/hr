@@ -14,7 +14,8 @@ import {
   Plus,
   MoveLeft,
   CalendarRange,
-  X
+  X,
+  GripVertical
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import axiosInstance from '@/lib/axios';
@@ -24,6 +25,10 @@ import { useToast } from '@/components/ui/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 import AddRotaDialog from './components/AddRotaDialog';
+
+// react-dnd
+import { DndProvider, useDrag, useDrop } from 'react-dnd';
+import { HTML5Backend } from 'react-dnd-html5-backend';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type User = {
@@ -35,7 +40,10 @@ type User = {
   department?: string;
   image?: string;
   designationId?: { title: string };
+  index?: number;
 };
+
+const DRAG_TYPE = 'ROW';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const getInitials = (firstName?: string, lastName?: string, name?: string) => {
@@ -64,14 +72,13 @@ const calculateDurationMinutes = (
 };
 
 const formatDuration = (totalMinutes: number): string => {
-  if (totalMinutes === 0) return '0'; // display 0 instead of 00:00
-  const hours = Math.floor(totalMinutes / 60)
-    .toString()
-    .padStart(2, '0');
+  if (totalMinutes === 0) return '0';
+  const hours = Math.floor(totalMinutes / 60).toString().padStart(2, '0');
   const mins = (totalMinutes % 60).toString().padStart(2, '0');
   return `${hours}:${mins}`;
 };
 
+// ─── ShiftBlock ───────────────────────────────────────────────────────────────
 const ShiftBlock = ({
   leaveType,
   shiftName,
@@ -108,7 +115,6 @@ const ShiftBlock = ({
       `}
     >
       <div className="pointer-events-none absolute inset-0 rounded-md bg-white/40 opacity-0 transition-opacity group-hover/shift:opacity-100" />
-
       <span className="mt-0.5 w-full truncate text-center text-sm font-semibold leading-tight opacity-80">
         {duration}
       </span>
@@ -121,14 +127,165 @@ const leaveTypeColors: Record<
   string,
   { bg: string; border: string; text: string }
 > = {
- DO: { bg: '#E0F7FA', border: '#B2EBF2', text: '#006064' }, 
-    AL: { bg: '#93c47d', border: '#93c47d', text: '#ffffff' }, 
-    S:  { bg: '#ff0000', border: '#FFCDD2', text: '#ffffff' }, 
-    ML: { bg: '#F3E5F5', border: '#E1BEE7', text: '#4A148C' }, 
-    NT: { bg: '#ECEFF1', border: '#CFD8DC', text: '#37474F' } 
+  DO: { bg: '#E0F7FA', border: '#B2EBF2', text: '#006064' },
+  AL: { bg: '#93c47d', border: '#93c47d', text: '#ffffff' },
+  S:  { bg: '#ff0000', border: '#FFCDD2', text: '#ffffff' },
+  ML: { bg: '#F3E5F5', border: '#E1BEE7', text: '#4A148C' },
+  NT: { bg: '#ECEFF1', border: '#CFD8DC', text: '#37474F' }
 };
 
-// ─── Component ────────────────────────────────────────────────────────────────
+// ─── DraggableRow ─────────────────────────────────────────────────────────────
+interface DraggableRowProps {
+  user: User;
+  rowIndex: number;
+  moveRow: (dragIndex: number, hoverIndex: number) => void;
+  daysArray: moment.Moment[];
+  rotaMap: Record<string, Record<string, any>>;
+  employeeTotalDuration: Record<string, number>;
+  isCustomRange: boolean;
+  handleCellClick: (user: User, day: moment.Moment) => void;
+}
+
+const DraggableRow: React.FC<DraggableRowProps> = ({
+  user,
+  rowIndex,
+  moveRow,
+  daysArray,
+  rotaMap,
+  employeeTotalDuration,
+  isCustomRange,
+  handleCellClick
+}) => {
+  const ref = useRef<HTMLTableRowElement>(null);
+
+  const [{ isDragging }, drag, dragPreview] = useDrag({
+    type: DRAG_TYPE,
+    item: { rowIndex },
+    collect: (monitor) => ({ isDragging: monitor.isDragging() })
+  });
+
+  const [{ isOver }, drop] = useDrop<
+    { rowIndex: number },
+    void,
+    { isOver: boolean }
+  >({
+    accept: DRAG_TYPE,
+    collect: (monitor) => ({ isOver: monitor.isOver() }),
+    hover(item, monitor) {
+      if (!ref.current) return;
+      const dragIndex = item.rowIndex;
+      const hoverIndex = rowIndex;
+      if (dragIndex === hoverIndex) return;
+
+      const hoverBoundingRect = ref.current.getBoundingClientRect();
+      const hoverMiddleY = (hoverBoundingRect.bottom - hoverBoundingRect.top) / 2;
+      const clientOffset = monitor.getClientOffset();
+      if (!clientOffset) return;
+      const hoverClientY = clientOffset.y - hoverBoundingRect.top;
+
+      if (dragIndex < hoverIndex && hoverClientY < hoverMiddleY) return;
+      if (dragIndex > hoverIndex && hoverClientY > hoverMiddleY) return;
+
+      moveRow(dragIndex, hoverIndex);
+      item.rowIndex = hoverIndex;
+    }
+  });
+
+  drop(dragPreview(ref));
+
+  const totalMins = employeeTotalDuration[user._id] || 0;
+  const totalLabel = formatDuration(totalMins);
+
+  return (
+    <tr
+      ref={ref}
+      className={`transition-colors hover:bg-slate-50/60 ${
+        isDragging ? 'opacity-40 bg-blue-50' : ''
+      } ${isOver ? 'bg-slate-100' : ''}`}
+    >
+      {/* Fixed Staff Name + Total Duration */}
+      <td className="sticky left-0 z-20 border-b border-r border-gray-200 bg-white p-3 shadow-[2px_0_0_0_rgba(0,0,0,0.05)]">
+        <div className="flex items-center gap-2">
+          {/* Drag handle */}
+          <div
+            ref={drag as any}
+            className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 transition-colors flex-shrink-0"
+            title="Drag to reorder"
+          >
+            <GripVertical className="h-4 w-4" />
+          </div>
+
+          <Avatar className="h-9 w-9 border border-gray-200 flex-shrink-0">
+            <AvatarImage
+              src={user.image || '/placeholder.png'}
+              alt={user.firstName || 'User'}
+              className="object-cover"
+            />
+            <AvatarFallback className="bg-gray-100 text-[11px] font-black text-black">
+              {getInitials(user.firstName, user.lastName, user.name)}
+            </AvatarFallback>
+          </Avatar>
+
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold text-black">
+              {user.firstName ? `${user.firstName} ${user.lastName}` : user.name}
+            </p>
+            <div className="flex flex-row items-center justify-between gap-4">
+              <p className="text-[10px] font-medium text-gray-500">
+                {user?.designationId?.title}
+              </p>
+              <div className="flex-shrink-0 rounded-md border border-theme bg-theme px-1.5 py-0.5 text-xs font-semibold tracking-wider text-white">
+                Total: {totalLabel}
+              </div>
+            </div>
+          </div>
+        </div>
+      </td>
+
+      {/* Day cells */}
+      {daysArray.map((day, idx) => {
+        const dateKey = day.format('YYYY-MM-DD');
+        const rota = rotaMap[user._id]?.[dateKey];
+
+        let shiftColors: any = 'theme';
+        if (rota) {
+          if (rota.leaveType && leaveTypeColors[rota.leaveType]) {
+            shiftColors = leaveTypeColors[rota.leaveType];
+          } else if (rota.color) {
+            shiftColors =
+              typeof rota.color === 'string'
+                ? { bg: rota.color, border: rota.color, text: '#FFFFFF' }
+                : rota.color;
+          }
+        }
+
+        return (
+          <td
+            key={idx}
+            onClick={() => handleCellClick(user, day)}
+            className="group min-w-[65px] cursor-pointer border-b border-r border-gray-200 p-1 text-center hover:bg-slate-100/80"
+          >
+            {rota ? (
+              <ShiftBlock
+                leaveType={rota.leaveType}
+                shiftName={rota.shiftName}
+                startTime={rota.startTime}
+                endTime={rota.endTime}
+                colors={shiftColors}
+              />
+            ) : (
+              <div className="mx-auto flex h-9 w-full min-w-[50px] items-center justify-center rounded-lg border border-dashed border-transparent text-gray-300 opacity-0 transition-all group-hover:border-gray-300 group-hover:bg-gray-50 group-hover:opacity-100">
+                <Plus className="h-4 w-4" />
+              </div>
+            )}
+          </td>
+        );
+      })}
+    </tr>
+  );
+};
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 export default function CompanyRotaReport() {
   const { id: companyId } = useParams();
   const [currentDate, setCurrentDate] = useState(moment());
@@ -150,23 +307,57 @@ export default function CompanyRotaReport() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isAddRotaOpen, setIsAddRotaOpen] = useState(false);
 
-  // Date range: [startDate, endDate]
-  const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([
-    null,
-    null
-  ]);
+  // Date range
+  const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
   const [rangeStart, rangeEnd] = dateRange;
-
-  // Whether user has clicked "Custom" to enter custom range mode
   const [isCustomMode, setIsCustomMode] = useState(false);
-  // Applied range — only set when user clicks Apply (triggers fetch)
-  const [appliedRange, setAppliedRange] = useState<[Date | null, Date | null]>([
-    null,
-    null
-  ]);
+  const [appliedRange, setAppliedRange] = useState<[Date | null, Date | null]>([null, null]);
   const [appliedStart, appliedEnd] = appliedRange;
   const isCustomRange = !!(appliedStart && appliedEnd);
 
+  // Debounce timer for index persistence
+  const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── Persist indices (debounced) ────────────────────────────────────────────
+  const persistIndices = useCallback(
+    (updatedUsers: User[]) => {
+      if (persistTimer.current) clearTimeout(persistTimer.current);
+      persistTimer.current = setTimeout(async () => {
+        try {
+          await Promise.all(
+            updatedUsers.map((u) =>
+              axiosInstance.patch(`/users/${u._id}`, { index: u.index })
+            )
+          );
+        } catch (e) {
+          console.error('Failed to persist user indices', e);
+          toast({
+            title: 'Failed to save order',
+            description: 'User order could not be saved to server.',
+            variant: 'destructive'
+          });
+        }
+      }, 600);
+    },
+    [toast]
+  );
+
+  // ── Move row (drag) ────────────────────────────────────────────────────────
+  const moveRow = useCallback(
+    (dragIndex: number, hoverIndex: number) => {
+      setUsers((prev) => {
+        const updated = [...prev];
+        const [removed] = updated.splice(dragIndex, 1);
+        updated.splice(hoverIndex, 0, removed);
+        const reindexed = updated.map((u, i) => ({ ...u, index: i }));
+        persistIndices(reindexed);
+        return reindexed;
+      });
+    },
+    [persistIndices]
+  );
+
+  // ── Fetch ──────────────────────────────────────────────────────────────────
   const fetchUsersAndRotas = useCallback(async () => {
     if (!companyId) return;
     setIsLoading(true);
@@ -174,9 +365,42 @@ export default function CompanyRotaReport() {
       const userRes = await axiosInstance.get(
         `/users?limit=all&role=employee&company=${companyId}`
       );
-      const fetchedUsers =
+      const fetchedUsers: User[] =
         userRes.data?.data?.result || userRes.data?.data || [];
-      setUsers(fetchedUsers);
+
+      // ── Assign index if missing ──────────────────────────────────────────
+      const usersNeedingIndex = fetchedUsers.filter(
+        (u) => u.index === undefined || u.index === null
+      );
+
+      if (usersNeedingIndex.length > 0) {
+        const indexed = fetchedUsers
+          .filter((u) => u.index !== undefined && u.index !== null)
+          .sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+
+        let nextIndex =
+          indexed.length > 0
+            ? Math.max(...indexed.map((u) => u.index ?? 0)) + 1
+            : 0;
+
+        await Promise.all(
+          usersNeedingIndex.map(async (u) => {
+            const assignedIndex = nextIndex++;
+            try {
+              await axiosInstance.patch(`/users/${u._id}`, { index: assignedIndex });
+              u.index = assignedIndex;
+            } catch (e) {
+              console.error(`Failed to set index for user ${u._id}`, e);
+            }
+          })
+        );
+      }
+
+      // Sort by index ascending
+      const sortedUsers = [...fetchedUsers].sort(
+        (a, b) => (a.index ?? 0) - (b.index ?? 0)
+      );
+      setUsers(sortedUsers);
 
       const startDate = isCustomRange
         ? moment(appliedStart).format('YYYY-MM-DD')
@@ -205,7 +429,7 @@ export default function CompanyRotaReport() {
     fetchUsersAndRotas();
   }, [fetchUsersAndRotas]);
 
-  // rotaMap keyed by employeeId → dateKey
+  // ── Derived data ───────────────────────────────────────────────────────────
   const rotaMap = useMemo(() => {
     const map: Record<string, Record<string, any>> = {};
     rotas.forEach((rota) => {
@@ -217,16 +441,11 @@ export default function CompanyRotaReport() {
     return map;
   }, [rotas]);
 
-  // Total duration per employee — calculated from fetched rotas (already date-range filtered by API)
   const employeeTotalDuration = useMemo(() => {
     const totals: Record<string, number> = {};
     rotas.forEach((rota) => {
       const empId = rota.employeeId;
-      const mins = calculateDurationMinutes(
-        rota.startTime,
-        rota.endTime,
-        rota.leaveType
-      );
+      const mins = calculateDurationMinutes(rota.startTime, rota.endTime, rota.leaveType);
       totals[empId] = (totals[empId] || 0) + mins;
     });
     return totals;
@@ -259,6 +478,13 @@ export default function CompanyRotaReport() {
     );
   }, [currentDate, isCustomRange, appliedStart, appliedEnd]);
 
+  // Flat index map for DraggableRow
+  const userIndexMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    users.forEach((u, i) => { map[u._id] = i; });
+    return map;
+  }, [users]);
+
   const prevMonth = () => setCurrentDate((d) => d.clone().subtract(1, 'month'));
   const nextMonth = () => setCurrentDate((d) => d.clone().add(1, 'month'));
 
@@ -286,7 +512,7 @@ export default function CompanyRotaReport() {
   const handleApply = () => {
     if (rangeStart && rangeEnd) {
       setAppliedRange([rangeStart, rangeEnd]);
-      setIsCustomMode(false); // collapse picker back to badge view
+      setIsCustomMode(false);
     }
   };
 
@@ -297,287 +523,202 @@ export default function CompanyRotaReport() {
   };
 
   return (
-    <div className="flex h-full w-full max-w-[100vw] flex-col overflow-hidden rounded-md bg-white p-4 text-black shadow-sm">
-      <style>{`
-        .custom-scrollbar::-webkit-scrollbar { height: 14px; width: 14px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: #F8FAFC; border-radius: 8px; border: 1px solid #E2E8F0; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #CBD5E1; border-radius: 8px; border: 3px solid #F8FAFC; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background-color: #94A3B8; }
-        .custom-scrollbar::-webkit-scrollbar-corner { background: #F8FAFC; }
-        .scrollbar-top-wrapper { transform: rotateX(180deg); }
-        .scrollbar-top-wrapper > table { transform: rotateX(180deg); }
-      `}</style>
+    <DndProvider backend={HTML5Backend}>
+      <div className="flex h-full w-full max-w-[100vw] flex-col overflow-hidden rounded-md bg-white p-4 text-black shadow-sm">
+        <style>{`
+          .custom-scrollbar::-webkit-scrollbar { height: 14px; width: 14px; }
+          .custom-scrollbar::-webkit-scrollbar-track { background: #F8FAFC; border-radius: 8px; border: 1px solid #E2E8F0; }
+          .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #CBD5E1; border-radius: 8px; border: 3px solid #F8FAFC; }
+          .custom-scrollbar::-webkit-scrollbar-thumb:hover { background-color: #94A3B8; }
+          .custom-scrollbar::-webkit-scrollbar-corner { background: #F8FAFC; }
+          .scrollbar-top-wrapper { transform: rotateX(180deg); }
+          .scrollbar-top-wrapper > table { transform: rotateX(180deg); }
+        `}</style>
 
-      {/* ── Header ── */}
-      <div className="mb-4 flex flex-none flex-wrap items-center justify-between gap-3">
-        {/* Left: Title */}
-        <div className="flex items-center gap-3">
-          <h1 className="text-lg font-bold">Report</h1>
-        </div>
+        {/* ── Header ── */}
+        <div className="mb-4 flex flex-none flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <h1 className="text-lg font-bold">Report</h1>
+          </div>
 
-        {/* Center: Unified Date Control */}
-        <div className="flex items-center gap-2">
-          {isCustomRange && !isCustomMode ? (
-            /* ── Applied custom range badge — click to re-edit, × to clear ── */
-            <div className="flex items-center gap-1 rounded-full border border-theme/30 bg-theme/5 p-1">
-              <button
-                onClick={() => setIsCustomMode(true)}
-                className="flex items-center gap-2 px-3 py-1 text-xs font-semibold text-theme transition-all hover:text-blue-900"
-              >
-                <CalendarRange className="h-3.5 w-3.5 flex-shrink-0" />
-                {moment(appliedStart).format('DD MMM YYYY')}
-                {' → '}
-                {moment(appliedEnd).format('DD MMM YYYY')}
-              </button>
-              <button
-                onClick={clearRange}
-                title="Back to month view"
-                className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-100 text-theme transition-all hover:bg-red-100 hover:text-red-500"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </div>
-          ) : isCustomMode ? (
-            /* ── Custom Range picker + Apply ── */
-            <div className="rota-range-picker flex items-center gap-2 rounded-full border border-blue-300 bg-white p-1 shadow-sm">
-              <CalendarRange className="ml-2 h-3.5 w-3.5 flex-shrink-0 text-theme" />
-              <DatePicker
-                selectsRange
-                startDate={rangeStart}
-                endDate={rangeEnd}
-                onChange={handleRangeChange}
-                dateFormat="dd MMM yyyy"
-                placeholderText="Select date range..."
-                isClearable={false}
-                className="w-52 border-none bg-transparent text-xs font-semibold text-gray-700 outline-none placeholder:text-gray-400"
-              />
-              <button
-                onClick={handleApply}
-                disabled={!rangeStart || !rangeEnd}
-                className="flex h-7 items-center gap-1 rounded-full bg-theme px-3 text-[11px] font-bold text-white transition-all hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Apply
-              </button>
-              <button
-                onClick={() => {
-                  setIsCustomMode(false);
-                  if (!isCustomRange) setDateRange([null, null]);
-                }}
-                className="mr-1 flex h-7 w-7 items-center justify-center rounded-full text-gray-400 transition-all hover:bg-gray-100 hover:text-gray-600"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          ) : (
-            /* ── Month Slider Mode ── */
-            <div className="flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50/50 p-1">
-              <Button
-                variant="ghost"
-                onClick={prevMonth}
-                size="icon"
-                className="h-8 w-8 rounded-full hover:bg-theme hover:text-white"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <div className="relative">
+          {/* Center: Unified Date Control */}
+          <div className="flex items-center gap-2">
+            {isCustomRange && !isCustomMode ? (
+              <div className="flex items-center gap-1 rounded-full border border-theme/30 bg-theme/5 p-1">
                 <button
-                  ref={pickerAnchorRef}
-                  onClick={() => setPickerOpen((o) => !o)}
-                  className="flex w-36 items-center justify-center gap-2 border-none text-sm font-bold uppercase text-black"
+                  onClick={() => setIsCustomMode(true)}
+                  className="flex items-center gap-2 px-3 py-1 text-xs font-semibold text-theme transition-all hover:text-blue-900"
                 >
-                  <CalendarDays className="h-4 w-4" />
-                  {currentDate.format('MMM YYYY')}
+                  <CalendarRange className="h-3.5 w-3.5 flex-shrink-0" />
+                  {moment(appliedStart).format('DD MMM YYYY')}
+                  {' → '}
+                  {moment(appliedEnd).format('DD MMM YYYY')}
                 </button>
-                {pickerOpen && (
-                  <div className="absolute left-1/2 z-50 -translate-x-1/2 rounded-lg border-none">
-                    <DatePicker
-                      selected={currentDate.toDate()}
-                      onChange={handlePickerChange}
-                      dateFormat="MM/yyyy"
-                      showMonthYearPicker
-                      onClickOutside={() => setPickerOpen(false)}
-                    />
-                  </div>
-                )}
+                <button
+                  onClick={clearRange}
+                  title="Back to month view"
+                  className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-100 text-theme transition-all hover:bg-red-100 hover:text-red-500"
+                >
+                  <X className="h-3 w-3" />
+                </button>
               </div>
-              <Button
-                variant="ghost"
-                onClick={nextMonth}
-                size="icon"
-                className="h-8 w-8 rounded-full hover:bg-theme hover:text-white"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
+            ) : isCustomMode ? (
+              <div className="rota-range-picker flex items-center gap-2 rounded-full border border-blue-300 bg-white p-1 shadow-sm">
+                <CalendarRange className="ml-2 h-3.5 w-3.5 flex-shrink-0 text-theme" />
+                <DatePicker
+                  selectsRange
+                  startDate={rangeStart}
+                  endDate={rangeEnd}
+                  onChange={handleRangeChange}
+                  dateFormat="dd MMM yyyy"
+                  placeholderText="Select date range..."
+                  isClearable={false}
+                  className="w-52 border-none bg-transparent text-xs font-semibold text-gray-700 outline-none placeholder:text-gray-400"
+                />
+                <button
+                  onClick={handleApply}
+                  disabled={!rangeStart || !rangeEnd}
+                  className="flex h-7 items-center gap-1 rounded-full bg-theme px-3 text-[11px] font-bold text-white transition-all hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Apply
+                </button>
+                <button
+                  onClick={() => {
+                    setIsCustomMode(false);
+                    if (!isCustomRange) setDateRange([null, null]);
+                  }}
+                  className="mr-1 flex h-7 w-7 items-center justify-center rounded-full text-gray-400 transition-all hover:bg-gray-100 hover:text-gray-600"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50/50 p-1">
+                <Button
+                  variant="ghost"
+                  onClick={prevMonth}
+                  size="icon"
+                  className="h-8 w-8 rounded-full hover:bg-theme hover:text-white"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <div className="relative">
+                  <button
+                    ref={pickerAnchorRef}
+                    onClick={() => setPickerOpen((o) => !o)}
+                    className="flex w-36 items-center justify-center gap-2 border-none text-sm font-bold uppercase text-black"
+                  >
+                    <CalendarDays className="h-4 w-4" />
+                    {currentDate.format('MMM YYYY')}
+                  </button>
+                  {pickerOpen && (
+                    <div className="absolute left-1/2 z-50 -translate-x-1/2 rounded-lg border-none">
+                      <DatePicker
+                        selected={currentDate.toDate()}
+                        onChange={handlePickerChange}
+                        dateFormat="MM/yyyy"
+                        showMonthYearPicker
+                        onClickOutside={() => setPickerOpen(false)}
+                      />
+                    </div>
+                  )}
+                </div>
+                <Button
+                  variant="ghost"
+                  onClick={nextMonth}
+                  size="icon"
+                  className="h-8 w-8 rounded-full hover:bg-theme hover:text-white"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <button
+                  onClick={() => setIsCustomMode(true)}
+                  className="ml-1 flex h-8 items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 text-[11px] font-semibold text-gray-500 shadow-sm transition-all hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600"
+                >
+                  <CalendarRange className="h-3 w-3" />
+                  Custom
+                </button>
+              </div>
+            )}
+          </div>
 
-              {/* Custom button — replaces the slider when clicked */}
-              <button
-                onClick={() => setIsCustomMode(true)}
-                className="ml-1 flex h-8 items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 text-[11px] font-semibold text-gray-500 shadow-sm transition-all hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600"
-              >
-                <CalendarRange className="h-3 w-3" />
-                Custom
-              </button>
-            </div>
-          )}
+          {/* Right: Action Buttons */}
+          <div className="flex items-center gap-2">
+            <Button onClick={() => navigate(-1)} variant="outline" className="h-9 gap-2">
+              <MoveLeft className="h-4 w-4" /> Back
+            </Button>
+          </div>
         </div>
 
-        {/* Right: Action Buttons */}
-        <div className="flex items-center gap-2">
-          <Button
-            onClick={() => navigate(-1)}
-            variant="outline"
-            className="h-9 gap-2"
-          >
-            <MoveLeft className="h-4 w-4" /> Back
-          </Button>
-        </div>
-      </div>
-
-      {/* ── Table ── */}
-      {isLoading ? (
-        <div className="flex h-[60vh] flex-1 items-center justify-center">
-          <BlinkingDots size="large" color="bg-theme" />
-        </div>
-      ) : (
-        <div className="custom-scrollbar scrollbar-top-wrapper relative min-h-0 w-full flex-1 overflow-auto bg-white">
-          <table className="w-full border-collapse text-left">
-            <thead className="sticky bottom-0 top-0 z-40 bg-[#F8FAFC]">
-              <tr>
-                <th className="sticky bottom-0 left-0 top-0 z-50 min-w-[160px] border-b border-r border-gray-200 bg-[#F8FAFC] p-4 shadow-[1px_0_0_0_rgba(0,0,0,0.1)] sm:min-w-[240px]">
-                  <span className="text-xs font-bold uppercase text-black">
-                    Staff Member
-                  </span>
-                </th>
-                {daysArray.map((day) => {
-                  const isToday = day.isSame(moment(), 'day');
-                  const isWeekend = day.day() === 0 || day.day() === 6;
-                  return (
-                    <th
-                      key={day.format('YYYY-MM-DD')}
-                      className={`min-w-[52px] border-b border-r border-gray-200 py-2 text-center
-                        ${isToday ? 'bg-theme/50 text-white' : isWeekend ? 'bg-theme/5' : ''}
-                      `}
-                    >
-                      <div className="text-[10px] font-bold uppercase text-black">
-                        {day.format('ddd')}
-                      </div>
-                      <div
-                        className={`text-sm font-black ${
-                          isToday
-                            ? 'mx-auto flex h-6 w-6 items-center justify-center rounded-full bg-theme text-white'
-                            : 'text-black'
-                        }`}
-                      >
-                        {day.format('D')}
-                      </div>
-                      {isCustomRange && (
-                        <div className="text-[9px] font-medium text-gray-400">
-                          {day.format('MMM')}
-                        </div>
-                      )}
-                    </th>
-                  );
-                })}
-              </tr>
-            </thead>
-
-            <tbody>
-              {Object.entries(groupedUsers).map(([groupName, groupUsers]) => (
-                <React.Fragment key={groupName}>
-                  {groupUsers.map((user) => {
-                    const totalMins = employeeTotalDuration[user._id] || 0;
-                    const totalLabel = formatDuration(totalMins);
-
+        {/* ── Table ── */}
+        {isLoading ? (
+          <div className="flex h-[60vh] flex-1 items-center justify-center">
+            <BlinkingDots size="large" color="bg-theme" />
+          </div>
+        ) : (
+          <div className="custom-scrollbar scrollbar-top-wrapper relative min-h-0 w-full flex-1 overflow-auto bg-white">
+            <table className="w-full border-collapse text-left">
+              <thead className="sticky bottom-0 top-0 z-40 bg-[#F8FAFC]">
+                <tr>
+                  <th className="sticky bottom-0 left-0 top-0 z-50 min-w-[160px] border-b border-r border-gray-200 bg-[#F8FAFC] p-4 shadow-[1px_0_0_0_rgba(0,0,0,0.1)] sm:min-w-[240px]">
+                    <span className="text-xs font-bold uppercase text-black">Staff Member</span>
+                  </th>
+                  {daysArray.map((day) => {
+                    const isToday = day.isSame(moment(), 'day');
+                    const isWeekend = day.day() === 0 || day.day() === 6;
                     return (
-                      <tr
-                        key={user._id}
-                        className="transition-colors hover:bg-slate-50/60"
+                      <th
+                        key={day.format('YYYY-MM-DD')}
+                        className={`min-w-[52px] border-b border-r border-gray-200 py-2 text-center
+                          ${isToday ? 'bg-theme/50 text-white' : isWeekend ? 'bg-theme/5' : ''}
+                        `}
                       >
-                        {/* Fixed Staff Name + Total Duration */}
-                        <td className="sticky left-0 z-20 border-b border-r border-gray-200 bg-white p-3 shadow-[2px_0_0_0_rgba(0,0,0,0.05)]">
-                          <div className="flex items-center gap-3">
-                            <Avatar className="h-9 w-9 border border-gray-200">
-                              <AvatarImage
-                                src={user.image || '/placeholder.png'}
-                                alt={user.firstName || 'User'}
-                                className="object-cover"
-                              />
-                              <AvatarFallback className="bg-gray-100 text-[11px] font-black text-black">
-                                {getInitials(
-                                  user.firstName,
-                                  user.lastName,
-                                  user.name
-                                )}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate text-sm font-semibold text-black">
-                                {user.firstName
-                                  ? `${user.firstName} ${user.lastName}`
-                                  : user.name}
-                              </p>
-
-                              <div className="flex flex-row items-center justify-between gap-4">
-                                <p className="text-[10px] font-medium text-gray-500">
-                                  {user?.designationId?.title}
-                                </p>
-                                {/* Total duration badge — styled to match default theme */}
-                                <div className="flex-shrink-0 rounded-md border border-theme bg-theme px-1.5 py-0.5 text-xs font-semibold tracking-wider text-white">
-                                  Total: {totalLabel}
-                                </div>
-                              </div>
-                            </div>
+                        <div className="text-[10px] font-bold uppercase text-black">
+                          {day.format('ddd')}
+                        </div>
+                        <div
+                          className={`text-sm font-black ${
+                            isToday
+                              ? 'mx-auto flex h-6 w-6 items-center justify-center rounded-full bg-theme text-white'
+                              : 'text-black'
+                          }`}
+                        >
+                          {day.format('D')}
+                        </div>
+                        {isCustomRange && (
+                          <div className="text-[9px] font-medium text-gray-400">
+                            {day.format('MMM')}
                           </div>
-                        </td>
-
-                        {daysArray.map((day, idx) => {
-                          const dateKey = day.format('YYYY-MM-DD');
-                          const rota = rotaMap[user._id]?.[dateKey];
-
-                          // --- THEME COLOR LOGIC ---
-                          let shiftColors: any = 'theme'; // Default to Tailwind theme
-
-                          if (rota) {
-                            if (rota.leaveType && leaveTypeColors[rota.leaveType]) {
-                              shiftColors = leaveTypeColors[rota.leaveType];
-                            } else if (rota.color) {
-                              shiftColors = typeof rota.color === 'string' 
-                                ? { bg: rota.color, border: rota.color, text: '#FFFFFF' } 
-                                : rota.color;
-                            }
-                          }
-
-                          return (
-                            <td
-                              key={idx}
-                              onClick={() => handleCellClick(user, day)}
-                              className="group min-w-[65px] cursor-pointer border-b border-r border-gray-200 p-1 text-center hover:bg-slate-100/80"
-                            >
-                              {rota ? (
-                                <ShiftBlock
-                                  leaveType={rota.leaveType}
-                                  shiftName={rota.shiftName}
-                                  startTime={rota.startTime}
-                                  endTime={rota.endTime}
-                                  colors={shiftColors}
-                                />
-                              ) : (
-                                <div className="mx-auto flex h-9 w-full min-w-[50px] items-center justify-center rounded-lg border border-dashed border-transparent text-gray-300 opacity-0 transition-all group-hover:border-gray-300 group-hover:bg-gray-50 group-hover:opacity-100">
-                                  <Plus className="h-4 w-4" />
-                                </div>
-                              )}
-                            </td>
-                          );
-                        })}
-                      </tr>
+                        )}
+                      </th>
                     );
                   })}
-                </React.Fragment>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
+                </tr>
+              </thead>
+
+              <tbody>
+                {Object.entries(groupedUsers).map(([groupName, groupUsers]) => (
+                  <React.Fragment key={groupName}>
+                    {groupUsers.map((user) => (
+                      <DraggableRow
+                        key={user._id}
+                        user={user}
+                        rowIndex={userIndexMap[user._id]}
+                        moveRow={moveRow}
+                        daysArray={daysArray}
+                        rotaMap={rotaMap}
+                        employeeTotalDuration={employeeTotalDuration}
+                        isCustomRange={isCustomRange}
+                        handleCellClick={handleCellClick}
+                      />
+                    ))}
+                  </React.Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </DndProvider>
   );
 }
