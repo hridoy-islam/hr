@@ -121,11 +121,11 @@ const leaveTypeColors: Record<
   string,
   { bg: string; border: string; text: string }
 > = {
-  DO: { bg: '#E0F7FA', border: '#B2EBF2', text: '#006064' }, // Day Off
-  AL: { bg: '#FFF3E0', border: '#FFE0B2', text: '#E65100' }, // Annual Leave
-  S: { bg: '#FFEBEE', border: '#FFCDD2', text: '#B71C1C' }, // Sick
-  ML: { bg: '#F3E5F5', border: '#E1BEE7', text: '#4A148C' }, // Maternity Leave
-  NT: { bg: '#ECEFF1', border: '#CFD8DC', text: '#37474F' } // No Task
+ DO: { bg: '#E0F7FA', border: '#B2EBF2', text: '#006064' }, 
+    AL: { bg: '#93c47d', border: '#93c47d', text: '#ffffff' }, 
+    S:  { bg: '#ff0000', border: '#FFCDD2', text: '#ffffff' }, 
+    ML: { bg: '#F3E5F5', border: '#E1BEE7', text: '#4A148C' }, 
+    NT: { bg: '#ECEFF1', border: '#CFD8DC', text: '#37474F' } 
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
