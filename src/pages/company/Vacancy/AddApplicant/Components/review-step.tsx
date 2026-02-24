@@ -104,6 +104,7 @@ const ReviewStep: React.FC<ReviewStepProps> = ({ formData, onSubmit, onBack }) =
                 <TableSectionHeader icon={User} title="Personal Details" />
                 <DataRow label="Title" value={personalDetails.title} />
                 <DataRow label="First Name" value={personalDetails.firstName} />
+                <DataRow label="Initial" value={personalDetails.initial} />
                 <DataRow label="Last Name" value={personalDetails.lastName} />
                 <DataRow label="Date of Birth" value={personalDetails.dateOfBirth ? moment(personalDetails.dateOfBirth).format('DD MMMM YYYY') : null} />
                 <DataRow label="Gender" value={demography.gender} />

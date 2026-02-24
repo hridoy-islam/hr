@@ -245,6 +245,7 @@ export default function CreateVacancy() {
                   </Label>
                   <Input
                     type="number"
+                    step="any"
                     placeholder="Min Salary..."
                     {...register('salaryRange.min', {
                       valueAsNumber: true,
@@ -266,6 +267,7 @@ export default function CreateVacancy() {
                   <Input
                     type="number"
                     placeholder="Max Salary..."
+                    step="any"
                     {...register('salaryRange.max', {
                       valueAsNumber: true,
                       required: 'Maximum salary is required'

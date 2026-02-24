@@ -29,10 +29,17 @@ const generalInfoSchema = z
       required_error: 'Available from date is required'
     }),
     startDate: z.date({ required_error: 'Start date is required' }),
-    // ✅ Added rtwCheckDate
-    rtwCheckDate: z.date({ 
-      required_error: 'RTW check date is required' 
+    
+    // ✅ Added noRtwCheck as required boolean
+    noRtwCheck: z.boolean({
+      required_error: 'Please specify if RTW check is needed',
+      invalid_type_error: 'Please select an option'
     }),
+
+    // ✅ Changed to optional/nullable. Conditional requirement is handled in superRefine
+    rtwCheckDate: z.date({
+        invalid_type_error: 'Invalid date format'
+    }).optional().nullable(),
 
     area: z.string().min(1, { message: 'Area is required' }),
     contractHours: z.coerce
@@ -47,7 +54,6 @@ const generalInfoSchema = z
       paymentMethod: z
         .string()
         .min(1, { message: 'Payment method is required' }),
-      // Optional bank fields
       bankName: z.string().optional(),
       accountNumber: z.string().optional(),
       sortCode: z.string().optional(),
@@ -55,6 +61,15 @@ const generalInfoSchema = z
     })
   })
   .superRefine((data, ctx) => {
+    // ✅ Cross-field validation: if noRtwCheck is false, rtwCheckDate is mandatory
+    if (!data.noRtwCheck && !data.rtwCheckDate) {
+      ctx.addIssue({
+        path: ['rtwCheckDate'],
+        code: z.ZodIssueCode.custom,
+        message: 'RTW check date is required'
+      });
+    }
+
     const { paymentMethod } = data.payroll;
 
     if (paymentMethod === 'Bank Transfer') {
@@ -114,10 +129,12 @@ export function GeneralInformation({
       startDate: defaultValues?.startDate
         ? new Date(defaultValues.startDate)
         : undefined,
-      // ✅ Added default value for rtwCheckDate
+      
+      // ✅ Default setup for new fields
+      noRtwCheck: defaultValues?.noRtwCheck ?? undefined, 
       rtwCheckDate: defaultValues?.rtwCheckDate
         ? new Date(defaultValues.rtwCheckDate)
-        : undefined,
+        : null,
         
       area: defaultValues?.area || '',
       contractHours: defaultValues?.contractHours ?? 0,
@@ -215,33 +232,74 @@ export function GeneralInformation({
               )}
             />
 
-            {/* ✅ RTW Check Date - Replaced Upload Field */}
+            {/* ✅ No need to check RTW? Field */}
             <FormField
               control={form.control}
-              name="rtwCheckDate"
+              name="noRtwCheck"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>
-                    RTW Check Date <span className="text-red-500">*</span>
+                    No need to check RTW? <span className="text-red-500">*</span>
                   </FormLabel>
                   <FormControl>
-                    <DatePicker
-                      selected={field.value}
-                      onChange={(date: Date | null) => field.onChange(date)}
-                      minDate={new Date()} // Prevent future dates
-                      dateFormat="dd-MM-yyyy"
-                      placeholderText="Select check date"
-                      className="h-9 w-full rounded-sm border border-gray-300 px-3 py-1 focus:border-theme focus:ring-2 focus:ring-theme"
-                      showMonthDropdown
-                      showYearDropdown
-                      dropdownMode="select"
-                      isClearable
-                      wrapperClassName="w-full"
+                    <Select<OptionType>
+                      options={[
+                        { value: 'true', label: 'Yes' },
+                        { value: 'false', label: 'No' }
+                      ]}
+                      value={booleanToOption(field.value)}
+                      onChange={(option) =>
+                        field.onChange(option?.value === 'true')
+                      }
+                      placeholder="Select option"
+                      className="react-select"
+                      classNamePrefix="react-select"
+                      styles={{
+                        control: (base) => ({
+                          ...base,
+                          borderColor: '#e2e8f0',
+                          '&:hover': { borderColor: '#cbd5e1' },
+                          boxShadow: 'none'
+                        })
+                      }}
                     />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
+            />
+
+            {/* ✅ RTW Check Date - Conditionally rendered required asterisk & Disabled state */}
+            <FormField
+              control={form.control}
+              name="rtwCheckDate"
+              render={({ field }) => {
+                const isNoRtwCheck = form.watch('noRtwCheck');
+                return (
+                  <FormItem>
+                    <FormLabel>
+                      RTW Check Date {!isNoRtwCheck && <span className="text-red-500">*</span>}
+                    </FormLabel>
+                    <FormControl>
+                      <DatePicker
+                        selected={field.value ?? null}
+                        onChange={(date: Date | null) => field.onChange(date)}
+                        minDate={new Date()} // Prevent future dates
+                        dateFormat="dd-MM-yyyy"
+                        placeholderText="Select check date"
+                        className={`h-9 w-full rounded-sm border border-gray-300 px-3 py-1 focus:border-theme focus:ring-2 focus:ring-theme ${isNoRtwCheck ? 'bg-gray-100 opacity-60 cursor-not-allowed' : ''}`}
+                        showMonthDropdown
+                        showYearDropdown
+                        dropdownMode="select"
+                        isClearable
+                        wrapperClassName="w-full"
+                        disabled={isNoRtwCheck} // Disable field if 'Yes' is selected
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                );
+              }}
             />
 
             {/* Area */}

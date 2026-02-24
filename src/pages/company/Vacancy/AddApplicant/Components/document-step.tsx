@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Card, CardHeader, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox'; // ✅ Added Checkbox import
 import {
   Trash2,
   FileText,
@@ -25,14 +26,16 @@ import {
 } from '@/components/ui/dialog';
 import Select, { SingleValue } from 'react-select';
 
-// ✅ 1. Schema Definition
+// ✅ 1. Schema Definition (Updated with niDoc and isBritish)
 export const createDocumentSchema = () =>
   z.object({
+    isBritish: z.boolean().optional(),
     passport: z.string().optional(),
     dbs: z.string().optional(),
     rightToWork: z.string().optional(),
     immigrationStatus: z.string().optional(),
-    proofOfAddress: z.string().optional()
+    proofOfAddress: z.string().optional(),
+    niDoc: z.string().optional() // Added niDoc / Driving License
   });
 
 export type DocumentFile = z.infer<ReturnType<typeof createDocumentSchema>>;
@@ -46,18 +49,24 @@ interface DocumentsStepProps {
   saveAndLogout: () => void;
 }
 
-// ✅ 3. Document Types Configuration
-const documentTypes = [
-  { id: 'passport', label: 'Passport', required: true },
-  { id: 'dbs', label: 'DBS Certificate', required: true },
-  { id: 'rightToWork', label: 'Right to Work', required: true },
-  { id: 'immigrationStatus', label: 'Immigration Status', required: true },
-  {
-    id: 'proofOfAddress',
-    label: 'Proof of Address',
-    required: true
+// ✅ 3. Dynamic Document Types Configuration
+const getDocumentTypes = (isBritish: boolean) => {
+  if (isBritish) {
+    return [
+      { id: 'dbs', label: 'DBS Certificate', required: true },
+      { id: 'proofOfAddress', label: 'Proof of Address', required: true },
+      { id: 'niDoc', label: 'National Insurance / Driving License', required: true }
+    ];
   }
-];
+
+  return [
+    { id: 'passport', label: 'Passport', required: true },
+    { id: 'dbs', label: 'DBS Certificate', required: true },
+    { id: 'rightToWork', label: 'Right to Work', required: true },
+    { id: 'immigrationStatus', label: 'Immigration Status', required: true },
+    { id: 'proofOfAddress', label: 'Proof of Address', required: true }
+  ];
+};
 
 interface DocOption {
   value: keyof DocumentFile;
@@ -74,21 +83,25 @@ export function DocumentStep({
   const documentSchema = createDocumentSchema();
 
   const [documents, setDocuments] = useState<DocumentFile>({
+    isBritish: false,
     passport: '',
     dbs: '',
     rightToWork: '',
     immigrationStatus: '',
-    proofOfAddress: ''
+    proofOfAddress: '',
+    niDoc: ''
   });
 
   useEffect(() => {
     if (defaultValues) {
       setDocuments({
+        isBritish: defaultValues.isBritish ?? false,
         passport: defaultValues.passport ?? '',
         dbs: defaultValues.dbs ?? '',
         rightToWork: defaultValues.rightToWork ?? '',
         immigrationStatus: defaultValues.immigrationStatus ?? '',
-        proofOfAddress: defaultValues.proofOfAddress ?? ''
+        proofOfAddress: defaultValues.proofOfAddress ?? '',
+        niDoc: defaultValues.niDoc ?? ''
       });
     }
   }, [defaultValues]);
@@ -128,11 +141,14 @@ export function DocumentStep({
     return !!documents[field];
   };
 
-  const allDocumentsUploaded = documentTypes
+  // Compute required docs based on isBritish status
+  const currentDocumentTypes = getDocumentTypes(documents.isBritish || false);
+
+  const allDocumentsUploaded = currentDocumentTypes
     .filter((doc) => doc.required)
     .every((doc) => !!documents[doc.id as keyof DocumentFile]);
 
-  const hasUploadedDocuments = documentTypes.some((doc) =>
+  const hasUploadedDocuments = currentDocumentTypes.some((doc) =>
     isDocumentUploaded(doc.id as keyof DocumentFile)
   );
 
@@ -146,7 +162,7 @@ export function DocumentStep({
   const [uploadedFileUrl, setUploadedFileUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const uploadableOptions: DocOption[] = documentTypes
+  const uploadableOptions: DocOption[] = currentDocumentTypes
     .map((doc) => ({
       value: doc.id as keyof DocumentFile,
       label: `${doc.label}${doc.required ? ' *' : ''}`,
@@ -247,19 +263,39 @@ export function DocumentStep({
   return (
     <div className="w-full">
       <Card className="border-0 shadow-none">
-        <CardHeader className='p-0'>
+        <CardHeader className="p-0">
           <h2 className="text-2xl font-bold text-gray-900">Document Upload</h2>
           <p className="text-md mt-1 text-gray-600">
             Please upload all required documents to complete your application
           </p>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="flex flex-col gap-6 lg:flex-row">
+          <div className="flex flex-col gap-6 lg:flex-row mt-6">
             {/* Left: Upload Area */}
             <div className="lg:flex-1">
+              
+              {/* ✅ British Applicant Toggle */}
+              <div className="mb-6 flex items-center space-x-2 rounded-lg border border-gray-200 bg-gray-50 p-4">
+                <Checkbox
+                  id="isBritish"
+                  checked={documents.isBritish}
+                  onCheckedChange={(checked) => {
+                    setDocuments((prev) => ({
+                      ...prev,
+                      isBritish: checked === true
+                    }));
+                  }}
+                />
+                <Label
+                  htmlFor="isBritish"
+                  className="cursor-pointer text-sm font-semibold text-gray-800"
+                >
+                  Is the applicant British?
+                </Label>
+              </div>
+
               <div className="mb-6">
                 <div className="flex items-center justify-end gap-4">
-                  
                   <Dialog
                     open={isDialogOpen}
                     onOpenChange={handleDialogOpenChange}
@@ -421,8 +457,8 @@ export function DocumentStep({
                     </DialogContent>
                   </Dialog>
                 </div>
-                
-                {/* 🔽🔽🔽 UPDATED UI SECTION 🔽🔽🔽 */}
+
+                {/* 🔽🔽🔽 DYNAMIC UI SECTION 🔽🔽🔽 */}
                 <div className="mt-6 space-y-3">
                   {!hasUploadedDocuments && (
                     <div className="flex h-32 flex-col items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50 text-center">
@@ -435,7 +471,7 @@ export function DocumentStep({
                     </div>
                   )}
 
-                  {documentTypes.map(({ id, label, required }) => {
+                  {currentDocumentTypes.map(({ id, label, required }) => {
                     const fileUrl = documents[id as keyof DocumentFile];
                     if (!fileUrl) return null;
 
@@ -456,7 +492,6 @@ export function DocumentStep({
                                 <span className="ml-1 text-red-500">*</span>
                               )}
                             </h4>
-                          
                           </div>
                         </div>
 
@@ -464,16 +499,18 @@ export function DocumentStep({
                         <div className="flex items-center gap-2 sm:justify-end">
                           <Button
                             size="sm"
-                            onClick={() => window.open(fileUrl, '_blank')}
+                            onClick={() => window.open(fileUrl as string, '_blank')}
                           >
                             <Eye className="h-4 w-4" />
                             View
                           </Button>
 
                           <Button
-                          variant={'destructive'}
+                            variant={'destructive'}
                             size="sm"
-                            onClick={() => handleRemoveFile(id as keyof DocumentFile)}
+                            onClick={() =>
+                              handleRemoveFile(id as keyof DocumentFile)
+                            }
                           >
                             <Trash2 className="h-4 w-4" />
                             Delete
@@ -483,7 +520,7 @@ export function DocumentStep({
                     );
                   })}
                 </div>
-                {/* 🔼🔼🔼 END UPDATED UI SECTION 🔼🔼🔼 */}
+                {/* 🔼🔼🔼 END DYNAMIC UI SECTION 🔼🔼🔼 */}
               </div>
             </div>
 
@@ -496,19 +533,19 @@ export function DocumentStep({
                   </h3>
                   <p className="text-sm text-gray-600">
                     {
-                      documentTypes.filter(
+                      currentDocumentTypes.filter(
                         (d) =>
                           d.required &&
                           isDocumentUploaded(d.id as keyof DocumentFile)
                       ).length
                     }{' '}
-                    of {documentTypes.filter((d) => d.required).length}{' '}
+                    of {currentDocumentTypes.filter((d) => d.required).length}{' '}
                     completed
                   </p>
                 </CardHeader>
                 <CardContent className="pt-0">
                   <div className="space-y-3">
-                    {documentTypes
+                    {currentDocumentTypes
                       .filter((doc) => doc.required)
                       .map(({ id, label }) => {
                         const uploaded = isDocumentUploaded(
@@ -549,7 +586,7 @@ export function DocumentStep({
             <Button
               onClick={handleSubmit}
               disabled={!allDocumentsUploaded}
-              className="w-full justify-center bg-theme text-white hover:bg-theme/90 sm:w-auto"
+              className="w-full justify-center bg-blue-600 text-white hover:bg-blue-700 sm:w-auto"
             >
               Save
             </Button>

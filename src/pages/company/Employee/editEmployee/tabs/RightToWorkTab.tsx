@@ -42,7 +42,7 @@ interface HistoryEntry {
   title: string;
   date: string;
   document?: string;
-  updatedBy: string | { firstName: string; lastName: string };
+  updatedBy: string | { firstName: string; lastName: string; name?: string };
 }
 
 interface RTWData {
@@ -64,10 +64,13 @@ function RightToWorkTab() {
 
   // Display State
   const [complianceStatus, setComplianceStatus] = useState<
-    'active' | 'expired' | 'expiring-soon' | null
+    'active' | 'expired' | 'expiring-soon' | 'no-check-required' | null
   >(null);
   const [currentCheckDate, setCurrentCheckDate] = useState<string | null>(null);
   const [checkInterval, setCheckInterval] = useState<number>(0);
+
+  // User Data State
+  const [userData, setUserData] = useState<any>(null);
 
   // Data State
   const [rtwId, setRtwId] = useState<string | null>(null);
@@ -100,7 +103,18 @@ function RightToWorkTab() {
     }
   };
 
-  // 2. Fetch RTW Data
+  // 2. Fetch User Data
+  const fetchUserData = async () => {
+    if (!eid) return;
+    try {
+      const res = await axiosInstance.get(`/users/${eid}`);
+      setUserData(res.data?.data || null);
+    } catch (err) {
+      console.error('Error fetching user data:', err);
+    }
+  };
+
+  // 3. Fetch RTW Data
   const fetchRTWData = async () => {
     if (!eid) return;
     try {
@@ -136,40 +150,56 @@ function RightToWorkTab() {
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
-      await Promise.all([fetchScheduleSettings(), fetchRTWData()]);
+      await Promise.all([
+        fetchScheduleSettings(), 
+        fetchRTWData(), 
+        fetchUserData()
+      ]);
       setIsLoading(false);
     };
 
     loadData();
   }, [id, eid]);
 
-  // 3. Status Calculation (Warning threshold = checkInterval)
+  // 4. Status Calculation (Warning threshold = checkInterval)
   useEffect(() => {
+    // 1. Check override flag first
+    if (userData?.noRtwCheck) {
+      setComplianceStatus('no-check-required');
+      return;
+    }
+
     if (currentCheckDate) {
       const now = moment().startOf('day'); // Normalize to start of day for accurate comparison
       const checkDate = moment(currentCheckDate).startOf('day');
       const diffDays = checkDate.diff(now, 'days');
 
-      // 1. Check if Expired (Date has passed)
+      // 2. Check if Expired (Date has passed)
       if (now.isAfter(checkDate)) {
         setComplianceStatus('expired');
       }
-      // 2. Check if Expiring Soon (Within the checkInterval window)
+      // 3. Check if Expiring Soon (Within the checkInterval window)
       // Example: If interval is 30 days, warning shows if remaining days <= 30
       else if (checkInterval > 0 && diffDays <= checkInterval) {
         setComplianceStatus('expiring-soon');
       }
-      // 3. Otherwise Active
+      // 4. Otherwise Active
       else {
         setComplianceStatus('active');
       }
     } else {
       setComplianceStatus(null);
     }
-  }, [currentCheckDate, checkInterval]);
+  }, [currentCheckDate, checkInterval, userData]);
 
   const getStatusBadge = () => {
     switch (complianceStatus) {
+      case 'no-check-required':
+        return (
+          <Badge className="bg-gray-100 px-3 py-1 text-gray-800 hover:bg-gray-100">
+            No Check Required
+          </Badge>
+        );
       case 'active':
         return (
           <Badge className="bg-green-100 px-3 py-1 text-green-800 hover:bg-green-100">
@@ -313,7 +343,9 @@ function RightToWorkTab() {
                   RTW Next Check Date
                 </Label>
                 <div className="text-2xl font-bold text-gray-900">
-                  {currentCheckDate
+                  {userData?.noRtwCheck 
+                    ? 'N/A' 
+                    : currentCheckDate
                     ? moment(currentCheckDate).format('DD MMMM YYYY')
                     : 'Not Set'}
                 </div>
@@ -325,15 +357,16 @@ function RightToWorkTab() {
               <div className="border-t border-gray-100 pt-4">
                 <Button
                   onClick={openUpdateModal}
-                  className="bg-theme hover:bg-theme/90 w-full text-white"
+                  disabled={userData?.noRtwCheck}
+                  className={cn(
+                    "w-full text-white",
+                    userData?.noRtwCheck 
+                      ? "bg-gray-300 hover:bg-gray-300 cursor-not-allowed" 
+                      : "bg-theme hover:bg-theme/90"
+                  )}
                 >
-                  Update Next Check Date
+                  {userData?.noRtwCheck ? 'Update Not Required' : 'Update Next Check Date'}
                 </Button>
-                {/* {checkInterval > 0 && (
-                  <p className="mt-3 text-center text-xs text-gray-500">
-                    Alert triggers {checkInterval} days before expiry
-                  </p>
-                )} */}
               </div>
             </div>
           </div>

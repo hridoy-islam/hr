@@ -57,11 +57,12 @@ export const REQUIRED_DOCUMENTS_LIST = [
   'GDPR declaration form',
   'Health Declaration / Post employment Medical Questionnaire',
   'Identification Document',
-  'DBS Reference', // Included
-  'Reference', // Included (Requires 2 uploads)
+  'DBS Reference', 
+  'Reference', 
   'National Insurance',
   'Bank Account Details',
-  'P46 / P45'
+  'P46 / P45',
+  'Ni number/Driving licence'
 ];
 
 const OPTIONAL_DOCUMENTS_LIST = [
@@ -106,8 +107,8 @@ export default function EmployeeDocumentTab() {
 
   // --- State ---
   const [documents, setDocuments] = useState<TEmployeeDocument[]>([]);
-  const [complianceStatus, setComplianceStatus] =
-    useState<TComplianceStatus | null>(null);
+  const [complianceStatus, setComplianceStatus] = useState<TComplianceStatus | null>(null);
+  const [userData, setUserData] = useState<any>(null); // ✅ Added user state
   const [isLoading, setIsLoading] = useState(true);
 
   // Dialog State
@@ -115,9 +116,7 @@ export default function EmployeeDocumentTab() {
   const [editingDoc, setEditingDoc] = useState<TEmployeeDocument | null>(null);
 
   // Form State
-  const [selectedOption, setSelectedOption] = useState<SelectOption | null>(
-    null
-  );
+  const [selectedOption, setSelectedOption] = useState<SelectOption | null>(null);
   const [customDocTitle, setCustomDocTitle] = useState('');
 
   // File Upload State
@@ -132,15 +131,18 @@ export default function EmployeeDocumentTab() {
     if (!eid) return;
     try {
       setIsLoading(true);
-      const [docsRes, statusRes] = await Promise.all([
+      // ✅ Fetch docs, status, AND user data simultaneously
+      const [docsRes, statusRes, userRes] = await Promise.all([
         axiosInstance.get(`/employee-documents?limit=all`, {
           params: { employeeId: eid }
         }),
-        axiosInstance.get(`/employee-documents/status/${eid}`)
+        axiosInstance.get(`/employee-documents/status/${eid}`),
+        axiosInstance.get(`/users/${eid}`)
       ]);
 
       setDocuments(docsRes.data?.data?.result || []);
       setComplianceStatus(statusRes.data?.data || null);
+      setUserData(userRes.data?.data || null); // ✅ Store user data
     } catch (error) {
       console.error('Failed to fetch data', error);
     } finally {
@@ -157,9 +159,24 @@ export default function EmployeeDocumentTab() {
     const uploadedTitles = documents.map((d) => d.documentTitle.trim());
 
     // Count specifically for "Reference" (Employment Reference)
-    const referenceCount = uploadedTitles.filter(
-      (t) => t === 'Reference'
-    ).length;
+    const referenceCount = uploadedTitles.filter((t) => t === 'Reference').length;
+
+    // ✅ Dynamic list logic based on user profile
+    let dynamicRequiredList = [...REQUIRED_DOCUMENTS_LIST];
+    
+    if (userData?.noRtwCheck) {
+      dynamicRequiredList = dynamicRequiredList.filter(
+        (req) => !["Immigration Status", "Right to Work", "Passport", "Ni number/Driving licence"].includes(req)
+      );
+    } else if (userData?.isBritish) {
+      dynamicRequiredList = dynamicRequiredList.filter(
+        (req) => !["Immigration Status", "Right to Work", "Passport"].includes(req)
+      );
+    } else {
+      dynamicRequiredList = dynamicRequiredList.filter(
+        (req) => req !== "Ni number/Driving licence"
+      );
+    }
 
     const filterUploaded = (list: string[]) => {
       return list
@@ -175,7 +192,7 @@ export default function EmployeeDocumentTab() {
         .map((title) => ({ label: title, value: title }));
     };
 
-    const requiredOpts = filterUploaded(REQUIRED_DOCUMENTS_LIST);
+    const requiredOpts = filterUploaded(dynamicRequiredList); // ✅ Apply dynamic list
     const optionalOpts = filterUploaded(OPTIONAL_DOCUMENTS_LIST);
 
     return [
@@ -192,7 +209,7 @@ export default function EmployeeDocumentTab() {
         options: [{ label: '+ Other (Type Manually)', value: 'Other' }]
       }
     ];
-  }, [documents]);
+  }, [documents, userData]); // ✅ Added userData to dependencies
 
   // --- Handlers ---
   const handleOpenCreate = () => {

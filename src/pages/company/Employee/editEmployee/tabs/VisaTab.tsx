@@ -34,7 +34,7 @@ interface HistoryEntry {
   title: string;
   date: string;
   document?: string;
-  updatedBy: string | { firstName: string; lastName: string };
+  updatedBy: string | { firstName: string; lastName: string; name?: string };
 }
 
 interface VisaData {
@@ -57,7 +57,7 @@ function VisaTab() {
 
   // Display State
   const [complianceStatus, setComplianceStatus] = useState<
-    'active' | 'expired' | 'expiring-soon' | null
+    'active' | 'expired' | 'expiring-soon' | 'no-check-required' | null
   >(null);
   
   const [currentExpiryDate, setCurrentExpiryDate] = useState<string | null>(
@@ -65,6 +65,9 @@ function VisaTab() {
   );
   const [currentStartDate, setCurrentStartDate] = useState<string | null>(null);
   const [visaCheckInterval, setVisaCheckInterval] = useState<number>(0);
+
+  // User Data State
+  const [userData, setUserData] = useState<any>(null);
 
   // Data State
   const [visaId, setVisaId] = useState<string | null>(null);
@@ -98,7 +101,18 @@ function VisaTab() {
     }
   };
 
-  // 2. Fetch Visa Data
+  // 2. Fetch User Data to check noRtwCheck flag
+  const fetchUserData = async () => {
+    if (!eid) return;
+    try {
+      const res = await axiosInstance.get(`/users/${eid}`);
+      setUserData(res.data?.data || null);
+    } catch (err) {
+      console.error('Error fetching user data:', err);
+    }
+  };
+
+  // 3. Fetch Visa Data
   const fetchVisaData = async () => {
     if (!eid) return;
     try {
@@ -134,15 +148,25 @@ function VisaTab() {
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
-      await Promise.all([fetchScheduleSettings(), fetchVisaData()]);
+      await Promise.all([
+        fetchScheduleSettings(), 
+        fetchVisaData(),
+        fetchUserData()
+      ]);
       setIsLoading(false);
     };
 
     loadData();
   }, [eid, id]);
 
-  // 3. Status Calculation
+  // 4. Status Calculation
   useEffect(() => {
+    // 1. Check override flag first
+    if (userData?.noRtwCheck) {
+      setComplianceStatus('no-check-required');
+      return;
+    }
+
     if (currentExpiryDate) {
       const now = moment().startOf('day');
       const expiry = moment(currentExpiryDate).startOf('day');
@@ -159,7 +183,7 @@ function VisaTab() {
     } else {
       setComplianceStatus(null);
     }
-  }, [currentExpiryDate, visaCheckInterval]);
+  }, [currentExpiryDate, visaCheckInterval, userData]);
 
   // File Upload Logic
   const handleFileSelect = async (
@@ -298,7 +322,9 @@ function VisaTab() {
                     Visa Start Date
                   </Label>
                   <div className="text-lg font-semibold text-gray-900">
-                    {currentStartDate
+                    {userData?.noRtwCheck 
+                      ? 'N/A' 
+                      : currentStartDate
                       ? moment(currentStartDate).format('DD MMMM YYYY')
                       : 'Not Set'}
                   </div>
@@ -309,7 +335,9 @@ function VisaTab() {
                     Visa Expiry Date
                   </Label>
                   <div className="text-lg font-semibold text-gray-900">
-                    {currentExpiryDate
+                    {userData?.noRtwCheck 
+                      ? 'N/A' 
+                      : currentExpiryDate
                       ? moment(currentExpiryDate).format('DD MMMM YYYY')
                       : 'Not Set'}
                   </div>
@@ -320,16 +348,19 @@ function VisaTab() {
                     <Badge
                       className={cn(
                         'px-3 py-1 text-sm',
+                        complianceStatus === 'no-check-required' && 'bg-gray-100 text-gray-800 hover:bg-gray-100',
                         complianceStatus === 'active' && 'bg-green-100 text-green-800 hover:bg-green-100',
                         complianceStatus === 'expiring-soon' && 'bg-amber-100 text-amber-800 hover:bg-amber-100',
                         complianceStatus === 'expired' && 'bg-red-100 text-red-800 hover:bg-red-100'
                       )}
                     >
-                      {complianceStatus === 'active' 
-                        ? 'Active' 
-                        : complianceStatus === 'expiring-soon' 
-                          ? 'Expiring Soon' 
-                          : 'Expired'
+                      {complianceStatus === 'no-check-required'
+                        ? 'No Check Required'
+                        : complianceStatus === 'active' 
+                          ? 'Active' 
+                          : complianceStatus === 'expiring-soon' 
+                            ? 'Expiring Soon' 
+                            : 'Expired'
                       }
                     </Badge>
                   </div>
@@ -340,11 +371,21 @@ function VisaTab() {
               <div className="border-t border-gray-100 pt-4">
                 <Button
                   onClick={openUpdateModal}
-                  className="w-full bg-theme text-white hover:bg-theme/90"
+                  disabled={userData?.noRtwCheck}
+                  className={cn(
+                    "w-full text-white",
+                    userData?.noRtwCheck 
+                      ? "bg-gray-300 hover:bg-gray-300 cursor-not-allowed" 
+                      : "bg-theme hover:bg-theme/90"
+                  )}
                 >
-                  {currentExpiryDate ? 'Renew / Update Visa' : 'Add Visa Details'}
+                  {userData?.noRtwCheck 
+                    ? 'Update Not Required' 
+                    : currentExpiryDate 
+                      ? 'Renew / Update Visa' 
+                      : 'Add Visa Details'}
                 </Button>
-                {visaCheckInterval > 0 && (
+                {visaCheckInterval > 0 && !userData?.noRtwCheck && (
                   <p className="mt-3 text-center text-xs text-gray-500">
                     Policy: Alert if expiring within {visaCheckInterval} days
                   </p>
@@ -364,79 +405,79 @@ function VisaTab() {
 
             <div className="overflow-hidden rounded-md border border-gray-100">
               <Table>
-                             <TableHeader>
-                               <TableRow>
-                                 {/* Date & Time Column Removed */}
-                                 <TableHead>Activity</TableHead>
-                                 <TableHead >Updated By</TableHead>
-                                 <TableHead className="text-right">Document</TableHead>
-                               </TableRow>
-                             </TableHeader>
-                             <TableBody>
-                               {history.length === 0 ? (
-                                 <TableRow>
-                                   <TableCell
-                                     colSpan={3} // Adjusted colspan from 4 to 3
-                                     className="py-8 text-center italic text-gray-500"
-                                   >
-                                     No history records found.
-                                   </TableCell>
-                                 </TableRow>
-                               ) : (
-                                 history
-                                   .slice()
-                                   .sort(
-                                     (a, b) =>
-                                       new Date(b.date).getTime() -
-                                       new Date(a.date).getTime()
-                                   )
-                                   .map((entry) => (
-                                     <TableRow key={entry._id} className="hover:bg-gray-50">
-                                       {/* Date Cell Removed */}
-             
-                                       <TableCell className="font-medium text-gray-900">
-                                         {entry.title || 'Update'}
-                                       </TableCell>
-             
-                                       <TableCell className="">
-                                         <div className='flex '>
-                                         <div className="flex flex-col">
-                                           <span className="font-medium">
-                                             {entry.updatedBy &&
-                                             typeof entry.updatedBy === 'object'
-                                               ? entry.updatedBy.name ||
-                                                 `${entry.updatedBy.firstName ?? ''} ${entry.updatedBy.lastName ?? ''}`.trim()
-                                               : 'System'}
-                                           </span>
-                                           {/* Date moved here underneath the name */}
-                                           <span className="text-xs ">
-                                             {moment(entry.date).format('DD MMM YYYY')}
-                                           </span>
-                                         </div>
-                                         </div>
-                                       </TableCell>
-             
-                                       <TableCell className="text-right">
-                                         {entry.document ? (
-                                           <Button
-                                             size="sm"
-                                             className="h-8"
-                                             onClick={() =>
-                                               window.open(entry.document, '_blank')
-                                             }
-                                           >
-                                             <Eye className="mr-2 h-4 w-4" />
-                                             View
-                                           </Button>
-                                         ) : (
-                                           <span className="text-gray-300">-</span>
-                                         )}
-                                       </TableCell>
-                                     </TableRow>
-                                   ))
-                               )}
-                             </TableBody>
-                           </Table>
+                              <TableHeader>
+                                <TableRow>
+                                  {/* Date & Time Column Removed */}
+                                  <TableHead>Activity</TableHead>
+                                  <TableHead >Updated By</TableHead>
+                                  <TableHead className="text-right">Document</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {history.length === 0 ? (
+                                  <TableRow>
+                                    <TableCell
+                                      colSpan={3} // Adjusted colspan from 4 to 3
+                                      className="py-8 text-center italic text-gray-500"
+                                    >
+                                      No history records found.
+                                    </TableCell>
+                                  </TableRow>
+                                ) : (
+                                  history
+                                    .slice()
+                                    .sort(
+                                      (a, b) =>
+                                        new Date(b.date).getTime() -
+                                        new Date(a.date).getTime()
+                                    )
+                                    .map((entry) => (
+                                      <TableRow key={entry._id} className="hover:bg-gray-50">
+                                        {/* Date Cell Removed */}
+              
+                                        <TableCell className="font-medium text-gray-900">
+                                          {entry.title || 'Update'}
+                                        </TableCell>
+              
+                                        <TableCell className="">
+                                          <div className='flex '>
+                                          <div className="flex flex-col">
+                                            <span className="font-medium">
+                                              {entry.updatedBy &&
+                                              typeof entry.updatedBy === 'object'
+                                                ? entry.updatedBy.name ||
+                                                  `${entry.updatedBy.firstName ?? ''} ${entry.updatedBy.lastName ?? ''}`.trim()
+                                                : 'System'}
+                                            </span>
+                                            {/* Date moved here underneath the name */}
+                                            <span className="text-xs ">
+                                              {moment(entry.date).format('DD MMM YYYY')}
+                                            </span>
+                                          </div>
+                                          </div>
+                                        </TableCell>
+              
+                                        <TableCell className="text-right">
+                                          {entry.document ? (
+                                            <Button
+                                              size="sm"
+                                              className="h-8"
+                                              onClick={() =>
+                                                window.open(entry.document, '_blank')
+                                              }
+                                            >
+                                              <Eye className="mr-2 h-4 w-4" />
+                                              View
+                                            </Button>
+                                          ) : (
+                                            <span className="text-gray-300">-</span>
+                                          )}
+                                        </TableCell>
+                                      </TableRow>
+                                    ))
+                                )}
+                              </TableBody>
+                            </Table>
             </div>
           </div>
         </div>

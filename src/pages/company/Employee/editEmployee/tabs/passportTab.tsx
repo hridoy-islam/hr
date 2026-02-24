@@ -58,11 +58,14 @@ function PassportTab() {
 
   // Display State
   const [complianceStatus, setComplianceStatus] = useState<
-    'active' | 'expired' | 'expiring-soon' | null
+    'active' | 'expired' | 'expiring-soon' | 'no-check-required' | null
   >(null);
 
   // Settings State (From ScheduleCheck)
   const [passportCheckInterval, setPassportCheckInterval] = useState<number>(0);
+  
+  // User Data State
+  const [userData, setUserData] = useState<any>(null);
 
   // Current Data State
   const [passportId, setPassportId] = useState<string | null>(null);
@@ -100,7 +103,18 @@ function PassportTab() {
     }
   };
 
-  // 2. Fetch Passport Data
+  // 2. Fetch User Data to check noRtwCheck flag
+  const fetchUserData = async () => {
+    if (!eid) return;
+    try {
+      const res = await axiosInstance.get(`/users/${eid}`);
+      setUserData(res.data?.data || null);
+    } catch (err) {
+      console.error('Error fetching user data:', err);
+    }
+  };
+
+  // 3. Fetch Passport Data
   const fetchPassportData = async () => {
     if (!eid) return;
     try {
@@ -132,14 +146,24 @@ function PassportTab() {
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
-      await Promise.all([fetchPassportData(), fetchScheduleSettings()]);
+      await Promise.all([
+        fetchPassportData(), 
+        fetchScheduleSettings(),
+        fetchUserData()
+      ]);
       setIsLoading(false);
     };
     loadData();
   }, [eid, id]);
 
-  // 3. Status Calculation (Days Logic)
+  // 4. Status Calculation (Days Logic)
   useEffect(() => {
+    // 1. Check override flag first
+    if (userData?.noRtwCheck) {
+      setComplianceStatus('no-check-required');
+      return;
+    }
+
     if (currentExpiryDate) {
       const now = moment().startOf('day');
       const expiry = moment(currentExpiryDate);
@@ -158,10 +182,16 @@ function PassportTab() {
     } else {
       setComplianceStatus(null);
     }
-  }, [currentExpiryDate, passportCheckInterval]);
+  }, [currentExpiryDate, passportCheckInterval, userData]);
 
   const getStatusBadge = () => {
     switch (complianceStatus) {
+      case 'no-check-required':
+        return (
+          <Badge className="bg-gray-100 text-gray-800 hover:bg-gray-100 px-3 py-1">
+            No Check Required
+          </Badge>
+        );
       case 'active':
         return (
           <Badge className="bg-green-100 text-green-800 hover:bg-green-100 px-3 py-1">
@@ -312,7 +342,9 @@ function PassportTab() {
                   Passport Number
                 </Label>
                 <div className="text-lg font-semibold text-gray-900">
-                  {currentPassportNumber || 'Not Set'}
+                  {userData?.noRtwCheck 
+                    ? 'N/A' 
+                    : currentPassportNumber || 'Not Set'}
                 </div>
               </div>
 
@@ -322,7 +354,9 @@ function PassportTab() {
                   Expiry Date
                 </Label>
                 <div className="text-lg font-bold text-gray-900">
-                  {currentExpiryDate
+                  {userData?.noRtwCheck 
+                    ? 'N/A'
+                    : currentExpiryDate
                     ? moment(currentExpiryDate).format('DD MMMM YYYY')
                     : 'Not Set'}
                 </div>
@@ -335,9 +369,19 @@ function PassportTab() {
               <div className="border-t border-gray-100 pt-6 space-y-3">
                 <Button
                   onClick={openUpdateModal}
-                  className="w-full bg-theme text-white hover:bg-theme/90"
+                  disabled={userData?.noRtwCheck}
+                  className={cn(
+                    "w-full text-white",
+                    userData?.noRtwCheck 
+                      ? "bg-gray-300 hover:bg-gray-300 cursor-not-allowed" 
+                      : "bg-theme hover:bg-theme/90"
+                  )}
                 >
-                  {currentExpiryDate ? 'Update / Renew Passport' : 'Add Passport Details'}
+                  {userData?.noRtwCheck 
+                    ? 'Update Not Required' 
+                    : currentExpiryDate 
+                      ? 'Update / Renew Passport' 
+                      : 'Add Passport Details'}
                 </Button>
               </div>
             </div>

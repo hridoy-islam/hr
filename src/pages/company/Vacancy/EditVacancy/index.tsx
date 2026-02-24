@@ -265,6 +265,7 @@ export default function EditVacancy() {
                   <Label>Min Salary <span className="text-red-500">*</span></Label>
                   <Input
                     type="number"
+                    step="any"
                     placeholder="Min Salary..."
                     defaultValue={editVacancy?.salaryRange?.min}
                     {...register('salaryRange.min', {
@@ -284,6 +285,7 @@ export default function EditVacancy() {
                   <Label>Max Salary <span className="text-red-500">*</span></Label>
                   <Input
                     type="number"
+                    step="any"
                     placeholder="Max Salary..."
                     defaultValue={editVacancy?.salaryRange?.max}
                     {...register('salaryRange.max', {

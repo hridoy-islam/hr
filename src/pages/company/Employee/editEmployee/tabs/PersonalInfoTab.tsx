@@ -179,6 +179,16 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
                 required
               />
             </FormRow>
+            <FormRow label="Initial">
+              <EditableField
+                id="initial"
+                label=""
+                value={formData.initial}
+                onUpdate={(val) => onUpdate('initial', val)}
+                isSaving={isFieldSaving.initial}
+                required
+              />
+            </FormRow>
 
             <FormRow label="Last Name">
               <EditableField
