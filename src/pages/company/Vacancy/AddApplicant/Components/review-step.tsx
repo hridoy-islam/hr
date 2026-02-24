@@ -143,6 +143,10 @@ const ReviewStep: React.FC<ReviewStepProps> = ({ formData, onSubmit, onBack }) =
                 <DataRow label="Branch" value={personalDetails.branch} />
                 <DataRow label="Application Date" value={personalDetails.applicationDate ? moment(personalDetails.applicationDate).format('DD MMM YYYY') : null} />
                 <DataRow label="Available From" value={personalDetails.availableFromDate ? moment(personalDetails.availableFromDate).format('DD MMM YYYY') : null} />
+<DataRow 
+  label="Is the applicant a British citizen?" 
+  value={personalDetails.isBritish ? "Yes" : "No"} 
+/>
 
                 {/* --- 6. Health & Disability --- */}
                 <TableSectionHeader icon={Accessibility} title="Health & Adjustments" />
@@ -196,6 +200,10 @@ const ReviewStep: React.FC<ReviewStepProps> = ({ formData, onSubmit, onBack }) =
                 <DataRow 
                   label="Proof of Address" 
                   value={<FileLink url={documents.proofOfAddress} />} 
+                />
+                <DataRow 
+                  label="Ni number/Driving licence" 
+                  value={<FileLink url={documents.niDoc} />} 
                 />
 
               </TableBody>

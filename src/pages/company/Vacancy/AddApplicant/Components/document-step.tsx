@@ -55,7 +55,7 @@ const getDocumentTypes = (isBritish: boolean) => {
     return [
       { id: 'dbs', label: 'DBS Certificate', required: true },
       { id: 'proofOfAddress', label: 'Proof of Address', required: true },
-      { id: 'niDoc', label: 'National Insurance / Driving License', required: true }
+      { id: 'niDoc', label: 'Ni number/Driving licence', required: true }
     ];
   }
 
@@ -290,7 +290,7 @@ export function DocumentStep({
                   htmlFor="isBritish"
                   className="cursor-pointer text-sm font-semibold text-gray-800"
                 >
-                  Is the applicant British?
+                  Is the applicant a British citizen?
                 </Label>
               </div>
 
