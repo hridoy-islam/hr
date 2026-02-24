@@ -216,7 +216,8 @@ const RecruitApplicantForm = () => {
           { key: 'dbs', label: 'DBS Certificate' },
           { key: 'rightToWork', label: 'Right to Work' },
           { key: 'immigrationStatus', label: 'Immigration Status' },
-          { key: 'proofOfAddress', label: 'Proof of Address' }
+          { key: 'proofOfAddress', label: 'Proof of Address' },
+          { key: 'niDoc', label: 'Ni number/Driving licence' }
         ];
 
         const documentPromises = documentTypes

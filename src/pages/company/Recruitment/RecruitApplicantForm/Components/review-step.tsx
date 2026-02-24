@@ -97,7 +97,7 @@ const ReviewStep = ({ formData, onSubmit, onBack, applicantData }) => {
           />
           <TableRow label="NHS Number" value={applicantData?.nhsNumber} />
           <TableRow
-            label="No Need to Check RTW"
+            label="Skip RTW verification for this applicant"
             value={
               typeof formData?.GeneralInformation?.noRtwCheck === 'boolean'
                 ? formData.GeneralInformation.noRtwCheck
@@ -139,7 +139,7 @@ const ReviewStep = ({ formData, onSubmit, onBack, applicantData }) => {
               value={formatDate(applicantData?.availableFromDate)}
             />
             <TableRow
-              label="App Date"
+              label="Application Date"
               value={formatDate(applicantData?.applicationDate)}
             />
             <TableRow

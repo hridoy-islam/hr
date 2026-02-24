@@ -239,7 +239,7 @@ export function GeneralInformation({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>
-                    No need to check RTW? <span className="text-red-500">*</span>
+                    Skip RTW verification for this applicant <span className="text-red-500">*</span>
                   </FormLabel>
                   <FormControl>
                     <Select<OptionType>
