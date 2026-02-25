@@ -1,207 +1,386 @@
-import { useEffect, useState } from "react"
-import moment from "moment"
-import { Calendar, AlertCircle, UserIcon, Bell, Lock, Globe } from "lucide-react"
-import axiosInstance from "@/lib/axios"
-import { BlinkingDots } from "@/components/shared/blinking-dots"
-import { Card } from "@/components/ui/card"
-import { useToast } from "@/components/ui/use-toast"
-import { DynamicPagination } from "@/components/shared/DynamicPagination"
-import { Badge } from "@/components/ui/badge"
-import { useSelector } from "react-redux"
-import { useParams } from "react-router-dom"
+import { useEffect, useState } from 'react';
+import { Pen, Plus, Calendar as CalendarIcon } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from '@/components/ui/table';
+import axiosInstance from '@/lib/axios';
+import { useToast } from '@/components/ui/use-toast';
+import { BlinkingDots } from '@/components/shared/blinking-dots';
+import moment from 'moment';
+import { DynamicPagination } from '@/components/shared/DynamicPagination';
+import Select from 'react-select';
 
-// Updated Interface based on new Schema
-interface Notice {
-  _id: string
-  noticeDescription: string
-  createdAt: string // Mongoose timestamp
-  updatedAt: string
-  status: string
-  noticeSetting: "all" | "individual"
-  users: any[] // Can be array of strings (IDs) or Objects depending on population
-  noticeBy?: {
-    firstName: string
-    lastName: string
-  }
-}
+// --- IMPORTS FOR REACT DATEPICKER ---
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
+import { NoticeDialog } from './components/NoticeDialog';
+import { useParams } from 'react-router-dom';
 
 export default function CompanyNoticeBoard() {
-  const [notices, setNotices] = useState<Notice[]>([])
-  const [filteredNotices, setFilteredNotices] = useState<Notice[]>([])
-  const [loading, setLoading] = useState(true)
-  const [currentUser, setCurrentUser] = useState<any | null>(null)
-  const { toast } = useToast()
-  
-  // robustly get user ID
-  const authUser = useSelector((state: any) => state.auth?.user)
-  const userId = authUser?._id || authUser?.id
-  const {id} = useParams()
-  const [entriesPerPage, setEntriesPerPage] = useState(10)
-  const [currentPage, setCurrentPage] = useState(1)
-  const [totalPages, setTotalPages] = useState(1)
+  const [notice, setNotice] = useState<any[]>([]);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingNotice, setEditingNotice] = useState<any>();
+  const [initialLoading, setInitialLoading] = useState(true);
+  const { toast } = useToast();
+  const {id:companyId} = useParams()
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [entriesPerPage, setEntriesPerPage] = useState(10);
 
+  // --- DATE PICKER STATE ---
+  // We store start and end date in a single array or separate variables.
+  // react-datepicker range mode uses [start, end]
+  const [dateRange, setDateRange] = useState<(Date | null)[]>([null, null]);
+  const [startDate, endDate] = dateRange;
 
-  // Fetch notices
-  const fetchNotices = async () => {
-    try {
-      setLoading(true)
-      const res = await axiosInstance.get("/admin-notice", {
-        params: {
-          status: "active",
-          page: currentPage,
-          limit: entriesPerPage,
-        },
-      })
+  // Filter states
+  const [departments, setDepartments] = useState<any[]>([]);
+  const [designations, setDesignations] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
 
-      const fetchedNotices = res.data.data.result || []
-      setNotices(fetchedNotices)
-      setTotalPages(res.data.data.meta?.totalPage || res.data.data.totalPages || 1)
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to fetch notices",
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
+  const [selectedDepartments, setSelectedDepartments] = useState<any[]>([]);
+  const [selectedDesignations, setSelectedDesignations] = useState<any[]>([]);
+  const [selectedUsers, setSelectedUsers] = useState<any[]>([]);
 
-  // Filter Logic based on new Schema
+  // Fetch filter options
   useEffect(() => {
-    if (!id || notices.length === 0) {
-        setFilteredNotices([])
-        return
+    const fetchFilters = async () => {
+      try {
+        const [deptRes, desigRes, userRes] = await Promise.all([
+            axiosInstance.get(`/hr/department?companyId=${companyId}&limit=all`),
+                 axiosInstance.get(`/hr/designation?companyId=${companyId}&limit=all`),
+                 axiosInstance.get(`/users?company=${companyId}&limit=all`)
+        ]);
+        setDepartments(deptRes.data.data.result);
+        setDesignations(desigRes.data.data.result);
+        setUsers(userRes.data.data.result);
+      } catch (err) {
+        console.error('Error fetching filters', err);
+      }
+    };
+    fetchFilters();
+  }, []);
+
+  const fetchData = async (
+    page: number,
+    entries: number,
+    startStr?: string | null,
+    endStr?: string | null,
+    departmentIds?: string[],
+    designationIds?: string[],
+    userIds?: string[]
+  ) => {
+    try {
+      setInitialLoading(true);
+      const response = await axiosInstance.get(`/hr/notice?companyId=${companyId}`, {
+        params: {
+          page,
+          limit: entries,
+          ...(startStr && { startDate: startStr }),
+          ...(endStr && { endDate: endStr }),
+          ...(departmentIds?.length && { department: departmentIds.join(',') }),
+          ...(designationIds?.length && {
+            designation: designationIds.join(',')
+          }),
+          ...(userIds?.length && { users: userIds.join(',') })
+        }
+      });
+      setNotice(response.data.data.result);
+      setTotalPages(response.data.data.meta.totalPage);
+    } catch (error) {
+      console.error('Error fetching Notice:', error);
+    } finally {
+      setInitialLoading(false);
     }
+  };
 
-    const filtered = notices.filter((notice) => {
-      // 1. Show if setting is 'all'
-      if (notice.noticeSetting === "all") return true
-
-      // 2. Show if setting is 'individual' AND user is in the list
-      if (notice.noticeSetting === "individual") {
-        return notice.users.some((user: any) => {
-             // Handle if users are populated objects or just ID strings
-             const idToCheck = typeof user === 'string' ? user : id
-             return idToCheck === id
-        })
+  const handleSubmit = async (data: any) => {
+    try {
+      let response;
+      if (editingNotice) {
+        response = await axiosInstance.patch(
+          `/hr/notice/${editingNotice?._id}`,
+          data
+        );
+      } else {
+        response = await axiosInstance.post(`/hr/notice`, data);
       }
 
-      return false
-    })
+      if (response.data && response.data.success) {
+        toast({
+          title: response.data.message || 'Record Updated successfully',
+          className: 'bg-theme border-none text-white'
+        });
+      } else {
+        toast({
+          title: response.data.message || 'Operation failed',
+          className: 'bg-red-500 border-none text-white'
+        });
+      }
+      handleSearch();
+      setEditingNotice(undefined);
+    } catch (error) {
+      toast({
+        title: 'An error occurred. Please try again.',
+        className: 'bg-red-500 border-none text-white'
+      });
+    }
+  };
 
-    setFilteredNotices(filtered)
-  }, [notices, currentUser])
+  const handleStatusChange = async (id: string, status: boolean) => {
+    try {
+      const updatedStatus = status ? 'active' : 'inactive';
+      await axiosInstance.patch(`/hr/notice/${id}`, { status: updatedStatus });
+      toast({
+        title: 'Record updated successfully',
+        className: 'bg-green-500 border-none text-white'
+      });
+      handleSearch();
+    } catch (error) {
+      console.error('Error updating status:', error);
+    }
+  };
 
-  // Initial Data Load
+  const handleEdit = (notice: any) => {
+    setEditingNotice(notice);
+    setDialogOpen(true);
+  };
+
+  // Helper to format dates and fetch
+  const handleSearch = () => {
+    const formattedStart = startDate
+      ? moment(startDate).format('YYYY-MM-DD')
+      : undefined;
+    const formattedEnd = endDate
+      ? moment(endDate).format('YYYY-MM-DD')
+      : undefined;
+
+    fetchData(
+      currentPage,
+      entriesPerPage,
+      formattedStart,
+      formattedEnd,
+      selectedDepartments.map((d) => d.value),
+      selectedDesignations.map((d) => d.value),
+      selectedUsers.map((d) => d.value)
+    );
+  };
+
+  // Auto-fetch when filters change
   useEffect(() => {
-    const loadData = async () => {
-      await fetchNotices()
-    }
-    if (id) {
-        loadData()
-    }
-  }, [id, currentPage, entriesPerPage])
-
+    handleSearch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    currentPage,
+    entriesPerPage,
+    selectedDepartments,
+    selectedDesignations,
+    selectedUsers,
+    startDate, // Trigger when start date changes
+    endDate // Trigger when end date changes
+  ]);
 
   return (
-    <div className=" bg-white p-6 rounded-xl shadow-lg">
+    <div className="space-y-3 rounded-md bg-white p-4 shadow-sm">
+      <div className="flex items-center justify-between">
+        <h2 className="flex items-center gap-2 text-2xl font-bold text-gray-900">
+          All Notice
+        </h2>
+        <Button
+          className="bg-theme text-white hover:bg-theme/90"
+          size={'sm'}
+          onClick={() => setDialogOpen(true)}
+        >
+          <Plus className="mr-2 h-4 w-4" /> New Notice
+        </Button>
+      </div>
+
       <div className="">
-        {/* Header */}
-        <div className="mb-8 flex items-center gap-4">
-            <Bell className="h-6 w-6 text-theme" />
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Notice Board</h1>
+        {/* Filters */}
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="w-64">
+            <label className="mb-1 block text-sm font-medium">Department</label>
+            <Select
+              isMulti
+              options={departments.map((d) => ({
+                value: d._id,
+                label: d.departmentName
+              }))}
+               menuPortalTarget={document.body}
+              menuPosition="fixed"
+              styles={{
+                menuPortal: (base) => ({ ...base, zIndex: 9999 })
+              }}
+              className="react-select-container"
+              classNamePrefix="react-select"
+              value={selectedDepartments}
+              onChange={(val) => setSelectedDepartments(val as any)}
+            />
+          </div>
+
+          <div className="w-64">
+            <label className="mb-1 block text-sm font-medium">
+              Designation
+            </label>
+            <Select
+              isMulti
+              options={designations.map((d) => ({
+                value: d._id,
+                label: d.title
+              }))}
+               menuPortalTarget={document.body}
+              menuPosition="fixed"
+              styles={{
+                menuPortal: (base) => ({ ...base, zIndex: 9999 })
+              }}
+              className="react-select-container"
+              classNamePrefix="react-select"
+              value={selectedDesignations}
+              onChange={(val) => setSelectedDesignations(val as any)}
+            />
+          </div>
+
+          <div className="w-64">
+            <label className="mb-1 block text-sm font-medium">Users</label>
+            <Select
+              isMulti
+              options={users.map((u) => ({
+                value: u._id,
+                label: `${u.firstName} ${u.lastName}`
+              }))}
+              menuPortalTarget={document.body}
+              menuPosition="fixed"
+              styles={{
+                menuPortal: (base) => ({ ...base, zIndex: 9999 })
+              }}
+              className="react-select-container"
+              classNamePrefix="react-select"
+              value={selectedUsers}
+              onChange={(val) => setSelectedUsers(val as any)}
+            />
+          </div>
+
+          {/* --- REACT DATEPICKER IMPLEMENTATION --- */}
+          <div className="w-">
+            <label className="mb-1 block text-sm font-medium">
+              Filter By Date
+            </label>
+            <div className="relative">
+              <DatePicker
+                selectsRange={true}
+                startDate={startDate}
+                endDate={endDate}
+                onChange={(update) => {
+                  setDateRange(update);
+                }}
+                popperClassName="z-[99999]"
+                portalId="root-portal"
+                isClearable={true}
+                placeholderText="Select Date Range"
+                className="flex h-10 w-64 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              />
+            </div>
+          </div>
         </div>
 
-        {/* Content */}
-        <div className="space-y-4">
-          {loading ? (
-            <div className="flex flex-col items-center justify-center py-24">
+        {/* Table */}
+        <div className="py-4 ">
+          {initialLoading ? (
+            <div className="flex justify-center py-6">
               <BlinkingDots size="large" color="bg-theme" />
             </div>
-          ) : filteredNotices.length === 0 ? (
-            <Card className="border border-slate-200 bg-white py-16 text-center shadow-sm">
-              <div className="flex flex-col items-center">
-                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-slate-100">
-                  <AlertCircle className="h-8 w-8 text-slate-400" />
-                </div>
-                <h3 className="mb-2 text-xl font-semibold text-slate-900">No notices found</h3>
-                <p className="max-w-md text-slate-600">
-                  There are no active notices available for you at this time.
-                </p>
-              </div>
-            </Card>
+          ) : notice.length === 0 ? (
+            <div className="flex justify-center py-6 text-gray-500">
+              No records found.
+            </div>
           ) : (
-            <>
-              {filteredNotices.map((notice) => (
-                <Card
-                  key={notice._id}
-                  className="group overflow-hidden border border-slate-200 bg-white shadow-sm transition-all duration-200 hover:border-slate-300 hover:shadow-md"
-                >
-                  <div className="p-5">
-                    {/* Top row: Badge and Date */}
-                    <div className="mb-3 flex flex-wrap items-center justify-between gap-4">
-                      <div className="flex items-center gap-2">
-                        {/* Scope Badge */}
-                        {notice.noticeSetting === "all" ? (
-                             <Badge className="bg-blue-500 hover:bg-blue-600 text-white flex gap-1 items-center">
-                                <Globe className="w-3 h-3" /> Public Announcement
-                             </Badge>
-                        ) : (
-                            <Badge className="bg-purple-500 hover:bg-purple-600 text-white flex gap-1 items-center">
-                                <Lock className="w-3 h-3" /> Private Notice
-                            </Badge>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
-                        <Calendar className="h-3.5 w-3.5" />
-                        <span>
-                          {moment(notice.createdAt).format("DD MMM YYYY")} at{" "}
-                          {moment(notice.createdAt).format("h:mm A")}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Description */}
-                    <div className="mb-4">
-                        <p className="text-sm leading-relaxed text-slate-700 whitespace-pre-wrap">
-                            {notice.noticeDescription}
-                        </p>
-                    </div>
-
-                    {/* Footer: Posted by */}
-                    {notice.noticeBy && (
-                      <div className="flex items-center justify-end border-t border-slate-100 pt-3">
-                        <div className="flex items-center gap-1.5 text-xs">
-                            <span className="text-slate-400">Posted by:</span>
-                            <UserIcon className="h-3.5 w-3.5 text-slate-400" />
-                            <span className="font-semibold text-slate-700">
-                                {notice.noticeBy?.name}
-                            </span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </Card>
-              ))}
-
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="mt-8 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-                  <DynamicPagination
-                    pageSize={entriesPerPage}
-                    setPageSize={setEntriesPerPage}
-                    currentPage={currentPage}
-                    totalPages={totalPages}
-                    onPageChange={setCurrentPage}
-                  />
-                </div>
-              )}
-            </>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Notice Type</TableHead>
+                  <TableHead>Notice Description</TableHead>
+                  <TableHead>Notice Date</TableHead>
+                  <TableHead>Notice By</TableHead>
+                  <TableHead>Department</TableHead>
+                  <TableHead>Designation</TableHead>
+                  <TableHead>Users</TableHead>
+                  <TableHead className="w-32 text-center">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {notice.map((n) => (
+                  <TableRow key={n._id}>
+                    <TableCell>
+                      {n.noticeType.charAt(0).toUpperCase() +
+                        n.noticeType.slice(1)}
+                    </TableCell>
+                    <TableCell>{n.noticeDescription}</TableCell>
+                    <TableCell>
+                      {moment(n.noticeDate).format('MMMM Do YYYY')}
+                    </TableCell>
+                    <TableCell>
+  {n.noticeBy?.firstName || n.noticeBy?.lastName
+    ? `${n.noticeBy?.firstName ?? ""} ${n.noticeBy?.lastName ?? ""}`.trim()
+    : n.noticeBy?.name}
+</TableCell>
+                    <TableCell>
+                      {n.department
+                        ?.map((d: any) => d.departmentName)
+                        .join(', ') || '-'}
+                    </TableCell>
+                    <TableCell>
+                      {n.designation?.map((d: any) => d.title).join(', ') ||
+                        '-'}
+                    </TableCell>
+                    <TableCell>
+                      {n.users
+                        ?.map((u: any) => `${u.firstName} ${u.lastName}`)
+                        .join(', ') || '-'}
+                    </TableCell>
+                    
+                    <TableCell className="text-center">
+                      <Button
+                        variant="ghost"
+                        className="border-none bg-theme text-white hover:bg-theme/90"
+                        size="icon"
+                        onClick={() => handleEdit(n)}
+                      >
+                        <Pen className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+          {notice.length > 9 && (
+            <DynamicPagination
+              pageSize={entriesPerPage}
+              setPageSize={setEntriesPerPage}
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+            />
           )}
         </div>
       </div>
+      <NoticeDialog
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) setEditingNotice(undefined);
+        }}
+        onSubmit={handleSubmit}
+        initialData={editingNotice}
+      />
     </div>
-  )
+  );
 }

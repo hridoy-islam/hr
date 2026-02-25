@@ -16,6 +16,8 @@ export default function SignInPage() {
     navigate('/admin');
   } else if (user?.role === 'company') {
     navigate(`/company/${user?._id}`);  
+  }else if (user?.role === 'employee') {
+    navigate(`/company/${user?.company}/staff/${user?._id}`);  
   } else {
     navigate('/'); 
   }

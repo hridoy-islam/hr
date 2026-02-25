@@ -85,6 +85,9 @@ import EmployeeRequiredDocumentPage from '@/pages/company/ExpiryPage/EmployeeReq
 import CompanyRota from '@/pages/company/Rota';
 import RotaLayout from '@/components/layout/rota-layout';
 import CompanyRotaReport from '@/pages/company/RotaReport';
+import StaffDashboardPage from '@/pages/Dashboard/StaffDashboard';
+import UpcomingShiftPage from '@/pages/staff/upcoming-shifts';
+import StaffNoticeBoard from '@/pages/staff/notice';
 
 const SignInPage = lazy(() => import('@/pages/auth/signin'));
 
@@ -245,7 +248,33 @@ export default function AppRouter() {
       ]
     }
   ];
-  const rotaRoutes = [
+  const StaffRoutes = [
+    {
+      path: '/company/:id/staff/:eid',
+      element: (
+        <ProtectedRoute>
+          <ScheduleStatusProvider>
+            <HrLayout />
+          </ScheduleStatusProvider>
+        </ProtectedRoute>
+      ),
+      children: [
+        {
+          index: true,
+          element: (
+            <Suspense>
+              <StaffDashboardPage />
+            </Suspense>
+          )
+        },
+
+        { path: 'upcoming-shifts', element: <UpcomingShiftPage /> },
+        { path: 'notice', element: <StaffNoticeBoard /> }
+        
+      ]
+    }
+  ];
+    const rotaRoutes = [
     {
       path: '/company/:id/rota',
       element: (
@@ -308,7 +337,7 @@ export default function AppRouter() {
     }
   ];
 
-  const routes = useRoutes([...publicRoutes, ...adminRoutes, ...companyRoutes,...rotaRoutes]);
+  const routes = useRoutes([...publicRoutes, ...adminRoutes, ...companyRoutes,...rotaRoutes,...StaffRoutes]);
 
   return routes;
 }

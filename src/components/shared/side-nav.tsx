@@ -44,7 +44,10 @@ import {
   FileJsonIcon,
   PenBox,
   FileBadge,
-  CalendarClock
+  CalendarClock,
+  CalendarCheck2,
+  CalendarRange,
+  AlertCircle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Link, useNavigate, useLocation, useParams } from 'react-router-dom';
@@ -62,7 +65,19 @@ const navItems = [
     icon: LayoutDashboard,
     label: 'Dashboard',
     href: '',
-    roles: ['admin', 'company']
+    roles: ['admin', 'company', 'employee']
+  },
+  {
+    icon: CalendarCheck2,
+    label: 'Upcoming Shifts',
+    href: 'upcoming-shifts',
+    roles: ['employee']
+  },
+  {
+    icon: AlertCircle,
+    label: 'Notice',
+    href: 'notice',
+    roles: ['employee']
   },
 
   // --- Admin Specific ---
@@ -343,7 +358,8 @@ const NavItem = ({
   depth = 0,
   basePath,
   status,
-  companyId
+  companyId,
+  effectiveRole // Added effectiveRole prop to help structure targetPath appropriately
 }: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   item: any;
@@ -355,31 +371,28 @@ const NavItem = ({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   status?: any;
   companyId?: string | null;
+  effectiveRole?: string;
 }) => {
   const location = useLocation();
   const isExpanded = expandedItems[item.label];
 
-  // Build target path with companyId if it's a company route
+  // Build target path based on the role
   let targetPath = '#';
-  
+
   // Check if href exists and is not '#'
   if (item.href !== undefined && item.href !== '#') {
-    if (item.roles?.includes('company') && companyId) {
-      // For company routes, include companyId
+    if (effectiveRole === 'company' && companyId) {
+      // For company routes, insert companyId specifically
       if (item.href === '') {
-        // Dashboard route for company: /company/:companyId
         targetPath = `/company/${companyId}`;
       } else {
-        // Other company routes: /company/:companyId/:href
         targetPath = `/company/${companyId}/${item.href}`;
       }
     } else {
-      // For admin routes or when no companyId
+      // For Admin and Employee, basePath handles the full prefix
       if (item.href === '') {
-        // Dashboard route for admin: /admin
         targetPath = basePath;
       } else {
-        // Other admin routes: /admin/:href
         targetPath = `${basePath}/${item.href}`;
       }
     }
@@ -442,6 +455,7 @@ const NavItem = ({
                 basePath={basePath}
                 status={status}
                 companyId={companyId}
+                effectiveRole={effectiveRole}
               />
             ))}
           </div>
@@ -455,7 +469,7 @@ const NavItem = ({
       to={targetPath}
       className={cn(
         'group flex w-full items-center space-x-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 hover:bg-theme hover:text-white',
-        isActiveLeaf && 'bg-blue-50 text-theme shadow-sm',
+
         depth > 0 && 'pl-3'
       )}
     >
@@ -483,7 +497,7 @@ export function SideNav() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [userData, setUserData] = useState(null);
   const [companyThemeColor, setCompanyThemeColor] = useState<string>('');
-  const {id} = useParams();
+  const { id } = useParams();
 
   // Detect if admin is viewing company layout
   const isAdminViewingCompany =
@@ -510,22 +524,36 @@ export function SideNav() {
     if (user) {
       const fetchCompanyData = async () => {
         try {
-          let userId = user?._id;
+          let fetchId = user?._id;
 
           // If admin is viewing company layout, fetch that company's data
           if (isAdminViewingCompany) {
-            const companyId = getCompanyIdFromUrl();
-            if (companyId) {
-              userId = companyId;
+            const companyIdFromUrl = getCompanyIdFromUrl();
+            if (companyIdFromUrl) {
+              fetchId = companyIdFromUrl;
             }
           }
+          // NEW: If user is employee, fetch company details to get theme
+          else if (userRole === 'employee' && user?.company) {
+            fetchId = user.company;
+          }
 
-          const response = await axiosInstance.get(`/users/${userId}`);
+          const response = await axiosInstance.get(`/users/${fetchId}`);
           const themeColor = response.data.data.themeColor || '#38bdf8';
           setCompanyThemeColor(themeColor);
-          setUserData(response.data.data);
+
+          // Only set user data if it's the actual logged in user (or adjust logic if you want company profile loaded)
+          if (userRole !== 'employee' || fetchId === user._id) {
+            setUserData(response.data.data);
+          } else {
+            // For employee we can still just fetch their own data or use Redux directly
+            // To keep avatar logic unbroken, let's load the employee's personal user object here:
+            const selfResponse = await axiosInstance.get(`/users/${user._id}`);
+            setUserData(selfResponse.data.data);
+          }
+
           const storageKey = isAdminViewingCompany
-            ? `themeColor_company_${userId}`
+            ? `themeColor_company_${fetchId}`
             : 'themeColor';
           localStorage.setItem(storageKey, themeColor);
 
@@ -545,7 +573,7 @@ export function SideNav() {
       localStorage.setItem('themeColor', fallbackColor);
       document.documentElement.style.setProperty('--theme', fallbackColor);
     }
-  }, [user, isAdminViewingCompany, location.pathname]);
+  }, [user, isAdminViewingCompany, location.pathname, userRole]);
 
   // Use the Context Hook
   const { status } = useScheduleStatus();
@@ -555,11 +583,17 @@ export function SideNav() {
     ? getCompanyIdFromUrl()
     : userRole === 'company'
       ? user?._id
-      : null;
+      : userRole === 'employee'
+        ? user?.company
+        : null;
 
-  // Determine basePath - if admin is viewing company, use /company
+  // Determine basePath based on roles
   const basePath =
-    userRole === 'company' || isAdminViewingCompany ? '/company' : '/admin';
+    userRole === 'employee'
+      ? `/company/${user?.company}/staff/${user?._id}`
+      : userRole === 'company' || isAdminViewingCompany
+        ? '/company'
+        : '/admin';
 
   const handleLogout = async () => {
     await dispatch(logout());
@@ -632,22 +666,26 @@ export function SideNav() {
         />
         <div className="flex flex-col items-center space-y-1">
           <div
-            onClick={() => {
-              if (user?.role !== 'admin' && user?.role !== 'company') {
-                navigate(`${basePath}/profile`);
-              }
-            }}
+            // onClick={() => {
+            //   if (user?.role !== 'admin' && user?.role !== 'company') {
+            //     navigate(`${basePath}/profile`);
+            //   }
+            // }}
             className={`text-md font-medium text-gray-900
     ${
       user?.role === 'admin' || user?.role === 'company'
         ? 'cursor-default'
-        : 'cursor-pointer underline'
+        : 'cursor-pointer '
     }`}
           >
-            {userData ? userData?.name : 'User'}
+            {userData
+              ? userData?.firstName || userData?.lastName
+                ? `${userData?.firstName ?? ''} ${userData?.lastName ?? ''}`.trim()
+                : userData?.name ?? 'User'
+              : 'User'}
           </div>
           {isAdminViewingCompany && (
-            <div className="text-xs text-theme bg-theme/10 px-2 py-1 rounded">
+            <div className="rounded bg-theme/10 px-2 py-1 text-xs text-theme">
               Viewing as Admin
             </div>
           )}
@@ -665,6 +703,7 @@ export function SideNav() {
             basePath={basePath}
             status={status}
             companyId={companyId}
+            effectiveRole={effectiveRole}
           />
         ))}
       </nav>

@@ -21,19 +21,21 @@ const ErrorPage = () => {
       navigate('/admin');
     } else if (user?.role === 'company') {
       navigate(`/company/${user?._id}`);
+    } else if (user?.role === 'employee') {
+      navigate(`/company/${user?.company}/staff/${user?._id}`);
     } else {
       navigate('/');
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4">
-      <div className="max-w-4xl mx-auto grid lg:grid-cols-2 grid-cols-1 gap-12 items-center">
+    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12">
+      <div className="mx-auto grid max-w-4xl grid-cols-1 items-center gap-12 lg:grid-cols-2">
         {/* Error Image */}
         <div className="flex justify-center">
-          <img 
-            src={errorPage} 
-            alt="Page Not Found" 
+          <img
+            src={errorPage}
+            alt="Page Not Found"
             className="w-full max-w-md object-contain"
           />
         </div>
@@ -41,34 +43,26 @@ const ErrorPage = () => {
         {/* Error Content */}
         <div className="space-y-8">
           <div>
-            <h1 className="text-6xl md:text-7xl font-bold text-gray-900 mb-4">
+            <h1 className="mb-4 text-6xl font-bold text-gray-900 md:text-7xl">
               404
             </h1>
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+            <h2 className="mb-4 text-3xl font-bold text-gray-900 md:text-4xl">
               PAGE NOT FOUND
             </h2>
-            <p className="text-gray-600 text-lg mb-6">
+            <p className="mb-6 text-lg text-gray-600">
               Oops! The page you're looking for doesn't exist or has been moved.
             </p>
           </div>
 
           {/* Navigation Buttons */}
-          <div className="flex flex-col sm:flex-row gap-4">
-     
-           
-
+          <div className="flex flex-col gap-4 sm:flex-row">
             {/* Dashboard/Home Button */}
-            <Button
-              onClick={handleNavigateToDashboard}
-              variant={'outline'}
-            >
+            <Button onClick={handleNavigateToDashboard} variant={'outline'}>
               {user?.role === 'admin' || user?.role === 'company'
                 ? 'Go to Dashboard'
                 : 'Back to Home'}
             </Button>
           </div>
-
-          
         </div>
       </div>
     </div>
