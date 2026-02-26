@@ -74,6 +74,12 @@ const navItems = [
     roles: ['employee']
   },
   {
+    icon: CalendarClock,
+    label: 'Holiday',
+    href: 'holiday',
+    roles: ['employee']
+  },
+  {
     icon: AlertCircle,
     label: 'Notice',
     href: 'notice',
@@ -222,7 +228,7 @@ const navItems = [
   {
     icon: Calendar,
     label: 'Leave Management',
-    href: '#',
+    href: 'leave-approval',
     roles: ['company']
   },
   {

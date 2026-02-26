@@ -164,7 +164,7 @@ const UpcomingShiftPage = () => {
             </div>
           ) : (
             Object.entries(groupedShifts).map(([monthYear, monthShifts]) => (
-              <div key={monthYear} className="relative">
+              <div key={monthYear} className="relative  -mt-5">
                 {/* Month Header */}
                 <div className="z-10 py-3">
                   <h2 className="text-lg font-bold tracking-tight text-slate-800">
@@ -173,7 +173,7 @@ const UpcomingShiftPage = () => {
                 </div>
 
                 {/* Shifts List */}
-                <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-3 ">
                   {monthShifts.map((shift, index) => {
                     const isLeave = !shift.startTime && !shift.endTime;
 

@@ -88,6 +88,8 @@ import CompanyRotaReport from '@/pages/company/RotaReport';
 import StaffDashboardPage from '@/pages/Dashboard/StaffDashboard';
 import UpcomingShiftPage from '@/pages/staff/upcoming-shifts';
 import StaffNoticeBoard from '@/pages/staff/notice';
+import HolidayPage from '@/pages/staff/holiday';
+import CompanyLeaveApprovalPage from '@/pages/company/LeaveApproval';
 
 const SignInPage = lazy(() => import('@/pages/auth/signin'));
 
@@ -244,7 +246,8 @@ export default function AppRouter() {
 
         { path: 'email-setup', element: <EmailSetup /> },
         { path: 'bank-holiday', element: <BankHolidayPage /> },
-        { path: 'schedule-check', element: <CompanyScheduleCheckPage /> }
+        { path: 'schedule-check', element: <CompanyScheduleCheckPage /> },
+        { path: 'leave-approval', element: <CompanyLeaveApprovalPage /> }
       ]
     }
   ];
@@ -269,7 +272,8 @@ export default function AppRouter() {
         },
 
         { path: 'upcoming-shifts', element: <UpcomingShiftPage /> },
-        { path: 'notice', element: <StaffNoticeBoard /> }
+        { path: 'notice', element: <StaffNoticeBoard /> },
+        { path: 'holiday', element: <HolidayPage /> }
         
       ]
     }

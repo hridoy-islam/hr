@@ -124,13 +124,25 @@ const StaffDashboardPage = () => {
   return (
     <div className="rounded-md bg-white p-6 shadow-sm min-h-screen">
       {/* Header Section */}
-      <div className="mb-10 border-b border-slate-100 pb-6">
+     <div className="mb-10 flex flex-col gap-4 border-b border-slate-100 pb-2 sm:flex-row sm:items-end sm:justify-between">
         <h1 className="text-3xl font-extrabold tracking-tight">
           Welcome Back{userData?.firstName ? `, ${userData.firstName}` : '!'}
         </h1>
+        
+        {/* Company Name Added Here */}
+        {userData?.company?.name && (
+          <div className="text-left sm:text-right">
+            <span className="mb-1 block text-xs font-semibold uppercase tracking-wider ">
+              Organization
+            </span>
+            <span className="text-lg font-bold text-slate-800 sm:text-xl">
+              {userData.company.name}
+            </span>
+          </div>
+        )}
       </div>
 
-      <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-3">
+      <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-3 -mt-5">
         {/* LEFT COLUMN: UPCOMING SHIFTS (Spans 2 columns on large screens) */}
         <div className="lg:col-span-2">
           <div className="flex flex-row items-center justify-between mb-5">
