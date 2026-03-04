@@ -24,26 +24,30 @@ import 'react-datepicker/dist/react-datepicker.css';
 import { useToast } from '@/components/ui/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
-import AddRotaDialog from './components/AddRotaDialog';
 
 // react-dnd
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+type Department = { _id: string; departmentName: string; index: number };
+type DepartmentWiseIndex = { departmentId: string; index: number };
+type UserDepartment = { _id: string; departmentName: string };
 type User = {
   _id: string;
   name: string;
   firstName?: string;
   lastName?: string;
   role: string;
-  department?: string;
   image?: string;
   designationId?: { title: string };
+  departmentId?: UserDepartment[];
+  departmentWiseIndex?: DepartmentWiseIndex[];
   index?: number;
 };
 
 const DRAG_TYPE = 'ROW';
+const DEPT_DRAG_TYPE = 'DEPARTMENT';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const getInitials = (firstName?: string, lastName?: string, name?: string) => {
@@ -59,6 +63,11 @@ const getInitials = (firstName?: string, lastName?: string, name?: string) => {
   return 'U';
 };
 
+const getDeptIndex = (user: User, deptId: string): number => {
+  const e = user.departmentWiseIndex?.find((d) => d.departmentId === deptId);
+  return e?.index ?? 9999;
+};
+
 const calculateDurationMinutes = (
   startTime?: string,
   endTime?: string,
@@ -72,28 +81,24 @@ const calculateDurationMinutes = (
 };
 
 const formatDuration = (totalMinutes: number): string => {
-  if (totalMinutes === 0) return '0';
-  const hours = Math.floor(totalMinutes / 60).toString().padStart(2, '0');
+  if (!totalMinutes || totalMinutes === 0) return '0';
+  const hours = Math.floor(totalMinutes / 60)
+    .toString()
+    .padStart(2, '0');
   const mins = (totalMinutes % 60).toString().padStart(2, '0');
   return `${hours}:${mins}`;
 };
 
 // ─── ShiftBlock ───────────────────────────────────────────────────────────────
 const ShiftBlock = ({
-  leaveType,
-  shiftName,
-  startTime,
-  endTime,
+  text,
+  title,
   colors
 }: {
-  leaveType?: string;
-  shiftName?: string;
-  startTime?: string;
-  endTime?: string;
+  text: string;
+  title?: string;
   colors: 'theme' | { bg: string; border: string; text: string };
 }) => {
-  const durationMins = calculateDurationMinutes(startTime, endTime, leaveType);
-  const duration = formatDuration(durationMins);
   const isTheme = colors === 'theme';
 
   return (
@@ -101,22 +106,23 @@ const ShiftBlock = ({
       style={
         !isTheme
           ? {
-              backgroundColor: colors.bg,
-              borderColor: colors.border,
-              color: colors.text
+              backgroundColor: (colors as any).bg,
+              borderColor: (colors as any).border,
+              color: (colors as any).text
             }
           : undefined
       }
       className={`
-        group/shift relative mx-auto flex min-h-[44px] w-full min-w-[50px] cursor-pointer
+        group/shift relative mx-auto flex min-h-[30px] w-full min-w-[50px] cursor-pointer
         flex-col items-center justify-center rounded-md border p-1 shadow-sm
         transition-all duration-200 hover:scale-105 hover:brightness-105
-        ${isTheme ? 'bg-theme border-theme text-white' : ''}
+        ${isTheme ? 'border-theme bg-theme text-white' : ''}
       `}
+      title={title}
     >
       <div className="pointer-events-none absolute inset-0 rounded-md bg-white/40 opacity-0 transition-opacity group-hover/shift:opacity-100" />
-      <span className="mt-0.5 w-full truncate text-center text-sm font-semibold leading-tight opacity-80">
-        {duration}
+      <span className="w-full truncate text-center text-[11px] font-bold leading-tight opacity-90">
+        {text}
       </span>
     </div>
   );
@@ -129,7 +135,7 @@ const leaveTypeColors: Record<
 > = {
   DO: { bg: '#E0F7FA', border: '#B2EBF2', text: '#006064' },
   AL: { bg: '#93c47d', border: '#93c47d', text: '#ffffff' },
-  S:  { bg: '#ff0000', border: '#FFCDD2', text: '#ffffff' },
+  S: { bg: '#ff0000', border: '#FFCDD2', text: '#ffffff' },
   ML: { bg: '#F3E5F5', border: '#E1BEE7', text: '#4A148C' },
   NT: { bg: '#ECEFF1', border: '#CFD8DC', text: '#37474F' }
 };
@@ -137,48 +143,51 @@ const leaveTypeColors: Record<
 // ─── DraggableRow ─────────────────────────────────────────────────────────────
 interface DraggableRowProps {
   user: User;
-  rowIndex: number;
-  moveRow: (dragIndex: number, hoverIndex: number) => void;
+  deptRowIndex: number;
+  departmentId: string;
+  moveRow: (
+    departmentId: string,
+    dragIndex: number,
+    hoverIndex: number
+  ) => void;
   daysArray: moment.Moment[];
-  rotaMap: Record<string, Record<string, any>>;
-  employeeTotalDuration: Record<string, number>;
-  isCustomRange: boolean;
-  handleCellClick: (user: User, day: moment.Moment) => void;
+  rotaMap: Record<string, Record<string, any[]>>;
+  employeeTotalDuration: Record<string, Record<string, number>>;
 }
 
 const DraggableRow: React.FC<DraggableRowProps> = ({
   user,
-  rowIndex,
+  deptRowIndex,
+  departmentId,
   moveRow,
   daysArray,
   rotaMap,
-  employeeTotalDuration,
-  isCustomRange,
-  handleCellClick
+  employeeTotalDuration
 }) => {
   const ref = useRef<HTMLTableRowElement>(null);
 
   const [{ isDragging }, drag, dragPreview] = useDrag({
     type: DRAG_TYPE,
-    item: { rowIndex },
+    item: { deptRowIndex, departmentId },
     collect: (monitor) => ({ isDragging: monitor.isDragging() })
   });
 
   const [{ isOver }, drop] = useDrop<
-    { rowIndex: number },
+    { deptRowIndex: number; departmentId: string },
     void,
     { isOver: boolean }
   >({
     accept: DRAG_TYPE,
     collect: (monitor) => ({ isOver: monitor.isOver() }),
     hover(item, monitor) {
-      if (!ref.current) return;
-      const dragIndex = item.rowIndex;
-      const hoverIndex = rowIndex;
+      if (!ref.current || item.departmentId !== departmentId) return;
+      const dragIndex = item.deptRowIndex;
+      const hoverIndex = deptRowIndex;
       if (dragIndex === hoverIndex) return;
 
       const hoverBoundingRect = ref.current.getBoundingClientRect();
-      const hoverMiddleY = (hoverBoundingRect.bottom - hoverBoundingRect.top) / 2;
+      const hoverMiddleY =
+        (hoverBoundingRect.bottom - hoverBoundingRect.top) / 2;
       const clientOffset = monitor.getClientOffset();
       if (!clientOffset) return;
       const hoverClientY = clientOffset.y - hoverBoundingRect.top;
@@ -186,36 +195,33 @@ const DraggableRow: React.FC<DraggableRowProps> = ({
       if (dragIndex < hoverIndex && hoverClientY < hoverMiddleY) return;
       if (dragIndex > hoverIndex && hoverClientY > hoverMiddleY) return;
 
-      moveRow(dragIndex, hoverIndex);
-      item.rowIndex = hoverIndex;
+      moveRow(departmentId, dragIndex, hoverIndex);
+      item.deptRowIndex = hoverIndex;
     }
   });
 
   drop(dragPreview(ref));
 
-  const totalMins = employeeTotalDuration[user._id] || 0;
+  const totalMins = employeeTotalDuration[departmentId]?.[user._id] || 0;
   const totalLabel = formatDuration(totalMins);
 
   return (
     <tr
       ref={ref}
       className={`transition-colors hover:bg-slate-50/60 ${
-        isDragging ? 'opacity-40 bg-blue-50' : ''
+        isDragging ? 'bg-blue-50 opacity-40' : ''
       } ${isOver ? 'bg-slate-100' : ''}`}
     >
-      {/* Fixed Staff Name + Total Duration */}
       <td className="sticky left-0 z-20 border-b border-r border-gray-200 bg-white p-3 shadow-[2px_0_0_0_rgba(0,0,0,0.05)]">
         <div className="flex items-center gap-2">
-          {/* Drag handle */}
           <div
             ref={drag as any}
-            className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 transition-colors flex-shrink-0"
+            className="flex-shrink-0 cursor-grab text-gray-300 transition-colors hover:text-gray-500 active:cursor-grabbing"
             title="Drag to reorder"
           >
             <GripVertical className="h-4 w-4" />
           </div>
-
-          <Avatar className="h-9 w-9 border border-gray-200 flex-shrink-0">
+          <Avatar className="h-9 w-9 flex-shrink-0 border border-gray-200">
             <AvatarImage
               src={user.image || '/placeholder.png'}
               alt={user.firstName || 'User'}
@@ -225,16 +231,17 @@ const DraggableRow: React.FC<DraggableRowProps> = ({
               {getInitials(user.firstName, user.lastName, user.name)}
             </AvatarFallback>
           </Avatar>
-
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold text-black">
-              {user.firstName ? `${user.firstName} ${user.lastName}` : user.name}
+              {user.firstName
+                ? `${user.firstName} ${user.lastName}`
+                : user.name}
             </p>
             <div className="flex flex-row items-center justify-between gap-4">
               <p className="text-[10px] font-medium text-gray-500">
                 {user?.designationId?.title}
               </p>
-              <div className="flex-shrink-0 rounded-md border border-theme bg-theme px-1.5 py-0.5 text-xs font-semibold tracking-wider text-white">
+              <div className="flex-shrink-0 rounded-md border border-theme bg-theme px-1.5 py-0.5 text-[10px] font-semibold tracking-wider text-white">
                 Total: {totalLabel}
               </div>
             </div>
@@ -242,39 +249,73 @@ const DraggableRow: React.FC<DraggableRowProps> = ({
         </div>
       </td>
 
-      {/* Day cells */}
       {daysArray.map((day, idx) => {
         const dateKey = day.format('YYYY-MM-DD');
-        const rota = rotaMap[user._id]?.[dateKey];
-
-        let shiftColors: any = 'theme';
-        if (rota) {
-          if (rota.leaveType && leaveTypeColors[rota.leaveType]) {
-            shiftColors = leaveTypeColors[rota.leaveType];
-          } else if (rota.color) {
-            shiftColors =
-              typeof rota.color === 'string'
-                ? { bg: rota.color, border: rota.color, text: '#FFFFFF' }
-                : rota.color;
-          }
-        }
+        const dayRotas = (rotaMap[user._id]?.[dateKey] || []).filter(
+          (r: any) =>
+            (typeof r.departmentId === 'object'
+              ? r.departmentId._id
+              : r.departmentId) === departmentId
+        );
 
         return (
           <td
             key={idx}
-            onClick={() => handleCellClick(user, day)}
-            className="group min-w-[65px] cursor-pointer border-b border-r border-gray-200 p-1 text-center hover:bg-slate-100/80"
+            className="group min-w-[65px] border-b border-r border-gray-200 p-1 text-center hover:bg-slate-100/80"
           >
-            {rota ? (
-              <ShiftBlock
-                leaveType={rota.leaveType}
-                shiftName={rota.shiftName}
-                startTime={rota.startTime}
-                endTime={rota.endTime}
-                colors={shiftColors}
-              />
+            {dayRotas.length > 0 ? (
+              <div className="flex flex-col gap-0.5">
+                {(() => {
+                  let totalDayMins = 0;
+                  const tooltipArr: string[] = [];
+
+                  // Calculate total sum for the day across all of their shifts in this dept
+                  dayRotas.forEach((r) => {
+                    totalDayMins += calculateDurationMinutes(
+                      r.startTime,
+                      r.endTime,
+                      r.leaveType
+                    );
+                    tooltipArr.push(
+                      r.leaveType ||
+                        r.shiftName ||
+                        `${r.startTime} - ${r.endTime}`
+                    );
+                  });
+
+                  // We use the color of the first shift to theme the single card
+                  const firstRota = dayRotas[0];
+                  let shiftColors: any = 'theme';
+
+                  if (
+                    firstRota.leaveType &&
+                    leaveTypeColors[firstRota.leaveType]
+                  ) {
+                    shiftColors = leaveTypeColors[firstRota.leaveType];
+                  } else if (firstRota.color) {
+                    shiftColors =
+                      typeof firstRota.color === 'string'
+                        ? {
+                            bg: firstRota.color,
+                            border: firstRota.color,
+                            text: '#FFFFFF'
+                          }
+                        : firstRota.color;
+                  }
+
+                  const displayText = formatDuration(totalDayMins);
+
+                  return (
+                    <ShiftBlock
+                      text={displayText}
+                      title={tooltipArr.join(' | ')}
+                      colors={shiftColors}
+                    />
+                  );
+                })()}
+              </div>
             ) : (
-              <div className="mx-auto flex h-9 w-full min-w-[50px] items-center justify-center rounded-lg border border-dashed border-transparent text-gray-300 opacity-0 transition-all group-hover:border-gray-300 group-hover:bg-gray-50 group-hover:opacity-100">
+              <div className="mx-auto flex h-[30px] w-full min-w-[50px] items-center justify-center rounded-lg border border-dashed border-transparent text-gray-300 opacity-0 transition-all group-hover:border-gray-300 group-hover:bg-gray-50 group-hover:opacity-100">
                 <Plus className="h-4 w-4" />
               </div>
             )}
@@ -285,11 +326,133 @@ const DraggableRow: React.FC<DraggableRowProps> = ({
   );
 };
 
+// ─── DraggableDepartmentHeader ────────────────────────────────────────────────
+interface DraggableDepartmentHeaderProps {
+  department: Department;
+  deptIndex: number;
+  moveDepartment: (dragIndex: number, hoverIndex: number) => void;
+  daysArray: moment.Moment[];
+  users: User[];
+  rotaMap: Record<string, Record<string, any[]>>;
+  employeeTotalDuration: Record<string, Record<string, number>>;
+  departmentTotalDuration: Record<string, number>;
+  moveRow: (
+    departmentId: string,
+    dragIndex: number,
+    hoverIndex: number
+  ) => void;
+}
+
+const DraggableDepartmentHeader: React.FC<DraggableDepartmentHeaderProps> = ({
+  department,
+  deptIndex,
+  moveDepartment,
+  daysArray,
+  users,
+  rotaMap,
+  employeeTotalDuration,
+  departmentTotalDuration,
+  moveRow
+}) => {
+  const ref = useRef<HTMLTableRowElement>(null);
+
+  const [{ isDragging }, drag, dragPreview] = useDrag({
+    type: DEPT_DRAG_TYPE,
+    item: { deptIndex, departmentId: department._id },
+    collect: (monitor) => ({ isDragging: monitor.isDragging() })
+  });
+
+  const [{ isOver }, drop] = useDrop<
+    { deptIndex: number; departmentId: string },
+    void,
+    { isOver: boolean }
+  >({
+    accept: DEPT_DRAG_TYPE,
+    collect: (monitor) => ({ isOver: monitor.isOver() }),
+    hover(item, monitor) {
+      if (!ref.current || isUnassigned || item.departmentId === 'unassigned')
+        return;
+      const dragIndex = item.deptIndex;
+      const hoverIndex = deptIndex;
+      if (dragIndex === hoverIndex) return;
+
+      const hoverBoundingRect = ref.current.getBoundingClientRect();
+      const hoverMiddleY =
+        (hoverBoundingRect.bottom - hoverBoundingRect.top) / 2;
+      const clientOffset = monitor.getClientOffset();
+      if (!clientOffset) return;
+      const hoverClientY = clientOffset.y - hoverBoundingRect.top;
+
+      if (dragIndex < hoverIndex && hoverClientY < hoverMiddleY) return;
+      if (dragIndex > hoverIndex && hoverClientY > hoverMiddleY) return;
+
+      moveDepartment(dragIndex, hoverIndex);
+      item.deptIndex = hoverIndex;
+    }
+  });
+
+  const isUnassigned = department._id === 'unassigned';
+  drop(dragPreview(ref));
+
+  const deptTotalMins = departmentTotalDuration[department._id] || 0;
+
+  return (
+    <>
+      <tr
+        ref={ref}
+        className={`border-b border-t border-gray-300 transition-colors ${
+          isDragging ? 'opacity-40' : ''
+        } ${isOver && !isUnassigned ? 'bg-blue-50' : 'bg-slate-100'}`}
+      >
+        <td className="sticky left-0 z-20 border-r border-gray-200 bg-inherit px-4 py-2 shadow-[2px_0_0_0_rgba(0,0,0,0.04)]">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              {!isUnassigned ? (
+                <div
+                  ref={drag as any}
+                  className="flex-shrink-0 cursor-grab text-slate-400 transition-colors hover:text-slate-600 active:cursor-grabbing"
+                  title="Drag to reorder department"
+                >
+                  <GripVertical className="h-4 w-4" />
+                </div>
+              ) : (
+                <div className="w-4 flex-shrink-0" />
+              )}
+              <span className="text-xs font-extrabold uppercase tracking-widest text-slate-600">
+                {department.departmentName}
+              </span>
+            </div>
+            <div className="rounded border border-theme/20 bg-theme/10 px-2 py-1 text-[11px] font-bold text-theme">
+              Dept Total: {formatDuration(deptTotalMins)}
+            </div>
+          </div>
+        </td>
+        {daysArray.map((_, i) => (
+          <td key={i} className="border-r border-gray-200 bg-inherit" />
+        ))}
+      </tr>
+      {users.map((user, deptRowIndex) => (
+        <DraggableRow
+          key={`${department._id}-${user._id}`}
+          user={user}
+          deptRowIndex={deptRowIndex}
+          departmentId={department._id}
+          moveRow={moveRow}
+          daysArray={daysArray}
+          rotaMap={rotaMap}
+          employeeTotalDuration={employeeTotalDuration}
+        />
+      ))}
+    </>
+  );
+};
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function CompanyRotaReport() {
   const { id: companyId } = useParams();
   const [currentDate, setCurrentDate] = useState(moment());
   const [users, setUsers] = useState<User[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [rotas, setRotas] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -297,110 +460,40 @@ export default function CompanyRotaReport() {
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  // Interaction States
-  const [selectedContext, setSelectedContext] = useState<{
-    employee: User | null;
-    date: any;
-  }>({ employee: null, date: null });
-  const [selectedRota, setSelectedRota] = useState<any>(null);
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [isEditOpen, setIsEditOpen] = useState(false);
-  const [isAddRotaOpen, setIsAddRotaOpen] = useState(false);
-
   // Date range
-  const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
+  const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([
+    null,
+    null
+  ]);
   const [rangeStart, rangeEnd] = dateRange;
   const [isCustomMode, setIsCustomMode] = useState(false);
-  const [appliedRange, setAppliedRange] = useState<[Date | null, Date | null]>([null, null]);
+  const [appliedRange, setAppliedRange] = useState<[Date | null, Date | null]>([
+    null,
+    null
+  ]);
   const [appliedStart, appliedEnd] = appliedRange;
   const isCustomRange = !!(appliedStart && appliedEnd);
-
-  // Debounce timer for index persistence
-  const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // ── Persist indices (debounced) ────────────────────────────────────────────
-  const persistIndices = useCallback(
-    (updatedUsers: User[]) => {
-      if (persistTimer.current) clearTimeout(persistTimer.current);
-      persistTimer.current = setTimeout(async () => {
-        try {
-          await Promise.all(
-            updatedUsers.map((u) =>
-              axiosInstance.patch(`/users/${u._id}`, { index: u.index })
-            )
-          );
-        } catch (e) {
-          console.error('Failed to persist user indices', e);
-          toast({
-            title: 'Failed to save order',
-            description: 'User order could not be saved to server.',
-            variant: 'destructive'
-          });
-        }
-      }, 600);
-    },
-    [toast]
-  );
-
-  // ── Move row (drag) ────────────────────────────────────────────────────────
-  const moveRow = useCallback(
-    (dragIndex: number, hoverIndex: number) => {
-      setUsers((prev) => {
-        const updated = [...prev];
-        const [removed] = updated.splice(dragIndex, 1);
-        updated.splice(hoverIndex, 0, removed);
-        const reindexed = updated.map((u, i) => ({ ...u, index: i }));
-        persistIndices(reindexed);
-        return reindexed;
-      });
-    },
-    [persistIndices]
-  );
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
   const fetchUsersAndRotas = useCallback(async () => {
     if (!companyId) return;
     setIsLoading(true);
     try {
+      const deptRes = await axiosInstance.get(
+        `/hr/department?companyId=${companyId}&limit=all`
+      );
+      const fetchedDepts: Department[] =
+        deptRes.data?.data?.result || deptRes.data?.data || [];
+      setDepartments(
+        [...fetchedDepts].sort((a, b) => (a.index ?? 0) - (b.index ?? 0))
+      );
+
       const userRes = await axiosInstance.get(
         `/users?limit=all&role=employee&company=${companyId}`
       );
       const fetchedUsers: User[] =
         userRes.data?.data?.result || userRes.data?.data || [];
-
-      // ── Assign index if missing ──────────────────────────────────────────
-      const usersNeedingIndex = fetchedUsers.filter(
-        (u) => u.index === undefined || u.index === null
-      );
-
-      if (usersNeedingIndex.length > 0) {
-        const indexed = fetchedUsers
-          .filter((u) => u.index !== undefined && u.index !== null)
-          .sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
-
-        let nextIndex =
-          indexed.length > 0
-            ? Math.max(...indexed.map((u) => u.index ?? 0)) + 1
-            : 0;
-
-        await Promise.all(
-          usersNeedingIndex.map(async (u) => {
-            const assignedIndex = nextIndex++;
-            try {
-              await axiosInstance.patch(`/users/${u._id}`, { index: assignedIndex });
-              u.index = assignedIndex;
-            } catch (e) {
-              console.error(`Failed to set index for user ${u._id}`, e);
-            }
-          })
-        );
-      }
-
-      // Sort by index ascending
-      const sortedUsers = [...fetchedUsers].sort(
-        (a, b) => (a.index ?? 0) - (b.index ?? 0)
-      );
-      setUsers(sortedUsers);
+      setUsers(fetchedUsers);
 
       const startDate = isCustomRange
         ? moment(appliedStart).format('YYYY-MM-DD')
@@ -429,37 +522,209 @@ export default function CompanyRotaReport() {
     fetchUsersAndRotas();
   }, [fetchUsersAndRotas]);
 
-  // ── Derived data ───────────────────────────────────────────────────────────
-  const rotaMap = useMemo(() => {
-    const map: Record<string, Record<string, any>> = {};
-    rotas.forEach((rota) => {
-      const empId = rota.employeeId;
-      const dateKey = moment(rota.startDate).format('YYYY-MM-DD');
-      if (!map[empId]) map[empId] = {};
-      map[empId][dateKey] = rota;
-    });
-    return map;
-  }, [rotas]);
+  // ── Derived Grouping Data ───────────────────────────────────────────────────
+  const groupedByDepartment = useMemo(() => {
+    const groups: { department: Department; users: User[] }[] = [];
 
-  const employeeTotalDuration = useMemo(() => {
-    const totals: Record<string, number> = {};
-    rotas.forEach((rota) => {
-      const empId = rota.employeeId;
-      const mins = calculateDurationMinutes(rota.startTime, rota.endTime, rota.leaveType);
-      totals[empId] = (totals[empId] || 0) + mins;
-    });
-    return totals;
-  }, [rotas]);
+    departments.forEach((dept) => {
+      const deptUsers = users
+        .filter((u) =>
+          u.departmentId?.some(
+            (d: any) => (typeof d === 'object' ? d._id : d) === dept._id
+          )
+        )
+        .sort((a, b) => getDeptIndex(a, dept._id) - getDeptIndex(b, dept._id));
 
-  const groupedUsers = useMemo(() => {
-    const groups: Record<string, User[]> = {};
-    users.forEach((user) => {
-      const groupName = user.department || user.role || 'Staff';
-      if (!groups[groupName]) groups[groupName] = [];
-      groups[groupName].push(user);
+      if (deptUsers.length > 0)
+        groups.push({ department: dept, users: deptUsers });
     });
+
+    const unassigned = users.filter(
+      (u) => !u.departmentId || u.departmentId.length === 0
+    );
+    if (unassigned.length > 0) {
+      groups.push({
+        department: {
+          _id: 'unassigned',
+          departmentName: 'Unassigned',
+          index: 9999
+        },
+        users: unassigned
+      });
+    }
+
     return groups;
+  }, [departments, users]);
+
+  const [orderedGroups, setOrderedGroups] = useState<
+    { department: Department; users: User[] }[]
+  >([]);
+
+  useEffect(() => {
+    setOrderedGroups(groupedByDepartment);
+  }, [groupedByDepartment]);
+
+  // Keep `orderedGroups` synced if users update
+  useEffect(() => {
+    setOrderedGroups((prev) =>
+      prev.map((g) => {
+        if (g.department._id === 'unassigned') {
+          return {
+            ...g,
+            users: users.filter(
+              (u) => !u.departmentId || u.departmentId.length === 0
+            )
+          };
+        }
+        return {
+          ...g,
+          users: users
+            .filter((u) =>
+              u.departmentId?.some(
+                (d: any) =>
+                  (typeof d === 'object' ? d._id : d) === g.department._id
+              )
+            )
+            .sort(
+              (a, b) =>
+                getDeptIndex(a, g.department._id) -
+                getDeptIndex(b, g.department._id)
+            )
+        };
+      })
+    );
   }, [users]);
+
+  // ── DND Logic ────────────────────────────────────────────────────────────────
+  const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const moveRow = useCallback(
+    (departmentId: string, dragIndex: number, hoverIndex: number) => {
+      setUsers((prev) => {
+        const deptUsers = prev
+          .filter((u) =>
+            u.departmentId?.some(
+              (d: any) => (typeof d === 'object' ? d._id : d) === departmentId
+            )
+          )
+          .sort(
+            (a, b) =>
+              getDeptIndex(a, departmentId) - getDeptIndex(b, departmentId)
+          );
+
+        const reordered = [...deptUsers];
+        const [removed] = reordered.splice(dragIndex, 1);
+        reordered.splice(hoverIndex, 0, removed);
+
+        const newIndexMap: Record<string, number> = {};
+        reordered.forEach((u, i) => {
+          newIndexMap[u._id] = i;
+        });
+
+        const updated = prev.map((u) => {
+          if (newIndexMap[u._id] === undefined) return u;
+          const newDWI = [...(u.departmentWiseIndex || [])];
+          const ei = newDWI.findIndex((d) => d.departmentId === departmentId);
+          if (ei >= 0)
+            newDWI[ei] = { ...newDWI[ei], index: newIndexMap[u._id] };
+          else newDWI.push({ departmentId, index: newIndexMap[u._id] });
+          return { ...u, departmentWiseIndex: newDWI };
+        });
+
+        if (persistTimer.current) clearTimeout(persistTimer.current);
+        persistTimer.current = setTimeout(async () => {
+          try {
+            await Promise.all(
+              Object.entries(newIndexMap).map(([userId]) => {
+                const userObj = updated.find((u) => u._id === userId);
+                return axiosInstance.patch(`/users/${userId}`, {
+                  departmentWiseIndex: userObj?.departmentWiseIndex
+                });
+              })
+            );
+          } catch (e) {
+            console.error('Failed to persist order', e);
+          }
+        }, 600);
+
+        return updated;
+      });
+    },
+    []
+  );
+
+  const deptPersistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const moveDepartment = useCallback(
+    (dragIndex: number, hoverIndex: number) => {
+      setOrderedGroups((prev) => {
+        const updated = [...prev];
+        const [removed] = updated.splice(dragIndex, 1);
+        updated.splice(hoverIndex, 0, removed);
+
+        if (deptPersistTimer.current) clearTimeout(deptPersistTimer.current);
+        deptPersistTimer.current = setTimeout(async () => {
+          try {
+            await Promise.all(
+              updated
+                .filter((g) => g.department._id !== 'unassigned')
+                .map((g, i) =>
+                  axiosInstance.patch(`/hr/department/${g.department._id}`, {
+                    index: i
+                  })
+                )
+            );
+          } catch (e) {
+            console.error('Failed to persist department order', e);
+          }
+        }, 600);
+
+        return updated;
+      });
+    },
+    []
+  );
+
+  // ── Derived Mappings and Calculations ───────────────────────────────────────
+  const { rotaMap, employeeTotalDuration, departmentTotalDuration } =
+    useMemo(() => {
+      const map: Record<string, Record<string, any[]>> = {};
+      const empTotals: Record<string, Record<string, number>> = {};
+      const deptTotals: Record<string, number> = {};
+
+      rotas.forEach((rota) => {
+        const empId =
+          typeof rota.employeeId === 'object'
+            ? rota.employeeId._id
+            : rota.employeeId;
+        const deptId =
+          typeof rota.departmentId === 'object'
+            ? rota.departmentId._id
+            : rota.departmentId;
+        const dateKey = moment(rota.startDate).format('YYYY-MM-DD');
+
+        // Populate array map per day
+        if (!map[empId]) map[empId] = {};
+        if (!map[empId][dateKey]) map[empId][dateKey] = [];
+        map[empId][dateKey].push(rota);
+
+        // Populate Duration
+        const mins = calculateDurationMinutes(
+          rota.startTime,
+          rota.endTime,
+          rota.leaveType
+        );
+
+        if (!empTotals[deptId]) empTotals[deptId] = {};
+        empTotals[deptId][empId] = (empTotals[deptId][empId] || 0) + mins;
+
+        deptTotals[deptId] = (deptTotals[deptId] || 0) + mins;
+      });
+
+      return {
+        rotaMap: map,
+        employeeTotalDuration: empTotals,
+        departmentTotalDuration: deptTotals
+      };
+    }, [rotas]);
 
   const daysArray = useMemo(() => {
     if (isCustomRange && appliedStart && appliedEnd) {
@@ -478,31 +743,13 @@ export default function CompanyRotaReport() {
     );
   }, [currentDate, isCustomRange, appliedStart, appliedEnd]);
 
-  // Flat index map for DraggableRow
-  const userIndexMap = useMemo(() => {
-    const map: Record<string, number> = {};
-    users.forEach((u, i) => { map[u._id] = i; });
-    return map;
-  }, [users]);
-
+  // ── Handlers ────────────────────────────────────────────────────────────────
   const prevMonth = () => setCurrentDate((d) => d.clone().subtract(1, 'month'));
   const nextMonth = () => setCurrentDate((d) => d.clone().add(1, 'month'));
 
   const handlePickerChange = (date: Date | null) => {
     if (date) setCurrentDate(moment(date));
     setPickerOpen(false);
-  };
-
-  const handleCellClick = (user: User, day: moment.Moment) => {
-    const dateKey = day.format('YYYY-MM-DD');
-    const existingRota = rotaMap[user._id]?.[dateKey];
-    setSelectedContext({ employee: user, date: day });
-    if (existingRota) {
-      setSelectedRota(existingRota);
-      setIsEditOpen(true);
-    } else {
-      setIsCreateOpen(true);
-    }
   };
 
   const handleRangeChange = (update: [Date | null, Date | null]) => {
@@ -538,7 +785,7 @@ export default function CompanyRotaReport() {
         {/* ── Header ── */}
         <div className="mb-4 flex flex-none flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <h1 className="text-lg font-bold">Report</h1>
+            <h1 className="text-lg font-bold">Rota Report</h1>
           </div>
 
           {/* Center: Unified Date Control */}
@@ -617,7 +864,8 @@ export default function CompanyRotaReport() {
                         selected={currentDate.toDate()}
                         onChange={handlePickerChange}
                         dateFormat="MM/yyyy"
-                        showMonthYearPicker
+                            showMonthYearPicker
+                            inline
                         onClickOutside={() => setPickerOpen(false)}
                       />
                     </div>
@@ -644,7 +892,11 @@ export default function CompanyRotaReport() {
 
           {/* Right: Action Buttons */}
           <div className="flex items-center gap-2">
-            <Button onClick={() => navigate(-1)} variant="outline" className="h-9 gap-2">
+            <Button
+              onClick={() => navigate(-1)}
+              variant="outline"
+              className="h-9 gap-2"
+            >
               <MoveLeft className="h-4 w-4" /> Back
             </Button>
           </div>
@@ -661,7 +913,9 @@ export default function CompanyRotaReport() {
               <thead className="sticky bottom-0 top-0 z-40 bg-[#F8FAFC]">
                 <tr>
                   <th className="sticky bottom-0 left-0 top-0 z-50 min-w-[160px] border-b border-r border-gray-200 bg-[#F8FAFC] p-4 shadow-[1px_0_0_0_rgba(0,0,0,0.1)] sm:min-w-[240px]">
-                    <span className="text-xs font-bold uppercase text-black">Staff Member</span>
+                    <span className="text-xs font-bold uppercase text-black">
+                      Staff Member
+                    </span>
                   </th>
                   {daysArray.map((day) => {
                     const isToday = day.isSame(moment(), 'day');
@@ -697,23 +951,22 @@ export default function CompanyRotaReport() {
               </thead>
 
               <tbody>
-                {Object.entries(groupedUsers).map(([groupName, groupUsers]) => (
-                  <React.Fragment key={groupName}>
-                    {groupUsers.map((user) => (
-                      <DraggableRow
-                        key={user._id}
-                        user={user}
-                        rowIndex={userIndexMap[user._id]}
-                        moveRow={moveRow}
-                        daysArray={daysArray}
-                        rotaMap={rotaMap}
-                        employeeTotalDuration={employeeTotalDuration}
-                        isCustomRange={isCustomRange}
-                        handleCellClick={handleCellClick}
-                      />
-                    ))}
-                  </React.Fragment>
-                ))}
+                {orderedGroups.map(
+                  ({ department, users: deptUsers }, deptIndex) => (
+                    <DraggableDepartmentHeader
+                      key={department._id}
+                      department={department}
+                      deptIndex={deptIndex}
+                      moveDepartment={moveDepartment}
+                      daysArray={daysArray}
+                      users={deptUsers}
+                      rotaMap={rotaMap}
+                      employeeTotalDuration={employeeTotalDuration}
+                      departmentTotalDuration={departmentTotalDuration}
+                      moveRow={moveRow}
+                    />
+                  )
+                )}
               </tbody>
             </table>
           </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { Input } from '@/components/ui/input';
@@ -7,9 +7,10 @@ import moment from 'moment';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { CalendarIcon, Users, Clock, Check } from 'lucide-react';
+import { CalendarIcon, Users, Clock, Check, Building } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
-import { CirclePicker } from 'react-color'; // Added import
+import { CirclePicker } from 'react-color';
+import Select from 'react-select';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const getInitials = (firstName?: string, lastName?: string, name?: string) => {
@@ -37,16 +38,31 @@ const leaveOptions = [
 ];
 
 const themeColors = [
-  "#f44336", "#e91e63", "#9c27b0", "#673ab7", "#3f51b5", 
-  "#2196f3", "#03a9f4", "#00bcd4", "#009688", "#4caf50", 
-  "#8bc34a", "#cddc39", "#ffeb3b", "#ffc107", "#ff9800", 
-  "#ff5722", "#795548", "#607d8b"
+  '#f44336',
+  '#e91e63',
+  '#9c27b0',
+  '#673ab7',
+  '#3f51b5',
+  '#2196f3',
+  '#03a9f4',
+  '#00bcd4',
+  '#009688',
+  '#4caf50',
+  '#8bc34a',
+  '#cddc39',
+  '#ffeb3b',
+  '#ffc107',
+  '#ff9800',
+  '#ff5722',
+  '#795548',
+  '#607d8b'
 ];
 
 export default function BulkAssignDialog({
   isOpen,
   onClose,
   users = [],
+  departments = [],
   companyId,
   onSuccess,
   setGlobalSkippedRecords,
@@ -56,6 +72,7 @@ export default function BulkAssignDialog({
 
   // Selections
   const [selectedEmployees, setSelectedEmployees] = useState<any[]>([]);
+  const [departmentId, setDepartmentId] = useState<string>('');
 
   // Dates & Times
   const [startDate, setStartDate] = useState<Date | null>(null);
@@ -66,10 +83,9 @@ export default function BulkAssignDialog({
   const [shiftName, setShiftName] = useState<string>('');
   const [startTime, setStartTime] = useState<string>('');
   const [endTime, setEndTime] = useState<string>('');
-  const [color, setColor] = useState<string>("#2196f3");
+  const [color, setColor] = useState<string>('#2196f3');
 
   const isStandardShift = !leaveType;
-
 
   useEffect(() => {
     if (!isOpen) {
@@ -79,13 +95,14 @@ export default function BulkAssignDialog({
 
   const resetForm = () => {
     setSelectedEmployees([]);
+    setDepartmentId('');
     setStartDate(null);
     setEndDate(null);
     setLeaveType('');
     setShiftName('');
     setStartTime('');
     setEndTime('');
-    setColor("#2196f3");
+    setColor('#2196f3');
   };
 
   const handleTimeBlur = (
@@ -100,8 +117,32 @@ export default function BulkAssignDialog({
     setter(cleanValue);
   };
 
+  // ─── Filter Users by Selected Department ──────────────────────────────────
+  const filteredUsers = useMemo(() => {
+    if (!departmentId) return [];
+
+    return users.filter((u: any) => {
+      if (!u.departmentId || !Array.isArray(u.departmentId)) return false;
+      return u.departmentId.some((d: any) => {
+        const id = typeof d === 'object' ? d._id : d;
+        return id === departmentId;
+      });
+    });
+  }, [users, departmentId]);
+
+  // Clean up selected employees if the department is changed
+  useEffect(() => {
+    setSelectedEmployees((prev) => {
+      const validSelected = prev.filter((emp) =>
+        filteredUsers.some((u: any) => u._id === emp._id)
+      );
+      // Only trigger a state update if the length changed to prevent unnecessary re-renders
+      return validSelected.length === prev.length ? prev : validSelected;
+    });
+  }, [filteredUsers]);
+
   // ─── Selection Handlers ───────────────────────────────────────────────────
-  const unselectedUsers = users.filter(
+  const unselectedUsers = filteredUsers.filter(
     (u: any) => !selectedEmployees.some((s) => s._id === u._id)
   );
 
@@ -113,13 +154,25 @@ export default function BulkAssignDialog({
     }
   };
 
-  const selectAll = () => setSelectedEmployees(users);
+  const selectAll = () => {
+    if (departmentId) setSelectedEmployees(filteredUsers);
+  };
   const clearAll = () => setSelectedEmployees([]);
 
   const handleSubmit = async () => {
+    if (!departmentId) {
+      toast({
+        title: 'Department required',
+        description: 'Please select a department for the bulk assignment.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
     try {
       const payload = {
         companyId,
+        departmentId,
         employeeIds: selectedEmployees,
         startDate: moment(startDate).format('YYYY-MM-DD'),
         endDate: moment(endDate).format('YYYY-MM-DD'),
@@ -131,10 +184,9 @@ export default function BulkAssignDialog({
       };
 
       const res = await axiosInstance.post('/rota/bulk-assign', payload);
-      const {meta} = res.data.data;
+      const { meta } = res.data.data;
 
       if (onSuccess) onSuccess(res.data.data.result);
-      console.log(res.data.data.result)
       onClose();
 
       if (meta?.hasSkippedRecords) {
@@ -178,11 +230,38 @@ export default function BulkAssignDialog({
         </div>
 
         <div className="flex flex-1 overflow-hidden">
-          {/* LEFT PANEL: Staff Selection */}
-          <div className="flex w-1/2 flex-col border-r border-gray-100 p-6">
-            <div className="mb-4 flex items-center gap-2">
+          {/* LEFT PANEL: Department & Staff Selection */}
+          <div className="flex w-1/2 flex-col space-y-5 border-r border-gray-100 p-6">
+            {/* 1. Select Department */}
+            <div>
+              <div className="mb-3 flex items-center gap-2">
+                <Building className="h-5 w-5 text-theme" />
+                <h3 className="text-sm font-bold ">1. Select Department</h3>
+              </div>
+              <Select
+                options={departments.map((d: any) => ({
+                  value: d._id,
+                  label: d.departmentName
+                }))}
+                value={
+                  departmentId
+                    ? {
+                        value: departmentId,
+                        label:
+                          departments.find((d: any) => d._id === departmentId)
+                            ?.departmentName || ''
+                      }
+                    : null
+                }
+                onChange={(opt) => setDepartmentId(opt?.value || '')}
+                placeholder="Select a department first..."
+                className="text-sm text-black"
+              />
+            </div>
+
+            <div className="flex items-center gap-2">
               <Users className="h-5 w-5 text-theme" />
-              <h3 className="text-sm font-bold ">Select Staff</h3>
+              <h3 className="text-sm font-bold ">2. Select Staff</h3>
             </div>
 
             {/* Dual List Container */}
@@ -195,41 +274,47 @@ export default function BulkAssignDialog({
                   </span>
                   <button
                     onClick={selectAll}
-                    className="text-xs font-bold text-theme hover:text-theme"
+                    disabled={!departmentId || unselectedUsers.length === 0}
+                    className="text-xs font-bold text-theme hover:text-theme disabled:opacity-50"
                   >
                     Select All
                   </button>
                 </div>
                 <div className="flex-1 space-y-1 overflow-y-auto p-2">
-                  {unselectedUsers.map((user: any) => (
-                    <div
-                      key={user._id}
-                      onClick={() => toggleEmployee(user)}
-                      className="flex cursor-pointer items-center gap-3 rounded-md border border-transparent p-2 transition-colors hover:bg-gray-50"
-                    >
-                      <div className="h-4 w-4 flex-shrink-0 rounded border border-gray-300" />
-                      <Avatar className="h-7 w-7">
-                        <AvatarImage
-                          src={user?.image || '/placeholder.png'}
-                          alt={user?.name || 'User'}
-                        />
-                        <AvatarFallback className="bg-blue-100 text-[10px] font-bold text-theme">
-                          {getInitials(
-                            user?.firstName,
-                            user?.lastName,
-                            user?.name
-                          )}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className="truncate text-sm font-medium text-gray-700">
-                        {user.firstName} {user.lastName}
-                      </span>
-                    </div>
-                  ))}
-                  {unselectedUsers.length === 0 && (
+                  {!departmentId ? (
+                    <p className="mt-10 text-center text-xs text-gray-400">
+                      Please select a department
+                    </p>
+                  ) : unselectedUsers.length === 0 ? (
                     <p className="mt-10 text-center text-xs text-gray-400">
                       No users available
                     </p>
+                  ) : (
+                    unselectedUsers.map((user: any) => (
+                      <div
+                        key={user._id}
+                        onClick={() => toggleEmployee(user)}
+                        className="flex cursor-pointer items-center gap-3 rounded-md border border-transparent p-2 transition-colors hover:bg-gray-50"
+                      >
+                        <div className="h-4 w-4 flex-shrink-0 rounded border border-gray-300" />
+                        <Avatar className="h-7 w-7">
+                          <AvatarImage
+                            src={user?.image || '/placeholder.png'}
+                            alt={user?.name || 'User'}
+                          />
+                          <AvatarFallback className="bg-blue-100 text-[10px] font-bold text-theme">
+                            {getInitials(
+                              user?.firstName,
+                              user?.lastName,
+                              user?.name
+                            )}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="truncate text-sm font-medium text-gray-700">
+                          {user.firstName} {user.lastName}
+                        </span>
+                      </div>
+                    ))
                   )}
                 </div>
               </div>
@@ -242,7 +327,8 @@ export default function BulkAssignDialog({
                   </span>
                   <button
                     onClick={clearAll}
-                    className="text-xs font-bold  hover:text-red-600"
+                    disabled={selectedEmployees.length === 0}
+                    className="text-xs font-bold hover:text-red-600 disabled:opacity-50"
                   >
                     Clear
                   </button>
@@ -287,7 +373,7 @@ export default function BulkAssignDialog({
 
           {/* RIGHT PANEL: Form Details */}
           <div className="flex w-1/2 flex-col space-y-5 overflow-y-auto p-6">
-            {/* 1. Select Date Range */}
+            {/* Date Range */}
             <div>
               <div className="mb-4 flex items-center gap-2">
                 <CalendarIcon className="h-5 w-5 text-theme" />
@@ -330,7 +416,7 @@ export default function BulkAssignDialog({
               </div>
             </div>
 
-            {/* 2. Shift Details */}
+            {/* Shift Details */}
             <div>
               <div className="mb-4 flex items-center gap-2">
                 <Clock className="h-5 w-5 text-theme" />
@@ -348,7 +434,7 @@ export default function BulkAssignDialog({
                       <Input
                         value={shiftName}
                         onChange={(e) => setShiftName(e.target.value)}
-                        maxLength={10}
+                        maxLength={20}
                         placeholder="e.g. Morning"
                       />
                     </div>
@@ -415,7 +501,7 @@ export default function BulkAssignDialog({
                       </label>
                       <div className="pt-2">
                         <CirclePicker
-                          color={color || companyColor || "#2196f3"}
+                          color={color || companyColor || '#2196f3'}
                           width="252px"
                           colors={themeColors}
                           circleSize={28}
@@ -434,7 +520,7 @@ export default function BulkAssignDialog({
                 )}
 
                 {/* Leave Type Selector */}
-                <div className="space-y-3 pt-2 border-t border-gray-100">
+                <div className="space-y-3 border-t border-gray-100 pt-2">
                   <label className="text-xs font-bold uppercase ">
                     Leave Type
                   </label>
@@ -473,7 +559,12 @@ export default function BulkAssignDialog({
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={!selectedEmployees.length || !startDate || !endDate}
+            disabled={
+              !selectedEmployees.length ||
+              !startDate ||
+              !endDate ||
+              !departmentId
+            }
           >
             Bulk Assign
           </Button>

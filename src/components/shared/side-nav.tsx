@@ -672,11 +672,11 @@ export function SideNav() {
         />
         <div className="flex flex-col items-center space-y-1">
           <div
-            // onClick={() => {
-            //   if (user?.role !== 'admin' && user?.role !== 'company') {
-            //     navigate(`${basePath}/profile`);
-            //   }
-            // }}
+            onClick={() => {
+              if (user?.role !== 'admin' && user?.role !== 'company') {
+                navigate(`${basePath}/profile`);
+              }
+            }}
             className={`text-md font-medium text-gray-900
     ${
       user?.role === 'admin' || user?.role === 'company'

@@ -158,26 +158,60 @@ const ReviewStep: React.FC<ReviewStepProps> = ({
 
                 {/* --- 3. Official Documents (Numbers) --- */}
                 <TableSectionHeader icon={FileText} title="Official IDs" />
-                <DataRow
-                  label="NI Number"
-                  value={personalDetails.nationalInsuranceNumber}
-                />
-                <DataRow label="NHS Number" value={personalDetails.nhsNumber} />
-                <DataRow
-                  label="Passport Number"
-                  value={personalDetails.passportNo}
-                />
-                {/* ✅ Added Passport Expiry */}
-                <DataRow
-                  label="Passport Expiry"
-                  value={
-                    personalDetails.passportExpiry
-                      ? moment(personalDetails.passportExpiry).format(
+
+                {/* General IDs - shown if they exist */}
+                {personalDetails.nationalInsuranceNumber && (
+                  <DataRow
+                    label="NI Number"
+                    value={personalDetails.nationalInsuranceNumber}
+                  />
+                )}
+
+                {personalDetails.nhsNumber && (
+                  <DataRow
+                    label="NHS Number"
+                    value={personalDetails.nhsNumber}
+                  />
+                )}
+
+                {/* Conditional IDs - shown based on idDocumentType */}
+                {personalDetails.idDocumentType === 'Passport' && (
+                  <>
+                    {personalDetails.passportNo && (
+                      <DataRow
+                        label="Passport Number"
+                        value={personalDetails.passportNo}
+                      />
+                    )}
+                    {personalDetails.passportExpiry && (
+                      <DataRow
+                        label="Passport Expiry"
+                        value={moment(personalDetails.passportExpiry).format(
                           'DD MMM YYYY'
-                        )
-                      : null
-                  }
-                />
+                        )}
+                      />
+                    )}
+                  </>
+                )}
+
+                {personalDetails.idDocumentType === 'Driving Licence' && (
+                  <>
+                    {personalDetails.drivingLicenceNo && (
+                      <DataRow
+                        label="Driving Licence No"
+                        value={personalDetails.drivingLicenceNo}
+                      />
+                    )}
+                    {personalDetails.drivingLicenceExpiry && (
+                      <DataRow
+                        label="Licence Expiry"
+                        value={moment(
+                          personalDetails.drivingLicenceExpiry
+                        ).format('DD MMM YYYY')}
+                      />
+                    )}
+                  </>
+                )}
 
                 {/* --- 5. Application Details --- */}
                 <TableSectionHeader
@@ -269,30 +303,55 @@ const ReviewStep: React.FC<ReviewStepProps> = ({
                   icon={FileCheck}
                   title="Uploaded Documents"
                 />
-                <DataRow
-                  label="Passport"
-                  value={<FileLink url={documents.passport} />}
-                />
-                <DataRow
-                  label="DBS Certificate"
-                  value={<FileLink url={documents.dbs} />}
-                />
-                <DataRow
-                  label="Right to Work"
-                  value={<FileLink url={documents.rightToWork} />}
-                />
-                <DataRow
-                  label="Immigration Status"
-                  value={<FileLink url={documents.immigrationStatus} />}
-                />
-                <DataRow
-                  label="Proof of Address"
-                  value={<FileLink url={documents.proofOfAddress} />}
-                />
-                <DataRow
-                  label="Ni number/Driving licence"
-                  value={<FileLink url={documents.niDoc} />}
-                />
+
+                {documents.passport && (
+                  <DataRow
+                    label="Passport"
+                    value={<FileLink url={documents.passport} />}
+                  />
+                )}
+
+                {documents.dbs && (
+                  <DataRow
+                    label="DBS Certificate"
+                    value={<FileLink url={documents.dbs} />}
+                  />
+                )}
+
+                {documents.rightToWork && (
+                  <DataRow
+                    label="Right to Work"
+                    value={<FileLink url={documents.rightToWork} />}
+                  />
+                )}
+
+                {documents.immigrationStatus && (
+                  <DataRow
+                    label="Immigration Status"
+                    value={<FileLink url={documents.immigrationStatus} />}
+                  />
+                )}
+
+                {documents.proofOfAddress && (
+                  <DataRow
+                    label="Proof of Address"
+                    value={<FileLink url={documents.proofOfAddress} />}
+                  />
+                )}
+
+                {documents.niDoc && (
+                  <DataRow
+                    label="NI Number / Driving Licence"
+                    value={<FileLink url={documents.niDoc} />}
+                  />
+                )}
+
+                {/* Optional: Fallback if no documents are uploaded */}
+                {!Object.values(documents).some((doc) => doc) && (
+                  <div className="px-4 py-3 text-sm italic text-gray-500">
+                    No documents uploaded yet.
+                  </div>
+                )}
               </TableBody>
             </Table>
           </div>

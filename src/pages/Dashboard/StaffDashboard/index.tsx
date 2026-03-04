@@ -213,6 +213,15 @@ const StaffDashboardPage = () => {
                                 </span>
                               </div>
 
+                              <div className="w-full sm:w-auto sm:min-w-[130px]">
+                                <span className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">
+                                 Department
+                                </span>
+                                <span className="inline-flex items-center rounded-md bg-theme/10 px-2.5 py-1 text-xs font-semibold text-theme">
+                                  {shift?.departmentId?.departmentName || ''}
+                                </span>
+                              </div>
+
                               {isLeave ? (
                                 <div className="flex w-full flex-1 items-center">
                                   <span className="inline-flex items-center rounded-full border border-amber-200/60 bg-amber-50 px-3 py-1 text-sm font-medium text-amber-700">
@@ -222,16 +231,32 @@ const StaffDashboardPage = () => {
                               ) : (
                                 <div className="grid w-full flex-1 grid-cols-3 items-center gap-4 sm:border-l sm:border-slate-100 sm:pl-6">
                                   <div>
-                                    <span className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Start</span>
-                                    <span className="text-sm font-bold">{shift.startTime}</span>
+                                    <span className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">
+                                      Start
+                                    </span>
+                                    <span className="text-sm font-bold">
+                                      {shift.startTime}
+                                    </span>
                                   </div>
                                   <div>
-                                    <span className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">End</span>
-                                    <span className="text-sm font-bold">{shift.endTime}</span>
+                                    <span className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">
+                                      End
+                                    </span>
+                                    <span className="text-sm font-bold">
+                                      {shift.endTime}
+                                    </span>
                                   </div>
                                   <div>
-                                    <span className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Duration</span>
-                                    <span className="text-sm font-semibold">{calculateDuration(shift.startTime, shift.endTime)} h</span>
+                                    <span className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">
+                                      Duration
+                                    </span>
+                                    <span className="text-sm font-semibold">
+                                      {calculateDuration(
+                                        shift.startTime,
+                                        shift.endTime
+                                      )}{' '}
+                                      h
+                                    </span>
                                   </div>
                                 </div>
                               )}

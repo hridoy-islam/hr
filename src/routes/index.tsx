@@ -90,6 +90,7 @@ import UpcomingShiftPage from '@/pages/staff/upcoming-shifts';
 import StaffNoticeBoard from '@/pages/staff/notice';
 import HolidayPage from '@/pages/staff/holiday';
 import CompanyLeaveApprovalPage from '@/pages/company/LeaveApproval';
+import StaffProfile from '@/pages/staff/profile';
 
 const SignInPage = lazy(() => import('@/pages/auth/signin'));
 
@@ -273,8 +274,8 @@ export default function AppRouter() {
 
         { path: 'upcoming-shifts', element: <UpcomingShiftPage /> },
         { path: 'notice', element: <StaffNoticeBoard /> },
-        { path: 'holiday', element: <HolidayPage /> }
-        
+        { path: 'holiday', element: <HolidayPage /> },
+        { path: 'profile', element: <StaffProfile /> }
       ]
     }
   ];

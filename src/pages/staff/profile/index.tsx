@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
-import { EditableField } from '../EditableField';
+import React, { useState, useEffect, useRef } from 'react';
 import moment from 'moment';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input'; // Make sure this is installed
+import { Input } from '@/components/ui/input';
 import {
   Camera,
   Loader2,
@@ -28,6 +27,7 @@ import { useToast } from '@/components/ui/use-toast';
 // --- Zod Schema for Password Validation ---
 const passwordSchema = z
   .object({
+    currentPassword: z.string().min(1, 'Current password is required'),
     password: z.string().min(6, 'Password must be at least 6 characters'),
     confirmPassword: z.string()
   })
@@ -65,49 +65,62 @@ const FormRow = ({
         {label}
       </span>
     </div>
-    {/* Input Column */}
+    {/* Data Column */}
     <div className="flex items-center bg-white px-4 py-2 sm:w-2/3 lg:w-3/5 xl:w-2/3">
-      <div className="w-full">{children}</div>
+      <div className="w-full text-sm font-medium text-gray-900">{children}</div>
     </div>
   </div>
 );
 
 // --- Main Component ---
 
-interface PersonalInfoTabProps {
-  formData: any;
-  onUpdate: (fieldName: string, value: any) => void;
-  onDateChange: (fieldName: string, dateStr: string) => void;
-  onSelectChange: (fieldName: string, value: string) => void;
-  isFieldSaving: Record<string, boolean>;
-}
-
-const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
-  formData,
-  onUpdate,
-  onDateChange,
-  onSelectChange,
-  isFieldSaving
-}) => {
+const StaffProfile: React.FC = () => {
   const { eid: id } = useParams();
+  const { toast } = useToast();
+
+  // --- Data State ---
+  const [userData, setUserData] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   // --- Upload State ---
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // --- Password State ---
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
   const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
     password: '',
     confirmPassword: ''
   });
   const [passwordErrors, setPasswordErrors] = useState<Record<string, string>>(
     {}
   );
-  const { toast } = useToast();
+
+  // --- Fetch Data ---
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        setIsLoading(true);
+        const res = await axiosInstance.get(`/users/${id}`);
+        setUserData(res.data.data);
+      } catch (error) {
+        console.error('Failed to fetch user data:', error);
+        setFetchError('Could not load user profile details.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (id) {
+      fetchUserData();
+    }
+  }, [id]);
+
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -128,6 +141,8 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
 
     const formDataUpload = new FormData();
     formDataUpload.append('file', file);
+    formDataUpload.append('entityId', id || '');
+    formDataUpload.append('file_type', 'profile');
 
     try {
       const uploadRes = await axiosInstance.post('/documents', formDataUpload, {
@@ -136,8 +151,10 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
 
       const imageUrl = uploadRes.data?.data?.fileUrl || uploadRes.data.url;
 
-      onUpdate('image', imageUrl);
+      // Update local state to reflect the new image
+      setUserData((prev: any) => ({ ...prev, image: imageUrl }));
       setIsDialogOpen(false);
+      toast({ title: 'Profile photo updated successfully' });
     } catch (error) {
       console.error('Upload failed:', error);
       setUploadError('Failed to upload image. Please try again.');
@@ -148,36 +165,62 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
 
   const handlePasswordSubmit = async () => {
     try {
-      // 1. Validate with Zod
       setPasswordErrors({});
       passwordSchema.parse(passwordData);
 
-      // 2. Make API Request
       setIsUpdatingPassword(true);
-      await axiosInstance.patch(`/users/${id}`, {
-        password: passwordData.password
+      await axiosInstance.patch(`/auth/${id}/change-password`, {
+        currentPassword: passwordData.currentPassword,
+        newPassword: passwordData.password
       });
 
       setIsPasswordDialogOpen(false);
-      setPasswordData({ password: '', confirmPassword: '' });
-      toast({
-        title:"Password Updated Successfully"
-      })
-    } catch (error) {
+      resetPasswordForm();
+      toast({ title: 'Password Updated Successfully' });
+    } catch (error: any) {
       console.error('Password update failed:', error);
-      toast({
-        title: error?.response?.data.message || 'Password update failed',
-        variant:"destructive"
-      });
+      if (error instanceof z.ZodError) {
+        const fieldErrors: Record<string, string> = {};
+        error.errors.forEach((err) => {
+          if (err.path[0]) fieldErrors[err.path[0].toString()] = err.message;
+        });
+        setPasswordErrors(fieldErrors);
+      } else {
+        // Show backend error message
+        toast({
+          title:
+            error?.response?.data?.message ||
+            error?.response?.data?.error ||
+            'Password update failed',
+          variant: 'destructive'
+        });
+      }
     } finally {
       setIsUpdatingPassword(false);
     }
   };
 
   const resetPasswordForm = () => {
-    setPasswordData({ password: '', confirmPassword: '' });
+    setPasswordData({ currentPassword: '', password: '', confirmPassword: '' });
     setPasswordErrors({});
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-theme" />
+      </div>
+    );
+  }
+
+  if (fetchError || !userData) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center text-red-500">
+        <AlertCircle className="mr-2 h-6 w-6" />
+        {fetchError || 'User not found'}
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen space-y-6 pb-10 duration-500 animate-in fade-in">
@@ -185,9 +228,9 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
       <div className="flex flex-col items-center gap-6 rounded-lg border border-gray-200 bg-white p-6 shadow-sm sm:flex-row sm:items-start">
         <div className="group relative shrink-0">
           <div className="h-24 w-24 overflow-hidden rounded-full border-4 border-white bg-gray-100 shadow-md ring-1 ring-gray-200">
-            {formData.image ? (
+            {userData.image ? (
               <img
-                src={formData.image}
+                src={userData.image}
                 alt="Profile"
                 className="h-full w-full object-cover"
               />
@@ -205,11 +248,11 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
 
         <div className="flex-1 space-y-1 text-center sm:text-left">
           <h2 className="text-xl font-bold text-gray-900">
-            {formData.firstName} {formData.lastName}
+            {userData.firstName} {userData.lastName}
           </h2>
           <div className="mt-2 flex items-center justify-center gap-4 text-xs text-gray-400 sm:justify-start">
             <span className="rounded border border-theme/20 bg-theme/10 px-2 py-1 capitalize text-theme">
-              {formData.employmentType || 'Employment Type N/A'}
+              {userData.employmentType || 'Employment Type N/A'}
             </span>
           </div>
         </div>
@@ -218,139 +261,25 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
       {/* 2. Main Content Grid */}
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         {/* Left Column: Identity Information */}
-        <div className=" h-fit rounded-lg border border-gray-200 bg-white shadow-sm">
+        <div className="h-fit rounded-lg border border-gray-200 bg-white shadow-sm">
           <SectionHeader icon={User} title="General Information" />
           <div className="flex flex-col">
-            <FormRow label="Title">
-              <EditableField
-                id="title"
-                label=""
-                value={formData.title}
-                type="select"
-                options={[
-                  { value: 'Mr', label: 'Mr' },
-                  { value: 'Mrs', label: 'Mrs' },
-                  { value: 'Miss', label: 'Miss' },
-                  { value: 'Ms', label: 'Ms' },
-                  { value: 'Dr', label: 'Dr' }
-                ]}
-                onUpdate={(val) => onSelectChange('title', val)}
-                isSaving={isFieldSaving.title}
-              />
-            </FormRow>
-
-            <FormRow label="First Name">
-              <EditableField
-                id="firstName"
-                label=""
-                value={formData.firstName}
-                onUpdate={(val) => onUpdate('firstName', val)}
-                isSaving={isFieldSaving.firstName}
-                required
-              />
-            </FormRow>
-
-            <FormRow label="Initial">
-              <EditableField
-                id="initial"
-                label=""
-                value={formData.initial}
-                onUpdate={(val) => onUpdate('initial', val)}
-                isSaving={isFieldSaving.initial}
-                required
-              />
-            </FormRow>
-
-            <FormRow label="Last Name">
-              <EditableField
-                id="lastName"
-                label=""
-                value={formData.lastName}
-                onUpdate={(val) => onUpdate('lastName', val)}
-                isSaving={isFieldSaving.lastName}
-                required
-              />
-            </FormRow>
-
+            <FormRow label="Title">{userData.title || '-'}</FormRow>
+            <FormRow label="First Name">{userData.firstName || '-'}</FormRow>
+            <FormRow label="Initial">{userData.initial || '-'}</FormRow>
+            <FormRow label="Last Name">{userData.lastName || '-'}</FormRow>
             <FormRow label="Date of Birth">
-              <EditableField
-                id="dateOfBirth"
-                label=""
-                value={formData.dateOfBirth}
-                type="date"
-                onUpdate={(val) => onDateChange('dateOfBirth', val)}
-                isSaving={isFieldSaving.dateOfBirth}
-              />
+              {userData.dateOfBirth
+                ? moment(userData.dateOfBirth).format('DD MMM YYYY')
+                : '-'}
             </FormRow>
-
-            <FormRow label="Gender">
-              <EditableField
-                id="gender"
-                label=""
-                value={formData.gender}
-                type="select"
-                options={[
-                  { value: 'Male', label: 'Male' },
-                  { value: 'Female', label: 'Female' },
-                  { value: 'Other', label: 'Other' }
-                ]}
-                onUpdate={(val) => onSelectChange('gender', val)}
-                isSaving={isFieldSaving.gender}
-              />
-            </FormRow>
-
+            <FormRow label="Gender">{userData.gender || '-'}</FormRow>
             <FormRow label="Marital Status">
-              <EditableField
-                id="maritalStatus"
-                label=""
-                value={formData.maritalStatus}
-                type="select"
-                options={[
-                  { value: 'Single', label: 'Single' },
-                  { value: 'Married', label: 'Married' },
-                  { value: 'Divorced', label: 'Divorced' },
-                  { value: 'Widowed', label: 'Widowed' }
-                ]}
-                onUpdate={(val) => onSelectChange('maritalStatus', val)}
-                isSaving={isFieldSaving.maritalStatus}
-              />
+              {userData.maritalStatus || '-'}
             </FormRow>
-
             <FormRow label="NI Number">
-              <EditableField
-                id="nationalInsuranceNumber"
-                label=""
-                value={formData.nationalInsuranceNumber}
-                onUpdate={(val) => onUpdate('nationalInsuranceNumber', val)}
-                isSaving={isFieldSaving.nationalInsuranceNumber}
-              />
+              {userData.nationalInsuranceNumber || '-'}
             </FormRow>
-
-            {formData.drivingLicenceNo && (
-              <FormRow label="Driving Licence No">
-                <EditableField
-                  id="drivingLicenceNo"
-                  label=""
-                  value={formData.drivingLicenceNo}
-                  onUpdate={(val) => onUpdate('drivingLicenceNo', val)}
-                  isSaving={isFieldSaving.drivingLicenceNo}
-                />
-              </FormRow>
-            )}
-
-            {/* Only show Expiry if value exists */}
-            {formData.drivingLicenceExpiry && (
-              <FormRow label="Licence Expiry">
-                <EditableField
-                  id="drivingLicenceExpiry"
-                  label=""
-                  value={formData.drivingLicenceExpiry}
-                  type="date"
-                  onUpdate={(val) => onDateChange('drivingLicenceExpiry', val)}
-                  isSaving={isFieldSaving.drivingLicenceExpiry}
-                />
-              </FormRow>
-            )}
           </div>
         </div>
 
@@ -360,40 +289,15 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
           <div className="h-fit overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
             <SectionHeader icon={Phone} title="Contact Details" />
             <div className="flex flex-col">
-              <FormRow label="Email Address">
-                <EditableField
-                  id="email"
-                  label=""
-                  value={formData.email}
-                  type="email"
-                  onUpdate={(val) => onUpdate('email', val)}
-                  isSaving={isFieldSaving.email}
-                />
-              </FormRow>
-
+              <FormRow label="Email Address">{userData.email || '-'}</FormRow>
               <FormRow label="Mobile Phone">
-                <EditableField
-                  id="mobilePhone"
-                  label=""
-                  value={formData.mobilePhone}
-                  onUpdate={(val) => onUpdate('mobilePhone', val)}
-                  isSaving={isFieldSaving.mobilePhone}
-                />
+                {userData.mobilePhone || '-'}
               </FormRow>
-
-              <FormRow label="Home Phone">
-                <EditableField
-                  id="homePhone"
-                  label=""
-                  value={formData.homePhone}
-                  onUpdate={(val) => onUpdate('homePhone', val)}
-                  isSaving={isFieldSaving.homePhone}
-                />
-              </FormRow>
+              <FormRow label="Home Phone">{userData.homePhone || '-'}</FormRow>
             </div>
           </div>
 
-          {/* Security Section (New) */}
+          {/* Security Section */}
           <div className="h-fit overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
             <SectionHeader icon={Lock} title="Security" />
             <div className="flex flex-col p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -410,7 +314,7 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
                 className="mt-3 sm:mt-0"
                 onClick={() => setIsPasswordDialogOpen(true)}
               >
-                Set Password
+                Change Password
               </Button>
             </div>
           </div>
@@ -419,9 +323,8 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
 
       {/* --- Dialogs --- */}
 
-      {/* Photo Upload Dialog (Existing) */}
+      {/* Photo Upload Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        {/* ... (Kept exactly the same to save space, but standard implementation remains) ... */}
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Update Profile Photo</DialogTitle>
@@ -493,7 +396,7 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
         </DialogContent>
       </Dialog>
 
-      {/* Password Update Dialog (New) */}
+      {/* Password Update Dialog */}
       <Dialog
         open={isPasswordDialogOpen}
         onOpenChange={(open) => {
@@ -503,14 +406,40 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
       >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Set New Password</DialogTitle>
+            <DialogTitle>Change Password</DialogTitle>
             <DialogDescription>
-              Enter a new password for this account. Must be at least 6
-              characters long.
+              Enter your current password and a new password for this account.
             </DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">
+                Current Password
+              </label>
+              <Input
+                type="password"
+                placeholder="••••••••"
+                value={passwordData.currentPassword}
+                onChange={(e) =>
+                  setPasswordData({
+                    ...passwordData,
+                    currentPassword: e.target.value
+                  })
+                }
+                className={
+                  passwordErrors.currentPassword
+                    ? 'border-red-500 focus-visible:ring-red-500'
+                    : ''
+                }
+              />
+              {passwordErrors.currentPassword && (
+                <p className="text-xs font-medium text-red-500">
+                  {passwordErrors.currentPassword}
+                </p>
+              )}
+            </div>
+
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700">
                 New Password
@@ -537,7 +466,7 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
 
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700">
-                Confirm Password
+                Confirm New Password
               </label>
               <Input
                 type="password"
@@ -600,4 +529,4 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
   );
 };
 
-export default PersonalInfoTab;
+export default StaffProfile;

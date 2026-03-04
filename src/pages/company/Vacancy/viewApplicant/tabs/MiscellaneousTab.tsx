@@ -50,7 +50,7 @@ const MiscellaneousTab: React.FC<MiscellaneousTabProps> = ({
           <EditableField
             id="applicationDate"
             label="Application Date"
-            value={formData.applicationDate ? moment(formData.applicationDate).format('YYYY-MM-DD') : ''}
+            value={formData.applicationDate ? moment(formData.applicationDate).format('DD-MM-YYYY') : ''}
             type="date"
             onUpdate={(value) => onDateChange('applicationDate', value)}
             isSaving={isFieldSaving.applicationDate}
@@ -60,7 +60,7 @@ const MiscellaneousTab: React.FC<MiscellaneousTabProps> = ({
           <EditableField
             id="availableFromDate"
             label="Available From Date"
-            value={formData.availableFromDate ? moment(formData.availableFromDate).format('YYYY-MM-DD') : ''}
+            value={formData.availableFromDate ? moment(formData.availableFromDate).format('DD-MM-YYYY') : ''}
             type="date"
             onUpdate={(value) => onDateChange('availableFromDate', value)}
             isSaving={isFieldSaving.availableFromDate}

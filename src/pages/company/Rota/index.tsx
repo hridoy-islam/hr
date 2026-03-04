@@ -32,31 +32,32 @@ import { BlinkingDots } from '@/components/shared/blinking-dots';
 import AddRotaDialog from './components/AddRotaDialog';
 import CopyRotaDialog from './components/CopyRotaDialog';
 import BulkAssignDialog from './components/BulkAssignDialog';
-
-// react-dnd imports
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// Types
+type Department = { _id: string; departmentName: string; index: number };
+type DepartmentWiseIndex = { departmentId: string; index: number };
+type UserDepartment = { _id: string; departmentName: string };
 type User = {
   _id: string;
   name: string;
   firstName?: string;
   lastName?: string;
   role: string;
-  department?: string;
   image?: string;
-  designationId?: { title: string };
+  designationId?: { _id: string; title: string }[] | { title: string };
   index?: number;
+  departmentId?: UserDepartment[];
+  departmentWiseIndex?: DepartmentWiseIndex[];
 };
 
 const DRAG_TYPE = 'ROW';
+const DEPT_DRAG_TYPE = 'DEPARTMENT';
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 const getInitials = (firstName?: string, lastName?: string, name?: string) => {
-  if (firstName && lastName) {
+  if (firstName && lastName)
     return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
-  }
   if (firstName) return firstName.substring(0, 2).toUpperCase();
   if (name) {
     const parts = name.trim().split(' ');
@@ -67,69 +68,110 @@ const getInitials = (firstName?: string, lastName?: string, name?: string) => {
   return 'U';
 };
 
-// ─── ShiftBlock ───────────────────────────────────────────────────────────────
+const getDesignationTitle = (d: User['designationId']): string => {
+  if (!d) return '';
+
+  if (Array.isArray(d)) {
+    return d
+      .map((item) => item?.title)
+      .filter(Boolean)
+      .join(', ');
+  }
+
+  return (d as { title: string }).title || '';
+};
+
+const getDeptIndex = (user: User, deptId: string): number => {
+  const e = user.departmentWiseIndex?.find((d) => d.departmentId === deptId);
+  return e?.index ?? 9999;
+};
+
+// ShiftBlock — supports single or multiple time-slots grouped in one card
+interface TimeSlot {
+  startTime?: string;
+  endTime?: string;
+}
+
 const ShiftBlock = ({
   leaveType,
   shiftName,
   startTime,
   endTime,
-  colors
+  colors,
+  extraSlots // additional slots beyond the first, for multi-rota cards
 }: {
   leaveType?: string;
   shiftName?: string;
   startTime?: string;
   endTime?: string;
   colors: 'theme' | { bg: string; border: string; text: string };
+  extraSlots?: TimeSlot[];
 }) => {
   const title = leaveType || shiftName || '';
-  const hasTime = startTime && endTime && !leaveType;
   const isTheme = colors === 'theme';
+  const allSlots: TimeSlot[] = [];
+  if (!leaveType) {
+    allSlots.push({ startTime, endTime });
+    if (extraSlots) allSlots.push(...extraSlots);
+  }
 
   return (
     <div
       style={
         !isTheme
           ? {
-              backgroundColor: colors.bg,
-              borderColor: colors.border,
-              color: colors.text
+              backgroundColor: (colors as any).bg,
+              borderColor: (colors as any).border,
+              color: (colors as any).text
             }
           : undefined
       }
-      className={`
-        group/shift relative mx-auto flex min-h-[44px] w-full min-w-[50px] cursor-pointer 
-        flex-col items-center justify-center rounded-md border p-1 shadow-sm 
-        transition-all duration-200 hover:scale-105 hover:brightness-105
-        ${isTheme ? 'bg-theme border-theme text-white' : ''}
-      `}
+      className={`group/shift relative mx-auto flex min-h-[44px] w-full min-w-[50px] cursor-pointer flex-col items-center justify-center rounded-md border p-1 shadow-sm transition-all duration-200 hover:scale-105 hover:brightness-105 ${isTheme ? 'border-theme bg-theme text-white' : ''}`}
     >
       <div className="pointer-events-none absolute inset-0 rounded-md bg-white/40 opacity-0 transition-opacity group-hover/shift:opacity-100" />
       <span className="text-md w-full truncate text-center font-bold uppercase leading-tight tracking-widest">
         {title}
       </span>
-      {hasTime && (
-        <span className="mt-0.5 w-full truncate text-center text-xs font-semibold leading-tight tracking-wide opacity-90">
-          {startTime}-{endTime}
-        </span>
+      {allSlots.map(
+        (slot, i) =>
+          slot.startTime &&
+          slot.endTime && (
+            <span
+              key={i}
+              className="mt-0.5 w-full truncate text-center text-xs font-semibold leading-tight tracking-wide opacity-90"
+            >
+              {slot.startTime}–{slot.endTime}
+            </span>
+          )
       )}
     </div>
   );
 };
 
-// ─── DraggableRow ─────────────────────────────────────────────────────────────
+// DraggableRow
 interface DraggableRowProps {
   user: User;
-  rowIndex: number;
-  moveRow: (dragIndex: number, hoverIndex: number) => void;
+  deptRowIndex: number;
+  departmentId: string;
+  moveRow: (
+    departmentId: string,
+    dragIndex: number,
+    hoverIndex: number
+  ) => void;
   daysArray: moment.Moment[];
-  rotaMap: Record<string, Record<string, any>>;
+  rotaMap: Record<string, Record<string, any[]>>;
   leaveTypeColors: Record<string, { bg: string; border: string; text: string }>;
-  handleCellClick: (user: User, day: moment.Moment) => void;
+  handleCellClick: (
+    user: User,
+    day: moment.Moment,
+    departmentId: string
+  ) => void;
 }
 
 const DraggableRow: React.FC<DraggableRowProps> = ({
   user,
-  rowIndex,
+  deptRowIndex,
+  departmentId,
   moveRow,
   daysArray,
   rotaMap,
@@ -137,66 +179,52 @@ const DraggableRow: React.FC<DraggableRowProps> = ({
   handleCellClick
 }) => {
   const ref = useRef<HTMLTableRowElement>(null);
-
   const [{ isDragging }, drag, dragPreview] = useDrag({
     type: DRAG_TYPE,
-    item: { rowIndex },
-    collect: (monitor) => ({
-      isDragging: monitor.isDragging()
-    })
+    item: { deptRowIndex, departmentId },
+    collect: (monitor) => ({ isDragging: monitor.isDragging() })
   });
-
   const [{ isOver }, drop] = useDrop<
-    { rowIndex: number },
+    { deptRowIndex: number; departmentId: string },
     void,
     { isOver: boolean }
   >({
     accept: DRAG_TYPE,
     collect: (monitor) => ({ isOver: monitor.isOver() }),
     hover(item, monitor) {
-      if (!ref.current) return;
-      const dragIndex = item.rowIndex;
-      const hoverIndex = rowIndex;
+      if (!ref.current || item.departmentId !== departmentId) return;
+      const dragIndex = item.deptRowIndex;
+      const hoverIndex = deptRowIndex;
       if (dragIndex === hoverIndex) return;
-
       const hoverBoundingRect = ref.current.getBoundingClientRect();
       const hoverMiddleY =
         (hoverBoundingRect.bottom - hoverBoundingRect.top) / 2;
       const clientOffset = monitor.getClientOffset();
       if (!clientOffset) return;
       const hoverClientY = clientOffset.y - hoverBoundingRect.top;
-
       if (dragIndex < hoverIndex && hoverClientY < hoverMiddleY) return;
       if (dragIndex > hoverIndex && hoverClientY > hoverMiddleY) return;
-
-      moveRow(dragIndex, hoverIndex);
-      item.rowIndex = hoverIndex;
+      moveRow(departmentId, dragIndex, hoverIndex);
+      item.deptRowIndex = hoverIndex;
     }
   });
-
-  // Attach drop to the row, drag handle only to the grip icon
   drop(dragPreview(ref));
 
   return (
     <tr
       ref={ref}
-      className={`transition-colors hover:bg-slate-50/60 ${
-        isDragging ? 'opacity-40 bg-blue-50' : ''
-      } ${isOver ? 'bg-slate-100' : ''}`}
+      className={`transition-colors hover:bg-slate-50/60 ${isDragging ? 'bg-blue-50 opacity-40' : ''} ${isOver ? 'bg-slate-100' : ''}`}
     >
-      {/* Sticky name cell */}
       <td className="sticky left-0 z-20 border-b border-r border-gray-200 bg-white p-3 shadow-[2px_0_0_0_rgba(0,0,0,0.05)]">
         <div className="flex items-center gap-2">
-          {/* Drag handle */}
           <div
             ref={drag as any}
-            className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 transition-colors flex-shrink-0"
+            className="flex-shrink-0 cursor-grab text-gray-300 transition-colors hover:text-gray-500 active:cursor-grabbing"
             title="Drag to reorder"
           >
             <GripVertical className="h-4 w-4" />
           </div>
-
-          <Avatar className="h-9 w-9 border border-gray-200 flex-shrink-0">
+          <Avatar className="h-9 w-9 flex-shrink-0 border border-gray-200">
             <AvatarImage
               src={user.image || '/placeholder.png'}
               alt={user.firstName || 'User'}
@@ -213,43 +241,65 @@ const DraggableRow: React.FC<DraggableRowProps> = ({
                 : user.name}
             </p>
             <p className="text-[10px] font-medium text-gray-500">
-              {user?.designationId?.title}
+              {getDesignationTitle(user.designationId)}
             </p>
           </div>
         </div>
       </td>
-
-      {/* Day cells */}
       {daysArray.map((day, idx) => {
         const dateKey = day.format('YYYY-MM-DD');
-        const rota = rotaMap[user._id]?.[dateKey];
-
-        let shiftColors: any = 'theme';
-        if (rota) {
-          if (rota.leaveType && leaveTypeColors[rota.leaveType]) {
-            shiftColors = leaveTypeColors[rota.leaveType];
-          } else if (rota.color) {
-            shiftColors =
-              typeof rota.color === 'string'
-                ? { bg: rota.color, border: rota.color, text: '#FFFFFF' }
-                : rota.color;
-          }
-        }
+        // Filter rotas by matching departmentId
+        const rotaList = (rotaMap[user._id]?.[dateKey] || []).filter(
+          (r: any) =>
+            (typeof r.departmentId === 'object'
+              ? r.departmentId._id
+              : r.departmentId) === departmentId
+        );
 
         return (
           <td
             key={idx}
-            onClick={() => handleCellClick(user, day)}
+            onClick={() => handleCellClick(user, day, departmentId)}
             className="group min-w-[65px] cursor-pointer border-b border-r border-gray-200 p-1 text-center hover:bg-slate-100/80"
           >
-            {rota ? (
-              <ShiftBlock
-                leaveType={rota.leaveType}
-                shiftName={rota.shiftName}
-                startTime={rota.startTime}
-                endTime={rota.endTime}
-                colors={shiftColors}
-              />
+            {rotaList.length > 0 ? (
+              <div className="flex flex-col gap-0.5">
+                {(() => {
+                  const firstRota = rotaList[0];
+                  const extraSlots = rotaList
+                    .slice(1)
+                    .map((r: any) => ({
+                      startTime: r.startTime,
+                      endTime: r.endTime
+                    }));
+                  let shiftColors: any = 'theme';
+                  if (
+                    firstRota.leaveType &&
+                    leaveTypeColors[firstRota.leaveType]
+                  )
+                    shiftColors = leaveTypeColors[firstRota.leaveType];
+                  else if (firstRota.color)
+                    shiftColors =
+                      typeof firstRota.color === 'string'
+                        ? {
+                            bg: firstRota.color,
+                            border: firstRota.color,
+                            text: '#FFFFFF'
+                          }
+                        : firstRota.color;
+                  return (
+                    <ShiftBlock
+                      key={firstRota._id}
+                      leaveType={firstRota.leaveType}
+                      shiftName={firstRota.shiftName}
+                      startTime={firstRota.startTime}
+                      endTime={firstRota.endTime}
+                      colors={shiftColors}
+                      extraSlots={extraSlots}
+                    />
+                  );
+                })()}
+              </div>
             ) : (
               <div className="mx-auto flex h-9 w-full min-w-[50px] items-center justify-center rounded-lg border border-dashed border-transparent text-gray-300 opacity-0 transition-all group-hover:border-gray-300 group-hover:bg-gray-50 group-hover:opacity-100">
                 <Plus className="h-4 w-4" />
@@ -262,25 +312,136 @@ const DraggableRow: React.FC<DraggableRowProps> = ({
   );
 };
 
-// ─── Main Component ───────────────────────────────────────────────────────────
+// DraggableDepartmentHeader
+interface DraggableDepartmentHeaderProps {
+  department: Department;
+  deptIndex: number;
+  moveDepartment: (dragIndex: number, hoverIndex: number) => void;
+  daysArray: moment.Moment[];
+  users: User[];
+  rotaMap: Record<string, Record<string, any[]>>;
+  leaveTypeColors: Record<string, { bg: string; border: string; text: string }>;
+  moveRow: (
+    departmentId: string,
+    dragIndex: number,
+    hoverIndex: number
+  ) => void;
+  handleCellClick: (
+    user: User,
+    day: moment.Moment,
+    departmentId: string
+  ) => void;
+}
+
+const DraggableDepartmentHeader: React.FC<DraggableDepartmentHeaderProps> = ({
+  department,
+  deptIndex,
+  moveDepartment,
+  daysArray,
+  users,
+  rotaMap,
+  leaveTypeColors,
+  moveRow,
+  handleCellClick
+}) => {
+  const ref = useRef<HTMLTableRowElement>(null);
+  const [{ isDragging }, drag, dragPreview] = useDrag({
+    type: DEPT_DRAG_TYPE,
+    item: { deptIndex, departmentId: department._id },
+    collect: (monitor) => ({ isDragging: monitor.isDragging() })
+  });
+  const [{ isOver }, drop] = useDrop<
+    { deptIndex: number; departmentId: string },
+    void,
+    { isOver: boolean }
+  >({
+    accept: DEPT_DRAG_TYPE,
+    collect: (monitor) => ({ isOver: monitor.isOver() }),
+    hover(item, monitor) {
+      if (!ref.current || isUnassigned || item.departmentId === 'unassigned')
+        return;
+      const dragIndex = item.deptIndex;
+      const hoverIndex = deptIndex;
+      if (dragIndex === hoverIndex) return;
+      const hoverBoundingRect = ref.current.getBoundingClientRect();
+      const hoverMiddleY =
+        (hoverBoundingRect.bottom - hoverBoundingRect.top) / 2;
+      const clientOffset = monitor.getClientOffset();
+      if (!clientOffset) return;
+      const hoverClientY = clientOffset.y - hoverBoundingRect.top;
+      if (dragIndex < hoverIndex && hoverClientY < hoverMiddleY) return;
+      if (dragIndex > hoverIndex && hoverClientY > hoverMiddleY) return;
+      moveDepartment(dragIndex, hoverIndex);
+      item.deptIndex = hoverIndex;
+    }
+  });
+  const isUnassigned = department._id === 'unassigned';
+  drop(dragPreview(ref));
+
+  return (
+    <>
+      <tr
+        ref={ref}
+        className={`border-b border-t border-gray-300 transition-colors ${isDragging ? 'opacity-40' : ''} ${isOver && !isUnassigned ? 'bg-blue-50' : 'bg-slate-100'}`}
+      >
+        <td className="sticky left-0 z-20 border-r border-gray-200 bg-inherit px-4 py-2 shadow-[2px_0_0_0_rgba(0,0,0,0.04)]">
+          <div className="flex items-center gap-2">
+            {!isUnassigned ? (
+              <div
+                ref={drag as any}
+                className="flex-shrink-0 cursor-grab text-slate-400 transition-colors hover:text-slate-600 active:cursor-grabbing"
+                title="Drag to reorder department"
+              >
+                <GripVertical className="h-4 w-4" />
+              </div>
+            ) : (
+              <div className="w-4 flex-shrink-0" />
+            )}
+            <span className="text-xs font-extrabold uppercase tracking-widest text-slate-600">
+              {department.departmentName}
+            </span>
+          </div>
+        </td>
+        {daysArray.map((_, i) => (
+          <td key={i} className="border-r border-gray-200 bg-inherit" />
+        ))}
+      </tr>
+      {users.map((user, deptRowIndex) => (
+        <DraggableRow
+          key={`${department._id}-${user._id}`}
+          user={user}
+          deptRowIndex={deptRowIndex}
+          departmentId={department._id}
+          moveRow={moveRow}
+          daysArray={daysArray}
+          rotaMap={rotaMap}
+          leaveTypeColors={leaveTypeColors}
+          handleCellClick={handleCellClick}
+        />
+      ))}
+    </>
+  );
+};
+
+// Main
 export default function CompanyRota() {
   const { id: companyId } = useParams();
   const [currentDate, setCurrentDate] = useState(moment());
   const [users, setUsers] = useState<User[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [rotas, setRotas] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [pickerOpen, setPickerOpen] = useState(false);
   const pickerAnchorRef = useRef<HTMLButtonElement>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
-
-  // Interaction States
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [selectedContext, setSelectedContext] = useState<{
     employee: User | null;
     date: any;
-  }>({ employee: null, date: null });
+    departmentId: string | null;
+  }>({ employee: null, date: null, departmentId: null });
   const [selectedRota, setSelectedRota] = useState<any>(null);
   const [skippedRecords, setSkippedRecords] = useState<any[]>([]);
   const [isAddRotaOpen, setIsAddRotaOpen] = useState(false);
@@ -288,64 +449,26 @@ export default function CompanyRota() {
   const [isCopyRotaOpen, setIsCopyRotaOpen] = useState(false);
   const [companyColor, setCompanyColor] = useState(null);
 
-  // Ref to avoid stale closure in moveRow
-  const usersRef = useRef<User[]>(users);
-  useEffect(() => {
-    usersRef.current = users;
-  }, [users]);
-
-  // ── Fetch ──────────────────────────────────────────────────────────────────
   const fetchUsersAndRotas = useCallback(
     async (isInitial = false) => {
       if (!companyId) return;
-      if (isInitial || (users.length === 0 && rotas.length === 0)) {
-        setIsLoading(true);
-      }
-
+      if (isInitial) setIsLoading(true);
       try {
+        const deptRes = await axiosInstance.get(
+          `/hr/department?companyId=${companyId}&limit=all`
+        );
+        const fetchedDepts: Department[] =
+          deptRes.data?.data?.result || deptRes.data?.data || [];
+        setDepartments(
+          [...fetchedDepts].sort((a, b) => (a.index ?? 0) - (b.index ?? 0))
+        );
+
         const userRes = await axiosInstance.get(
           `/users?limit=all&role=employee&company=${companyId}`
         );
         const fetchedUsers: User[] =
           userRes.data?.data?.result || userRes.data?.data || [];
-
-        // ── Assign index if missing ──────────────────────────────────────────
-        const usersNeedingIndex = fetchedUsers.filter(
-          (u) => u.index === undefined || u.index === null
-        );
-
-        if (usersNeedingIndex.length > 0) {
-          // Sort existing indexed users first, then append unindexed
-          const indexed = fetchedUsers
-            .filter((u) => u.index !== undefined && u.index !== null)
-            .sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
-
-          let nextIndex =
-            indexed.length > 0
-              ? Math.max(...indexed.map((u) => u.index ?? 0)) + 1
-              : 0;
-
-          // Update unindexed users via API
-          await Promise.all(
-            usersNeedingIndex.map(async (u) => {
-              const assignedIndex = nextIndex++;
-              try {
-                await axiosInstance.patch(`/users/${u._id}`, {
-                  index: assignedIndex
-                });
-                u.index = assignedIndex;
-              } catch (e) {
-                console.error(`Failed to set index for user ${u._id}`, e);
-              }
-            })
-          );
-        }
-
-        // Sort users by index ascending
-        const sortedUsers = [...fetchedUsers].sort(
-          (a, b) => (a.index ?? 0) - (b.index ?? 0)
-        );
-        setUsers(sortedUsers);
+        setUsers(fetchedUsers);
 
         const startOfMonth = currentDate
           .clone()
@@ -355,13 +478,10 @@ export default function CompanyRota() {
           .clone()
           .endOf('month')
           .format('YYYY-MM-DD');
-
         const rotaRes = await axiosInstance.get(
           `/rota?companyId=${companyId}&startDate=${startOfMonth}&endDate=${endOfMonth}&limit=all`
         );
-        const fetchedRotas =
-          rotaRes.data?.data?.result || rotaRes.data?.data || [];
-        setRotas(fetchedRotas);
+        setRotas(rotaRes.data?.data?.result || rotaRes.data?.data || []);
 
         const companyRes = await axiosInstance.get(`/users/${companyId}`);
         setCompanyColor(companyRes.data?.data?.themeColor);
@@ -372,73 +492,78 @@ export default function CompanyRota() {
         setIsLoading(false);
       }
     },
-    [companyId, currentDate, toast, users.length, rotas.length]
+    [companyId, currentDate, toast]
   );
 
   useEffect(() => {
     fetchUsersAndRotas(true);
   }, [companyId, currentDate]);
 
-  // ── Drag-and-drop row move ─────────────────────────────────────────────────
-  /**
-   * Called during hover — reorders the list in state immediately for a smooth
-   * drag experience, then persists the new indices to the API on drop.
-   */
-  const moveRow = useCallback(
-    async (dragIndex: number, hoverIndex: number) => {
-      setUsers((prev) => {
-        const updated = [...prev];
-        const [removed] = updated.splice(dragIndex, 1);
-        updated.splice(hoverIndex, 0, removed);
-
-        // Reassign sequential indices
-        const reindexed = updated.map((u, i) => ({ ...u, index: i }));
-
-        // Persist to API (fire-and-forget during drag, await on drop)
-        // We debounce by doing it inside a setTimeout so rapid hover events
-        // don't flood the API; the last call wins.
-        persistIndices(reindexed);
-
-        return reindexed;
-      });
-    },
-    []
-  );
-
-  // Debounce ref so we only call API after dragging settles
   const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const persistIndices = useCallback(
-    (updatedUsers: User[]) => {
-      if (persistTimer.current) clearTimeout(persistTimer.current);
-      persistTimer.current = setTimeout(async () => {
-        try {
-          await Promise.all(
-            updatedUsers.map((u) =>
-              axiosInstance.patch(`/users/${u._id}`, { index: u.index })
-            )
+  const moveRow = useCallback(
+    (departmentId: string, dragIndex: number, hoverIndex: number) => {
+      setUsers((prev) => {
+        const deptUsers = prev
+          .filter((u) => u.departmentId?.some((d) => d._id === departmentId))
+          .sort(
+            (a, b) =>
+              getDeptIndex(a, departmentId) - getDeptIndex(b, departmentId)
           );
-        } catch (e) {
-          console.error('Failed to persist user indices', e);
-          toast({
-            title: 'Failed to save order',
-            description: 'User order could not be saved to server.',
-            variant: 'destructive'
-          });
-        }
-      }, 600); // 600ms debounce
+
+        const reordered = [...deptUsers];
+        const [removed] = reordered.splice(dragIndex, 1);
+        reordered.splice(hoverIndex, 0, removed);
+
+        const newIndexMap: Record<string, number> = {};
+        reordered.forEach((u, i) => {
+          newIndexMap[u._id] = i;
+        });
+
+        const updated = prev.map((u) => {
+          if (newIndexMap[u._id] === undefined) return u;
+          const newDWI = [...(u.departmentWiseIndex || [])];
+          const ei = newDWI.findIndex((d) => d.departmentId === departmentId);
+          if (ei >= 0)
+            newDWI[ei] = { ...newDWI[ei], index: newIndexMap[u._id] };
+          else newDWI.push({ departmentId, index: newIndexMap[u._id] });
+          return { ...u, departmentWiseIndex: newDWI };
+        });
+
+        if (persistTimer.current) clearTimeout(persistTimer.current);
+        persistTimer.current = setTimeout(async () => {
+          try {
+            await Promise.all(
+              Object.entries(newIndexMap).map(([userId]) => {
+                const userObj = updated.find((u) => u._id === userId);
+                return axiosInstance.patch(`/users/${userId}`, {
+                  departmentWiseIndex: userObj?.departmentWiseIndex
+                });
+              })
+            );
+          } catch (e) {
+            console.error('Failed to persist order', e);
+            toast({ title: 'Failed to save order', variant: 'destructive' });
+          }
+        }, 600);
+
+        return updated;
+      });
     },
     [toast]
   );
 
-  // ── Derived data ───────────────────────────────────────────────────────────
   const rotaMap = useMemo(() => {
-    const map: Record<string, Record<string, any>> = {};
+    const map: Record<string, Record<string, any[]>> = {};
     rotas.forEach((rota) => {
-      const empId = rota.employeeId;
+      const empId =
+        typeof rota.employeeId === 'object'
+          ? rota.employeeId._id
+          : rota.employeeId;
       const dateKey = moment(rota.startDate).format('YYYY-MM-DD');
       if (!map[empId]) map[empId] = {};
-      map[empId][dateKey] = rota;
+      if (!map[empId][dateKey]) map[empId][dateKey] = [];
+      map[empId][dateKey].push(rota);
     });
     return map;
   }, [rotas]);
@@ -449,20 +574,109 @@ export default function CompanyRota() {
   > = {
     DO: { bg: '#E0F7FA', border: '#B2EBF2', text: '#006064' },
     AL: { bg: '#93c47d', border: '#93c47d', text: '#ffffff' },
-    S:  { bg: '#ff0000', border: '#FFCDD2', text: '#ffffff' },
+    S: { bg: '#ff0000', border: '#FFCDD2', text: '#ffffff' },
     ML: { bg: '#F3E5F5', border: '#E1BEE7', text: '#4A148C' },
     NT: { bg: '#ECEFF1', border: '#CFD8DC', text: '#37474F' }
   };
 
-  const groupedUsers = useMemo(() => {
-    const groups: Record<string, User[]> = {};
-    users.forEach((user) => {
-      const groupName = user.department || user.role || 'Staff';
-      if (!groups[groupName]) groups[groupName] = [];
-      groups[groupName].push(user);
+  const groupedByDepartment = useMemo(() => {
+    const groups: { department: Department; users: User[] }[] = [];
+
+    departments.forEach((dept) => {
+      const deptUsers = users
+        .filter((u) => u.departmentId?.some((d) => d._id === dept._id))
+        .sort((a, b) => getDeptIndex(a, dept._id) - getDeptIndex(b, dept._id));
+      if (deptUsers.length > 0)
+        groups.push({ department: dept, users: deptUsers });
     });
+
+    const unassigned = users.filter(
+      (u) => !u.departmentId || u.departmentId.length === 0
+    );
+    if (unassigned.length > 0) {
+      groups.push({
+        department: {
+          _id: 'unassigned',
+          departmentName: 'Unassigned',
+          index: 9999
+        },
+        users: unassigned
+      });
+    }
+
     return groups;
+  }, [departments, users]);
+
+  const [orderedGroups, setOrderedGroups] = useState<
+    { department: Department; users: User[] }[]
+  >([]);
+
+  useEffect(() => {
+    setOrderedGroups(groupedByDepartment);
+  }, [groupedByDepartment]);
+
+  useEffect(() => {
+    setOrderedGroups((prev) =>
+      prev.map((g) => {
+        if (g.department._id === 'unassigned') {
+          return {
+            ...g,
+            users: users.filter(
+              (u) => !u.departmentId || u.departmentId.length === 0
+            )
+          };
+        }
+        return {
+          ...g,
+          users: users
+            .filter((u) =>
+              u.departmentId?.some((d) => d._id === g.department._id)
+            )
+            .sort(
+              (a, b) =>
+                getDeptIndex(a, g.department._id) -
+                getDeptIndex(b, g.department._id)
+            )
+        };
+      })
+    );
   }, [users]);
+
+  const deptPersistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const moveDepartment = useCallback(
+    (dragIndex: number, hoverIndex: number) => {
+      setOrderedGroups((prev) => {
+        const updated = [...prev];
+        const [removed] = updated.splice(dragIndex, 1);
+        updated.splice(hoverIndex, 0, removed);
+
+        if (deptPersistTimer.current) clearTimeout(deptPersistTimer.current);
+        deptPersistTimer.current = setTimeout(async () => {
+          try {
+            await Promise.all(
+              updated
+                .filter((g) => g.department._id !== 'unassigned')
+                .map((g, i) =>
+                  axiosInstance.patch(`/hr/department/${g.department._id}`, {
+                    index: i
+                  })
+                )
+            );
+          } catch (e) {
+            console.error('Failed to persist department order', e);
+            toast({
+              title: 'Failed to save department order',
+              variant: 'destructive'
+            });
+          }
+        }, 600);
+
+        return updated;
+      });
+    },
+    [toast]
+  );
 
   const daysArray = useMemo(() => {
     const count = currentDate.daysInMonth();
@@ -473,49 +687,59 @@ export default function CompanyRota() {
 
   const prevMonth = () => setCurrentDate((d) => d.clone().subtract(1, 'month'));
   const nextMonth = () => setCurrentDate((d) => d.clone().add(1, 'month'));
-
   const handlePickerChange = (date: Date | null) => {
     if (date) setCurrentDate(moment(date));
     setPickerOpen(false);
   };
 
   const handleAddRotaSuccess = (newRota: any) => {
-    setRotas((prev) => [...prev, newRota]);
+    if (Array.isArray(newRota)) setRotas((p) => [...p, ...newRota]);
+    else setRotas((p) => [...p, newRota]);
   };
 
   const handleUpdateRotaSuccess = (updatedRota: any) => {
-    setRotas((prev) =>
-      prev.map((r) => (r._id === updatedRota._id ? updatedRota : r))
-    );
-  };
+    setRotas((prev) => {
+      const updatedArray = Array.isArray(updatedRota)
+        ? updatedRota
+        : [updatedRota];
+      let newRotas = [...prev];
 
-  const handleDeleteRotaSuccess = (deletedRotaId: string) => {
-    setRotas((prev) => prev.filter((r) => r._id !== deletedRotaId));
-  };
+      updatedArray.forEach((updatedItem) => {
+        const index = newRotas.findIndex((r) => r._id === updatedItem._id);
+        if (index !== -1) {
+          // Exists, update it
+          newRotas[index] = updatedItem;
+        } else {
+          // Brand new shift slot added inside the Edit sidebar, push it to state
+          newRotas.push(updatedItem);
+        }
+      });
 
-  const handleCellClick = (user: User, day: moment.Moment) => {
-    const dateKey = day.format('YYYY-MM-DD');
-    const existingRota = rotaMap[user._id]?.[dateKey];
-    setSelectedContext({ employee: user, date: day });
-    if (existingRota) {
-      setSelectedRota(existingRota);
-      setIsEditOpen(true);
-    } else {
-      setIsCreateOpen(true);
-    }
-  };
-
-  // Flat ordered users list (for drag — we manage order ourselves, not groups)
-  const orderedUsers = users;
-
-  // Build a flat row index map so DraggableRow can reference the correct global index
-  const userIndexMap = useMemo(() => {
-    const map: Record<string, number> = {};
-    orderedUsers.forEach((u, i) => {
-      map[u._id] = i;
+      return newRotas;
     });
-    return map;
-  }, [orderedUsers]);
+  };
+
+  const handleDeleteRotaSuccess = (deletedRotaId: string) =>
+    setRotas((p) => p.filter((r) => r._id !== deletedRotaId));
+
+  const handleCellClick = (
+    user: User,
+    day: moment.Moment,
+    departmentId: string
+  ) => {
+    const dateKey = day.format('YYYY-MM-DD');
+    const existingRotas = (rotaMap[user._id]?.[dateKey] || []).filter(
+      (r: any) =>
+        (typeof r.departmentId === 'object'
+          ? r.departmentId._id
+          : r.departmentId) === departmentId
+    );
+    setSelectedContext({ employee: user, date: day, departmentId });
+    if (existingRotas && existingRotas.length > 0) {
+      setSelectedRota(existingRotas); // pass the array of rotas to the editor
+      setIsEditOpen(true);
+    } else setIsCreateOpen(true);
+  };
 
   return (
     <DndProvider backend={HTML5Backend}>
@@ -530,12 +754,11 @@ export default function CompanyRota() {
           .scrollbar-top-wrapper > table { transform: rotateX(180deg); }
         `}</style>
 
-        {/* ── Header ── */}
+        {/* Header */}
         <div className="flex flex-none items-center justify-between pb-4">
           <div className="flex items-center gap-3">
             <h1 className="text-lg font-bold">Staff Rota</h1>
           </div>
-
           <div className="flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50/50 p-1">
             <Button
               variant="ghost"
@@ -576,39 +799,45 @@ export default function CompanyRota() {
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
-
           <div className="flex items-center gap-2">
-            <Button onClick={() => navigate(-1)} variant="outline" className="h-9 gap-2">
+            <Button
+              onClick={() => navigate(-1)}
+              variant="outline"
+              className="h-9 gap-2"
+            >
               <MoveLeft className="h-4 w-4" /> Back
             </Button>
             <Button
               onClick={() => setIsCopyRotaOpen(true)}
               variant="outline"
-              className="h-9 gap-2 bg-emerald-800 text-white hover:bg-emerald-700 border-none"
+              className="h-9 gap-2 border-none bg-emerald-800 text-white hover:bg-emerald-700"
             >
               <Copy className="h-4 w-4" /> Copy Rota
             </Button>
             <Button
               onClick={() => navigate('report')}
               variant="outline"
-              className="h-9 gap-2 bg-purple-800 text-white hover:bg-purple-700 border-none"
+              className="h-9 gap-2 border-none bg-purple-800 text-white hover:bg-purple-700"
             >
               <File className="h-4 w-4" /> Report
             </Button>
             <Button
               onClick={() => setIsBulkAssignOpen(true)}
               variant="outline"
-              className="h-9 gap-2 bg-orange-800 text-white hover:bg-orange-700 border-none"
+              className="h-9 gap-2 border-none bg-orange-800 text-white hover:bg-orange-700"
             >
               <Users className="h-4 w-4" /> Bulk Assign
             </Button>
-            <Button onClick={() => setIsAddRotaOpen(true)} className="h-9 gap-2">
+            <Button
+              onClick={() => setIsAddRotaOpen(true)}
+              className="h-9 gap-2"
+            >
               <Plus className="h-4 w-4" /> Add Rota
             </Button>
           </div>
         </div>
 
-        {/* ── Skipped Records Banner ── */}
+        {/* Skipped Records Banner */}
         {skippedRecords.length > 0 && (
           <div className="relative mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4 shadow-sm animate-in fade-in slide-in-from-top-4">
             <button
@@ -623,14 +852,19 @@ export default function CompanyRota() {
               </div>
               <div className="flex-1">
                 <h3 className="text-sm font-bold text-amber-900">
-                  Action Completed with Warnings ({skippedRecords.length} shifts skipped)
+                  Action Completed with Warnings ({skippedRecords.length} shifts
+                  skipped)
                 </h3>
                 <p className="mb-3 mt-1 text-xs font-medium text-amber-700">
-                  The following shifts were not created because the staff already had an assignment on those dates:
+                  The following shifts were not created because the staff
+                  already had an assignment on those dates:
                 </p>
                 <div className="custom-scrollbar grid max-h-48 grid-cols-1 gap-2 overflow-y-auto pr-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                   {skippedRecords.map((rec, idx) => (
-                    <div key={idx} className="flex flex-col justify-center rounded-md border border-amber-100 bg-white p-2 shadow-sm">
+                    <div
+                      key={idx}
+                      className="flex flex-col justify-center rounded-md border border-amber-100 bg-white p-2 shadow-sm"
+                    >
                       <span className="truncate text-[13px] font-bold text-gray-800">
                         {rec.firstName} {rec.lastName}
                       </span>
@@ -645,7 +879,7 @@ export default function CompanyRota() {
           </div>
         )}
 
-        {/* ── Table ── */}
+        {/* Table */}
         {isLoading ? (
           <div className="flex h-[60vh] flex-1 items-center justify-center">
             <div className="flex h-[60vh] justify-center py-6">
@@ -658,7 +892,9 @@ export default function CompanyRota() {
               <thead className="sticky bottom-0 top-0 z-40 bg-gray-50">
                 <tr>
                   <th className="sticky bottom-0 left-0 top-0 z-50 min-w-[160px] border-b border-r border-gray-200 bg-[#F8FAFC] p-4 shadow-[1px_0_0_0_rgba(0,0,0,0.1)] sm:min-w-[240px]">
-                    <span className="text-xs font-bold uppercase text-black">Staff Member</span>
+                    <span className="text-xs font-bold uppercase text-black">
+                      Staff Member
+                    </span>
                   </th>
                   {daysArray.map((day) => {
                     const isToday = day.isSame(moment(), 'day');
@@ -666,14 +902,14 @@ export default function CompanyRota() {
                     return (
                       <th
                         key={day.format('D')}
-                        className={`min-w-[52px] border-b border-r border-gray-200 py-2 text-center
-                          ${isToday ? 'bg-theme/50 text-white' : isWeekend ? 'bg-theme/5' : ''}
-                        `}
+                        className={`min-w-[52px] border-b border-r border-gray-200 py-2 text-center ${isToday ? 'bg-theme/50 text-white' : isWeekend ? 'bg-theme/5' : ''}`}
                       >
-                        <div className={`text-xs font-bold uppercase ${isWeekend ? 'text-black' : 'text-black'}`}>
+                        <div className="text-xs font-bold uppercase text-black">
                           {day.format('ddd')}
                         </div>
-                        <div className={`text-sm font-black ${isToday ? 'mx-auto flex h-6 w-6 items-center justify-center rounded-full bg-theme text-white' : 'text-black'}`}>
+                        <div
+                          className={`text-sm font-black ${isToday ? 'mx-auto flex h-6 w-6 items-center justify-center rounded-full bg-theme text-white' : 'text-black'}`}
+                        >
                           {day.format('D')}
                         </div>
                       </th>
@@ -681,30 +917,29 @@ export default function CompanyRota() {
                   })}
                 </tr>
               </thead>
-
               <tbody>
-                {Object.entries(groupedUsers).map(([groupName, groupUsers]) => (
-                  <React.Fragment key={groupName}>
-                    {groupUsers.map((user) => (
-                      <DraggableRow
-                        key={user._id}
-                        user={user}
-                        rowIndex={userIndexMap[user._id]}
-                        moveRow={moveRow}
-                        daysArray={daysArray}
-                        rotaMap={rotaMap}
-                        leaveTypeColors={leaveTypeColors}
-                        handleCellClick={handleCellClick}
-                      />
-                    ))}
-                  </React.Fragment>
-                ))}
+                {orderedGroups.map(
+                  ({ department, users: deptUsers }, deptIndex) => (
+                    <DraggableDepartmentHeader
+                      key={department._id}
+                      department={department}
+                      deptIndex={deptIndex}
+                      moveDepartment={moveDepartment}
+                      daysArray={daysArray}
+                      users={deptUsers}
+                      rotaMap={rotaMap}
+                      leaveTypeColors={leaveTypeColors}
+                      moveRow={moveRow}
+                      handleCellClick={handleCellClick}
+                    />
+                  )
+                )}
               </tbody>
             </table>
           </div>
         )}
 
-        {/* ── Dialogs & Sidebars ── */}
+        {/* Dialogs */}
         <CreateRotaDialog
           isOpen={isCreateOpen}
           onClose={() => setIsCreateOpen(false)}
@@ -713,8 +948,9 @@ export default function CompanyRota() {
           companyId={companyId}
           onSuccess={handleAddRotaSuccess}
           companyColor={companyColor}
+          departments={departments}
+          preselectedDepartmentId={selectedContext.departmentId}
         />
-
         <EditRotaSidebar
           isOpen={isEditOpen}
           onClose={() => setIsEditOpen(false)}
@@ -724,7 +960,6 @@ export default function CompanyRota() {
           onDeleteSuccess={handleDeleteRotaSuccess}
           companyColor={companyColor}
         />
-
         <AddRotaDialog
           isOpen={isAddRotaOpen}
           onClose={() => setIsAddRotaOpen(false)}
@@ -732,8 +967,8 @@ export default function CompanyRota() {
           companyId={companyId}
           onSuccess={handleAddRotaSuccess}
           companyColor={companyColor}
+          departments={departments}
         />
-
         <BulkAssignDialog
           isOpen={isBulkAssignOpen}
           onClose={() => setIsBulkAssignOpen(false)}
@@ -742,8 +977,8 @@ export default function CompanyRota() {
           onSuccess={fetchUsersAndRotas}
           setGlobalSkippedRecords={setSkippedRecords}
           companyColor={companyColor}
+          departments={departments}
         />
-
         <CopyRotaDialog
           isOpen={isCopyRotaOpen}
           onClose={() => setIsCopyRotaOpen(false)}

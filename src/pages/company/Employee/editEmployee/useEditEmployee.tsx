@@ -5,7 +5,7 @@ import moment from 'moment';
 import { useToast } from '@/components/ui/use-toast';
 
 export const useEditEmployee = () => {
-  const { id,eid } = useParams();
+  const { id, eid } = useParams();
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('personal');
   const [isFieldSaving, setIsFieldSaving] = useState<Record<string, boolean>>(
@@ -132,7 +132,7 @@ export const useEditEmployee = () => {
           gender: data.gender || '',
           maritalStatus: data.maritalStatus || '',
           ethnicOrigin: data.ethnicOrigin || '',
-          image:data.image || '',
+          image: data.image || '',
           // Contact Information
           email: data.email || '',
           homePhone: data.homePhone || '',
@@ -143,7 +143,11 @@ export const useEditEmployee = () => {
           stateOrProvince: data.stateOrProvince || '',
           postCode: data.postCode || '',
           country: data.country || '',
+          drivingLicenceNo: data.drivingLicenceNo || '',
 
+          drivingLicenceExpiry: data.drivingLicenceExpiry
+            ? moment(data.drivingLicenceExpiry)
+            : null,
           // Employment Details
           employmentType: data.employmentType || '',
           position: data.position || '',
@@ -219,8 +223,12 @@ export const useEditEmployee = () => {
           sortCode: data.sortCode || '',
 
           // Department, Designation, Training
-          designationId: data.designationId || '',
-          departmentId: data.departmentId || '',
+          designationId: Array.isArray(data.designationId)
+            ? data.designationId
+            : [],
+          departmentId: Array.isArray(data.departmentId)
+            ? data.departmentId
+            : [],
           training: Array.isArray(data.training) ? data.training : [],
           passportNo: data.passportNo || '',
           passportExpiry: data.passportExpiry
@@ -243,21 +251,26 @@ export const useEditEmployee = () => {
     fetchEmployee();
   }, [eid, toast]);
 
+  // In useEditEmployee.tsx - fix serializeMoments
   const serializeMoments = (obj: any): any => {
     if (moment.isMoment(obj)) {
       return obj.toISOString();
     }
 
     if (Array.isArray(obj)) {
-      return obj.map(serializeMoments);
+      return obj.map(serializeMoments); // ✅ arrays preserved as-is (strings pass through)
     }
 
     if (obj && typeof obj === 'object') {
       const result: Record<string, any> = {};
       for (const [key, val] of Object.entries(obj)) {
-        // Skip null or undefined values
+        // ❌ BUG: skipping null/undefined causes array fields set to [] to be lost
+        // when the whole updateData object is processed — but more critically,
+        // empty arrays ARE falsy in some checks. Preserve them explicitly:
         if (val !== null && val !== undefined) {
           result[key] = serializeMoments(val);
+        } else {
+          result[key] = val; // keep null/undefined as-is instead of dropping
         }
       }
       return result;
@@ -266,6 +279,7 @@ export const useEditEmployee = () => {
     return obj;
   };
 
+  // In useEditEmployee.tsx - updateField, fix the setFormData update for arrays
   const updateField = useCallback(
     async (fieldName: string, value: any) => {
       try {
@@ -273,19 +287,21 @@ export const useEditEmployee = () => {
         if (fieldName === 'contractHours') {
           value = Number(value);
         }
-        // Special handling for nested objects
+
         let updateData;
         if (fieldName.includes('.')) {
-          // Handle nested fields (e.g., 'rightToWork.expiryDate')
           const [parentField, childField] = fieldName.split('.');
           updateData = {
             [parentField]: {
-              ...formData[parentField as keyof typeof formData],
+              ...(formData[parentField as keyof typeof formData] as object),
               [childField]: serializeMoments(value)
             }
           };
         } else {
-          updateData = { [fieldName]: serializeMoments(value) };
+          // ✅ FIX: Preserve arrays explicitly — don't let serializeMoments drop empty arrays
+          updateData = {
+            [fieldName]: Array.isArray(value) ? value : serializeMoments(value)
+          };
         }
 
         await axiosInstance.patch(`/users/${eid}`, updateData);
@@ -295,20 +311,18 @@ export const useEditEmployee = () => {
           ...(fieldName.includes('.')
             ? {
                 [fieldName.split('.')[0]]: {
-                  ...prev[fieldName.split('.')[0] as keyof typeof prev],
+                  ...(prev[
+                    fieldName.split('.')[0] as keyof typeof prev
+                  ] as object),
                   [fieldName.split('.')[1]]: value
                 }
               }
             : { [fieldName]: value })
         }));
-
-        // toast({
-        //   title: 'Data updated successfully'
-        // });
       } catch (error) {
         toast({
           variant: 'destructive',
-          title: error?.response?.data?.message ||'Update failed',
+          title: error?.response?.data?.message || 'Update failed'
         });
       } finally {
         setIsFieldSaving((prev) => ({ ...prev, [fieldName]: false }));

@@ -207,6 +207,15 @@ const UpcomingShiftPage = () => {
                               </span>
                             </div>
 
+                            <div className="w-full sm:w-auto sm:min-w-[130px]">
+                              <span className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">
+                                Department
+                              </span>
+                              <span className="inline-flex items-center rounded-md bg-theme/10 px-2.5 py-1 text-xs font-semibold text-theme">
+                                {shift?.departmentId?.departmentName || ''}
+                              </span>
+                            </div>
+                            
                             {/* Render conditionally based on if it's a leave day or working shift */}
                             {isLeave ? (
                               <div className="flex w-full flex-1 items-center">

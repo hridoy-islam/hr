@@ -32,7 +32,7 @@ export default function Employee() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [entriesPerPage, setEntriesPerPage] = useState(100);
-  const {id} = useParams()
+  const { id } = useParams();
   const [searchInput, setSearchInput] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -58,7 +58,7 @@ export default function Employee() {
         page: currentPage,
         limit: entriesPerPage,
         role: 'employee',
-        company:id
+        company: id
       };
 
       if (searchTerm) params.searchTerm = searchTerm;
@@ -75,7 +75,7 @@ export default function Employee() {
       toast({
         title: 'Error',
         description:
-        error.response?.data?.message || 'Failed to load employees.',
+          error.response?.data?.message || 'Failed to load employees.',
         variant: 'destructive'
       });
     } finally {
@@ -268,13 +268,13 @@ export default function Employee() {
                   <TableHead>Phone</TableHead>
                   <TableHead>Department</TableHead>
                   <TableHead>Designation</TableHead>
-                  <TableHead className='text-center'>Status</TableHead>
+                  <TableHead className="text-center">Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {employees.map((employee) => (
-                  <TableRow key={employee._id} className='cursor-pointer'>
+                  <TableRow key={employee._id} className="cursor-pointer">
                     <TableCell onClick={() => navigate(`${employee._id}`)}>
                       {employee.title} {employee.firstName} {employee.initial}{' '}
                       {employee.lastName}
@@ -286,10 +286,21 @@ export default function Employee() {
                       {employee.mobilePhone || '–'}
                     </TableCell>
                     <TableCell onClick={() => navigate(`${employee._id}`)}>
-                      {employee.departmentId?.departmentName || '–'}
+                      {Array.isArray(employee.departmentId) &&
+                      employee.departmentId.length > 0
+                        ? employee.departmentId
+                            .map((dep: any) => dep.departmentName)
+                            .join(', ')
+                        : '–'}
                     </TableCell>
+
                     <TableCell onClick={() => navigate(`${employee._id}`)}>
-                      {employee.designationId?.title || '–'}
+                      {Array.isArray(employee.designationId) &&
+                      employee.designationId.length > 0
+                        ? employee.designationId
+                            .map((des: any) => des.title)
+                            .join(', ')
+                        : '–'}
                     </TableCell>
 
                     <TableCell className="text-center">

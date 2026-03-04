@@ -242,12 +242,14 @@ const RecruitApplicantForm = () => {
 
       // 4. Create Right-to-Work Record
       try {
-        await axiosInstance.post(`/hr/right-to-work`, {
-          nextCheckDate: newUser?.rtwCheckDate,
-          employeeId: newUser._id,
-          updatedBy: user?._id,
-          document: newUser?.rightToWork
-        });
+        if (newUser.noRtwCheck === true && newUser.rtwCheckDate)  {
+          await axiosInstance.post(`/hr/right-to-work`, {
+            nextCheckDate: newUser?.rtwCheckDate,
+            employeeId: newUser._id,
+            updatedBy: user?._id,
+            document: newUser?.rightToWork
+          });
+        }
       } catch (rtwError) {
         console.error('Failed to create RTW record, skipping step:', rtwError);
       }

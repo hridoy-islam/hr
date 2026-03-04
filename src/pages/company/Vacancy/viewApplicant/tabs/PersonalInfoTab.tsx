@@ -15,7 +15,7 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
   onUpdate,
   onDateChange,
   onSelectChange,
-  isFieldSaving,
+  isFieldSaving
 }) => {
   const titleOptions = [
     { value: 'Mr', label: 'Mr' },
@@ -23,14 +23,14 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
     { value: 'Miss', label: 'Miss' },
     { value: 'Ms', label: 'Ms' },
     { value: 'Dr', label: 'Dr' },
-    { value: 'Prof', label: 'Prof' },
+    { value: 'Prof', label: 'Prof' }
   ];
 
   const genderOptions = [
     { value: 'Male', label: 'Male' },
     { value: 'Female', label: 'Female' },
     { value: 'Other', label: 'Other' },
-    { value: 'Prefer not to say', label: 'Prefer not to say' },
+    { value: 'Prefer not to say', label: 'Prefer not to say' }
   ];
 
   const maritalStatusOptions = [
@@ -39,17 +39,29 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
     { value: 'Divorced', label: 'Divorced' },
     { value: 'Widowed', label: 'Widowed' },
     { value: 'Separated', label: 'Separated' },
-    { value: 'Civil Partnership', label: 'Civil Partnership' },
+    { value: 'Civil Partnership', label: 'Civil Partnership' }
+  ];
+
+  const idDocumentOptions = [
+    { value: 'Passport', label: 'Passport' },
+    { value: 'Driving Licence', label: 'Driving Licence' }
+  ];
+
+  const employmentTypeOptions = [
+    { value: 'full-time', label: 'Full-time' },
+    { value: 'part-time', label: 'Part-time' },
+    { value: 'contractor', label: 'Contractor' },
+    { value: 'bank', label: 'Bank/Casual' }
   ];
 
   return (
     <div className="space-y-8">
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-6 border-b border-gray-200 pb-3">
+      {/* 1. General Personal Information */}
+      <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+        <h3 className="mb-6 border-b border-gray-200 pb-3 text-lg font-semibold text-gray-900">
           Personal Information
         </h3>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
           <EditableField
             id="title"
             label="Title"
@@ -60,7 +72,6 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
             isSaving={isFieldSaving.title}
             required
           />
-
           <EditableField
             id="firstName"
             label="First Name"
@@ -70,17 +81,15 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
             required
             placeholder="Enter first name"
           />
-
           <EditableField
             id="initial"
             label="Middle Initial"
             value={formData.initial}
             onUpdate={(value) => onUpdate('initial', value)}
             isSaving={isFieldSaving.initial}
-            placeholder="Enter middle initial"
+            placeholder="M"
             maxLength={1}
           />
-
           <EditableField
             id="lastName"
             label="Last Name"
@@ -90,17 +99,19 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
             required
             placeholder="Enter last name"
           />
-
           <EditableField
             id="dateOfBirth"
             label="Date of Birth"
-            value={formData.dateOfBirth ? moment(formData.dateOfBirth).format('YYYY-MM-DD') : ''}
+            value={
+              formData.dateOfBirth
+                ? moment(formData.dateOfBirth).format('DD-MM-YYYY')
+                : ''
+            }
             type="date"
             onUpdate={(value) => onDateChange('dateOfBirth', value)}
             isSaving={isFieldSaving.dateOfBirth}
             required
           />
-
           <EditableField
             id="gender"
             label="Gender"
@@ -111,7 +122,6 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
             isSaving={isFieldSaving.gender}
             required
           />
-
           <EditableField
             id="maritalStatus"
             label="Marital Status"
@@ -122,7 +132,6 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
             isSaving={isFieldSaving.maritalStatus}
             required
           />
-
           <EditableField
             id="ethnicOrigin"
             label="Ethnic Origin"
@@ -134,21 +143,20 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-6 border-b border-gray-200 pb-3">
+      {/* 2. Identification & Document Status */}
+      <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+        <h3 className="mb-6 border-b border-gray-200 pb-3 text-lg font-semibold text-gray-900">
           Identification Numbers
         </h3>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
           <EditableField
             id="nationalInsuranceNumber"
-            label="National Insurance Number"
+            label="NI Number"
             value={formData.nationalInsuranceNumber}
             onUpdate={(value) => onUpdate('nationalInsuranceNumber', value)}
             isSaving={isFieldSaving.nationalInsuranceNumber}
-            placeholder="Enter NI number"
+            placeholder="QQ 12 34 56 C"
           />
-
           <EditableField
             id="nhsNumber"
             label="NHS Number"
@@ -158,24 +166,136 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
             placeholder="Enter NHS number"
           />
           <EditableField
-            id="passportNo"
-            label="Passport Number"
-            value={formData.passportNo}
-            onUpdate={(value) => onUpdate('passportNo', value)}
-            isSaving={isFieldSaving.nhsNumber}
-            placeholder="Enter Passport No"
-          />
-
-              <EditableField
-            id="passportExpiry"
-            label="Passport Expiry Date"
-            value={formData.passportExpiry ? moment(formData.passportExpiry).format('YYYY-MM-DD') : ''}
-            type="date"
-            onUpdate={(value) => onDateChange('passportExpiry', value)}
-            isSaving={isFieldSaving.dateOfBirth}
+            id="idDocumentType"
+            label="Primary ID Document"
+            value={formData.idDocumentType}
+            type="select"
+            options={idDocumentOptions}
+            onUpdate={(value) => onSelectChange('idDocumentType', value)}
+            isSaving={isFieldSaving.idDocumentType}
             required
           />
 
+          {/* Toggle Logic: Show Driving Licence if selected, otherwise show Passport */}
+          {formData.idDocumentType === 'Driving Licence' ? (
+            <>
+              <EditableField
+                id="drivingLicenceNo"
+                label="Driving Licence No"
+                value={formData.drivingLicenceNo}
+                onUpdate={(value) => onUpdate('drivingLicenceNo', value)}
+                isSaving={isFieldSaving.drivingLicenceNo}
+                placeholder="Enter Licence No"
+                required
+              />
+              <EditableField
+                id="drivingLicenceExpiry"
+                label="Licence Expiry"
+                value={
+                  formData.drivingLicenceExpiry
+                    ? moment(formData.drivingLicenceExpiry).format('DD-MM-YYYY')
+                    : ''
+                }
+                type="date"
+                onUpdate={(value) =>
+                  onDateChange('drivingLicenceExpiry', value)
+                }
+                isSaving={isFieldSaving.drivingLicenceExpiry}
+                required
+              />
+            </>
+          ) : (
+            <>
+              <EditableField
+                id="passportNo"
+                label="Passport Number"
+                value={formData.passportNo}
+                onUpdate={(value) => onUpdate('passportNo', value)}
+                isSaving={isFieldSaving.passportNo}
+                placeholder="Enter Passport No"
+                required
+              />
+              <EditableField
+                id="passportExpiry"
+                label="Passport Expiry"
+                value={
+                  formData.passportExpiry
+                    ? moment(formData.passportExpiry).format('DD-MM-YYYY')
+                    : ''
+                }
+                type="date"
+                onUpdate={(value) => onDateChange('passportExpiry', value)}
+                isSaving={isFieldSaving.passportExpiry}
+                required
+              />
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* 3. Employment & Application Details */}
+      <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+        <h3 className="mb-6 border-b border-gray-200 pb-3 text-lg font-semibold text-gray-900">
+          Application & Employment
+        </h3>
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+          <EditableField
+            id="employmentType"
+            label="Employment Type"
+            value={formData.employmentType}
+            type="select"
+            options={employmentTypeOptions}
+            onUpdate={(value) => onSelectChange('employmentType', value)}
+            isSaving={isFieldSaving.employmentType}
+          />
+          <EditableField
+            id="position"
+            label="Position"
+            value={formData.position}
+            onUpdate={(value) => onUpdate('position', value)}
+            isSaving={isFieldSaving.position}
+            placeholder="e.g. Registered Nurse"
+          />
+          {/* <EditableField
+            id="contractHours"
+            label="Contract Hours"
+            value={formData.contractHours}
+            onUpdate={(value) => onUpdate('contractHours', value)}
+            isSaving={isFieldSaving.contractHours}
+            placeholder="e.g. 37.5"
+          /> */}
+          <EditableField
+            id="branch"
+            label="Branch"
+            value={formData.branch}
+            onUpdate={(value) => onUpdate('branch', value)}
+            isSaving={isFieldSaving.branch}
+            placeholder="Enter branch location"
+          />
+          <EditableField
+            id="applicationDate"
+            label="Application Date"
+            value={
+              formData.applicationDate
+                ? moment(formData.applicationDate).format('DD-MM-YYYY')
+                : ''
+            }
+            type="date"
+            onUpdate={(value) => onDateChange('applicationDate', value)}
+            isSaving={isFieldSaving.applicationDate}
+          />
+          <EditableField
+            id="availableFromDate"
+            label="Available From"
+            value={
+              formData.availableFromDate
+                ? moment(formData.availableFromDate).format('DD-MM-YYYY')
+                : ''
+            }
+            type="date"
+            onUpdate={(value) => onDateChange('availableFromDate', value)}
+            isSaving={isFieldSaving.availableFromDate}
+          />
         </div>
       </div>
     </div>

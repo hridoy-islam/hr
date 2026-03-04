@@ -54,6 +54,10 @@ export const useEditApplicant = () => {
     status: '',
     notes: '',
     passportNo: '',
+    idDocumentType: '',
+    drivingLicenceNo: '',
+
+    drivingLicenceExpiry: '',
     passportExpiry: null as moment.Moment | null,
     // Document fields
     dbs: '',
@@ -82,8 +86,12 @@ export const useEditApplicant = () => {
         dateOfBirth: data.dateOfBirth ? moment(data.dateOfBirth) : null,
         nationalInsuranceNumber: data.nationalInsuranceNumber || '',
         nhsNumber: data.nhsNumber || '',
-        applicationDate: data.applicationDate ? moment(data.applicationDate) : null,
-        availableFromDate: data.availableFromDate ? moment(data.availableFromDate) : null,
+        applicationDate: data.applicationDate
+          ? moment(data.applicationDate)
+          : null,
+        availableFromDate: data.availableFromDate
+          ? moment(data.availableFromDate)
+          : null,
         employmentType: data.employmentType || '',
         position: data.position || '',
         source: data.source || '',
@@ -106,13 +114,21 @@ export const useEditApplicant = () => {
         reasonableAdjustmentDetails: data.reasonableAdjustmentDetails || '',
         status: data.status || '',
         notes: data.notes || '',
+        idDocumentType: data.idDocumentType || '',
+        drivingLicenceNo: data.drivingLicenceNo || '',
+
+        drivingLicenceExpiry: data.drivingLicenceExpiry
+          ? moment(data.drivingLicenceExpiry)
+          : null,
         passportNo: data.passportNo || '',
-        passportExpiry: data.passportExpiry ? moment(data.passportExpiry) : null,
+        passportExpiry: data.passportExpiry
+          ? moment(data.passportExpiry)
+          : null,
         dbs: data.dbs || '',
         passport: data.passport || '',
         rightToWork: data.rightToWork || '',
         immigrationStatus: data.immigrationStatus || '',
-        proofOfAddress: data.proofOfAddress || '',
+        proofOfAddress: data.proofOfAddress || ''
       });
     } catch (error) {
       toast({
@@ -123,7 +139,7 @@ export const useEditApplicant = () => {
     } finally {
       setLoading(false);
     }
-  }, [aid, toast]);
+  }, [aid]);
 
   // ✅ 2. Call the function in useEffect
   useEffect(() => {

@@ -29,7 +29,7 @@ const generalInfoSchema = z
       required_error: 'Available from date is required'
     }),
     startDate: z.date({ required_error: 'Start date is required' }),
-    
+
     // ✅ Added noRtwCheck as required boolean
     noRtwCheck: z.boolean({
       required_error: 'Please specify if RTW check is needed',
@@ -37,14 +37,18 @@ const generalInfoSchema = z
     }),
 
     // ✅ Changed to optional/nullable. Conditional requirement is handled in superRefine
-    rtwCheckDate: z.date({
+    rtwCheckDate: z
+      .date({
         invalid_type_error: 'Invalid date format'
-    }).optional().nullable(),
+      })
+      .optional()
+      .nullable(),
 
     area: z.string().min(1, { message: 'Area is required' }),
-    contractHours: z.coerce
-      .number()
-      .min(1, { message: 'Contract Hours must be at least 1' }),
+    contractHours: z.coerce.number({
+      required_error: 'Contract hours are required',
+      invalid_type_error: 'Contract hours must be a number'
+    }),
     carTravelAllowance: z.boolean().optional(),
 
     payroll: z.object({
@@ -119,7 +123,6 @@ export function GeneralInformation({
   onSave,
   applicantData
 }: GeneralInfoStepProps) {
-
   const form = useForm<GeneralInfoData>({
     resolver: zodResolver(generalInfoSchema),
     defaultValues: {
@@ -129,13 +132,13 @@ export function GeneralInformation({
       startDate: defaultValues?.startDate
         ? new Date(defaultValues.startDate)
         : undefined,
-      
+
       // ✅ Default setup for new fields
-      noRtwCheck: defaultValues?.noRtwCheck ?? undefined, 
+      noRtwCheck: defaultValues?.noRtwCheck ?? undefined,
       rtwCheckDate: defaultValues?.rtwCheckDate
         ? new Date(defaultValues.rtwCheckDate)
         : null,
-        
+
       area: defaultValues?.area || '',
       contractHours: defaultValues?.contractHours ?? 0,
       carTravelAllowance: defaultValues?.carTravelAllowance ?? undefined,
@@ -239,7 +242,8 @@ export function GeneralInformation({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>
-                    Skip RTW verification for this applicant <span className="text-red-500">*</span>
+                    Skip RTW verification for this applicant{' '}
+                    <span className="text-red-500">*</span>
                   </FormLabel>
                   <FormControl>
                     <Select<OptionType>
@@ -278,7 +282,8 @@ export function GeneralInformation({
                 return (
                   <FormItem>
                     <FormLabel>
-                      RTW Check Date {!isNoRtwCheck && <span className="text-red-500">*</span>}
+                      RTW Check Date{' '}
+                      {!isNoRtwCheck && <span className="text-red-500">*</span>}
                     </FormLabel>
                     <FormControl>
                       <DatePicker
@@ -287,7 +292,7 @@ export function GeneralInformation({
                         minDate={new Date()} // Prevent future dates
                         dateFormat="dd-MM-yyyy"
                         placeholderText="Select check date"
-                        className={`h-9 w-full rounded-sm border border-gray-300 px-3 py-1 focus:border-theme focus:ring-2 focus:ring-theme ${isNoRtwCheck ? 'bg-gray-100 opacity-60 cursor-not-allowed' : ''}`}
+                        className={`h-9 w-full rounded-sm border border-gray-300 px-3 py-1 focus:border-theme focus:ring-2 focus:ring-theme ${isNoRtwCheck ? 'cursor-not-allowed bg-gray-100 opacity-60' : ''}`}
                         showMonthDropdown
                         showYearDropdown
                         dropdownMode="select"

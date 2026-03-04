@@ -14,12 +14,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import Select from 'react-select';
-import { 
-  Camera, 
-  Loader2, 
-  Upload, 
-  AlertCircle 
-} from 'lucide-react';
+import { Camera, Loader2, Upload, AlertCircle } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import { useParams } from 'react-router-dom';
 import DatePicker from 'react-datepicker';
@@ -31,10 +26,11 @@ import {
   DialogDescription,
   DialogFooter,
   DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  DialogTitle
+} from '@/components/ui/dialog';
 
-const personalDetailsSchema = z.object({
+// 1. Updated Schema with Conditional Validation
+const personalDetailsSchemaBase = z.object({
   image: z.string().url().optional(),
   title: z.string().min(1, { message: 'Please select a title' }),
   firstName: z.string().min(1, { message: 'First name is required' }),
@@ -43,17 +39,63 @@ const personalDetailsSchema = z.object({
   dateOfBirth: z.date({ required_error: 'Date of birth is required' }),
   nationalInsuranceNumber: z.string().optional(),
   nhsNumber: z.string().optional(),
-  // ✅ Added/Enabled Fields
-  passportNo: z.string().min(1, { message: 'Passport number is required' }),
-  passportExpiry: z.date({ required_error: 'Passport expiry date is required' }),
-  
+
+  // ID Document Fields
+  idDocumentType: z
+    .string()
+    .min(1, { message: 'Please select an ID document type' }),
+  passportNo: z.string().optional(),
+  passportExpiry: z.date().optional(),
+  drivingLicenceNo: z.string().optional(),
+  drivingLicenceExpiry: z.date().optional(),
+
   applicationDate: z.date({ required_error: 'Application date is required' }),
-  availableFromDate: z.date({ required_error: 'Available from date is required' }),
-  employmentType: z.string().min(1, { message: 'Please select employment type' }),
+  availableFromDate: z.date({
+    required_error: 'Available from date is required'
+  }),
+  employmentType: z
+    .string()
+    .min(1, { message: 'Please select employment type' }),
   position: z.string().min(1, { message: 'Position is required' }),
   source: z.string().min(1, { message: 'Source is required' }),
   branch: z.string().min(1, { message: 'Branch location is required' })
 });
+
+const personalDetailsSchema = personalDetailsSchemaBase.superRefine(
+  (data, ctx) => {
+    if (data.idDocumentType === 'Passport') {
+      if (!data.passportNo || data.passportNo.trim() === '') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Passport number is required',
+          path: ['passportNo']
+        });
+      }
+      if (!data.passportExpiry) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Passport expiry date is required',
+          path: ['passportExpiry']
+        });
+      }
+    } else if (data.idDocumentType === 'Driving Licence') {
+      if (!data.drivingLicenceNo || data.drivingLicenceNo.trim() === '') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Driving licence number is required',
+          path: ['drivingLicenceNo']
+        });
+      }
+      if (!data.drivingLicenceExpiry) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Driving licence expiry date is required',
+          path: ['drivingLicenceExpiry']
+        });
+      }
+    }
+  }
+);
 
 type PersonalDetailsData = z.infer<typeof personalDetailsSchema>;
 
@@ -75,7 +117,9 @@ export function PersonalDetailsStep({
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const [uploadedDocUrl, setUploadedDocUrl] = useState<string | null>(defaultValues?.image || null);
+  const [uploadedDocUrl, setUploadedDocUrl] = useState<string | null>(
+    defaultValues?.image || null
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<PersonalDetailsData>({
@@ -88,17 +132,25 @@ export function PersonalDetailsStep({
       dateOfBirth: defaultValues?.dateOfBirth || undefined,
       nationalInsuranceNumber: defaultValues?.nationalInsuranceNumber || '',
       nhsNumber: defaultValues?.nhsNumber || '',
+
+      idDocumentType: defaultValues?.idDocumentType || '',
+      passportNo: defaultValues?.passportNo || '',
+      passportExpiry: defaultValues?.passportExpiry || undefined,
+      drivingLicenceNo: defaultValues?.drivingLicenceNo || '',
+      drivingLicenceExpiry: defaultValues?.drivingLicenceExpiry || undefined,
+
       applicationDate: defaultValues?.applicationDate || undefined,
       availableFromDate: defaultValues?.availableFromDate || undefined,
       employmentType: defaultValues?.employmentType || '',
       position: defaultValues?.position || '',
       source: defaultValues?.source || '',
       branch: defaultValues?.branch || '',
-      passportNo: defaultValues?.passportNo || '',
-      passportExpiry: defaultValues?.passportExpiry || undefined,
       image: defaultValues?.image || undefined
     }
   });
+
+  // Watch the selected ID Document Type to conditionally render fields
+  const selectedDocumentType = form.watch('idDocumentType');
 
   // Sync uploaded URL with form
   useEffect(() => {
@@ -118,8 +170,8 @@ export function PersonalDetailsStep({
       return false;
     }
     if (!file.type.startsWith('image/')) {
-        setUploadError('Please select a valid image file (JPG, PNG).');
-        return false;
+      setUploadError('Please select a valid image file (JPG, PNG).');
+      return false;
     }
     return true;
   };
@@ -134,8 +186,8 @@ export function PersonalDetailsStep({
     setIsUploading(true);
 
     const formData = new FormData();
-    if (id) formData.append('entityId', id); 
-    formData.append('file_type', 'profileImage'); 
+    if (id) formData.append('entityId', id);
+    formData.append('file_type', 'profileImage');
     formData.append('file', file);
 
     try {
@@ -144,14 +196,13 @@ export function PersonalDetailsStep({
           'Content-Type': 'multipart/form-data'
         }
       });
-      
-      const url = res.data?.data?.fileUrl; 
-      
+
+      const url = res.data?.data?.fileUrl;
+
       if (!url) throw new Error('No file URL returned from server');
 
       setUploadedDocUrl(url);
-      setIsDialogOpen(false); 
-      
+      setIsDialogOpen(false);
     } catch (err) {
       console.error('Upload failed:', err);
       setUploadError('Upload failed. Please try again.');
@@ -193,13 +244,18 @@ export function PersonalDetailsStep({
     { value: 'Other', label: 'Other' }
   ];
 
+  const idDocumentOptions = [
+    { value: 'Passport', label: 'Passport' },
+    { value: 'Driving Licence', label: 'Driving Licence' }
+  ];
+
   return (
     <>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)}>
           <CardContent className="space-y-6 p-0">
             <h1 className="text-2xl">Personal Details</h1>
-            
+
             {/* Profile Picture Upload Section */}
             <div className="flex basis-1/6 items-center justify-start">
               <div className="relative h-48 w-48 overflow-hidden rounded-full border border-gray-200">
@@ -227,22 +283,30 @@ export function PersonalDetailsStep({
                 name="title"
                 render={({ field }) => (
                   <FormItem className="mt-2 flex flex-col">
-                    <FormLabel>Title <span className="text-red-500">*</span></FormLabel>
+                    <FormLabel>
+                      Title <span className="text-red-500">*</span>
+                    </FormLabel>
                     <FormControl>
                       <Select
                         options={titleOptions}
-                        value={titleOptions.find((opt) => opt.value === field.value)}
-                        onChange={(selectedOption) => field.onChange(selectedOption ? selectedOption.value : '')}
+                        value={titleOptions.find(
+                          (opt) => opt.value === field.value
+                        )}
+                        onChange={(selectedOption) =>
+                          field.onChange(
+                            selectedOption ? selectedOption.value : ''
+                          )
+                        }
                         placeholder="Select Title"
                         isClearable
                         styles={{
-                            control: (base) => ({
-                              ...base,
-                              borderColor: '#e2e8f0',
-                              '&:hover': { borderColor: '#cbd5e1' },
-                              boxShadow: 'none',
-                            }),
-                          }}
+                          control: (base) => ({
+                            ...base,
+                            borderColor: '#e2e8f0',
+                            '&:hover': { borderColor: '#cbd5e1' },
+                            boxShadow: 'none'
+                          })
+                        }}
                       />
                     </FormControl>
                     <FormMessage />
@@ -255,8 +319,12 @@ export function PersonalDetailsStep({
                 name="firstName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>First Name <span className="text-red-500">*</span></FormLabel>
-                    <FormControl><Input {...field} /></FormControl>
+                    <FormLabel>
+                      First Name <span className="text-red-500">*</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -268,19 +336,25 @@ export function PersonalDetailsStep({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Initial</FormLabel>
-                    <FormControl><Input {...field} /></FormControl>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              
+
               <FormField
                 control={form.control}
                 name="lastName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Last Name <span className="text-red-500">*</span></FormLabel>
-                    <FormControl><Input {...field} /></FormControl>
+                    <FormLabel>
+                      Last Name <span className="text-red-500">*</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -291,7 +365,9 @@ export function PersonalDetailsStep({
                 name="dateOfBirth"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Date of Birth <span className="text-red-500">*</span></FormLabel>
+                    <FormLabel>
+                      Date of Birth <span className="text-red-500">*</span>
+                    </FormLabel>
                     <FormControl>
                       <DatePicker
                         selected={field.value ? new Date(field.value) : null}
@@ -313,7 +389,7 @@ export function PersonalDetailsStep({
               />
             </div>
 
-            <h1 className="text-2xl mt-6">Official Numbers</h1>
+            <h1 className="mt-6 text-2xl">Official Numbers</h1>
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               <FormField
                 control={form.control}
@@ -321,7 +397,9 @@ export function PersonalDetailsStep({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>National Insurance Number</FormLabel>
-                    <FormControl><Input {...field} /></FormControl>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -333,45 +411,8 @@ export function PersonalDetailsStep({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>NHS Number</FormLabel>
-                    <FormControl><Input {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* ✅ PASSPORT NUMBER ADDED HERE */}
-              <FormField
-                control={form.control}
-                name="passportNo"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Passport Number <span className="text-red-500">*</span></FormLabel>
-                    <FormControl><Input {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* ✅ PASSPORT EXPIRY ADDED HERE */}
-              <FormField
-                control={form.control}
-                name="passportExpiry"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Passport Expiry Date <span className="text-red-500">*</span></FormLabel>
                     <FormControl>
-                      <DatePicker
-                        selected={field.value ? new Date(field.value) : null}
-                        onChange={(date: Date) => field.onChange(date)}
-                        dateFormat="dd-MM-yyyy"
-                        placeholderText="Select passport expiry"
-                        className="mt-1 w-full rounded-md border border-gray-300 px-3 py-1 focus:border-theme focus:ring-2 focus:ring-theme"
-                        showMonthDropdown
-                        showYearDropdown
-                        dropdownMode="select"
-                        isClearable
-                        wrapperClassName="w-full"
-                      />
+                      <Input {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -379,14 +420,165 @@ export function PersonalDetailsStep({
               />
             </div>
 
-            <h1 className="text-2xl mt-6">Application Details</h1>
+            <h1 className="mt-6 text-2xl">Identity Document</h1>
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+              <FormField
+                control={form.control}
+                name="idDocumentType"
+                render={({ field }) => (
+                  <FormItem className="mt-2 flex flex-col">
+                    <FormLabel>
+                      Document Type <span className="text-red-500">*</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Select
+                        options={idDocumentOptions}
+                        value={idDocumentOptions.find(
+                          (opt) => opt.value === field.value
+                        )}
+                        onChange={(selectedOption) => {
+                          field.onChange(
+                            selectedOption ? selectedOption.value : ''
+                          );
+                          // Clear values when switching types
+                          form.setValue('passportNo', '');
+                          form.setValue('passportExpiry', undefined as any);
+                          form.setValue('drivingLicenceNo', '');
+                          form.setValue(
+                            'drivingLicenceExpiry',
+                            undefined as any
+                          );
+                        }}
+                        placeholder="Select ID Document"
+                        isClearable
+                        styles={{
+                          control: (base) => ({
+                            ...base,
+                            borderColor: '#e2e8f0',
+                            '&:hover': { borderColor: '#cbd5e1' },
+                            boxShadow: 'none'
+                          })
+                        }}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {selectedDocumentType === 'Passport' && (
+                <>
+                  <FormField
+                    control={form.control}
+                    name="passportNo"
+                    render={({ field }) => (
+                      <FormItem className="mt-2 flex flex-col">
+                        <FormLabel>
+                          Passport Number{' '}
+                          <span className="text-red-500">*</span>
+                        </FormLabel>
+                        <FormControl>
+                          <Input {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="passportExpiry"
+                    render={({ field }) => (
+                      <FormItem className="mt-2 flex flex-col">
+                        <FormLabel>
+                          Passport Expiry Date{' '}
+                          <span className="text-red-500">*</span>
+                        </FormLabel>
+                        <FormControl>
+                          <DatePicker
+                            selected={
+                              field.value ? new Date(field.value) : null
+                            }
+                            onChange={(date: Date) => field.onChange(date)}
+                            dateFormat="dd-MM-yyyy"
+                            placeholderText="Select passport expiry"
+                            className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-theme focus:ring-2 focus:ring-theme"
+                            showMonthDropdown
+                            showYearDropdown
+                            dropdownMode="select"
+                            isClearable
+                            wrapperClassName="w-full"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </>
+              )}
+
+              {selectedDocumentType === 'Driving Licence' && (
+                <>
+                  <FormField
+                    control={form.control}
+                    name="drivingLicenceNo"
+                    render={({ field }) => (
+                      <FormItem className="mt-2 flex flex-col">
+                        <FormLabel>
+                          Driving Licence No{' '}
+                          <span className="text-red-500">*</span>
+                        </FormLabel>
+                        <FormControl>
+                          <Input {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="drivingLicenceExpiry"
+                    render={({ field }) => (
+                      <FormItem className="mt-2 flex flex-col">
+                        <FormLabel>
+                          Licence Expiry Date{' '}
+                          <span className="text-red-500">*</span>
+                        </FormLabel>
+                        <FormControl>
+                          <DatePicker
+                            selected={
+                              field.value ? new Date(field.value) : null
+                            }
+                            onChange={(date: Date) => field.onChange(date)}
+                            dateFormat="dd-MM-yyyy"
+                            placeholderText="Select licence expiry"
+                            className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-theme focus:ring-2 focus:ring-theme"
+                            showMonthDropdown
+                            showYearDropdown
+                            dropdownMode="select"
+                            isClearable
+                            wrapperClassName="w-full"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </>
+              )}
+            </div>
+
+            <h1 className="mt-6 text-2xl">Application Details</h1>
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               <FormField
                 control={form.control}
                 name="applicationDate"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Application Date <span className="text-red-500">*</span></FormLabel>
+                    <FormLabel>
+                      Application Date <span className="text-red-500">*</span>
+                    </FormLabel>
                     <FormControl>
                       <DatePicker
                         selected={field.value ? new Date(field.value) : null}
@@ -411,7 +603,10 @@ export function PersonalDetailsStep({
                 name="availableFromDate"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Available From Date <span className="text-red-500">*</span></FormLabel>
+                    <FormLabel>
+                      Available From Date{' '}
+                      <span className="text-red-500">*</span>
+                    </FormLabel>
                     <FormControl>
                       <DatePicker
                         selected={field.value ? new Date(field.value) : null}
@@ -438,22 +633,30 @@ export function PersonalDetailsStep({
                 name="employmentType"
                 render={({ field }) => (
                   <FormItem className="mt-2 flex flex-col">
-                    <FormLabel>Employment Type <span className="text-red-500">*</span></FormLabel>
+                    <FormLabel>
+                      Employment Type <span className="text-red-500">*</span>
+                    </FormLabel>
                     <FormControl>
                       <Select
                         options={employmentTypeOptions}
-                        value={employmentTypeOptions.find((opt) => opt.value === field.value)}
-                        onChange={(selectedOption) => field.onChange(selectedOption ? selectedOption.value : '')}
+                        value={employmentTypeOptions.find(
+                          (opt) => opt.value === field.value
+                        )}
+                        onChange={(selectedOption) =>
+                          field.onChange(
+                            selectedOption ? selectedOption.value : ''
+                          )
+                        }
                         placeholder="Select Employment Type"
                         isClearable
                         styles={{
-                            control: (base) => ({
-                              ...base,
-                              borderColor: '#e2e8f0',
-                              '&:hover': { borderColor: '#cbd5e1' },
-                              boxShadow: 'none',
-                            }),
-                          }}
+                          control: (base) => ({
+                            ...base,
+                            borderColor: '#e2e8f0',
+                            '&:hover': { borderColor: '#cbd5e1' },
+                            boxShadow: 'none'
+                          })
+                        }}
                       />
                     </FormControl>
                     <FormMessage />
@@ -466,8 +669,12 @@ export function PersonalDetailsStep({
                 name="position"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Position <span className="text-red-500">*</span></FormLabel>
-                    <FormControl><Input {...field} /></FormControl>
+                    <FormLabel>
+                      Position <span className="text-red-500">*</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -480,22 +687,30 @@ export function PersonalDetailsStep({
                 name="source"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Application Source <span className="text-red-500">*</span></FormLabel>
+                    <FormLabel>
+                      Application Source <span className="text-red-500">*</span>
+                    </FormLabel>
                     <FormControl>
                       <Select
                         options={sourceOptions}
-                        value={sourceOptions.find((opt) => opt.value === field.value)}
-                        onChange={(selectedOption) => field.onChange(selectedOption ? selectedOption.value : '')}
+                        value={sourceOptions.find(
+                          (opt) => opt.value === field.value
+                        )}
+                        onChange={(selectedOption) =>
+                          field.onChange(
+                            selectedOption ? selectedOption.value : ''
+                          )
+                        }
                         placeholder="Select Source"
                         isClearable
                         styles={{
-                            control: (base) => ({
-                              ...base,
-                              borderColor: '#e2e8f0',
-                              '&:hover': { borderColor: '#cbd5e1' },
-                              boxShadow: 'none',
-                            }),
-                          }}
+                          control: (base) => ({
+                            ...base,
+                            borderColor: '#e2e8f0',
+                            '&:hover': { borderColor: '#cbd5e1' },
+                            boxShadow: 'none'
+                          })
+                        }}
                       />
                     </FormControl>
                     <FormMessage />
@@ -508,8 +723,12 @@ export function PersonalDetailsStep({
                 name="branch"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Branch <span className="text-red-500">*</span></FormLabel>
-                    <FormControl><Input {...field} /></FormControl>
+                    <FormLabel>
+                      Branch <span className="text-red-500">*</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
