@@ -98,16 +98,63 @@ const SettingsTab: React.FC<SettingsTabProps> = ({
   );
 
   // Filter options for React Select (only show what isn't already added)
-  const getAvailableOptions = (type: 'designationId' | 'departmentId') => {
-    if (type === 'designationId') {
-      return designations
-        .filter((d) => !currentDesignationIds.includes(d._id))
-        .map((d) => ({ value: d._id, label: d.title }));
-    }
-    return departments
-      .filter((d) => !currentDepartmentIds.includes(d._id))
-      .map((d) => ({ value: d._id, label: d.departmentName }));
-  };
+  // Inside SettingsTab component...
+
+ const getAvailableOptions = (type: 'designationId' | 'departmentId') => {
+   if (type === 'designationId') {
+     return designations
+       .filter((d) => !currentDesignationIds.includes(d._id))
+       .map((d) => ({ value: d._id, label: d.title }));
+   }
+
+   // --- Improved Department Hierarchy Logic ---
+   const options: any[] = [];
+
+   // 1. Get all root departments (no parent)
+   const roots = departments.filter((d) => !d.parentDepartmentId);
+
+   roots.forEach((root) => {
+     // Find all children for this specific root
+     const allChildrenOfThisRoot = departments.filter(
+       (child) =>
+         (child.parentDepartmentId?._id || child.parentDepartmentId) ===
+         root._id
+     );
+
+     // Filter to see which children are NOT yet selected
+     const availableChildren = allChildrenOfThisRoot.filter(
+       (child) => !currentDepartmentIds.includes(child._id)
+     );
+
+     const isParentAlreadySelected = currentDepartmentIds.includes(root._id);
+
+     // UX RULE: Show the parent if:
+     // a) The parent itself is not selected yet
+     // b) The parent IS selected, but it has children that are still available to pick
+     if (!isParentAlreadySelected || availableChildren.length > 0) {
+       options.push({
+         value: root._id,
+         label: root.departmentName,
+         isChild: false,
+         // If parent is already added, make it unclickable but visible for context
+         isDisabled: isParentAlreadySelected,
+         isHeader: isParentAlreadySelected // Custom flag for styling
+       });
+
+       // Add the available children under this parent
+       availableChildren.forEach((child) => {
+         options.push({
+           value: child._id,
+           label: child.departmentName,
+           isChild: true,
+           parentName: root.departmentName // Keep reference just in case
+         });
+       });
+     }
+   });
+
+   return options;
+ };
 
   // Actions
   const handleAddConfirm = () => {
@@ -197,6 +244,41 @@ const SettingsTab: React.FC<SettingsTabProps> = ({
               onChange={setSelectedToAdd}
               placeholder="Search and select..."
               isClearable
+              // Important: This allows the disabled parent to still be seen
+              isOptionDisabled={(option: any) => option.isDisabled}
+              formatOptionLabel={(option: any) => {
+                if (isAddOpen.type === 'departmentId') {
+                  if (option.isChild) {
+                    return (
+                      <div className="ml-6 flex items-center gap-2 ">
+                        <span className="">└─</span>
+                        <span>{option.label}</span>
+                      </div>
+                    );
+                  }
+                  // Style for the Parent
+                  return (
+                    <div
+                      className={` ${option.isHeader ? 'text-xs uppercase tracking-wider text-gray-400' : 'text-gray-900'}`}
+                    >
+                      {option.label} {option.isHeader && '(Already Added)'}
+                    </div>
+                  );
+                }
+                return <span>{option.label}</span>;
+              }}
+              styles={{
+                option: (base, state) => ({
+                  ...base,
+                  backgroundColor: state.isDisabled
+                    ? 'transparent'
+                    : base.backgroundColor,
+                  cursor: state.isDisabled ? 'default' : 'pointer',
+                  padding: state.data.isHeader
+                    ? '8px 12px 4px 12px'
+                    : '8px 12px'
+                }),
+              }}
             />
           </div>
           <DialogFooter>
@@ -223,9 +305,7 @@ const SettingsTab: React.FC<SettingsTabProps> = ({
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
             <AlertDialogDescription>
               This will remove{' '}
-              <span className="font-semibold">
-                "{deleteConfirm?.name}"
-              </span>{' '}
+              <span className="font-semibold">"{deleteConfirm?.name}"</span>{' '}
               from this record. This action can be undone by re-adding the item.
             </AlertDialogDescription>
           </AlertDialogHeader>

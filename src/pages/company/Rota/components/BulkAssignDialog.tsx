@@ -117,6 +117,46 @@ export default function BulkAssignDialog({
     setter(cleanValue);
   };
 
+  // --- NEW: Hierarchical Department Options Logic ---
+  const departmentOptions = useMemo(() => {
+    const options: any[] = [];
+
+    // Identify root departments (no parent or parent not in the list)
+    const allDeptIds = new Set(departments.map((d: any) => d._id));
+    const roots = departments
+      .filter((d: any) => {
+        const parentId = d.parentDepartmentId?._id || d.parentDepartmentId;
+        return !parentId || !allDeptIds.has(parentId);
+      })
+      .sort((a: any, b: any) => (a.index ?? 0) - (b.index ?? 0));
+
+    // Build the flat list with hierarchy markers
+    roots.forEach((root: any) => {
+      options.push({
+        value: root._id,
+        label: root.departmentName,
+        isChild: false
+      });
+
+      const children = departments
+        .filter((d: any) => {
+          const parentId = d.parentDepartmentId?._id || d.parentDepartmentId;
+          return parentId === root._id;
+        })
+        .sort((a: any, b: any) => (a.index ?? 0) - (b.index ?? 0));
+
+      children.forEach((child: any) => {
+        options.push({
+          value: child._id,
+          label: child.departmentName,
+          isChild: true
+        });
+      });
+    });
+
+    return options;
+  }, [departments]);
+
   // ─── Filter Users by Selected Department ──────────────────────────────────
   const filteredUsers = useMemo(() => {
     if (!departmentId) return [];
@@ -239,23 +279,22 @@ export default function BulkAssignDialog({
                 <h3 className="text-sm font-bold ">1. Select Department</h3>
               </div>
               <Select
-                options={departments.map((d: any) => ({
-                  value: d._id,
-                  label: d.departmentName
-                }))}
+                options={departmentOptions}
                 value={
-                  departmentId
-                    ? {
-                        value: departmentId,
-                        label:
-                          departments.find((d: any) => d._id === departmentId)
-                            ?.departmentName || ''
-                      }
-                    : null
+                  departmentOptions.find((opt) => opt.value === departmentId) ||
+                  null
                 }
                 onChange={(opt) => setDepartmentId(opt?.value || '')}
                 placeholder="Select a department first..."
                 className="text-sm text-black"
+                formatOptionLabel={(option: any) => (
+                  <div
+                    className={`flex items-center gap-2 ${option.isChild ? 'ml-6 ' : ' text-slate-900'}`}
+                  >
+                    {option.isChild && <span className="">└─</span>}
+                    <span>{option.label}</span>
+                  </div>
+                )}
               />
             </div>
 
@@ -334,37 +373,38 @@ export default function BulkAssignDialog({
                   </button>
                 </div>
                 <div className="flex-1 space-y-1 overflow-y-auto p-2">
-                  {selectedEmployees.map((user: any) => (
-                    <div
-                      key={user._id}
-                      onClick={() => toggleEmployee(user)}
-                      className="group flex cursor-pointer items-center gap-3 rounded-md border border-blue-100 bg-white p-2 shadow-sm transition-colors hover:border-red-200"
-                    >
-                      <div className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded border-theme bg-theme group-hover:border-red-500 group-hover:bg-red-500">
-                        <Check className="h-3 w-3 text-white" />
-                      </div>
-                      <Avatar className="h-7 w-7">
-                        <AvatarImage
-                          src={user?.image || '/placeholder.png'}
-                          alt={user?.name || 'User'}
-                        />
-                        <AvatarFallback className="bg-blue-100 text-[10px] font-bold text-theme">
-                          {getInitials(
-                            user?.firstName,
-                            user?.lastName,
-                            user?.name
-                          )}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className="truncate text-sm font-medium">
-                        {user.firstName} {user.lastName}
-                      </span>
-                    </div>
-                  ))}
-                  {selectedEmployees.length === 0 && (
+                  {selectedEmployees.length === 0 ? (
                     <p className="mt-10 text-center text-xs text-gray-400">
                       None selected
                     </p>
+                  ) : (
+                    selectedEmployees.map((user: any) => (
+                      <div
+                        key={user._id}
+                        onClick={() => toggleEmployee(user)}
+                        className="group flex cursor-pointer items-center gap-3 rounded-md border border-blue-100 bg-white p-2 shadow-sm transition-colors hover:border-red-200"
+                      >
+                        <div className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded border-theme bg-theme group-hover:border-red-500 group-hover:bg-red-500">
+                          <Check className="h-3 w-3 text-white" />
+                        </div>
+                        <Avatar className="h-7 w-7">
+                          <AvatarImage
+                            src={user?.image || '/placeholder.png'}
+                            alt={user?.name || 'User'}
+                          />
+                          <AvatarFallback className="bg-blue-100 text-[10px] font-bold text-theme">
+                            {getInitials(
+                              user?.firstName,
+                              user?.lastName,
+                              user?.name
+                            )}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="truncate text-sm font-medium">
+                          {user.firstName} {user.lastName}
+                        </span>
+                      </div>
+                    ))
                   )}
                 </div>
               </div>

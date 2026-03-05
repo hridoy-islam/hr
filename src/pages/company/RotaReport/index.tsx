@@ -30,7 +30,12 @@ import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type Department = { _id: string; departmentName: string; index: number };
+type Department = {
+  _id: string;
+  departmentName: string;
+  index: number;
+  parentDepartmentId?: any;
+};
 type DepartmentWiseIndex = { departmentId: string; index: number };
 type UserDepartment = { _id: string; departmentName: string };
 type User = {
@@ -46,8 +51,16 @@ type User = {
   index?: number;
 };
 
+// Hierarchy grouping types
+type DeptGroup = { department: Department; users: User[] };
+type HierarchicalGroup = {
+  parentGroup: DeptGroup;
+  childrenGroups: DeptGroup[];
+};
+
 const DRAG_TYPE = 'ROW';
 const DEPT_DRAG_TYPE = 'DEPARTMENT';
+const CHILD_DEPT_DRAG_TYPE = 'CHILD_DEPARTMENT';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const getInitials = (firstName?: string, lastName?: string, name?: string) => {
@@ -269,7 +282,6 @@ const DraggableRow: React.FC<DraggableRowProps> = ({
                   let totalDayMins = 0;
                   const tooltipArr: string[] = [];
 
-                  // Calculate total sum for the day across all of their shifts in this dept
                   dayRotas.forEach((r) => {
                     totalDayMins += calculateDurationMinutes(
                       r.startTime,
@@ -283,7 +295,6 @@ const DraggableRow: React.FC<DraggableRowProps> = ({
                     );
                   });
 
-                  // We use the color of the first shift to theme the single card
                   const firstRota = dayRotas[0];
                   let shiftColors: any = 'theme';
 
@@ -326,13 +337,17 @@ const DraggableRow: React.FC<DraggableRowProps> = ({
   );
 };
 
-// ─── DraggableDepartmentHeader ────────────────────────────────────────────────
-interface DraggableDepartmentHeaderProps {
-  department: Department;
-  deptIndex: number;
-  moveDepartment: (dragIndex: number, hoverIndex: number) => void;
+// ─── DraggableChildGroup ──────────────────────────────────────────────────────
+interface DraggableChildGroupProps {
+  childGroup: DeptGroup;
+  childIndex: number;
+  parentId: string;
+  moveChildGroup: (
+    parentId: string,
+    dragIndex: number,
+    hoverIndex: number
+  ) => void;
   daysArray: moment.Moment[];
-  users: User[];
   rotaMap: Record<string, Record<string, any[]>>;
   employeeTotalDuration: Record<string, Record<string, number>>;
   departmentTotalDuration: Record<string, number>;
@@ -343,12 +358,12 @@ interface DraggableDepartmentHeaderProps {
   ) => void;
 }
 
-const DraggableDepartmentHeader: React.FC<DraggableDepartmentHeaderProps> = ({
-  department,
-  deptIndex,
-  moveDepartment,
+const DraggableChildGroup: React.FC<DraggableChildGroupProps> = ({
+  childGroup,
+  childIndex,
+  parentId,
+  moveChildGroup,
   daysArray,
-  users,
   rotaMap,
   employeeTotalDuration,
   departmentTotalDuration,
@@ -357,10 +372,128 @@ const DraggableDepartmentHeader: React.FC<DraggableDepartmentHeaderProps> = ({
   const ref = useRef<HTMLTableRowElement>(null);
 
   const [{ isDragging }, drag, dragPreview] = useDrag({
-    type: DEPT_DRAG_TYPE,
-    item: { deptIndex, departmentId: department._id },
+    type: CHILD_DEPT_DRAG_TYPE,
+    item: { childIndex, parentId },
     collect: (monitor) => ({ isDragging: monitor.isDragging() })
   });
+
+  const [{ isOver }, drop] = useDrop({
+    accept: CHILD_DEPT_DRAG_TYPE,
+    collect: (monitor) => ({ isOver: monitor.isOver() }),
+    hover(item: any, monitor) {
+      if (!ref.current) return;
+      if (item.parentId !== parentId) return; // Prevent dragging out of parent
+
+      const dragIndex = item.childIndex;
+      const hoverIndex = childIndex;
+      if (dragIndex === hoverIndex) return;
+
+      const hoverBoundingRect = ref.current.getBoundingClientRect();
+      const hoverMiddleY =
+        (hoverBoundingRect.bottom - hoverBoundingRect.top) / 2;
+      const clientOffset = monitor.getClientOffset();
+      if (!clientOffset) return;
+      const hoverClientY = clientOffset.y - hoverBoundingRect.top;
+
+      if (dragIndex < hoverIndex && hoverClientY < hoverMiddleY) return;
+      if (dragIndex > hoverIndex && hoverClientY > hoverMiddleY) return;
+
+      moveChildGroup(parentId, dragIndex, hoverIndex);
+      item.childIndex = hoverIndex;
+    }
+  });
+
+  drop(dragPreview(ref));
+
+  const deptTotalMins = departmentTotalDuration[childGroup.department._id] || 0;
+
+  return (
+    <>
+      <tr
+        ref={ref}
+        className={`border-b border-t border-gray-200 transition-colors ${isOver ? 'bg-blue-50/50' : 'bg-slate-50'} ${isDragging ? 'opacity-40' : ''}`}
+      >
+        <td className="sticky left-0 z-20 border-r border-gray-200 bg-inherit px-2 py-2 shadow-[2px_0_0_0_rgba(0,0,0,0.04)]">
+          <div className="flex items-center justify-between pl-4">
+            <div className="flex items-center gap-2">
+              <div
+                ref={drag as any}
+                className="flex-shrink-0 cursor-grab text-slate-400 transition-colors hover:text-slate-600 active:cursor-grabbing"
+                title="Drag to reorder child department"
+              >
+                <GripVertical className="h-4 w-4" />
+              </div>
+              <span className="text-theme">└─</span>
+              <span className="text-xs font-bold uppercase tracking-widest ">
+                {childGroup.department.departmentName}
+              </span>
+            </div>
+            <div className="rounded border border-theme/20 bg-theme/10 px-2 py-1 text-[11px] font-bold text-theme">
+              Total: {formatDuration(deptTotalMins)}
+            </div>
+          </div>
+        </td>
+        {daysArray.map((_, i) => (
+          <td key={i} className="border-r border-gray-200 bg-inherit" />
+        ))}
+      </tr>
+      {childGroup.users.map((user, deptRowIndex) => (
+        <DraggableRow
+          key={`${childGroup.department._id}-${user._id}`}
+          user={user}
+          deptRowIndex={deptRowIndex}
+          departmentId={childGroup.department._id}
+          moveRow={moveRow}
+          daysArray={daysArray}
+          rotaMap={rotaMap}
+          employeeTotalDuration={employeeTotalDuration}
+        />
+      ))}
+    </>
+  );
+};
+
+// ─── DraggableHierarchyBlock ──────────────────────────────────────────────────
+interface DraggableHierarchyBlockProps {
+  hierarchy: HierarchicalGroup;
+  deptIndex: number;
+  moveDepartment: (dragIndex: number, hoverIndex: number) => void;
+  moveChildGroup: (
+    parentId: string,
+    dragIndex: number,
+    hoverIndex: number
+  ) => void;
+  daysArray: moment.Moment[];
+  rotaMap: Record<string, Record<string, any[]>>;
+  employeeTotalDuration: Record<string, Record<string, number>>;
+  departmentTotalDuration: Record<string, number>;
+  moveRow: (
+    departmentId: string,
+    dragIndex: number,
+    hoverIndex: number
+  ) => void;
+}
+
+const DraggableHierarchyBlock: React.FC<DraggableHierarchyBlockProps> = ({
+  hierarchy,
+  deptIndex,
+  moveDepartment,
+  moveChildGroup,
+  daysArray,
+  rotaMap,
+  employeeTotalDuration,
+  departmentTotalDuration,
+  moveRow
+}) => {
+  const ref = useRef<HTMLTableSectionElement>(null);
+
+  const [{ isDragging }, drag, dragPreview] = useDrag({
+    type: DEPT_DRAG_TYPE,
+    item: { deptIndex, departmentId: hierarchy.parentGroup.department._id },
+    collect: (monitor) => ({ isDragging: monitor.isDragging() })
+  });
+
+  const isUnassigned = hierarchy.parentGroup.department._id === 'unassigned';
 
   const [{ isOver }, drop] = useDrop<
     { deptIndex: number; departmentId: string },
@@ -391,18 +524,19 @@ const DraggableDepartmentHeader: React.FC<DraggableDepartmentHeaderProps> = ({
     }
   });
 
-  const isUnassigned = department._id === 'unassigned';
   drop(dragPreview(ref));
 
-  const deptTotalMins = departmentTotalDuration[department._id] || 0;
+  const deptTotalMins =
+    departmentTotalDuration[hierarchy.parentGroup.department._id] || 0;
 
   return (
-    <>
+    <tbody
+      ref={ref}
+      className={`transition-all ${isDragging ? 'opacity-40' : ''}`}
+    >
+      {/* 1. Parent Header Row */}
       <tr
-        ref={ref}
-        className={`border-b border-t border-gray-300 transition-colors ${
-          isDragging ? 'opacity-40' : ''
-        } ${isOver && !isUnassigned ? 'bg-blue-50' : 'bg-slate-100'}`}
+        className={`border-b border-t border-gray-300 transition-colors ${isOver && !isUnassigned ? 'bg-theme' : 'bg-slate-200'}`}
       >
         <td className="sticky left-0 z-20 border-r border-gray-200 bg-inherit px-4 py-2 shadow-[2px_0_0_0_rgba(0,0,0,0.04)]">
           <div className="flex items-center justify-between">
@@ -411,39 +545,59 @@ const DraggableDepartmentHeader: React.FC<DraggableDepartmentHeaderProps> = ({
                 <div
                   ref={drag as any}
                   className="flex-shrink-0 cursor-grab text-slate-400 transition-colors hover:text-slate-600 active:cursor-grabbing"
-                  title="Drag to reorder department"
+                  title="Drag to reorder hierarchy group"
                 >
                   <GripVertical className="h-4 w-4" />
                 </div>
               ) : (
                 <div className="w-4 flex-shrink-0" />
               )}
-              <span className="text-xs font-extrabold uppercase tracking-widest text-slate-600">
-                {department.departmentName}
+              <span className="text-xs font-extrabold uppercase tracking-widest ">
+                {hierarchy.parentGroup.department.departmentName}
               </span>
             </div>
-            <div className="rounded border border-theme/20 bg-theme/10 px-2 py-1 text-[11px] font-bold text-theme">
-              Dept Total: {formatDuration(deptTotalMins)}
-            </div>
+            {!isUnassigned && (
+              <div className="rounded border border-theme/20 bg-theme/10 px-2 py-1 text-[11px] font-bold text-theme">
+                Total: {formatDuration(deptTotalMins)}
+              </div>
+            )}
           </div>
         </td>
         {daysArray.map((_, i) => (
           <td key={i} className="border-r border-gray-200 bg-inherit" />
         ))}
       </tr>
-      {users.map((user, deptRowIndex) => (
+
+      {/* 2. Parent Users */}
+      {hierarchy.parentGroup.users.map((user, rowIdx) => (
         <DraggableRow
-          key={`${department._id}-${user._id}`}
+          key={`${hierarchy.parentGroup.department._id}-${user._id}`}
           user={user}
-          deptRowIndex={deptRowIndex}
-          departmentId={department._id}
+          deptRowIndex={rowIdx}
+          departmentId={hierarchy.parentGroup.department._id}
           moveRow={moveRow}
           daysArray={daysArray}
           rotaMap={rotaMap}
           employeeTotalDuration={employeeTotalDuration}
         />
       ))}
-    </>
+
+      {/* 3. Children Headers and Users via Sub-Component */}
+      {hierarchy.childrenGroups.map((childGroup, childIndex) => (
+        <DraggableChildGroup
+          key={childGroup.department._id}
+          childGroup={childGroup}
+          childIndex={childIndex}
+          parentId={hierarchy.parentGroup.department._id}
+          moveChildGroup={moveChildGroup}
+          daysArray={daysArray}
+          rotaMap={rotaMap}
+          employeeTotalDuration={employeeTotalDuration}
+          departmentTotalDuration={departmentTotalDuration}
+          moveRow={moveRow}
+        />
+      ))}
+    </tbody>
   );
 };
 
@@ -524,10 +678,9 @@ export default function CompanyRotaReport() {
 
   // ── Derived Grouping Data ───────────────────────────────────────────────────
   const groupedByDepartment = useMemo(() => {
-    const groups: { department: Department; users: User[] }[] = [];
-
-    departments.forEach((dept) => {
-      const deptUsers = users
+    const hierarchies: HierarchicalGroup[] = [];
+    const getDeptUsers = (dept: Department) =>
+      users
         .filter((u) =>
           u.departmentId?.some(
             (d: any) => (typeof d === 'object' ? d._id : d) === dept._id
@@ -535,68 +688,68 @@ export default function CompanyRotaReport() {
         )
         .sort((a, b) => getDeptIndex(a, dept._id) - getDeptIndex(b, dept._id));
 
-      if (deptUsers.length > 0)
-        groups.push({ department: dept, users: deptUsers });
+    const allDeptIds = new Set(departments.map((d) => d._id));
+
+    // Root departments
+    const roots = departments
+      .filter(
+        (d) =>
+          !d.parentDepartmentId ||
+          !allDeptIds.has(d.parentDepartmentId?._id || d.parentDepartmentId)
+      )
+      .sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+
+    roots.forEach((root) => {
+      const parentGroup = { department: root, users: getDeptUsers(root) };
+
+      const children = departments
+        .filter(
+          (d) =>
+            (d.parentDepartmentId?._id || d.parentDepartmentId) === root._id
+        )
+        .sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+
+      const childrenGroups = children
+        .map((child) => ({
+          department: child,
+          users: getDeptUsers(child)
+        }))
+        .filter((c) => c.users.length > 0 || c.department); // Keep empty child departments so we can drag into them
+
+      if (parentGroup.users.length > 0 || childrenGroups.length > 0) {
+        hierarchies.push({ parentGroup, childrenGroups });
+      }
     });
 
-    const unassigned = users.filter(
+    const unassignedUsers = users.filter(
       (u) => !u.departmentId || u.departmentId.length === 0
     );
-    if (unassigned.length > 0) {
-      groups.push({
-        department: {
-          _id: 'unassigned',
-          departmentName: 'Unassigned',
-          index: 9999
+    if (unassignedUsers.length > 0) {
+      hierarchies.push({
+        parentGroup: {
+          department: {
+            _id: 'unassigned',
+            departmentName: 'Unassigned',
+            index: 9999
+          } as any,
+          users: unassignedUsers
         },
-        users: unassigned
+        childrenGroups: []
       });
     }
 
-    return groups;
+    return hierarchies;
   }, [departments, users]);
 
-  const [orderedGroups, setOrderedGroups] = useState<
-    { department: Department; users: User[] }[]
-  >([]);
+  const [orderedGroups, setOrderedGroups] = useState<HierarchicalGroup[]>([]);
 
   useEffect(() => {
     setOrderedGroups(groupedByDepartment);
   }, [groupedByDepartment]);
 
-  // Keep `orderedGroups` synced if users update
-  useEffect(() => {
-    setOrderedGroups((prev) =>
-      prev.map((g) => {
-        if (g.department._id === 'unassigned') {
-          return {
-            ...g,
-            users: users.filter(
-              (u) => !u.departmentId || u.departmentId.length === 0
-            )
-          };
-        }
-        return {
-          ...g,
-          users: users
-            .filter((u) =>
-              u.departmentId?.some(
-                (d: any) =>
-                  (typeof d === 'object' ? d._id : d) === g.department._id
-              )
-            )
-            .sort(
-              (a, b) =>
-                getDeptIndex(a, g.department._id) -
-                getDeptIndex(b, g.department._id)
-            )
-        };
-      })
-    );
-  }, [users]);
-
   // ── DND Logic ────────────────────────────────────────────────────────────────
   const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const moveRow = useCallback(
     (departmentId: string, dragIndex: number, hoverIndex: number) => {
       setUsers((prev) => {
@@ -653,6 +806,7 @@ export default function CompanyRotaReport() {
   );
 
   const deptPersistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const moveDepartment = useCallback(
     (dragIndex: number, hoverIndex: number) => {
       setOrderedGroups((prev) => {
@@ -665,11 +819,14 @@ export default function CompanyRotaReport() {
           try {
             await Promise.all(
               updated
-                .filter((g) => g.department._id !== 'unassigned')
+                .filter((g) => g.parentGroup.department._id !== 'unassigned')
                 .map((g, i) =>
-                  axiosInstance.patch(`/hr/department/${g.department._id}`, {
-                    index: i
-                  })
+                  axiosInstance.patch(
+                    `/hr/department/${g.parentGroup.department._id}`,
+                    {
+                      index: i
+                    }
+                  )
                 )
             );
           } catch (e) {
@@ -681,6 +838,54 @@ export default function CompanyRotaReport() {
       });
     },
     []
+  );
+
+  const childDeptPersistTimer = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
+
+  const moveChildGroup = useCallback(
+    (parentId: string, dragIndex: number, hoverIndex: number) => {
+      setOrderedGroups((prev) => {
+        const updated = [...prev];
+        const parentIndex = updated.findIndex(
+          (g) => g.parentGroup.department._id === parentId
+        );
+
+        if (parentIndex === -1) return prev;
+
+        const newChildren = [...updated[parentIndex].childrenGroups];
+        const [removed] = newChildren.splice(dragIndex, 1);
+        newChildren.splice(hoverIndex, 0, removed);
+
+        updated[parentIndex] = {
+          ...updated[parentIndex],
+          childrenGroups: newChildren
+        };
+
+        if (childDeptPersistTimer.current)
+          clearTimeout(childDeptPersistTimer.current);
+        childDeptPersistTimer.current = setTimeout(async () => {
+          try {
+            await Promise.all(
+              newChildren.map((g, i) =>
+                axiosInstance.patch(`/hr/department/${g.department._id}`, {
+                  index: i
+                })
+              )
+            );
+          } catch (e) {
+            toast({
+              title: 'Failed to save child department order',
+              variant: 'destructive'
+            });
+          }
+        }, 600);
+
+        return updated;
+      });
+    },
+    [toast]
   );
 
   // ── Derived Mappings and Calculations ───────────────────────────────────────
@@ -864,8 +1069,8 @@ export default function CompanyRotaReport() {
                         selected={currentDate.toDate()}
                         onChange={handlePickerChange}
                         dateFormat="MM/yyyy"
-                            showMonthYearPicker
-                            inline
+                        showMonthYearPicker
+                        inline
                         onClickOutside={() => setPickerOpen(false)}
                       />
                     </div>
@@ -950,24 +1155,20 @@ export default function CompanyRotaReport() {
                 </tr>
               </thead>
 
-              <tbody>
-                {orderedGroups.map(
-                  ({ department, users: deptUsers }, deptIndex) => (
-                    <DraggableDepartmentHeader
-                      key={department._id}
-                      department={department}
-                      deptIndex={deptIndex}
-                      moveDepartment={moveDepartment}
-                      daysArray={daysArray}
-                      users={deptUsers}
-                      rotaMap={rotaMap}
-                      employeeTotalDuration={employeeTotalDuration}
-                      departmentTotalDuration={departmentTotalDuration}
-                      moveRow={moveRow}
-                    />
-                  )
-                )}
-              </tbody>
+              {orderedGroups.map((hierarchy, deptIndex) => (
+                <DraggableHierarchyBlock
+                  key={hierarchy.parentGroup.department._id}
+                  hierarchy={hierarchy}
+                  deptIndex={deptIndex}
+                  moveDepartment={moveDepartment}
+                  moveChildGroup={moveChildGroup}
+                  daysArray={daysArray}
+                  rotaMap={rotaMap}
+                  employeeTotalDuration={employeeTotalDuration}
+                  departmentTotalDuration={departmentTotalDuration}
+                  moveRow={moveRow}
+                />
+              ))}
             </table>
           </div>
         )}

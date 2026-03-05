@@ -1,7 +1,6 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Building, Pen, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
 import {
   Table,
   TableBody,
@@ -10,90 +9,92 @@ import {
   TableHeader,
   TableRow
 } from '@/components/ui/table';
-// import { InstitutionDialog } from './components/institution-dialog';
 import axiosInstance from '@/lib/axios';
 import { useToast } from '@/components/ui/use-toast';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
-
 import { Input } from '@/components/ui/input';
-import moment from 'moment';
 import { DynamicPagination } from '@/components/shared/DynamicPagination';
 import { DepartmentDialog } from './Components/departmentDialog';
-import { Badge } from '@/components/ui/badge';
 import { useSelector } from 'react-redux';
 import { useParams } from 'react-router-dom';
 
 export default function Department() {
-  const [department, setDepartment] = useState<any>([]);
+  const [department, setDepartment] = useState<any[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingDepartment, setEditingDepartment] = useState<any>();
-  const [initialLoading, setInitialLoading] = useState(true); // New state for initial loading
+  const [initialLoading, setInitialLoading] = useState(true);
   const { toast } = useToast();
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [entriesPerPage, setEntriesPerPage] = useState(100);
+  const [entriesPerPage, setEntriesPerPage] = useState(500);
   const [searchTerm, setSearchTerm] = useState('');
-const user = useSelector((state: any) => state.auth.user);
-const {id} = useParams()
-  const fetchData = async (page, entriesPerPage, searchTerm = '') => {
+
+  const user = useSelector((state: any) => state.auth.user);
+  const { id } = useParams();
+
+  const fetchData = async (page: number, limit: number, search = '') => {
     try {
       if (initialLoading) setInitialLoading(true);
       const response = await axiosInstance.get(`/hr/department`, {
         params: {
           page,
-          limit: entriesPerPage,
-          companyId:id,
-          ...(searchTerm ? { searchTerm } : {})
+          limit,
+          companyId: id,
+          ...(search ? { searchTerm: search } : {})
         }
       });
       setDepartment(response.data.data.result);
       setTotalPages(response.data.data.meta.totalPage);
     } catch (error) {
-      console.error('Error fetching institutions:', error);
+      console.error('Error fetching departments:', error);
     } finally {
       setInitialLoading(false);
     }
   };
 
-  const handleSubmit = async (data) => {
+  const displayRoots = department.filter((dept) => {
+    const parentId = dept.parentDepartmentId?._id || dept.parentDepartmentId;
+    // If it has no parent, it's a root.
+    if (!parentId) return true;
+    
+    // If it has a parent, check if that parent exists in the current 'department' array
+    const parentInResults = department.some(
+      (d) => d._id === parentId
+    );
+    
+    // If the parent is NOT in the results, show this child as a top-level item
+    return !parentInResults;
+  });
+
+  const handleSubmit = async (data: any) => {
     try {
       let response;
       if (editingDepartment) {
-        // Update institution
         response = await axiosInstance.patch(
           `/hr/department/${editingDepartment?._id}`,
           data
         );
       } else {
-        // Create new institution
-
         response = await axiosInstance.post(`/hr/department`, {
-        ...data,
-        companyId: id
-      });
+          ...data,
+          companyId: id
+        });
       }
 
-      // Check if the API response indicates success
       if (response.data && response.data.success === true) {
         toast({
           title: response.data.message || 'Record Updated successfully',
           className: 'bg-theme border-none text-white'
         });
-      } else if (response.data && response.data.success === false) {
-        toast({
-          title: response.data.message || 'Operation failed',
-          className: 'bg-red-500 border-none text-white'
-        });
       } else {
         toast({
-          title: 'Unexpected response. Please try again.',
+          title: response.data?.message || 'Operation failed',
           className: 'bg-red-500 border-none text-white'
         });
       }
 
-      // Refresh data
       fetchData(currentPage, entriesPerPage);
-      setEditingDepartment(undefined); // Reset editing state
+      setEditingDepartment(undefined);
     } catch (error) {
       toast({
         title: 'An error occurred. Please try again.',
@@ -102,24 +103,8 @@ const {id} = useParams()
     }
   };
 
-  const handleStatusChange = async (id, status) => {
-    try {
-      const updatedStatus = status ? 'active' : 'inactive';
-      await axiosInstance.patch(`/hr/department/${id}`, {
-        status: updatedStatus
-      });
-      toast({
-        title: 'Record updated successfully',
-        className: 'bg-theme border-none text-white'
-      });
-      fetchData(currentPage, entriesPerPage);
-    } catch (error) {
-      console.error('Error updating status:', error);
-    }
-  };
-
-  const handleEdit = (department) => {
-    setEditingDepartment(department);
+  const handleEdit = (dept: any) => {
+    setEditingDepartment(dept);
     setDialogOpen(true);
   };
 
@@ -131,6 +116,9 @@ const {id} = useParams()
     fetchData(currentPage, entriesPerPage, searchTerm);
   };
 
+  // Filter ONLY root departments (those without a parent)
+  const rootDepartments = department.filter((dept) => !dept.parentDepartmentId);
+
   return (
     <div className="space-y-3 rounded-md bg-white p-6 shadow-sm">
       <div className="flex items-center justify-between">
@@ -138,7 +126,7 @@ const {id} = useParams()
           <h2 className="flex items-center gap-2 text-2xl font-bold text-gray-900">
             <Building className="h-6 w-6" />
             All Departments
-          </h2>{' '}
+          </h2>
           <div className="flex items-center space-x-4">
             <Input
               type="text"
@@ -166,7 +154,7 @@ const {id} = useParams()
         </Button>
       </div>
 
-      <div className="">
+      <div>
         {initialLoading ? (
           <div className="flex justify-center py-6">
             <BlinkingDots size="large" color="bg-theme" />
@@ -180,72 +168,76 @@ const {id} = useParams()
             <TableHeader>
               <TableRow>
                 <TableHead>Department Name</TableHead>
-                {/* <TableHead className="text-center">Status</TableHead> */}
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead className="text-right">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {department.map((department) => (
-                <TableRow key={department._id}>
-                  <TableCell>{department.departmentName}</TableCell>
+              {displayRoots.map((rootDept) => (
+                <React.Fragment key={rootDept._id}>
+                  {/* Parent Row */}
+                  <TableRow>
+                    <TableCell className="font-medium text-gray-900">
+                      {rootDept.departmentName}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex flex-row items-center justify-end gap-4">
+                        <Button
+                          size="icon"
+                          onClick={() => handleEdit(rootDept)}
+                        >
+                          <Pen className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
 
-                  {/* <TableCell className="text-center">
-                    <div className="flex items-center justify-center gap-2">
-                      <Switch
-                        checked={department.status === 'active'}
-                        onCheckedChange={(checked) =>
-                          handleStatusChange(department._id, checked)
-                        }
-                      />
-                      <Badge
-                        variant={
-                          department.status === 'active'
-                            ? 'default'
-                            : 'secondary'
-                        }
-                        className={`
-        min-w-[70px] justify-center shadow-none
-        ${
-          department.status === 'active'
-            ? 'bg-theme text-white hover:bg-theme/90'
-            : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
-        }
-      `}
-                      >
-                        {department.status === 'active' ? 'Active' : 'Inactive'}
-                      </Badge>
-                    </div>
-                  </TableCell> */}
-                  <TableCell className="text-center">
-                    <div className="flex flex-row items-center  justify-end gap-4">
-                      <Button
-                        size="icon"
-                        onClick={() => handleEdit(department)}
-                      >
-                        <Pen className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
+                  {/* Child Rows (Rendered immediately after their parent) */}
+                  {department
+                    .filter(
+                      (childDept) =>
+                        childDept.parentDepartmentId?._id === rootDept._id ||
+                        childDept.parentDepartmentId === rootDept._id
+                    )
+                    .map((childDept) => (
+                      <TableRow key={childDept._id}>
+                        <TableCell className="">
+                          <span className="ml-6 flex items-center gap-2">
+                            └─ {childDept.departmentName}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex flex-row items-center justify-end gap-4">
+                            <Button
+                              size="icon"
+                              onClick={() => handleEdit(childDept)}
+                            >
+                              <Pen className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                </React.Fragment>
               ))}
             </TableBody>
           </Table>
         )}
 
-        {department.length > 50 && (
-          <>
-            <DynamicPagination
-              pageSize={entriesPerPage}
-              setPageSize={setEntriesPerPage}
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={setCurrentPage}
-            />
-          </>
+        {department.length > 300 && (
+          <DynamicPagination
+            pageSize={entriesPerPage}
+            setPageSize={setEntriesPerPage}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+          />
         )}
       </div>
+
+      {/* Notice we pass the full list of departments as a prop to the dialog so it can populate the select menu */}
       <DepartmentDialog
         open={dialogOpen}
+        departments={department}
         onOpenChange={(open) => {
           setDialogOpen(open);
           if (!open) setEditingDepartment(undefined);

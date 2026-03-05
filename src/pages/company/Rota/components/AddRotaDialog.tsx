@@ -28,6 +28,8 @@ import { Plus, Trash2 } from 'lucide-react';
 type Department = {
   _id: string;
   departmentName: string;
+  parentDepartmentId?: any;
+  index?: number;
 };
 
 type ShiftEntry = {
@@ -99,6 +101,46 @@ export default function AddRotaDialog({
       setShifts([{ id: '1', startTime: '', endTime: '' }]);
     }
   }, [isOpen, form]);
+
+  // --- NEW: Hierarchical Department Options Logic ---
+  const departmentOptions = useMemo(() => {
+    const options: any[] = [];
+
+    // Identify root departments (no parent or parent not in the list)
+    const allDeptIds = new Set(departments.map((d: any) => d._id));
+    const roots = departments
+      .filter((d: any) => {
+        const parentId = d.parentDepartmentId?._id || d.parentDepartmentId;
+        return !parentId || !allDeptIds.has(parentId);
+      })
+      .sort((a: any, b: any) => (a.index ?? 0) - (b.index ?? 0));
+
+    // Build the flat list with hierarchy markers
+    roots.forEach((root: any) => {
+      options.push({
+        value: root._id,
+        label: root.departmentName,
+        isChild: false
+      });
+
+      const children = departments
+        .filter((d: any) => {
+          const parentId = d.parentDepartmentId?._id || d.parentDepartmentId;
+          return parentId === root._id;
+        })
+        .sort((a: any, b: any) => (a.index ?? 0) - (b.index ?? 0));
+
+      children.forEach((child: any) => {
+        options.push({
+          value: child._id,
+          label: child.departmentName,
+          isChild: true
+        });
+      });
+    });
+
+    return options;
+  }, [departments]);
 
   // Filter users based on selected department
   const filteredUsers = useMemo(() => {
@@ -290,9 +332,7 @@ export default function AddRotaDialog({
           >
             <div className="min-h-0 flex-1 overflow-y-auto p-5">
               <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
-                {/* ─── Left Column ───────────────────────────────────────── */}
                 <div className="space-y-6">
-                  {/* 1. Select Department */}
                   <FormField
                     control={form.control}
                     name="departmentId"
@@ -303,24 +343,25 @@ export default function AddRotaDialog({
                         </FormLabel>
                         <FormControl>
                           <Select
-                            options={departments.map((d: any) => ({
-                              value: d._id,
-                              label: d.departmentName
-                            }))}
+                            options={departmentOptions}
                             value={
-                              field.value
-                                ? {
-                                    value: field.value,
-                                    label:
-                                      departments.find(
-                                        (d: any) => d._id === field.value
-                                      )?.departmentName || ''
-                                  }
-                                : null
+                              departmentOptions.find(
+                                (opt) => opt.value === field.value
+                              ) || null
                             }
                             onChange={(opt) => field.onChange(opt?.value || '')}
                             placeholder="Select department..."
                             className="text-sm text-black"
+                            formatOptionLabel={(option: any) => (
+                              <div
+                                className={`flex items-center gap-2 ${option.isChild ? 'ml-6 ' : 'font-semibold text-slate-900'}`}
+                              >
+                                {option.isChild && (
+                                  <span className="">└─</span>
+                                )}
+                                <span>{option.label}</span>
+                              </div>
+                            )}
                           />
                         </FormControl>
                         <FormMessage />
@@ -379,7 +420,7 @@ export default function AddRotaDialog({
                       </FormItem>
                     )}
                   />
-
+                    
                   {/* 3. Date */}
                   <FormField
                     control={form.control}
@@ -466,11 +507,7 @@ export default function AddRotaDialog({
                           <h3 className="text-sm font-bold text-slate-900">
                             Time Slots
                           </h3>
-                          <Button
-                            type="button"
-                            size="sm"
-                            onClick={addShift}
-                          >
+                          <Button type="button" size="sm" onClick={addShift}>
                             <Plus className="mr-1 h-3 w-3" />
                             Add Slot
                           </Button>

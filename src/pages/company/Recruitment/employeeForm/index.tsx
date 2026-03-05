@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import axiosInstance from '@/lib/axios';
 import {
   Card,
@@ -76,13 +76,7 @@ function EmployeeForm() {
           label: item.title
         }))
       );
-      setDepartments(
-        departmentRes.data.data.result.map((item) => ({
-          value: item._id,
-          label: item.departmentName
-        }))
-      );
-
+setDepartments(departmentRes.data.data.result || []);
       const allShifts = shiftsRes.data.data?.result || [];
       setShifts(allShifts);
 
@@ -107,6 +101,52 @@ function EmployeeForm() {
       console.error('Error fetching data:', error);
     }
   };
+
+
+ const departmentOptions = useMemo(() => {
+   const options = [];
+   const selectedIds = selectedDepartments.map((d) => d.value);
+
+   // 1. Identify Root Departments
+   const roots = departments.filter((d) => !d.parentDepartmentId);
+
+   roots.forEach((root) => {
+     const allChildrenOfThisRoot = departments.filter(
+       (child) =>
+         (child.parentDepartmentId?._id || child.parentDepartmentId) ===
+         root._id
+     );
+
+     // Filter out children that are already selected
+     const availableChildren = allChildrenOfThisRoot.filter(
+       (child) => !selectedIds.includes(child._id)
+     );
+
+     const isParentAlreadySelected = selectedIds.includes(root._id);
+
+     // Only show the parent if it's unselected OR it has unselected children
+     if (!isParentAlreadySelected || availableChildren.length > 0) {
+       options.push({
+         value: root._id,
+         label: root.departmentName,
+         isChild: false,
+         isDisabled: isParentAlreadySelected, // Disables it if already added
+         isHeader: isParentAlreadySelected // Custom flag for styling
+       });
+
+       // Add the unselected children under it
+       availableChildren.forEach((child) => {
+         options.push({
+           value: child._id,
+           label: child.departmentName,
+           isChild: true
+         });
+       });
+     }
+   });
+
+   return options;
+ }, [departments, selectedDepartments]);
 
   useEffect(() => {
     fetchData();
@@ -283,19 +323,53 @@ function EmployeeForm() {
               <h2 className="text-3xl font-bold text-gray-900">
                 Department Assignment
               </h2>
-              <p className="text-lg text-gray-500">
+              <p className="text-lg ">
                 Which departments does this employee belong to?
               </p>
             </div>
             <div className="py-4">
               <Select
-                isMulti // Added Multi support
-                options={departments}
+                isMulti
+                options={departmentOptions}
                 value={selectedDepartments}
                 onChange={setSelectedDepartments}
                 placeholder="Select Departments..."
-                styles={customStyles}
+                // FIX: Prevent react-select from hiding the parent automatically!
+                hideSelectedOptions={false}
+                isOptionDisabled={(option) => option.isDisabled}
+                styles={{
+                  ...customStyles,
+                  option: (base, state) => ({
+                    ...base,
+                    backgroundColor: state.isDisabled
+                      ? 'transparent'
+                      : base.backgroundColor,
+                    cursor: state.isDisabled ? 'default' : 'pointer'
+                  })
+                }}
                 className="w-full"
+                formatOptionLabel={(option) => {
+                  if (option.isChild) {
+                    return (
+                      <div className="ml-6 flex items-center gap-2 ">
+                        <span className="">└─</span>
+                        <span>{option.label}</span>
+                      </div>
+                    );
+                  }
+                  // Style for the Parent Header
+                  return (
+                    <div
+                      className={` ${
+                        option.isHeader
+                          ? 'text-xs uppercase tracking-wider '
+                          : 'text-gray-900'
+                      }`}
+                    >
+                      {option.label} {option.isHeader && '(Already Added)'}
+                    </div>
+                  );
+                }}
               />
             </div>
             <div className="flex justify-end gap-4 pt-4">
@@ -308,7 +382,6 @@ function EmployeeForm() {
             </div>
           </div>
         );
-
       case 2:
         return (
           <div className="space-y-10">
@@ -316,7 +389,7 @@ function EmployeeForm() {
               <h2 className="text-3xl font-bold text-gray-900">
                 Job Designation
               </h2>
-              <p className="text-lg text-gray-500">
+              <p className="text-lg ">
                 What are the employee's specific roles?
               </p>
             </div>
@@ -352,9 +425,7 @@ function EmployeeForm() {
           <div className="space-y-8">
             <div className="space-y-2">
               <h2 className="text-3xl font-bold text-gray-900">Pay Rates</h2>
-              <p className="text-lg text-gray-500">
-                Select shifts and assign hourly rates.
-              </p>
+              <p className="text-lg ">Select shifts and assign hourly rates.</p>
             </div>
             <div className="space-y-2">
               <Label className="text-md font-semibold">Add Shifts</Label>
