@@ -23,6 +23,8 @@ const ErrorPage = () => {
       navigate(`/company/${user?._id}`);
     } else if (user?.role === 'employee') {
       navigate(`/company/${user?.company}/staff/${user?._id}`);
+    } else if (user?.role === 'attendance') {
+      navigate(`/company/${user?.company}/employee-attendance`);
     } else {
       navigate('/');
     }

@@ -47,7 +47,8 @@ import {
   CalendarClock,
   CalendarCheck2,
   CalendarRange,
-  AlertCircle
+  AlertCircle,
+  User
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Link, useNavigate, useLocation, useParams } from 'react-router-dom';
@@ -303,6 +304,12 @@ const navItems = [
         icon: Mails,
         label: 'Email Setup',
         href: 'email-setup',
+        roles: ['company']
+      },
+      {
+        icon: User,
+        label: 'Attendance Account',
+        href: 'attendance-account',
         roles: ['company']
       },
       {

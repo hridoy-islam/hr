@@ -91,6 +91,9 @@ import StaffNoticeBoard from '@/pages/staff/notice';
 import HolidayPage from '@/pages/staff/holiday';
 import CompanyLeaveApprovalPage from '@/pages/company/LeaveApproval';
 import StaffProfile from '@/pages/staff/profile';
+import AttendanceLayout from '@/components/layout/attendance-layout';
+import AttendanceAccountPage from '@/pages/company/attendance-account';
+import AttendanceScanner from '@/pages/attendance/attendance-dashboard';
 
 const SignInPage = lazy(() => import('@/pages/auth/signin'));
 
@@ -248,7 +251,8 @@ export default function AppRouter() {
         { path: 'email-setup', element: <EmailSetup /> },
         { path: 'bank-holiday', element: <BankHolidayPage /> },
         { path: 'schedule-check', element: <CompanyScheduleCheckPage /> },
-        { path: 'leave-approval', element: <CompanyLeaveApprovalPage /> }
+        { path: 'leave-approval', element: <CompanyLeaveApprovalPage /> },
+        { path: 'attendance-account', element: <AttendanceAccountPage /> }
       ]
     }
   ];
@@ -303,7 +307,31 @@ export default function AppRouter() {
    
       ]
     }
-  ];
+    ];
+  
+  
+   const attendanceroutes = [
+     {
+       path: '/company/:id/employee-attendance',
+       element: (
+         <ProtectedRoute>
+           <ScheduleStatusProvider>
+             <AttendanceLayout />
+           </ScheduleStatusProvider>
+         </ProtectedRoute>
+       ),
+       children: [
+         {
+           index: true,
+           element: (
+             <Suspense>
+               <AttendanceScanner />
+             </Suspense>
+           )
+         },
+       ]
+     }
+   ];
 
   const publicRoutes = [
     {
@@ -342,7 +370,14 @@ export default function AppRouter() {
     }
   ];
 
-  const routes = useRoutes([...publicRoutes, ...adminRoutes, ...companyRoutes,...rotaRoutes,...StaffRoutes]);
+  const routes = useRoutes([
+    ...publicRoutes,
+    ...adminRoutes,
+    ...companyRoutes,
+    ...rotaRoutes,
+    ...StaffRoutes,
+    ...attendanceroutes
+  ]);
 
   return routes;
 }
