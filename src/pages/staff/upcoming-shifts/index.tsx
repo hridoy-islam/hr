@@ -424,10 +424,7 @@ const UpcomingShiftPage = () => {
             <div className="rounded-3xl bg-white p-8 shadow-2xl">
               {selectedRotaId && (
                 <QRCodeSVG
-                  value={JSON.stringify({
-                    rotaId: selectedRotaId,
-                    action: qrAction
-                  })}
+                  value={ selectedRotaId}
                   size={300}
                   level={'H'} // High error correction so scanners read it easily
                   includeMargin={false}
