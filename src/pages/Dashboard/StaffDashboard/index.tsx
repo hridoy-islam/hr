@@ -96,6 +96,17 @@ const StaffDashboardPage = () => {
   const [qrAction, setQrAction] = useState<'clockin' | 'clockout'>('clockin');
   const [currentTime, setCurrentTime] = useState(moment());
 
+
+   useEffect(() => {
+     if (qrModalOpen) {
+       const timer = setTimeout(() => {
+         setQrModalOpen(false);
+       }, 5000); // 5 seconds
+
+       return () => clearTimeout(timer);
+     }
+   }, [qrModalOpen]);
+  
   useEffect(() => {
     // Update the current time every minute to toggle QR button availability in real-time
     const timer = setInterval(() => {
@@ -104,25 +115,34 @@ const StaffDashboardPage = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // Check if a shift is active RIGHT NOW
+  // Check if a shift is active OR starting within 1 hour
   const isShiftActive = (shift: any) => {
     if (!shift.startDate || !shift.startTime || !shift.endTime) return false;
 
     const shiftStartDate = moment(shift.startDate).format('YYYY-MM-DD');
+
+    // The actual scheduled start time
     const shiftStart = moment(
       `${shiftStartDate} ${shift.startTime}`,
       'YYYY-MM-DD HH:mm'
     );
+
+    // Define the early clock-in window (1 hour before startTime)
+    const earlyClockInWindow = moment(shiftStart).subtract(1, 'hour');
+
     let shiftEnd = moment(
       `${shiftStartDate} ${shift.endTime}`,
       'YYYY-MM-DD HH:mm'
     );
 
+    // Handle shifts that cross over midnight
     if (shiftEnd.isBefore(shiftStart)) {
       shiftEnd.add(1, 'day');
     }
 
-    return currentTime.isBetween(shiftStart, shiftEnd, null, '[]');
+    // UPDATED: Now allows clocking in starting 1 hour before shiftStart
+    // until the shiftEnd
+    return currentTime.isBetween(earlyClockInWindow, shiftEnd, null, '[]');
   };
 
   const handleOpenQr = (rotaId: string, action: 'clockin' | 'clockout') => {
@@ -131,6 +151,42 @@ const StaffDashboardPage = () => {
     setQrModalOpen(true);
   };
 
+  // --- NEW: Silent background fetch for Rota Data ---
+  const fetchRotaData = async () => {
+    if (!eid) return;
+    try {
+      const rotaRes = await axiosInstance.get(
+        `/rota/upcoming-rota?employeeId=${eid}`
+      );
+      setShifts(rotaRes.data?.data?.result || []);
+    } catch (error) {
+      console.error('Error fetching background rota data:', error);
+    }
+  };
+
+  // --- NEW: 5-minute interval for refetching ---
+  useEffect(() => {
+    const fetchInterval = setInterval(
+      () => {
+        fetchRotaData();
+      },
+      5 * 60 * 1000
+    ); // 5 minutes in milliseconds
+
+    return () => clearInterval(fetchInterval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eid]);
+
+  // --- NEW: Handle QR Modal Open/Close ---
+  const handleQrModalChange = (isOpen: boolean) => {
+    setQrModalOpen(isOpen);
+    if (!isOpen) {
+      // Refetch data silently when the modal closes
+      fetchRotaData();
+    }
+  };
+
+  // Initial Data Fetch
   useEffect(() => {
     const fetchDashboardData = async () => {
       if (!eid) return;
@@ -174,6 +230,7 @@ const StaffDashboardPage = () => {
     });
     return activeShift?._id;
   }, [shifts]);
+  const groupedShifts = useMemo(() => groupShiftsByMonth(shifts), [shifts]);
 
   if (loading) {
     return (
@@ -183,7 +240,7 @@ const StaffDashboardPage = () => {
     );
   }
 
-  const groupedShifts = groupShiftsByMonth(shifts);
+ 
 
   return (
     <div className="min-h-screen rounded-md bg-white p-6 shadow-sm">
@@ -275,14 +332,21 @@ const StaffDashboardPage = () => {
                         !activeClockInShiftIdToday ||
                         activeClockInShiftIdToday === shift._id;
 
+                      const showClockOut = isActive && isCurrentlyClockedIn;
+                      const showClockIn =
+                        isActive &&
+                        !isCurrentlyClockedIn &&
+                        (!isToday || canClockInToThisShift);
+                      const showAnyButton = showClockIn || showClockOut;
+
                       return (
                         <div
                           key={shift._id || index}
                           className="group flex flex-col items-start overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-all duration-200 hover:border-theme/50 hover:shadow-md sm:flex-row sm:items-center sm:p-5"
                         >
-                          {/* Date Block */}
-                          <div className="mb-4 flex w-full shrink-0 justify-start sm:mb-0 sm:mr-6 sm:w-auto">
-                            <div className="flex h-[4.5rem] w-[4.5rem] flex-col items-center justify-center rounded-xl border border-blue-100 bg-theme/10 text-theme">
+                          {/* Date Block & Mobile Action Button */}
+                          <div className="mb-4 flex w-full shrink-0 items-center justify-between sm:mb-0 sm:mr-6 sm:w-auto sm:justify-start sm:gap-4">
+                            <div className="flex h-[4.5rem] w-[4.5rem] flex-col items-center justify-center rounded-xl border border-theme/10 bg-theme/10 text-theme">
                               <span className="mb-0.5 text-[11px] font-bold uppercase tracking-widest">
                                 {getDayName(shift.startDate)}
                               </span>
@@ -290,14 +354,43 @@ const StaffDashboardPage = () => {
                                 {getDateNumber(shift.startDate)}
                               </span>
                             </div>
+
+                            {/* Mobile/Tablet View Action Button */}
+                            {showAnyButton && (
+                              <div className="block lg:hidden">
+                                {showClockOut ? (
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    className="text-md w-[40vw] bg-red-500 shadow-sm hover:bg-red-600"
+                                    onClick={() =>
+                                      handleOpenQr(shift._id, 'clockout')
+                                    }
+                                  >
+                                    <QrCode className="mr-2 h-4 w-4" />
+                                    Clock Out
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    size="sm"
+                                    className="text-md w-[40vw] bg-theme"
+                                    onClick={() =>
+                                      handleOpenQr(shift._id, 'clockin')
+                                    }
+                                  >
+                                    <QrCode className="mr-2 h-4 w-4" />
+                                    Clock In
+                                  </Button>
+                                )}
+                              </div>
+                            )}
                           </div>
 
                           {/* Content Wrapper */}
                           <div className="w-full flex-1">
                             {isLeave ? (
-                              // --- LEAVE STATE ---
-                              <div className="grid grid-cols-2 items-center gap-4 lg:grid-cols-10 lg:gap-6">
-                                {/* Shift Name */}
+                              /* --- LEAVE STATE --- */
+                              <div className="grid grid-cols-2 items-center gap-4 lg:grid-cols-8 lg:gap-6">
                                 <div className="col-span-1 lg:col-span-2">
                                   <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-widest text-slate-500">
                                     Shift Name
@@ -307,7 +400,6 @@ const StaffDashboardPage = () => {
                                   </span>
                                 </div>
 
-                                {/* Department */}
                                 <div className="col-span-1 lg:col-span-2">
                                   <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-widest text-slate-500">
                                     Department
@@ -318,16 +410,21 @@ const StaffDashboardPage = () => {
                                   </span>
                                 </div>
 
-                                {/* Leave Pill */}
-                                <div className="col-span-2 flex h-full items-center pt-2 lg:col-span-6 lg:border-l lg:border-slate-100 lg:pl-6 lg:pt-0">
+                                <div className="col-span-2 flex h-full items-center pt-2 lg:col-span-4 lg:border-l lg:border-slate-100 lg:pl-6 lg:pt-0">
                                   <span className="inline-flex items-center rounded-full border border-amber-200/60 bg-amber-50 px-3 py-1 text-sm font-medium text-amber-700">
                                     Leave / Day Off
                                   </span>
                                 </div>
                               </div>
                             ) : (
-                              <div className="grid grid-cols-2 items-center gap-4 lg:grid-cols-10 lg:gap-6">
-                                {/* Shift Name */}
+                              /* --- ACTIVE SHIFT STATE --- */
+                              <div
+                                className={`grid grid-cols-2 items-center gap-4 lg:gap-6 ${
+                                  showAnyButton
+                                    ? 'lg:grid-cols-10'
+                                    : 'lg:grid-cols-8'
+                                }`}
+                              >
                                 <div className="col-span-1 lg:col-span-2">
                                   <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-widest text-slate-500">
                                     Shift Name
@@ -337,7 +434,6 @@ const StaffDashboardPage = () => {
                                   </span>
                                 </div>
 
-                                {/* Department */}
                                 <div className="col-span-1 lg:col-span-2">
                                   <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-widest text-slate-500">
                                     Department
@@ -348,8 +444,7 @@ const StaffDashboardPage = () => {
                                   </span>
                                 </div>
 
-                                {/* Start Time */}
-                                <div className="col-span-1 lg:col-span-1  ">
+                                <div className="col-span-1 lg:col-span-1">
                                   <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-widest text-slate-500">
                                     Start
                                   </span>
@@ -358,7 +453,6 @@ const StaffDashboardPage = () => {
                                   </span>
                                 </div>
 
-                                {/* End Time */}
                                 <div className="col-span-1 lg:col-span-1">
                                   <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-widest text-slate-500">
                                     End
@@ -368,8 +462,7 @@ const StaffDashboardPage = () => {
                                   </span>
                                 </div>
 
-                                {/* Duration */}
-                                <div className="col-span-1 lg:col-span-2">
+                                <div className="col-span-2 lg:col-span-2">
                                   <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-widest text-slate-500">
                                     Duration
                                   </span>
@@ -382,10 +475,10 @@ const StaffDashboardPage = () => {
                                   </span>
                                 </div>
 
-                                {/* QR Action */}
-                                <div className="col-span-1 flex items-center justify-end lg:col-span-2 lg:pr-2">
-                                  {isActive ? (
-                                    isCurrentlyClockedIn ? (
+                                {/* QR Action (Desktop View) */}
+                                {showAnyButton && (
+                                  <div className="hidden lg:col-span-2 lg:flex lg:items-center lg:justify-end lg:pr-2">
+                                    {showClockOut ? (
                                       <Button
                                         size="sm"
                                         variant="destructive"
@@ -404,29 +497,13 @@ const StaffDashboardPage = () => {
                                         onClick={() =>
                                           handleOpenQr(shift._id, 'clockin')
                                         }
-                                        disabled={
-                                          !canClockInToThisShift && isToday
-                                        }
-                                        title={
-                                          !canClockInToThisShift && isToday
-                                            ? 'Clock out of your previous shift first'
-                                            : ''
-                                        }
                                       >
                                         <QrCode className="mr-2 h-4 w-4" />
-                                        {!canClockInToThisShift && isToday
-                                          ? 'Complete prior shift'
-                                          : 'Clock In'}
+                                        Clock In
                                       </Button>
-                                    )
-                                  ) : (
-                                    <div className="w-full text-right">
-                                      <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
-                                        QR Access Locked
-                                      </span>
-                                    </div>
-                                  )}
-                                </div>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>
@@ -520,27 +597,23 @@ const StaffDashboardPage = () => {
       </div>
 
       {/* Full-Screen QR Modal */}
-      <Dialog open={qrModalOpen} onOpenChange={setQrModalOpen}>
+      {/* UPDATED: trigger silent fetch on close by passing handleQrModalChange */}
+      <Dialog open={qrModalOpen} onOpenChange={handleQrModalChange}>
         <DialogContent className="m-0 flex h-[100dvh] w-screen max-w-[100vw] flex-col items-center justify-center rounded-none border-none bg-black/95 p-0">
           <DialogClose className="absolute right-6 top-6 rounded-full bg-white/10 p-2 text-white transition-colors hover:bg-white/20">
             <X className="h-6 w-6" />
           </DialogClose>
 
-          <div className="flex flex-col items-center justify-center space-y-8 p-6 text-center">
-            <h2 className="text-3xl font-bold capitalize tracking-tight text-white">
-              Shift 
-              Verification
-            </h2>
-            <p className="max-w-sm text-white">
-              Present this QR code to the scanner to verify your{' '}
-              {qrAction === 'clockin' ? 'arrival' : 'departure'} for this shift.
+          <div className="flex flex-col items-center justify-center space-y-8 p-16 text-center md:p-6">
+            <p className="max-w-sm font-semibold text-white">
+              Scan this QR code to confirm your{' '}
+              {qrAction === 'clockin' ? 'arrival' : 'departure'}.
             </p>
 
             <div className="rounded-3xl bg-white p-8 shadow-2xl">
               {selectedRotaId && (
                 <QRCodeSVG
                   value={selectedRotaId}
-                  
                   size={300}
                   level={'H'}
                   includeMargin={false}
