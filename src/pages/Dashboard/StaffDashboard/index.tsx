@@ -7,9 +7,15 @@ import moment from 'moment';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, AlertCircle, UserIcon, Bell, QrCode, X } from 'lucide-react';
+import {
+  Calendar,
+  AlertCircle,
+  UserIcon,
+  Bell,
+  Download,
+  QrCode
+} from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
-import { Dialog, DialogContent, DialogClose } from '@/components/ui/dialog';
 
 // --- Types ---
 interface Notice {
@@ -90,68 +96,7 @@ const StaffDashboardPage = () => {
   const [notices, setNotices] = useState<Notice[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // QR Modal & Real-time validation State
-  const [qrModalOpen, setQrModalOpen] = useState(false);
-  const [selectedRotaId, setSelectedRotaId] = useState<string | null>(null);
-  const [qrAction, setQrAction] = useState<'clockin' | 'clockout'>('clockin');
-  const [currentTime, setCurrentTime] = useState(moment());
-
-
-   useEffect(() => {
-     if (qrModalOpen) {
-       const timer = setTimeout(() => {
-         setQrModalOpen(false);
-       }, 5000); // 5 seconds
-
-       return () => clearTimeout(timer);
-     }
-   }, [qrModalOpen]);
-  
-  useEffect(() => {
-    // Update the current time every minute to toggle QR button availability in real-time
-    const timer = setInterval(() => {
-      setCurrentTime(moment());
-    }, 60000);
-    return () => clearInterval(timer);
-  }, []);
-
-  // Check if a shift is active OR starting within 1 hour
-  const isShiftActive = (shift: any) => {
-    if (!shift.startDate || !shift.startTime || !shift.endTime) return false;
-
-    const shiftStartDate = moment(shift.startDate).format('YYYY-MM-DD');
-
-    // The actual scheduled start time
-    const shiftStart = moment(
-      `${shiftStartDate} ${shift.startTime}`,
-      'YYYY-MM-DD HH:mm'
-    );
-
-    // Define the early clock-in window (1 hour before startTime)
-    const earlyClockInWindow = moment(shiftStart).subtract(1, 'hour');
-
-    let shiftEnd = moment(
-      `${shiftStartDate} ${shift.endTime}`,
-      'YYYY-MM-DD HH:mm'
-    );
-
-    // Handle shifts that cross over midnight
-    if (shiftEnd.isBefore(shiftStart)) {
-      shiftEnd.add(1, 'day');
-    }
-
-    // UPDATED: Now allows clocking in starting 1 hour before shiftStart
-    // until the shiftEnd
-    return currentTime.isBetween(earlyClockInWindow, shiftEnd, null, '[]');
-  };
-
-  const handleOpenQr = (rotaId: string, action: 'clockin' | 'clockout') => {
-    setSelectedRotaId(rotaId);
-    setQrAction(action);
-    setQrModalOpen(true);
-  };
-
-  // --- NEW: Silent background fetch for Rota Data ---
+  // --- Silent background fetch for Rota Data ---
   const fetchRotaData = async () => {
     if (!eid) return;
     try {
@@ -164,7 +109,7 @@ const StaffDashboardPage = () => {
     }
   };
 
-  // --- NEW: 5-minute interval for refetching ---
+  // --- 5-minute interval for refetching ---
   useEffect(() => {
     const fetchInterval = setInterval(
       () => {
@@ -176,15 +121,6 @@ const StaffDashboardPage = () => {
     return () => clearInterval(fetchInterval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eid]);
-
-  // --- NEW: Handle QR Modal Open/Close ---
-  const handleQrModalChange = (isOpen: boolean) => {
-    setQrModalOpen(isOpen);
-    if (!isOpen) {
-      // Refetch data silently when the modal closes
-      fetchRotaData();
-    }
-  };
 
   // Initial Data Fetch
   useEffect(() => {
@@ -214,23 +150,40 @@ const StaffDashboardPage = () => {
     fetchDashboardData();
   }, [eid]);
 
-  // Find if there is an active clock-in for ANY shift today (Cross-rota validation)
-  const activeClockInShiftIdToday = useMemo(() => {
-    const todayStr = moment().format('YYYY-MM-DD');
-    const activeShift = shifts.find((s) => {
-      if (moment(s.startDate).format('YYYY-MM-DD') !== todayStr) return false;
-      const logs = s.attendanceLogs || [];
-      if (logs.length === 0) return false;
-
-      const latestLog = logs[logs.length - 1];
-      // Return true if there is a clockIn but no clockOut
-      return (
-        latestLog.clockIn && (!latestLog.clockOut || latestLog.clockOut === '')
-      );
-    });
-    return activeShift?._id;
-  }, [shifts]);
   const groupedShifts = useMemo(() => groupShiftsByMonth(shifts), [shifts]);
+
+  // --- Download QR Code Logic ---
+  const downloadQRCode = () => {
+    const svgElement = document.getElementById('employee-qr-code');
+    if (!svgElement) return;
+
+    const svgData = new XMLSerializer().serializeToString(svgElement);
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+
+    img.onload = () => {
+      // Add padding for the downloaded image
+      canvas.width = img.width + 40;
+      canvas.height = img.height + 40;
+      if (ctx) {
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 20, 20);
+
+        const pngFile = canvas.toDataURL('image/png');
+        const downloadLink = document.createElement('a');
+        downloadLink.download = `Attendance_QR_${eid}.png`;
+        downloadLink.href = pngFile;
+        downloadLink.click();
+      }
+    };
+
+    // Convert SVG to Base64 to draw on canvas
+    img.src =
+      'data:image/svg+xml;base64,' +
+      btoa(unescape(encodeURIComponent(svgData)));
+  };
 
   if (loading) {
     return (
@@ -240,13 +193,11 @@ const StaffDashboardPage = () => {
     );
   }
 
- 
-
   return (
     <div className="min-h-screen rounded-md bg-white p-6 shadow-sm">
       {/* Header Section */}
       <div className="mb-10 flex flex-col gap-4 border-b border-slate-100 pb-2 sm:flex-row sm:items-end sm:justify-between">
-        <h1 className="text-3xl font-extrabold tracking-tight">
+        <h1 className="text-xl md:text-3xl font-extrabold tracking-tight">
           Welcome Back{userData?.firstName ? `, ${userData.firstName}` : '!'}
         </h1>
 
@@ -263,9 +214,13 @@ const StaffDashboardPage = () => {
         )}
       </div>
 
-      <div className="-mt-5 grid grid-cols-1 items-start gap-8 lg:grid-cols-3">
-        {/* LEFT COLUMN: UPCOMING SHIFTS */}
-        <div className="lg:col-span-2">
+      {/* MAIN GRID LAYOUT 
+        Mobile: single column, gap-y-8 separates the distinct blocks.
+        Desktop: 3 columns. Gap-x is 8, but gap-y is 0 so the right-side borders connect perfectly.
+      */}
+      <div className="-mt-5 grid grid-cols-1 gap-y-8 lg:grid-cols-3 lg:items-start lg:gap-x-8 lg:gap-y-0">
+        {/* === 1. UPCOMING SHIFTS (Order: 2 Mobile | 1 Desktop) === */}
+        <div className="order-2 lg:order-1 lg:col-span-2 lg:row-span-2">
           <div className="mb-5 flex flex-row items-center justify-between">
             <h2 className="text-2xl font-extrabold tracking-tight">
               Upcoming Shifts
@@ -314,37 +269,13 @@ const StaffDashboardPage = () => {
                   <div className="flex flex-col gap-3">
                     {monthShifts.map((shift, index) => {
                       const isLeave = !shift.startTime && !shift.endTime;
-                      const isActive = !isLeave && isShiftActive(shift);
-
-                      // Attendance Log Logic Check
-                      const logs = shift.attendanceLogs || [];
-                      const latestLog = logs[logs.length - 1];
-                      const isCurrentlyClockedIn =
-                        latestLog &&
-                        latestLog.clockIn &&
-                        (!latestLog.clockOut || latestLog.clockOut === '');
-
-                      // Check if they are locked out because of another shift today
-                      const isToday =
-                        moment(shift.startDate).format('YYYY-MM-DD') ===
-                        moment().format('YYYY-MM-DD');
-                      const canClockInToThisShift =
-                        !activeClockInShiftIdToday ||
-                        activeClockInShiftIdToday === shift._id;
-
-                      const showClockOut = isActive && isCurrentlyClockedIn;
-                      const showClockIn =
-                        isActive &&
-                        !isCurrentlyClockedIn &&
-                        (!isToday || canClockInToThisShift);
-                      const showAnyButton = showClockIn || showClockOut;
 
                       return (
                         <div
                           key={shift._id || index}
                           className="group flex flex-col items-start overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-all duration-200 hover:border-theme/50 hover:shadow-md sm:flex-row sm:items-center sm:p-5"
                         >
-                          {/* Date Block & Mobile Action Button */}
+                          {/* Date Block */}
                           <div className="mb-4 flex w-full shrink-0 items-center justify-between sm:mb-0 sm:mr-6 sm:w-auto sm:justify-start sm:gap-4">
                             <div className="flex h-[4.5rem] w-[4.5rem] flex-col items-center justify-center rounded-xl border border-theme/10 bg-theme/10 text-theme">
                               <span className="mb-0.5 text-[11px] font-bold uppercase tracking-widest">
@@ -354,45 +285,14 @@ const StaffDashboardPage = () => {
                                 {getDateNumber(shift.startDate)}
                               </span>
                             </div>
-
-                            {/* Mobile/Tablet View Action Button */}
-                            {showAnyButton && (
-                              <div className="block lg:hidden">
-                                {showClockOut ? (
-                                  <Button
-                                    size="sm"
-                                    variant="destructive"
-                                    className="text-md w-[40vw] bg-red-500 shadow-sm hover:bg-red-600"
-                                    onClick={() =>
-                                      handleOpenQr(shift._id, 'clockout')
-                                    }
-                                  >
-                                    <QrCode className="mr-2 h-4 w-4" />
-                                    Clock Out
-                                  </Button>
-                                ) : (
-                                  <Button
-                                    size="sm"
-                                    className="text-md w-[40vw] bg-theme"
-                                    onClick={() =>
-                                      handleOpenQr(shift._id, 'clockin')
-                                    }
-                                  >
-                                    <QrCode className="mr-2 h-4 w-4" />
-                                    Clock In
-                                  </Button>
-                                )}
-                              </div>
-                            )}
                           </div>
 
                           {/* Content Wrapper */}
                           <div className="w-full flex-1">
                             {isLeave ? (
-                              /* --- LEAVE STATE --- */
                               <div className="grid grid-cols-2 items-center gap-4 lg:grid-cols-8 lg:gap-6">
                                 <div className="col-span-1 lg:col-span-2">
-                                  <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                                  <span className="mb-1.5 block text-xs font-bold uppercase tracking-widest text-slate-500">
                                     Shift Name
                                   </span>
                                   <span className="inline-flex items-center rounded-md bg-theme/10 px-3 py-1 text-xs font-semibold text-theme">
@@ -401,7 +301,7 @@ const StaffDashboardPage = () => {
                                 </div>
 
                                 <div className="col-span-1 lg:col-span-2">
-                                  <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                                  <span className="mb-1.5 block text-xs font-bold uppercase tracking-widest text-slate-500">
                                     Department
                                   </span>
                                   <span className="inline-flex items-center rounded-md bg-theme/10 px-3 py-1 text-xs font-semibold text-theme">
@@ -410,23 +310,16 @@ const StaffDashboardPage = () => {
                                   </span>
                                 </div>
 
-                                <div className="col-span-2 flex h-full items-center pt-2 lg:col-span-4 lg:border-l lg:border-slate-100 lg:pl-6 lg:pt-0">
+                                <div className="col-span-2 flex h-full items-center pt-2 lg:col-span-4  lg:pl-6 lg:pt-0">
                                   <span className="inline-flex items-center rounded-full border border-amber-200/60 bg-amber-50 px-3 py-1 text-sm font-medium text-amber-700">
                                     Leave / Day Off
                                   </span>
                                 </div>
                               </div>
                             ) : (
-                              /* --- ACTIVE SHIFT STATE --- */
-                              <div
-                                className={`grid grid-cols-2 items-center gap-4 lg:gap-6 ${
-                                  showAnyButton
-                                    ? 'lg:grid-cols-10'
-                                    : 'lg:grid-cols-8'
-                                }`}
-                              >
+                              <div className="grid grid-cols-2 items-center gap-4 lg:grid-cols-8 lg:gap-6">
                                 <div className="col-span-1 lg:col-span-2">
-                                  <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                                  <span className="mb-1.5 block text-xs font-bold uppercase tracking-widest text-slate-500">
                                     Shift Name
                                   </span>
                                   <span className="inline-flex items-center rounded-md bg-theme/10 px-3 py-1 text-xs font-semibold text-theme">
@@ -435,7 +328,7 @@ const StaffDashboardPage = () => {
                                 </div>
 
                                 <div className="col-span-1 lg:col-span-2">
-                                  <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                                  <span className="mb-1.5 block text-xs font-bold uppercase tracking-widest text-slate-500">
                                     Department
                                   </span>
                                   <span className="inline-flex items-center rounded-md bg-theme/10 px-3 py-1 text-xs font-semibold text-theme">
@@ -445,28 +338,28 @@ const StaffDashboardPage = () => {
                                 </div>
 
                                 <div className="col-span-1 lg:col-span-1">
-                                  <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                                  <span className="mb-1.5 block text-xs font-bold uppercase tracking-widest text-slate-500">
                                     Start
                                   </span>
-                                  <span className="text-sm font-bold text-slate-900">
+                                  <span className="text-sm font-bold text-black">
                                     {shift.startTime}
                                   </span>
                                 </div>
 
                                 <div className="col-span-1 lg:col-span-1">
-                                  <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                                  <span className="mb-1.5 block text-xs font-bold uppercase tracking-widest text-slate-500">
                                     End
                                   </span>
-                                  <span className="text-sm font-bold text-slate-900">
+                                  <span className="text-sm font-bold text-black">
                                     {shift.endTime}
                                   </span>
                                 </div>
 
                                 <div className="col-span-2 lg:col-span-2">
-                                  <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                                  <span className="mb-1.5 block text-xs font-bold uppercase tracking-widest text-slate-500">
                                     Duration
                                   </span>
-                                  <span className="text-sm font-bold text-slate-900">
+                                  <span className="text-sm font-bold text-black">
                                     {calculateDuration(
                                       shift.startTime,
                                       shift.endTime
@@ -474,36 +367,6 @@ const StaffDashboardPage = () => {
                                     h
                                   </span>
                                 </div>
-
-                                {/* QR Action (Desktop View) */}
-                                {showAnyButton && (
-                                  <div className="hidden lg:col-span-2 lg:flex lg:items-center lg:justify-end lg:pr-2">
-                                    {showClockOut ? (
-                                      <Button
-                                        size="sm"
-                                        variant="destructive"
-                                        className="w-full bg-red-500 shadow-sm hover:bg-red-600 sm:w-auto"
-                                        onClick={() =>
-                                          handleOpenQr(shift._id, 'clockout')
-                                        }
-                                      >
-                                        <QrCode className="mr-2 h-4 w-4" />
-                                        Clock Out
-                                      </Button>
-                                    ) : (
-                                      <Button
-                                        size="sm"
-                                        className="w-full bg-theme text-white shadow-sm hover:bg-blue-700 sm:w-auto"
-                                        onClick={() =>
-                                          handleOpenQr(shift._id, 'clockin')
-                                        }
-                                      >
-                                        <QrCode className="mr-2 h-4 w-4" />
-                                        Clock In
-                                      </Button>
-                                    )}
-                                  </div>
-                                )}
                               </div>
                             )}
                           </div>
@@ -517,14 +380,54 @@ const StaffDashboardPage = () => {
           </div>
         </div>
 
-        {/* RIGHT COLUMN: NOTICE BOARD */}
-        <div className="flex flex-col gap-4 border-t border-slate-100 pt-8 lg:col-span-1 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0">
+        {/* === 2. QR CODE PREVIEW (Order: 1 Mobile | 2 Desktop) === */}
+        <div className="order-1 flex flex-col gap-4 lg:order-2 lg:col-span-1 lg:border-l lg:border-slate-100 lg:pb-8 lg:pl-8">
+          <div className="mb-1 flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-theme/10 text-theme">
+              <QrCode className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold tracking-tight text-black">
+                Scan to clock in/out{' '}
+              </h2>
+            </div>
+          </div>
+
+          <Card className="flex flex-col items-center justify-center border-slate-200 bg-slate-200 p-6 shadow-sm">
+            <div className="rounded-xl bg-white p-4 shadow-sm">
+              {eid ? (
+                <QRCodeSVG
+                  id="employee-qr-code"
+                  value={eid}
+                  size={200}
+                  level="H"
+                  includeMargin={false}
+                />
+              ) : (
+                <div className="flex h-[160px] w-[160px] items-center justify-center bg-slate-100 text-sm text-slate-400">
+                  No ID Found
+                </div>
+              )}
+            </div>
+            <Button
+              onClick={downloadQRCode}
+              className="mt-6 w-full bg-theme text-white hover:bg-blue-700"
+              disabled={!eid}
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Download QR Code
+            </Button>
+          </Card>
+        </div>
+
+        {/* === 3. NOTICE BOARD (Order: 3 Mobile | 3 Desktop) === */}
+        <div className="order-3 flex flex-col gap-4 lg:order-3 lg:col-span-1 lg:border-l lg:border-slate-100 lg:pl-8">
           <div className="mb-1 flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-theme/10 text-theme">
               <Bell className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="text-xl font-bold tracking-tight text-slate-900">
+              <h2 className="text-xl font-bold tracking-tight text-black">
                 Notice
               </h2>
               <p className="text-xs text-slate-500">Latest announcements</p>
@@ -536,7 +439,7 @@ const StaffDashboardPage = () => {
               <Card className="border border-slate-200 bg-slate-50 py-10 text-center shadow-none">
                 <div className="flex flex-col items-center">
                   <AlertCircle className="mb-3 h-8 w-8 text-slate-500" />
-                  <h3 className="text-sm font-semibold text-slate-900">
+                  <h3 className="text-sm font-semibold text-black">
                     No recent notices
                   </h3>
                 </div>
@@ -549,7 +452,7 @@ const StaffDashboardPage = () => {
                 >
                   <div className="mb-2 flex items-start justify-between gap-2">
                     <Badge
-                      className={`px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${getNoticeTypeStyle(notice.noticeType)}`}
+                      className={`px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ${getNoticeTypeStyle(notice.noticeType)}`}
                     >
                       {notice.noticeType}
                     </Badge>
@@ -584,45 +487,16 @@ const StaffDashboardPage = () => {
             )}
           </div>
 
-          {notices.length >= 10 && (
+          {notices.length > 5 && (
             <Button
-              variant="outline"
               className="mt-2 w-full text-xs"
-              onClick={() => navigate('notice-board')}
+              onClick={() => navigate('notice')}
             >
               View All Notices
             </Button>
           )}
         </div>
       </div>
-
-      {/* Full-Screen QR Modal */}
-      {/* UPDATED: trigger silent fetch on close by passing handleQrModalChange */}
-      <Dialog open={qrModalOpen} onOpenChange={handleQrModalChange}>
-        <DialogContent className="m-0 flex h-[100dvh] w-screen max-w-[100vw] flex-col items-center justify-center rounded-none border-none bg-black/95 p-0">
-          <DialogClose className="absolute right-6 top-6 rounded-full bg-white/10 p-2 text-white transition-colors hover:bg-white/20">
-            <X className="h-6 w-6" />
-          </DialogClose>
-
-          <div className="flex flex-col items-center justify-center space-y-8 p-16 text-center md:p-6">
-            <p className="max-w-sm font-semibold text-white">
-              Scan this QR code to confirm your{' '}
-              {qrAction === 'clockin' ? 'arrival' : 'departure'}.
-            </p>
-
-            <div className="rounded-3xl bg-white p-8 shadow-2xl">
-              {selectedRotaId && (
-                <QRCodeSVG
-                  value={selectedRotaId}
-                  size={300}
-                  level={'H'}
-                  includeMargin={false}
-                />
-              )}
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };

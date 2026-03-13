@@ -94,6 +94,7 @@ import StaffProfile from '@/pages/staff/profile';
 import AttendanceLayout from '@/components/layout/attendance-layout';
 import AttendanceAccountPage from '@/pages/company/attendance-account';
 import AttendanceScanner from '@/pages/attendance/attendance-dashboard';
+import AttendanceDetails from '@/pages/company/Attendance/Attendance-details';
 
 const SignInPage = lazy(() => import('@/pages/auth/signin'));
 
@@ -199,6 +200,7 @@ export default function AppRouter() {
         { path: 'edit-training/:tid', element: <EditTraining /> },
 
         { path: 'attendance', element: <AttendancePage /> },
+        { path: 'attendance/:aid', element: <AttendanceDetails /> },
         { path: 'attendance-list', element: <AttendanceList /> },
         { path: 'csv-attendance', element: <BulkAttendancePage /> },
         { path: 'attendance-entry', element: <EntryAttendance /> },

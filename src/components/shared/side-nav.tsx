@@ -275,18 +275,18 @@ const navItems = [
         href: 'attendance',
         roles: ['company']
       },
-      {
-        icon: FileJsonIcon,
-        label: 'Upload Attendance',
-        href: 'csv-attendance',
-        roles: ['company']
-      },
-      {
-        icon: PenBox,
-        label: 'Manual Attendance',
-        href: 'attendance-entry',
-        roles: ['company']
-      }
+      // {
+      //   icon: FileJsonIcon,
+      //   label: 'Upload Attendance',
+      //   href: 'csv-attendance',
+      //   roles: ['company']
+      // },
+      // {
+      //   icon: PenBox,
+      //   label: 'Manual Attendance',
+      //   href: 'attendance-entry',
+      //   roles: ['company']
+      // }
     ]
   },
   {

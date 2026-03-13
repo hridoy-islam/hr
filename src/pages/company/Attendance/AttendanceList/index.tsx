@@ -5,24 +5,16 @@ import 'react-datepicker/dist/react-datepicker.css';
 import Select from 'react-select';
 import moment from 'moment';
 import {
-  CheckCircle2,
-  XCircle,
-  AlertCircle,
-  Clock,
   Search,
   Calendar as CalendarIcon,
-  History,
-  Pencil,
-  Check,
-  X as XIcon,
   Loader2,
-  RotateCcw
+  RotateCcw,
+  Eye
 } from 'lucide-react';
 
 // Shadcn UI Imports
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -31,11 +23,9 @@ import {
   TableHeader,
   TableRow
 } from '@/components/ui/table';
-import { Input } from '@/components/ui/input';
 
 // Custom Imports
 import axiosInstance from '@/lib/axios';
-import CSVExporter from './components/CSVExporter';
 import { useNavigate, useParams } from 'react-router-dom';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 
@@ -50,75 +40,45 @@ interface RootState {
   };
 }
 
-interface EditFormState {
-  startDate: string;
-  startTime: string; // HH:mm
-  endDate: string;
-  endTime: string; // HH:mm
-}
-
 // --- Helpers ---
 
 /**
- * Robust Duration Calculator
+ * Dynamically calculates duration from attendanceLogs array in HH:mm
  */
-const calculateDuration = (
-  sDate: string,
-  sTime: string,
-  eDate: string,
-  eTime: string
-) => {
-  // Normalize Time to "HH:mm"
-  const normalizeTime = (t: string) => {
-    if (!t || t === '--') return null;
-    if (t.includes('T')) return moment(t).format('HH:mm');
-    // Handle cases like "0930" -> "09:30"
-    if (!t.includes(':') && t.length >= 3) {
-       const m = moment(t, ['HHmm', 'Hmm']);
-       if(m.isValid()) return m.format('HH:mm');
+const calculateDynamicDuration = (logs: any[]) => {
+  if (!logs || logs.length === 0) return '00:00';
+
+  let totalMinutes = 0;
+
+  logs.forEach((log) => {
+    if (log.clockIn && log.clockOut) {
+      const start = moment(log.clockIn, 'HH:mm');
+      const end = moment(log.clockOut, 'HH:mm');
+
+      // Handle shifts that cross midnight
+      if (end.isBefore(start)) {
+        end.add(1, 'day');
+      }
+
+      totalMinutes += end.diff(start, 'minutes');
     }
-    if (t.includes(':')) return t.substring(0, 5);
-    return t;
-  };
+  });
 
-  const cleanSTime = normalizeTime(sTime);
-  const cleanETime = normalizeTime(eTime);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
 
-  if (!cleanSTime || !cleanETime || cleanSTime.length !== 5 || cleanETime.length !== 5) {
-    return { display: '--', minutes: 0 };
-  }
-
-  const start = moment(
-    `${moment(sDate).format('YYYY-MM-DD')} ${cleanSTime}`,
-    'YYYY-MM-DD HH:mm'
-  );
-  const end = moment(
-    `${moment(eDate).format('YYYY-MM-DD')} ${cleanETime}`,
-    'YYYY-MM-DD HH:mm'
-  );
-
-  if (!start.isValid() || !end.isValid()) {
-    return { display: '--', minutes: 0 };
-  }
-
-  const diffMs = end.diff(start);
-  const duration = moment.duration(diffMs);
-
-  const hours = Math.floor(duration.asHours());
-  const mins = duration.minutes();
-
-  const display = `${hours}:${mins}`;
-  return { display, minutes: duration.asMinutes() };
+  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
 };
 
 const AttendancePage = () => {
   const user = useSelector((state: RootState) => state.auth?.user) || null;
   const navigate = useNavigate();
-  const {id, aid} = useParams();
-  // State: Default range is Current Month Start -> Current Day
+  const { id } = useParams();
+  
+  // State: Default range is Full Current Month
   const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([
     moment().startOf('month').toDate(),
-    new Date()
+    moment().endOf('month').toDate()
   ]);
   const [startDate, endDate] = dateRange;
   const [attendanceData, setAttendanceData] = useState<any[]>([]);
@@ -128,23 +88,11 @@ const AttendancePage = () => {
   const [departmentsOptions, setDepartmentsOptions] = useState<any[]>([]);
   const [usersOptions, setUsersOptions] = useState<any[]>([]);
 
-  const [stats, setStats] = useState({ present: 0, absent: 0, pending: 0 });
-
   // Filters State
   const [selectedDesignation, setSelectedDesignation] = useState<any>(null);
   const [selectedDepartment, setSelectedDepartment] = useState<any>(null);
   const [selectedUser, setSelectedUser] = useState<any>(null);
 
-  // Inline Edit State
-  const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<EditFormState>({
-    startDate: '',
-    startTime: '',
-    endDate: '',
-    endTime: ''
-  });
-  const [editError, setEditError] = useState<string | null>(null);
-  const [isUpdating, setIsUpdating] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   // Fetch Meta Data
@@ -157,7 +105,7 @@ const AttendancePage = () => {
         const [desRes, deptRes, usersRes] = await Promise.all([
           axiosInstance.get(`/hr/designation?companyId=${companyId}&limit=all`),
           axiosInstance.get(`/hr/department?companyId=${companyId}&limit=all`),
-          axiosInstance.get(`/users?company=${companyId}&limit=all`)
+          axiosInstance.get(`/users?company=${companyId}&limit=all&role=employee`)
         ]);
 
         setDesignationsOptions(
@@ -183,7 +131,7 @@ const AttendancePage = () => {
       }
     };
     fetchMetaData();
-  }, [user]);
+  }, [id]);
 
   // Fetch Attendance Data
   const fetchAttendance = async () => {
@@ -208,9 +156,6 @@ const AttendancePage = () => {
 
       if (apiResponse.success && apiResponse.data) {
         setAttendanceData(apiResponse.data.result || []);
-        if (apiResponse.data.meta?.stats) {
-          setStats(apiResponse.data.meta.stats);
-        }
       }
     } catch (error) {
       console.error('Error fetching attendance:', error);
@@ -221,142 +166,25 @@ const AttendancePage = () => {
 
   useEffect(() => {
     fetchAttendance();
-  }, [user]);
+  }, [id]);
 
   // Reset Filters
   const handleReset = () => {
     setSelectedUser(null);
     setSelectedDesignation(null);
     setSelectedDepartment(null);
-    setDateRange([moment().startOf('month').toDate(), new Date()]);
+    setDateRange([moment().startOf('month').toDate(), moment().endOf('month').toDate()]);
   };
 
-  // --- Edit Handlers ---
-
-  const handleEditClick = (record: any) => {
-    setEditingRecordId(record._id);
-
-    const extractDate = (val: string, fallback: string) =>
-      val ? moment(val).format('YYYY-MM-DD') : fallback;
-      
-    const extractTime = (val: string) => {
-      if (!val) return '';
-      if (val.includes('T')) return moment(val).format('HH:mm');
-      if (val.length >= 5) return val.substring(0, 5);
-      return val;
-    };
-
-    setEditForm({
-      startDate: extractDate(
-        record.startDate,
-        moment(record.createdAt || record.date).format('YYYY-MM-DD')
-      ),
-      startTime: extractTime(record.startTime || record.clockIn),
-      endDate: extractDate(
-        record.endDate,
-        moment(record.createdAt || record.date).format('YYYY-MM-DD')
-      ),
-      endTime: extractTime(record.endTime || record.clockOut)
-    });
-    setEditError(null);
-  };
-
-  const handleCancelEdit = () => {
-    setEditingRecordId(null);
-    setEditForm({ startDate: '', startTime: '', endDate: '', endTime: '' });
-    setEditError(null);
-  };
-
-  const handleFormChange = (field: keyof EditFormState, value: string) => {
-    let processedValue = value;
-
-    if (field === 'startTime' || field === 'endTime') {
-      // 1. Sanitize: Allow only digits and colons, max 5 chars
-      processedValue = processedValue.replace(/[^0-9:]/g, '').slice(0, 5);
-
-      // 2. Smart Auto-Colon:
-      // If we went from 1 character to 2 characters, and neither is a colon, append the colon.
-      // This detects "typing" vs "backspacing".
-      if (
-        processedValue.length === 2 && 
-        editForm[field].length === 1 && 
-        !processedValue.includes(':')
-      ) {
-         processedValue += ':';
-      }
-    }
-
-    setEditForm({ ...editForm, [field]: processedValue });
-    setEditError(null);
-  };
-
-  const handleTimeBlur = (field: keyof EditFormState, value: string) => {
-    let cleanValue = value.trim();
-    if (cleanValue) {
-      // Parse whatever exists to HH:mm (e.g. "9" -> "09:00", "9:30" -> "09:30")
-      const m = moment(cleanValue, ['HH:mm', 'H:mm', 'HHmm', 'Hmm', 'H']);
-      if(m.isValid()) {
-         cleanValue = m.format('HH:mm');
-      }
-    }
-    setEditForm((prev) => ({ ...prev, [field]: cleanValue }));
-  };
-
-  const handleSaveEdit = async () => {
-    setIsUpdating(true);
-    try {
-      const { minutes } = calculateDuration(
-        editForm.startDate,
-        editForm.startTime,
-        editForm.endDate,
-        editForm.endTime
-      );
-
-      const formatForBackend = (t: string) => {
-          if(t && t.length === 5 && t.includes(':')) return `${t}:00.000`;
-          return t;
-      };
-
-      await axiosInstance.patch(`/hr/attendance/${editingRecordId}`, {
-        startDate: editForm.startDate,
-        startTime: formatForBackend(editForm.startTime),
-        endDate: editForm.endDate,
-        endTime: formatForBackend(editForm.endTime),
-        duration: minutes,
-        clockIn: formatForBackend(editForm.startTime),
-        clockOut: formatForBackend(editForm.endTime)
-      });
-
-      await fetchAttendance();
-      handleCancelEdit();
-    } catch (error) {
-      console.error('Failed to update attendance', error);
-      setEditError('Failed to update record. Please try again.');
-    } finally {
-      setIsUpdating(false);
-    }
-  };
-
-  const handleApprove = async (recordId: string) => {
-    try {
-      await axiosInstance.patch(`/hr/attendance/${recordId}`, {
-        approvalStatus: 'approved'
-      });
-      await fetchAttendance();
-    } catch (error) {
-      console.error('Failed to approve attendance', error);
-    }
+  const handleView = (recordId: string) => {
+    navigate(`${recordId}`);
   };
 
   return (
     <div className="space-y-3">
       <Card className="w-full bg-white shadow-md">
-       
-
         <CardContent className="space-y-3 pt-4">
-
-        
-
+          
           {/* Filters Row */}
           <div className="grid grid-cols-1 items-end gap-3 lg:grid-cols-5 ">
             {/* Employee Filter */}
@@ -390,7 +218,7 @@ const AttendancePage = () => {
             </div>
 
             {/* Designation Filter */}
-            <div className="">
+            {/* <div className="">
               <label className="mb-2 block text-xs font-semibold uppercase tracking-wider ">
                 Designation
               </label>
@@ -402,7 +230,7 @@ const AttendancePage = () => {
                 isClearable
                 className="text-sm"
               />
-            </div>
+            </div> */}
 
             {/* Date Range */}
             <div className="w-full">
@@ -419,7 +247,6 @@ const AttendancePage = () => {
                   className="flex w-full h-10 rounded-md border border-gray-300 px-3 py-2 pl-8 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholderText="Select range"
                   wrapperClassName="w-full"
-                  maxDate={new Date()}
                 />
                 <CalendarIcon className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-gray-400" />
               </div>
@@ -447,7 +274,7 @@ const AttendancePage = () => {
             </div>
           </div>
 
-          {/* SINGLE TABLE VIEW */}
+          {/* Table Header Summary */}
           <div className="mt-2 text-lg font-semibold text-gray-600">
               Attendance: <span className="">{startDate ? moment(startDate).format("MMM DD, YYYY") : '...'}</span> 
               {endDate && <span > - {moment(endDate).format("MMM DD, YYYY")}</span>}
@@ -457,16 +284,7 @@ const AttendancePage = () => {
             <TableSection
               data={attendanceData}
               loading={isLoading}
-              editingRecordId={editingRecordId}
-              editForm={editForm}
-              editError={editError}
-              isUpdating={isUpdating}
-              onEditClick={handleEditClick}
-              onCancelEdit={handleCancelEdit}
-              onSaveEdit={handleSaveEdit}
-              onFormChange={handleFormChange}
-              onTimeBlur={handleTimeBlur}
-              onApprove={handleApprove}
+              onViewClick={handleView}
             />
           </div>
 
@@ -480,29 +298,11 @@ const AttendancePage = () => {
 const TableSection = ({
   data,
   loading,
-  editingRecordId,
-  editForm,
-  editError,
-  isUpdating,
-  onEditClick,
-  onCancelEdit,
-  onSaveEdit,
-  onFormChange,
-  onTimeBlur,
-  onApprove
+  onViewClick
 }: {
   data: any[];
   loading: boolean;
-  editingRecordId: string | null;
-  editForm: EditFormState;
-  editError: string | null;
-  isUpdating: boolean;
-  onEditClick: (rec: any) => void;
-  onCancelEdit: () => void;
-  onSaveEdit: () => void;
-  onFormChange: (field: keyof EditFormState, value: string) => void;
-  onTimeBlur: (field: keyof EditFormState, value: string) => void;
-  onApprove: (recordId: string) => void;
+  onViewClick: (recordId: string) => void;
 }) => {
   if (loading) {
     return (
@@ -520,27 +320,23 @@ const TableSection = ({
         <h3 className="text-lg font-semibold text-gray-900">
           No records found
         </h3>
-        <p className="max-w-[250px] text-sm ">
+        <p className="max-w-[250px] text-sm text-gray-500">
           Try adjusting your filters or date range.
         </p>
       </div>
     );
   }
 
-  const datePickerClass =
-    'flex h-8 max-w-[120px] rounded-md border border-gray-300 px-3 py-2 text-xs ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50';
-
   return (
     <div className="space-y-2">
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead>Date</TableHead>
             <TableHead>Employee</TableHead>
             <TableHead>Email</TableHead>
-            <TableHead >Start Date</TableHead>
-            <TableHead>Start Time</TableHead>
-            <TableHead >End Date</TableHead>
-            <TableHead>End Time</TableHead>
+            <TableHead>Department</TableHead>
+            <TableHead>Shift Name</TableHead>
             <TableHead>Duration</TableHead>
             <TableHead className="text-right">Action</TableHead>
           </TableRow>
@@ -550,195 +346,53 @@ const TableSection = ({
             const firstName = record.userId?.firstName || '';
             const lastName = record.userId?.lastName || '';
             const fullName = `${firstName} ${lastName}`.trim() || 'Unknown';
-            const email = record.userId?.email || '';
-            const phone = record.userId?.phone || '';
-            const isEditing = editingRecordId === record._id;
+            const email = record.userId?.email || '--';
+            
+            // Extract values from Rota
+            const departmentName = record.rotaId?.departmentId?.departmentName || '--';
+            const shiftName = record.rotaId?.shiftName || '--';
+            
+            // Format Date
+            const displayDate = record.date ? moment(record.date).format('DD-MM-YYYY') : '--';
 
-            const rStartDate = record.startDate
-              ? moment(record.startDate).format('YYYY-MM-DD')
-              : moment(record.createdAt).format('YYYY-MM-DD');
-            const rStartTime = record.startTime || record.clockIn || '--';
-            const rEndDate = record.endDate
-              ? moment(record.endDate).format('YYYY-MM-DD')
-              : rStartDate;
-            const rEndTime = record.endTime || record.clockOut || '--';
-
-            const displayTime = (t: string) => {
-               if(!t || t === '--') return '--';
-               if(t.includes('T')) return moment(t).format('HH:mm');
-               if(t.length >= 5) return t.substring(0, 5);
-               return t;
-            };
-
-            const dCalc = isEditing
-              ? calculateDuration(
-                  editForm.startDate,
-                  editForm.startTime,
-                  editForm.endDate,
-                  editForm.endTime
-                )
-              : calculateDuration(rStartDate, rStartTime, rEndDate, rEndTime);
-
-            const isDurationValid = dCalc.minutes > 0;
+            // Calculate Dynamic Duration from Logs
+            const durationFormatted = calculateDynamicDuration(record.attendanceLogs);
 
             return (
               <TableRow key={record._id}>
+                <TableCell className="font-medium text-sm">
+                  {displayDate}
+                </TableCell>
+                
                 <TableCell>
-                  <div className="flex flex-col gap-1">
-                    <span className="text-sm font-medium">{fullName}</span>
-                   
-                  </div>
+                  <span className="text-sm font-medium">{fullName}</span>
                 </TableCell>
+                
                 <TableCell>
-                  <div className="flex flex-col gap-1">
-                    <span className="text-sm ">{email}</span>
-                  
-                  </div>
+                  <span className="text-sm text-gray-600">{email}</span>
                 </TableCell>
 
                 <TableCell className="text-sm">
-                  {isEditing ? (
-                    <div className="relative w-full">
-                      <DatePicker
-                        selected={
-                          editForm.startDate
-                            ? moment(editForm.startDate).toDate()
-                            : null
-                        }
-                        onChange={(date: Date) => {
-                          const val = date
-                            ? moment(date).format('YYYY-MM-DD')
-                            : '';
-                          onFormChange('startDate', val);
-                        }}
-                        dateFormat="dd-MM-yyyy"
-                        className={datePickerClass}
-                        placeholderText="Select Date"
-                        portalId="root"
-                      />
-                    </div>
-                  ) : (
-                    moment(rStartDate).format('DD-MM-YYYY')
-                  )}
-                </TableCell>
-
-                <TableCell className="font-mono text-sm">
-                  {isEditing ? (
-                    <Input
-                      value={editForm.startTime}
-                      onChange={(e) =>
-                        onFormChange('startTime', e.target.value)
-                      }
-                      onBlur={(e) => onTimeBlur('startTime', e.target.value)}
-                      placeholder="09:00"
-                      className="h-8 w-20 font-mono text-xs"
-                      maxLength={5}
-                    />
-                  ) : (
-                    displayTime(rStartTime)
-                  )}
+                  {departmentName}
                 </TableCell>
 
                 <TableCell className="text-sm">
-                  {isEditing ? (
-                    <div className="relative w-full">
-                      <DatePicker
-                        selected={
-                          editForm.endDate
-                            ? moment(editForm.endDate).toDate()
-                            : null
-                        }
-                        onChange={(date: Date) => {
-                          const val = date
-                            ? moment(date).format('YYYY-MM-DD')
-                            : '';
-                          onFormChange('endDate', val);
-                        }}
-                        dateFormat="dd-MM-yyyy"
-                        className={datePickerClass}
-                        placeholderText="Select Date"
-                        portalId="root"
-                      />
-                    </div>
-                  ) : (
-                    moment(rEndDate).format('DD-MM-YYYY')
-                  )}
+                  {shiftName}
                 </TableCell>
 
-                <TableCell className="font-mono text-sm">
-                  {isEditing ? (
-                    <Input
-                      value={editForm.endTime}
-                      onChange={(e) => onFormChange('endTime', e.target.value)}
-                      onBlur={(e) => onTimeBlur('endTime', e.target.value)}
-                      placeholder="18:00"
-                      className="h-8 w-20 font-mono text-xs"
-                      maxLength={5}
-                    />
-                  ) : (
-                    displayTime(rEndTime)
-                  )}
-                </TableCell>
-
-                <TableCell className="text-sm">
-                  <div
-                    className={`flex items-center gap-1 font-mono text-sm ${!isDurationValid && isEditing ? 'font-bold text-red-500' : 'text-black'}`}
-                  >
-                    {dCalc.display}
-                  </div>
+                <TableCell className="text-sm font-mono font-medium">
+                  {durationFormatted}
                 </TableCell>
 
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-2">
-                    {isEditing ? (
-                      <>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={onCancelEdit}
-                          disabled={isUpdating}
-                          className="h-8 px-2"
-                        >
-                          <XIcon className="mr-1 h-3 w-3" />
-                          Cancel
-                        </Button>
-                        <Button
-                          size="sm"
-                          onClick={onSaveEdit}
-                          disabled={isUpdating || !isDurationValid}
-                          className="h-8 px-2"
-                        >
-                          {isUpdating ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                          ) : (
-                            <Check className="mr-1 h-3 w-3" />
-                          )}
-                          Save
-                        </Button>
-                      </>
-                    ) : (
-                      <>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => onEditClick(record)}
-                          className="h-8 px-2"
-                        >
-                          <Pencil className="mr-1 h-3 w-3" />
-                          Reconcile
-                        </Button>
-                        {record.approvalStatus === 'pending' && (
-                          <Button
-                            size="sm"
-                            onClick={() => onApprove(record._id)}
-                            className="h-8 bg-green-600 px-2 hover:bg-green-700"
-                          >
-                            <CheckCircle2 className="mr-1 h-3 w-3" />
-                            Approve
-                          </Button>
-                        )}
-                      </>
-                    )}
+                    <Button
+                      size="sm"
+                      onClick={() => onViewClick(record._id)}
+                    >
+                      <Eye className="mr-2 h-3.5 w-3.5" />
+                      View
+                    </Button>
                   </div>
                 </TableCell>
               </TableRow>
@@ -746,11 +400,6 @@ const TableSection = ({
           })}
         </TableBody>
       </Table>
-      {editError && (
-        <div className="rounded border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-500">
-          {editError}
-        </div>
-      )}
     </div>
   );
 };

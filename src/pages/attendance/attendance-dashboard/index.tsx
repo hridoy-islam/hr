@@ -43,16 +43,7 @@ const isProcessing = useRef(false);
   const successSound = useMemo(() => new Audio('/qr-success.mp3'), []);
   const errorSound = useMemo(() => new Audio('/error.mp3'), []);
 
-  // --- Voice Feedback Logic ---
-  const speak = useCallback((text: string) => {
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 0.8;
-      utterance.pitch = 1;
-      window.speechSynthesis.speak(utterance);
-    }
-  }, []);
+
 
   const handleLogout = async () => {
     await dispatch(logout());
@@ -93,8 +84,8 @@ const isProcessing = useRef(false);
    setStatus('loading');
 
    try {
-     const response = await axiosInstance.post('/rota/attendance', {
-       rotaId: scannedId
+     const response = await axiosInstance.post('/hr/attendance/clock-event', {
+       userId: scannedId
      });
 
      if (response.data?.success) {
@@ -110,7 +101,6 @@ const isProcessing = useRef(false);
        // Play Audio & Speech
        successSound.currentTime = 0;
        successSound.play().catch((err) => console.log('Audio blocked', err));
-       speak(`Thank you ${userName}, attendance recorded.`);
      } else {
        throw new Error(response.data?.message || 'Invalid ID');
      }
@@ -122,7 +112,6 @@ const isProcessing = useRef(false);
      // Play Error Sound & Speech
      errorSound.currentTime = 0;
      errorSound.play().catch((err) => console.log('Audio blocked', err));
-     speak(`Error. ${errMsg}`);
    } finally {
      // 3. COOLDOWN: Wait 4 seconds before allowing another scan
      setTimeout(() => {
