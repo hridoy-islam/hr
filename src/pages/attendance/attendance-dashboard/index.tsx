@@ -23,11 +23,12 @@ import { AppDispatch } from '@/redux/store';
 import { logout } from '@/redux/features/authSlice';
 import moment from 'moment';
 import { useToast } from '@/components/ui/use-toast';
+import { BlinkingDots } from '@/components/shared/blinking-dots';
 
 export default function AttendanceScanner() {
   const [inputValue, setInputValue] = useState('');
   const [scanMode, setScanMode] = useState<'qr' | 'dob' | 'visitor'>('qr');
-
+  const [isSidebarLoading, setIsSidebarLoading] = useState(true);
   // DOB States
   const [selectedDob, setSelectedDob] = useState<Date | null>(null);
   const [matchedUser, setMatchedUser] = useState<any>(null);
@@ -70,6 +71,8 @@ export default function AttendanceScanner() {
       setEmployees(response.data?.data?.result || response.data?.data || []);
     } catch (error) {
       console.error('Failed to fetch employees status', error);
+    } finally {
+      setIsSidebarLoading(false); // Set to false once the API responds
     }
   };
 
@@ -300,55 +303,55 @@ export default function AttendanceScanner() {
         {/* LEFT/TOP: BUTTONS + MAIN SCANNER UI */}
         <div className="flex flex-1 flex-col gap-4">
           {/* THE 3 SELECTION BUTTONS (Outside the card) */}
-         <div className="w-full grid grid-cols-3 gap-3 z-20">
-  <Button
-    variant={scanMode === 'dob' ? 'default' : 'outline'}
-    className={`text-xs sm:text-sm border-gray-300 shadow-sm bg-white ${
-      scanMode === 'dob'
-        ? 'bg-theme text-white border-theme'
-        : 'text-slate-700'
-    }`}
-    onClick={() => {
-      setScanMode('dob');
-      setMatchedUser(null);
-      setSelectedDob(null);
-    }}
-  >
-    Try Another Way
-  </Button>
+          <div className="z-20 grid w-full grid-cols-3 gap-3">
+            <Button
+              variant={scanMode === 'dob' ? 'default' : 'outline'}
+              className={`border-gray-300 bg-white text-xs shadow-sm sm:text-sm ${
+                scanMode === 'dob'
+                  ? 'border-theme bg-theme text-white'
+                  : 'text-slate-700'
+              }`}
+              onClick={() => {
+                setScanMode('dob');
+                setMatchedUser(null);
+                setSelectedDob(null);
+              }}
+            >
+              Try Another Way
+            </Button>
 
-  <Button
-    variant={scanMode === 'visitor' ? 'default' : 'outline'}
-    className={`text-xs sm:text-sm border-gray-300 shadow-sm bg-white ${
-      scanMode === 'visitor'
-        ? 'bg-theme text-white border-theme'
-        : 'text-slate-700'
-    }`}
-    onClick={() => {
-      setScanMode('visitor');
-      setMatchedUser(null);
-      setSelectedDob(null);
-    }}
-  >
-    Visitor
-  </Button>
+            <Button
+              variant={scanMode === 'visitor' ? 'default' : 'outline'}
+              className={`border-gray-300 bg-white text-xs shadow-sm sm:text-sm ${
+                scanMode === 'visitor'
+                  ? 'border-theme bg-theme text-white'
+                  : 'text-slate-700'
+              }`}
+              onClick={() => {
+                setScanMode('visitor');
+                setMatchedUser(null);
+                setSelectedDob(null);
+              }}
+            >
+              Visitor
+            </Button>
 
-  <Button
-    variant={scanMode === 'qr' ? 'default' : 'outline'}
-    className={`text-xs sm:text-sm border-gray-300 shadow-sm bg-white ${
-      scanMode === 'qr'
-        ? 'bg-theme text-white border-theme'
-        : 'text-slate-700'
-    }`}
-    onClick={() => {
-      setScanMode('qr');
-      setMatchedUser(null);
-      setSelectedDob(null);
-    }}
-  >
-    QR Code
-  </Button>
-</div>
+            <Button
+              variant={scanMode === 'qr' ? 'default' : 'outline'}
+              className={`border-gray-300 bg-white text-xs shadow-sm sm:text-sm ${
+                scanMode === 'qr'
+                  ? 'border-theme bg-theme text-white'
+                  : 'text-slate-700'
+              }`}
+              onClick={() => {
+                setScanMode('qr');
+                setMatchedUser(null);
+                setSelectedDob(null);
+              }}
+            >
+              QR Code
+            </Button>
+          </div>
 
           {/* MAIN SCANNER UI CARD */}
           <div className="relative flex min-h-[500px] flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -624,48 +627,60 @@ export default function AttendanceScanner() {
 
         {/* RIGHT/BOTTOM: EMPLOYEE STATUS */}
         {scanMode !== 'visitor' && (
-        <div className="flex max-h-[600px] min-h-[400px] w-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm lg:max-h-full lg:w-[350px]">
-          <div className="flex items-center border-b border-slate-100 bg-slate-50 p-4">
-            <h2 className="flex items-center text-lg font-bold text-slate-800">
-              <Users className="mr-2 h-5 w-5 text-theme" />
-              Employee Status
-            </h2>
-          </div>
-
-          <ScrollArea className="max-h-[75vh] flex-1">
-            <div className="space-y-3 p-4">
-              {employees.map((emp) => {
-                const isClockedIn =
-                  emp.latestAttendance?.latestStatus === 'clockin';
-
-                return (
-                  <div
-                    key={emp._id}
-                    className="flex items-center justify-between rounded-xl border border-slate-100 bg-white p-3 transition-colors hover:bg-slate-50"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div>
-                        <p className="text-sm font-medium text-slate-800">
-                          {emp.name || `${emp.firstName} ${emp.lastName}`}
-                        </p>
-                      </div>
-                    </div>
-                    <div
-                      className={`rounded-full px-3 py-1 text-xs font-semibold ${isClockedIn ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}
-                    >
-                      {isClockedIn ? 'Active' : 'Inactive'}
-                    </div>
-                  </div>
-                );
-              })}
-              {employees.length === 0 && (
-                <div className="py-10 text-center text-sm text-slate-400">
-                  No employees found.
-                </div>
-              )}
+          <div className="flex max-h-[600px] min-h-[400px] w-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm lg:max-h-full lg:w-[350px]">
+            <div className="flex items-center border-b border-slate-100 bg-slate-50 p-4">
+              <h2 className="flex items-center text-lg font-bold text-slate-800">
+                <Users className="mr-2 h-5 w-5 text-theme" />
+                Employee Status
+              </h2>
             </div>
-          </ScrollArea>
-        </div>)}
+
+            <ScrollArea className="max-h-[75vh] flex-1">
+              <div className="space-y-3 p-4">
+                {isSidebarLoading ? (
+                  // --- INITIAL LOADING STATE ---
+                  <div className="flex flex-col items-center justify-center py-10 text-slate-400">
+                    <BlinkingDots size='medium' color='bg-theme'/>
+                  </div>
+                ) : employees.length > 0 ? (
+                  // --- DATA STATE ---
+                  employees.map((emp) => {
+                    const isClockedIn =
+                      emp.latestAttendance?.latestStatus === 'clockin';
+                    return (
+                      <div
+                        key={emp._id}
+                        className="flex items-center justify-between rounded-xl border border-slate-100 bg-white p-3 transition-colors hover:bg-slate-50"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div>
+                            <p className="text-sm font-medium text-slate-800">
+                              {emp.name || `${emp.firstName} ${emp.lastName}`}
+                            </p>
+                          </div>
+                        </div>
+                        <div
+                          className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                            isClockedIn
+                              ? 'bg-green-100 text-green-700'
+                              : 'bg-slate-100 text-slate-500'
+                          }`}
+                        >
+                          {isClockedIn ? 'Active' : 'Inactive'}
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  // --- EMPTY STATE ---
+                  <div className="py-10 text-center text-sm text-slate-400">
+                    No employees found.
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
+          </div>
+        )}
       </div>
     </div>
   );
