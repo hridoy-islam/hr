@@ -95,6 +95,7 @@ import AttendanceLayout from '@/components/layout/attendance-layout';
 import AttendanceAccountPage from '@/pages/company/attendance-account';
 import AttendanceScanner from '@/pages/attendance/attendance-dashboard';
 import AttendanceDetails from '@/pages/company/Attendance/Attendance-details';
+import ServiceUserPage from '@/pages/company/serviceUser';
 
 const SignInPage = lazy(() => import('@/pages/auth/signin'));
 
@@ -254,7 +255,8 @@ export default function AppRouter() {
         { path: 'bank-holiday', element: <BankHolidayPage /> },
         { path: 'schedule-check', element: <CompanyScheduleCheckPage /> },
         { path: 'leave-approval', element: <CompanyLeaveApprovalPage /> },
-        { path: 'attendance-account', element: <AttendanceAccountPage /> }
+        { path: 'attendance-account', element: <AttendanceAccountPage /> },
+        { path: 'service-user', element: <ServiceUserPage /> }
       ]
     }
   ];

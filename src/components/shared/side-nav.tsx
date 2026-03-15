@@ -48,7 +48,8 @@ import {
   CalendarCheck2,
   CalendarRange,
   AlertCircle,
-  User
+  User,
+  Users2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Link, useNavigate, useLocation, useParams } from 'react-router-dom';
@@ -230,6 +231,12 @@ const navItems = [
     icon: Calendar,
     label: 'Leave Management',
     href: 'leave-approval',
+    roles: ['company']
+  },
+  {
+    icon: Users2,
+    label: 'Service User',
+    href: 'service-user',
     roles: ['company']
   },
   {
