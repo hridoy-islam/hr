@@ -43,7 +43,7 @@ interface LogEntry {
   _id?: string;
   title: string;
   date: string;
-  document?: string;
+  document?: string[] | string; // Updated to support array or legacy string
   updatedBy: string | { firstName: string; lastName: string; name?: string };
 }
 
@@ -56,10 +56,15 @@ interface InductionData {
   logs?: LogEntry[];
 }
 
+interface UploadedFile {
+  name: string;
+  url: string;
+}
+
 // --- Main Component ---
 
 function InductionTab() {
-  const { id,eid } = useParams(); // employeeId
+  const { id, eid } = useParams(); // employeeId
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { user } = useSelector((state: any) => state.auth);
   const { toast } = useToast();
@@ -73,9 +78,7 @@ function InductionTab() {
 
   // Data
   const [inductionId, setInductionId] = useState<string | null>(null);
-  const [currentInductionDate, setCurrentInductionDate] = useState<
-    string | null
-  >(null);
+  const [currentInductionDate, setCurrentInductionDate] = useState<string | null>(null);
   const [noPromotion, setNoPromotion] = useState<boolean>(false);
   const [history, setHistory] = useState<LogEntry[]>([]);
 
@@ -85,14 +88,13 @@ function InductionTab() {
 
   // Form Inputs
   const [inputDate, setInputDate] = useState<Date | null>(null);
-  const [uploadedFileUrl, setUploadedFileUrl] = useState<string | null>(null);
-  const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
+  
+  // File Upload State
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
   // Promotion Choice State
-  const [promotionChoice, setPromotionChoice] = useState<'yes' | 'no' | null>(
-    null
-  );
+  const [promotionChoice, setPromotionChoice] = useState<'yes' | 'no' | null>(null);
 
   // --- Fetch Data ---
 
@@ -130,57 +132,65 @@ function InductionTab() {
 
   // --- Handlers ---
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !id) return;
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    if (!files.length || !id) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      setUploadError('File must be less than 5MB.');
-      return;
+    const validTypes = ['application/pdf', 'image/jpeg', 'image/png'];
+    
+    // Validate all files first
+    for (const file of files) {
+      if (!validTypes.includes(file.type)) {
+        setUploadError(`Invalid file type: ${file.name}. Only PDF, JPEG, or PNG allowed.`);
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        setUploadError(`File too large: ${file.name}. Must be less than 5MB.`);
+        return;
+      }
     }
 
     setIsUploading(true);
     setUploadError(null);
-    setSelectedFileName(file.name);
-
-    const formData = new FormData();
-    formData.append('entityId', user._id);
-    formData.append('file_type', 'document');
-    formData.append('file', file);
 
     try {
-      const res = await axiosInstance.post('/documents', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+      const uploadPromises = files.map(async (file) => {
+        const formData = new FormData();
+        formData.append('entityId', user._id);
+        formData.append('file_type', 'document');
+        formData.append('file', file);
+
+        const res = await axiosInstance.post('/documents', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        return { name: file.name, url: res.data?.data?.fileUrl };
       });
-      setUploadedFileUrl(res.data?.data?.fileUrl);
+
+      const uploadedResults = await Promise.all(uploadPromises);
+      setUploadedFiles((prev) => [...prev, ...uploadedResults]);
     } catch (err) {
-      setUploadError('Failed to upload document.');
-      setUploadedFileUrl(null);
+      setUploadError('Failed to upload one or more documents.');
     } finally {
       setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = ''; // Reset input
     }
   };
 
-  const handleRemoveFile = () => {
-    setUploadedFileUrl(null);
-    setSelectedFileName(null);
-    setUploadError(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
+  const handleRemoveFile = (indexToRemove: number) => {
+    setUploadedFiles((prev) => prev.filter((_, index) => index !== indexToRemove));
   };
 
   // Open Handlers
   const handleOpenSchedule = () => {
     setInputDate(null);
-    setUploadedFileUrl(null);
-    setSelectedFileName(null);
+    setUploadedFiles([]);
     setUploadError(null);
     setShowScheduleModal(true);
   };
 
   const handleOpenPromotion = () => {
     setInputDate(null);
-    setUploadedFileUrl(null);
-    setSelectedFileName(null);
+    setUploadedFiles([]);
     setUploadError(null);
     setPromotionChoice(null); // Reset choice
     setShowPromotionModal(true);
@@ -188,14 +198,14 @@ function InductionTab() {
 
   // Submit: Schedule (Create ONLY)
   const submitSchedule = async () => {
-    if (!inputDate || !id || !uploadedFileUrl) return;
+    if (!inputDate || !id || uploadedFiles.length === 0) return;
     setIsSubmitting(true);
 
     try {
       const payload = {
         inductionDate: moment(inputDate).toISOString(),
         updatedBy: user._id,
-        document: uploadedFileUrl
+        document: uploadedFiles.map(f => f.url) // Passed as Array
       };
 
       // Only allowing create logic here as reschedule button is hidden if ID exists
@@ -212,7 +222,6 @@ function InductionTab() {
         className: 'bg-theme text-white'
       });
       setShowScheduleModal(false);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       toast({
         title: error.response?.data?.message || 'Failed to schedule',
@@ -227,12 +236,11 @@ function InductionTab() {
   const submitPromotion = async () => {
     if (!inductionId || !id || !promotionChoice) return;
 
-    if (promotionChoice === 'yes' && (!inputDate || !uploadedFileUrl)) return;
+    if (promotionChoice === 'yes' && (!inputDate || uploadedFiles.length === 0)) return;
 
     setIsSubmitting(true);
 
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let payload: any = { updatedBy: user._id };
 
       if (promotionChoice === 'yes') {
@@ -240,7 +248,7 @@ function InductionTab() {
           ...payload,
           action: 'promotion',
           inductionDate: moment(inputDate).toISOString(),
-          document: uploadedFileUrl
+          document: uploadedFiles.map(f => f.url) // Array format
         };
       } else {
         payload = {
@@ -260,7 +268,6 @@ function InductionTab() {
         className: 'bg-theme text-white'
       });
       setShowPromotionModal(false);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       toast({
         title: error.response?.data?.message || 'Failed to update promotion',
@@ -279,27 +286,52 @@ function InductionTab() {
     );
   }
 
+  // Reusable File Input Render
   const renderFileInput = (isOptional: boolean = false) => (
-    <div className="space-y-2 pt-2">
+    <div className="space-y-3 pt-2">
       <Label className="text-sm font-medium text-gray-700">
-        Supporting Document{' '}
-        <span
-          className={isOptional ? 'font-normal text-gray-400' : 'text-red-500'}
-        >
-          {isOptional ? '(Optional)' : '*'}
+        Supporting Document(s) <span className={isOptional ? "text-gray-400 font-normal" : "text-red-500"}>
+          {isOptional ? "(Optional)" : "*"}
         </span>
       </Label>
+
+      {/* Uploaded Files List */}
+      {uploadedFiles.length > 0 && (
+        <div className="space-y-2 max-h-32 overflow-y-auto pr-1">
+          {uploadedFiles.map((file, index) => (
+            <div key={index} className="flex w-full items-center justify-between rounded-md border border-green-200 bg-green-50 p-2">
+              <div className="flex items-center gap-2 overflow-hidden">
+                <FileText className="h-5 w-5 flex-shrink-0 text-green-600" />
+                <p className="truncate text-xs font-medium text-green-700" title={file.name}>
+                  {file.name}
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={(e) => { e.stopPropagation(); handleRemoveFile(index); }}
+                className="h-8 w-8 flex-shrink-0 hover:bg-red-100 hover:text-red-600"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Upload Dropzone */}
       <div
         className={cn(
           'relative flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 transition-colors',
-          uploadedFileUrl
-            ? 'border-green-500 bg-green-50'
+          isUploading
+            ? 'border-blue-500 bg-blue-50'
             : 'border-gray-300 bg-gray-50 hover:bg-gray-100'
         )}
       >
         <input
           ref={fileInputRef}
           type="file"
+          multiple // Enables multiple file selection
           accept=".pdf,application/pdf,image/*"
           onChange={handleFileSelect}
           className="absolute inset-0 cursor-pointer opacity-0"
@@ -310,34 +342,15 @@ function InductionTab() {
             <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent"></div>
             <p className="text-xs text-blue-600">Uploading...</p>
           </div>
-        ) : uploadedFileUrl ? (
-          <div className="flex w-full items-center justify-between">
-            <div className="flex items-center gap-2 overflow-hidden">
-              <FileText className="h-5 w-5 flex-shrink-0 text-green-600" />
-              <span className="truncate text-sm font-medium text-green-700">
-                {selectedFileName}
-              </span>
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleRemoveFile();
-              }}
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
         ) : (
           <div className="flex flex-col items-center gap-1 text-center">
             <Upload className="h-6 w-6 text-gray-400" />
-            <span className="text-sm font-medium text-gray-600">
-              Upload Document
-            </span>
+            <span className="text-sm font-medium text-gray-600">Upload Document</span>
+            <span className="text-xs text-gray-400">PDF/Images (Max 5MB each)</span>
           </div>
         )}
       </div>
+      
       {uploadError && <p className="text-xs text-red-500">{uploadError}</p>}
     </div>
   );
@@ -410,7 +423,7 @@ function InductionTab() {
                   <TableRow>
                     <TableHead>Activity</TableHead>
                     <TableHead>Updated By</TableHead>
-                    <TableHead className="text-right">Document</TableHead>
+                    <TableHead className="text-right">Document(s)</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -454,20 +467,35 @@ function InductionTab() {
                             </div>
                           </TableCell>
                           <TableCell className="text-right">
-                            {entry.document ? (
-                              <Button
-                                size="sm"
-                                className="h-8"
-                                onClick={() =>
-                                  window.open(entry.document, '_blank')
-                                }
-                              >
-                                <Eye className="mr-2 h-4 w-4" />
-                                View
-                              </Button>
-                            ) : (
-                              <span className="text-gray-300">-</span>
-                            )}
+                            <div className="flex flex-col items-end gap-1">
+                              {/* Handle array formats */}
+                              {Array.isArray(entry.document) && entry.document.length > 0 ? (
+                                entry.document.map((docUrl, idx) => (
+                                  <Button
+                                    key={idx}
+                                    size="sm"
+                                    className="h-8"
+                                    onClick={() => window.open(docUrl, '_blank')}
+                                  >
+                                    <Eye className="mr-2 h-4 w-4" />
+                                    Document {entry.document!.length > 1 ? idx + 1 : ''}
+                                  </Button>
+                                ))
+                              ) 
+                              /* Handle legacy string format fallback */
+                              : entry.document && typeof entry.document === 'string' ? (
+                                <Button
+                                  size="sm"
+                                  className="h-8"
+                                  onClick={() => window.open(entry.document as string, '_blank')}
+                                >
+                                  <Eye className="mr-2 h-4 w-4" />
+                                  Document 
+                                </Button>
+                              ) : (
+                                <span className="text-gray-300">-</span>
+                              )}
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))
@@ -517,7 +545,7 @@ function InductionTab() {
             <Button
               className="bg-theme text-white"
               onClick={submitSchedule}
-              disabled={isSubmitting || !inputDate || !uploadedFileUrl}
+              disabled={isSubmitting || !inputDate || uploadedFiles.length === 0}
             >
               {isSubmitting ? 'Saving...' : 'Confirm Schedule'}
             </Button>
@@ -599,6 +627,7 @@ function InductionTab() {
                   />
                 </div>
 
+                {/* Upload Section conditionally shown in Yes */}
                 {renderFileInput(false)}
               </div>
             )}
@@ -631,7 +660,7 @@ function InductionTab() {
               disabled={
                 isSubmitting ||
                 !promotionChoice ||
-                (promotionChoice === 'yes' && (!inputDate || !uploadedFileUrl))
+                (promotionChoice === 'yes' && (!inputDate || uploadedFiles.length === 0))
               }
             >
               {isSubmitting ? 'Saving...' : 'Confirm Decision'}

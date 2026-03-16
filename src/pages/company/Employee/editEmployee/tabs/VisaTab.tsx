@@ -33,7 +33,7 @@ interface HistoryEntry {
   _id: string;
   title: string;
   date: string;
-  document?: string;
+  document?: string[] | string; // Supports array of strings and legacy string fallback
   updatedBy: string | { firstName: string; lastName: string; name?: string };
 }
 
@@ -46,8 +46,13 @@ interface VisaData {
   logs?: HistoryEntry[];
 }
 
+interface UploadedFile {
+  name: string;
+  url: string;
+}
+
 function VisaTab() {
-  const { id,eid } = useParams();
+  const { id, eid } = useParams();
   const { user } = useSelector((state: any) => state.auth);
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -60,9 +65,7 @@ function VisaTab() {
     'active' | 'expired' | 'expiring-soon' | 'no-check-required' | null
   >(null);
   
-  const [currentExpiryDate, setCurrentExpiryDate] = useState<string | null>(
-    null
-  );
+  const [currentExpiryDate, setCurrentExpiryDate] = useState<string | null>(null);
   const [currentStartDate, setCurrentStartDate] = useState<string | null>(null);
   const [visaCheckInterval, setVisaCheckInterval] = useState<number>(0);
 
@@ -77,8 +80,8 @@ function VisaTab() {
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [newExpiryDate, setNewExpiryDate] = useState<Date | null>(null);
   const [newStartDate, setNewStartDate] = useState<Date | null>(null);
-  const [uploadedFileUrl, setUploadedFileUrl] = useState<string | null>(null);
-  const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
+  
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
 
   // Action Loading States
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -89,9 +92,7 @@ function VisaTab() {
   const fetchScheduleSettings = async () => {
     if (!id) return;
     try {
-      const res = await axiosInstance.get(
-        `/schedule-check?companyId=${id}`
-      );
+      const res = await axiosInstance.get(`/schedule-check?companyId=${id}`);
       const result = res.data?.data?.result;
       if (result && result.length > 0) {
         setVisaCheckInterval(result[0].visaCheckDate || 30);
@@ -123,11 +124,8 @@ function VisaTab() {
         const visaData = visaList[0];
         setVisaId(visaData._id);
 
-        // Store dates for display
         setCurrentExpiryDate(visaData.expiryDate);
         setCurrentStartDate(visaData.startDate || null);
-
-        // Set history
         setHistory(visaData.logs || []);
       } else {
         setVisaId(null);
@@ -144,7 +142,6 @@ function VisaTab() {
     }
   };
 
-  // Initial Data Load
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
@@ -155,13 +152,11 @@ function VisaTab() {
       ]);
       setIsLoading(false);
     };
-
     loadData();
   }, [eid, id]);
 
   // 4. Status Calculation
   useEffect(() => {
-    // 1. Check override flag first
     if (userData?.noRtwCheck) {
       setComplianceStatus('no-check-required');
       return;
@@ -170,7 +165,6 @@ function VisaTab() {
     if (currentExpiryDate) {
       const now = moment().startOf('day');
       const expiry = moment(currentExpiryDate).startOf('day');
-      
       const daysUntilExpiry = expiry.diff(now, 'days');
 
       if (daysUntilExpiry < 0) {
@@ -185,92 +179,83 @@ function VisaTab() {
     }
   }, [currentExpiryDate, visaCheckInterval, userData]);
 
-  // File Upload Logic
-  const handleFileSelect = async (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = event.target.files?.[0];
-    if (!file || !id) return;
+  // Multiple File Upload Logic
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    if (!files.length || !id) return;
 
     const validTypes = ['application/pdf', 'image/jpeg', 'image/png'];
-    if (!validTypes.includes(file.type)) {
-      setUploadError('Only PDF, JPEG, or PNG files are allowed.');
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      setUploadError('File must be less than 5MB.');
-      return;
+    
+    // Validate all files first
+    for (const file of files) {
+      if (!validTypes.includes(file.type)) {
+        setUploadError(`Invalid file type: ${file.name}. Only PDF, JPEG, or PNG allowed.`);
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        setUploadError(`File too large: ${file.name}. Must be less than 5MB.`);
+        return;
+      }
     }
 
     setIsUploading(true);
     setUploadError(null);
-    setSelectedFileName(file.name);
-
-    const formData = new FormData();
-    formData.append('entityId', user._id);
-    formData.append('file_type', 'document');
-    formData.append('file', file);
 
     try {
-      const res = await axiosInstance.post('/documents', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+      const uploadPromises = files.map(async (file) => {
+        const formData = new FormData();
+        formData.append('entityId', user._id);
+        formData.append('file_type', 'document');
+        formData.append('file', file);
+
+        const res = await axiosInstance.post('/documents', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        return { name: file.name, url: res.data?.data?.fileUrl };
       });
-      setUploadedFileUrl(res.data?.data?.fileUrl);
+
+      const uploadedResults = await Promise.all(uploadPromises);
+      setUploadedFiles((prev) => [...prev, ...uploadedResults]);
     } catch (err) {
-      setUploadError('Failed to upload document.');
-      setUploadedFileUrl(null);
+      setUploadError('Failed to upload one or more documents.');
     } finally {
       setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = ''; // Reset input
     }
   };
 
-  const handleRemoveFile = () => {
-    setUploadedFileUrl(null);
-    setSelectedFileName(null);
-    setUploadError(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
+  const handleRemoveFile = (indexToRemove: number) => {
+    setUploadedFiles((prev) => prev.filter((_, index) => index !== indexToRemove));
   };
 
-  // --- UPDATED: Open Modal Logic ---
   const openUpdateModal = () => {
-    // Reset errors and file
-    setUploadedFileUrl(null);
-    setSelectedFileName(null);
+    setUploadedFiles([]); // Reset files
     setUploadError(null);
 
-    // 1. Show Initial Data: Pre-fill with the CURRENT data
-    if (currentStartDate) {
-      setNewStartDate(new Date(currentStartDate));
-    } else {
-      setNewStartDate(new Date());
-    }
+    if (currentStartDate) setNewStartDate(new Date(currentStartDate));
+    else setNewStartDate(new Date());
 
-    if (currentExpiryDate) {
-      setNewExpiryDate(new Date(currentExpiryDate));
-    } else {
-      setNewExpiryDate(null);
-    }
+    if (currentExpiryDate) setNewExpiryDate(new Date(currentExpiryDate));
+    else setNewExpiryDate(null);
     
     setShowUpdateModal(true);
   };
 
   // Submit Logic
   const handleSubmitUpdate = async () => {
-    if (!id || !uploadedFileUrl || !newExpiryDate || !newStartDate) return;
+    if (!id || uploadedFiles.length === 0 || !newExpiryDate || !newStartDate) return;
 
     setIsSubmitting(true);
 
     const payload: any = {
       updatedBy: user._id,
-      document: uploadedFileUrl,
-      title: selectedFileName || 'Visa Check Updated',
+      document: uploadedFiles.map(f => f.url), // Sending Array of URLs
+      title: uploadedFiles.map(f => f.name).join(', ') || 'Visa Check Updated',
       startDate: moment(newStartDate).toISOString(),
       expiryDate: moment(newExpiryDate).toISOString()
     };
 
-    if (!visaId && eid) {
-      payload.employeeId = eid;
-    }
+    if (!visaId && eid) payload.employeeId = eid;
 
     try {
       const url = visaId ? `/visa/${visaId}` : `/visa`;
@@ -315,7 +300,6 @@ function VisaTab() {
             </h2>
 
             <div className="space-y-6">
-              {/* Dates Display */}
               <div className="space-y-4">
                 <div>
                   <Label className="text-sm font-medium uppercase tracking-wide text-gray-500">
@@ -367,7 +351,6 @@ function VisaTab() {
                 )}
               </div>
 
-              {/* Action Button */}
               <div className="border-t border-gray-100 pt-4">
                 <Button
                   onClick={openUpdateModal}
@@ -405,79 +388,81 @@ function VisaTab() {
 
             <div className="overflow-hidden rounded-md border border-gray-100">
               <Table>
-                              <TableHeader>
-                                <TableRow>
-                                  {/* Date & Time Column Removed */}
-                                  <TableHead>Activity</TableHead>
-                                  <TableHead >Updated By</TableHead>
-                                  <TableHead className="text-right">Document</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {history.length === 0 ? (
-                                  <TableRow>
-                                    <TableCell
-                                      colSpan={3} // Adjusted colspan from 4 to 3
-                                      className="py-8 text-center italic text-gray-500"
-                                    >
-                                      No history records found.
-                                    </TableCell>
-                                  </TableRow>
-                                ) : (
-                                  history
-                                    .slice()
-                                    .sort(
-                                      (a, b) =>
-                                        new Date(b.date).getTime() -
-                                        new Date(a.date).getTime()
-                                    )
-                                    .map((entry) => (
-                                      <TableRow key={entry._id} className="hover:bg-gray-50">
-                                        {/* Date Cell Removed */}
-              
-                                        <TableCell className="font-medium text-gray-900">
-                                          {entry.title || 'Update'}
-                                        </TableCell>
-              
-                                        <TableCell className="">
-                                          <div className='flex '>
-                                          <div className="flex flex-col">
-                                            <span className="font-medium">
-                                              {entry.updatedBy &&
-                                              typeof entry.updatedBy === 'object'
-                                                ? entry.updatedBy.name ||
-                                                  `${entry.updatedBy.firstName ?? ''} ${entry.updatedBy.lastName ?? ''}`.trim()
-                                                : 'System'}
-                                            </span>
-                                            {/* Date moved here underneath the name */}
-                                            <span className="text-xs ">
-                                              {moment(entry.date).format('DD MMM YYYY')}
-                                            </span>
-                                          </div>
-                                          </div>
-                                        </TableCell>
-              
-                                        <TableCell className="text-right">
-                                          {entry.document ? (
-                                            <Button
-                                              size="sm"
-                                              className="h-8"
-                                              onClick={() =>
-                                                window.open(entry.document, '_blank')
-                                              }
-                                            >
-                                              <Eye className="mr-2 h-4 w-4" />
-                                              View
-                                            </Button>
-                                          ) : (
-                                            <span className="text-gray-300">-</span>
-                                          )}
-                                        </TableCell>
-                                      </TableRow>
-                                    ))
-                                )}
-                              </TableBody>
-                            </Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Activity</TableHead>
+                    <TableHead>Updated By</TableHead>
+                    <TableHead className="text-right">Document(s)</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {history.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={3} className="py-8 text-center italic text-gray-500">
+                        No history records found.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    history
+                      .slice()
+                      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                      .map((entry) => (
+                        <TableRow key={entry._id} className="hover:bg-gray-50">
+                          <TableCell className="font-medium text-gray-900">
+                            {entry.title || 'Update'}
+                          </TableCell>
+                          
+                          <TableCell className="">
+                            <div className='flex '>
+                              <div className="flex flex-col">
+                                <span className="font-medium">
+                                  {entry.updatedBy && typeof entry.updatedBy === 'object'
+                                    ? entry.updatedBy.name || `${entry.updatedBy.firstName ?? ''} ${entry.updatedBy.lastName ?? ''}`.trim()
+                                    : 'System'}
+                                </span>
+                                <span className="text-xs ">
+                                  {moment(entry.date).format('DD MMM YYYY')}
+                                </span>
+                              </div>
+                            </div>
+                          </TableCell>
+
+                          <TableCell className="text-right">
+                            <div className="flex flex-col items-end gap-1">
+                              {/* Handle new array format */}
+                              {Array.isArray(entry.document) && entry.document.length > 0 ? (
+                                entry.document.map((docUrl, idx) => (
+                                  <Button
+                                    key={idx}
+                                    size="sm"
+                                    className="h-8"
+                                    onClick={() => window.open(docUrl, '_blank')}
+                                  >
+                                    <Eye className="mr-2 h-4 w-4" />
+                                    Document {entry.document!.length > 1 ? idx + 1 : ''}
+                                  </Button>
+                                ))
+                              ) 
+                              /* Handle legacy string format fallback */
+                              : entry.document && typeof entry.document === 'string' ? (
+                                <Button
+                                  size="sm"
+                                  className="h-8"
+                                  onClick={() => window.open(entry.document as string, '_blank')}
+                                >
+                                  <Eye className="mr-2 h-4 w-4" />
+                                  Document 
+                                </Button>
+                              ) : (
+                                <span className="text-gray-300">-</span>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                  )}
+                </TableBody>
+              </Table>
             </div>
           </div>
         </div>
@@ -506,9 +491,7 @@ function VisaTab() {
                 showMonthDropdown
                 showYearDropdown
                 preventOpenOnFocus
-                                dropdownMode='select'
-
-                // UPDATED: Min date is the PREVIOUS expiry date
+                dropdownMode='select'
                 minDate={currentExpiryDate ? new Date(currentExpiryDate) : undefined}
               />
               {currentExpiryDate && (
@@ -538,24 +521,48 @@ function VisaTab() {
             </div>
 
             {/* Document Upload */}
-            <div className="space-y-2">
+            <div className="space-y-3">
               <Label className="text-sm font-medium text-gray-700">
-                Supporting Document <span className="text-red-500">*</span>
+                Supporting Documents <span className="text-red-500">*</span>
               </Label>
 
+              {/* Uploaded Files List */}
+              {uploadedFiles.length > 0 && (
+                <div className="space-y-2 max-h-32 overflow-y-auto pr-1">
+                  {uploadedFiles.map((file, index) => (
+                    <div key={index} className="flex w-full items-center justify-between rounded-md border border-green-200 bg-green-50 p-2">
+                      <div className="flex items-center gap-2 overflow-hidden">
+                        <FileText className="h-5 w-5 flex-shrink-0 text-green-600" />
+                        <p className="truncate text-xs font-medium text-green-700" title={file.name}>
+                          {file.name}
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleRemoveFile(index)}
+                        className="h-8 w-8 flex-shrink-0 hover:bg-red-100 hover:text-red-600"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Upload Dropzone */}
               <div
                 className={cn(
                   'relative flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 transition-colors',
-                  uploadedFileUrl
-                    ? 'border-green-500 bg-green-50'
-                    : isUploading
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-300 bg-gray-50 hover:bg-gray-100'
+                  isUploading
+                    ? 'border-blue-500 bg-blue-50'
+                    : 'border-gray-300 bg-gray-50 hover:bg-gray-100'
                 )}
               >
                 <input
                   ref={fileInputRef}
                   type="file"
+                  multiple // Enabled multiple selection
                   accept=".pdf,application/pdf,image/*"
                   onChange={handleFileSelect}
                   className="absolute inset-0 cursor-pointer opacity-0"
@@ -567,41 +574,17 @@ function VisaTab() {
                     <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent"></div>
                     <p className="text-xs text-blue-600">Uploading...</p>
                   </div>
-                ) : uploadedFileUrl ? (
-                  <div className="flex w-full items-center justify-between">
-                    <div className="flex items-center gap-2 overflow-hidden">
-                      <FileText className="h-5 w-5 flex-shrink-0 text-green-600" />
-                      <div className="overflow-hidden">
-                        <p className="text-sm font-medium text-green-700">
-                          File attached
-                        </p>
-                        <p className="max-w-[150px] truncate text-xs text-gray-500">
-                          {selectedFileName}
-                        </p>
-                      </div>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleRemoveFile();
-                      }}
-                      className="h-8 w-8 hover:bg-red-50 hover:text-red-600"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
                 ) : (
                   <div className="flex flex-col items-center gap-1 text-center">
                     <Upload className="h-6 w-6 text-gray-400" />
                     <span className="text-sm font-medium text-gray-600">
                       Upload Proof
                     </span>
-                    <span className="text-xs text-gray-400">PDF/Image</span>
+                    <span className="text-xs text-gray-400">PDF/Images (Max 5MB each)</span>
                   </div>
                 )}
               </div>
+              
               {uploadError && (
                 <p className="text-xs text-red-500">{uploadError}</p>
               )}
@@ -622,7 +605,7 @@ function VisaTab() {
               disabled={
                 isSubmitting ||
                 isUploading ||
-                !uploadedFileUrl ||
+                uploadedFiles.length === 0 ||
                 !newExpiryDate ||
                 !newStartDate
               }

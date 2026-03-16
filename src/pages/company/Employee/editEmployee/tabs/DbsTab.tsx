@@ -30,11 +30,16 @@ import {
 import { cn } from '@/lib/utils';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 
+interface UploadedFile {
+  name: string;
+  url: string;
+}
+
 interface LogEntry {
   _id: string;
   title: string;
   date: string;
-  document: string;
+  document?: string[] | string; // Supports array of strings and legacy string fallback
   updatedBy: string | { firstName: string; lastName: string; name?: string };
 }
 
@@ -42,14 +47,15 @@ interface DbsData {
   _id: string;
   userId: string;
   disclosureNumber: string;
-  dbsDocumentUrl: string;
+  dbsDocumentUrl?: string[] | string; // Supports array of strings and legacy string fallback
   dateOfIssue: string;
   expiryDate: string;
   logs?: LogEntry[];
 }
 
 function DbsTab() {
-  const { id,eid } = useParams();
+  const { id, eid } = useParams();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { user } = useSelector((state: any) => state.auth);
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -57,7 +63,7 @@ function DbsTab() {
   // Loading State
   const [isLoading, setIsLoading] = useState(true);
 
-  // --- UPDATED: Display State to include 'expiring-soon' ---
+  // Display State to include 'expiring-soon'
   const [complianceStatus, setComplianceStatus] = useState<
     'active' | 'expired' | 'expiring-soon' | null
   >(null);
@@ -67,16 +73,10 @@ function DbsTab() {
 
   // Current Data State
   const [dbsId, setDbsId] = useState<string | null>(null);
-  const [currentExpiryDate, setCurrentExpiryDate] = useState<string | null>(
-    null
-  );
-  const [currentDateOfIssue, setCurrentDateOfIssue] = useState<string | null>(
-    null
-  );
-  const [currentDisclosureNum, setCurrentDisclosureNum] = useState<
-    string | null
-  >(null);
-  const [currentDbsDocUrl, setCurrentDbsDocUrl] = useState<string | null>(null);
+  const [currentExpiryDate, setCurrentExpiryDate] = useState<string | null>(null);
+  const [currentDateOfIssue, setCurrentDateOfIssue] = useState<string | null>(null);
+  const [currentDisclosureNum, setCurrentDisclosureNum] = useState<string | null>(null);
+  const [currentDbsDocUrl, setCurrentDbsDocUrl] = useState<string[] | string | null>(null);
   const [history, setHistory] = useState<LogEntry[]>([]);
 
   // Modal & Form State
@@ -88,8 +88,7 @@ function DbsTab() {
   const [newExpiryDate, setNewExpiryDate] = useState<Date | null>(null);
 
   // File Upload State
-  const [uploadedFileUrl, setUploadedFileUrl] = useState<string | null>(null);
-  const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -98,9 +97,7 @@ function DbsTab() {
   const fetchScheduleSettings = async () => {
     if (!id) return;
     try {
-      const res = await axiosInstance.get(
-        `/schedule-check?companyId=${id}`
-      );
+      const res = await axiosInstance.get(`/schedule-check?companyId=${id}`);
       const result = res.data?.data?.result;
       if (result && result.length > 0) {
         setDbsCheckInterval(result[0].dbsCheckDate || 30);
@@ -123,7 +120,7 @@ function DbsTab() {
         setCurrentExpiryDate(data.expiryDate);
         setCurrentDateOfIssue(data.dateOfIssue);
         setCurrentDisclosureNum(data.disclosureNumber);
-        setCurrentDbsDocUrl(data.dbsDocumentUrl);
+        setCurrentDbsDocUrl(data.dbsDocumentUrl || null);
         setHistory(data.logs || []);
       } else {
         setDbsId(null);
@@ -152,7 +149,7 @@ function DbsTab() {
     loadData();
   }, [eid, id]);
 
-  // --- UPDATED: Status Calculation Logic ---
+  // Status Calculation Logic
   useEffect(() => {
     if (currentExpiryDate) {
       const now = moment();
@@ -166,7 +163,6 @@ function DbsTab() {
         setComplianceStatus('expired');
       }
       // 2. Check if Expiring Soon (Within the checkInterval window)
-      // Note: Assuming checkInterval is the warning threshold in days (e.g., 30 days)
       else if (dbsCheckInterval > 0 && diffDays <= dbsCheckInterval) {
         setComplianceStatus('expiring-soon');
       }
@@ -184,7 +180,6 @@ function DbsTab() {
     setNewDateOfIssue(date);
 
     // If we have a date and a configured interval > 0
-    // Note: This assumes interval is used as Months for validity period
     if (date && dbsCheckInterval > 0) {
       const calculatedExpiry = moment(date)
         .add(dbsCheckInterval, 'months')
@@ -194,55 +189,57 @@ function DbsTab() {
   };
 
   // File Upload Logic
-  const handleFileSelect = async (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = event.target.files?.[0];
-    if (!file || !id) return;
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    if (!files.length || !id) return;
 
     const validTypes = ['application/pdf', 'image/jpeg', 'image/png'];
-    if (!validTypes.includes(file.type)) {
-      setUploadError('Only PDF, JPEG, or PNG files are allowed.');
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      setUploadError('File must be less than 5MB.');
-      return;
+    
+    // Validate all files first
+    for (const file of files) {
+      if (!validTypes.includes(file.type)) {
+        setUploadError(`Invalid file type: ${file.name}. Only PDF, JPEG, or PNG allowed.`);
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        setUploadError(`File too large: ${file.name}. Must be less than 5MB.`);
+        return;
+      }
     }
 
     setIsUploading(true);
     setUploadError(null);
-    setSelectedFileName(file.name);
-
-    const formData = new FormData();
-    formData.append('entityId', user._id);
-    formData.append('file_type', 'document');
-    formData.append('file', file);
 
     try {
-      const res = await axiosInstance.post('/documents', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+      const uploadPromises = files.map(async (file) => {
+        const formData = new FormData();
+        formData.append('entityId', user._id);
+        formData.append('file_type', 'document');
+        formData.append('file', file);
+
+        const res = await axiosInstance.post('/documents', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        return { name: file.name, url: res.data?.data?.fileUrl };
       });
-      setUploadedFileUrl(res.data?.data?.fileUrl);
+
+      const uploadedResults = await Promise.all(uploadPromises);
+      setUploadedFiles((prev) => [...prev, ...uploadedResults]);
     } catch (err) {
-      setUploadError('Failed to upload document.');
-      setUploadedFileUrl(null);
+      setUploadError('Failed to upload one or more documents.');
     } finally {
       setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = ''; // Reset input
     }
   };
 
-  const handleRemoveFile = () => {
-    setUploadedFileUrl(null);
-    setSelectedFileName(null);
-    setUploadError(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
+  const handleRemoveFile = (indexToRemove: number) => {
+    setUploadedFiles((prev) => prev.filter((_, index) => index !== indexToRemove));
   };
 
   // Open Modal Logic
   const openUpdateModal = () => {
-    setUploadedFileUrl(null);
-    setSelectedFileName(null);
+    setUploadedFiles([]);
     setUploadError(null);
 
     setNewDisclosureNumber(currentDisclosureNum || '');
@@ -266,7 +263,7 @@ function DbsTab() {
   const handleSubmitUpdate = async () => {
     if (
       !id ||
-      !uploadedFileUrl ||
+      uploadedFiles.length === 0 ||
       !newExpiryDate ||
       !newDateOfIssue ||
       !newDisclosureNumber
@@ -275,10 +272,11 @@ function DbsTab() {
 
     setIsSubmitting(true);
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const payload: any = {
       updatedBy: user._id,
       title: 'DBS Details Updated',
-      dbsDocumentUrl: uploadedFileUrl,
+      dbsDocumentUrl: uploadedFiles.map((f) => f.url),
       disclosureNumber: newDisclosureNumber,
       dateOfIssue: moment(newDateOfIssue).toISOString(),
       expiryDate: moment(newExpiryDate).toISOString(),
@@ -301,6 +299,7 @@ function DbsTab() {
         className: 'bg-theme text-white'
       });
       setShowUpdateModal(false);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       console.error(err);
       toast({
@@ -354,7 +353,7 @@ function DbsTab() {
                 </div>
               </div>
 
-              {/* --- UPDATED: Status Badge with 3 States --- */}
+              {/* Status Badge */}
               {complianceStatus && (
                 <div>
                   <Badge
@@ -379,14 +378,32 @@ function DbsTab() {
               {/* Action Buttons */}
               <div className="space-y-3 border-t border-gray-100 pt-6">
                 {currentDbsDocUrl && (
-                  <Button
-                    variant="outline"
-                    className="w-full "
-                    onClick={() => window.open(currentDbsDocUrl, '_blank')}
-                  >
-                    <Eye className="mr-2 h-4 w-4" />
-                    View Certificate
-                  </Button>
+                  <div className="flex flex-col gap-2">
+                    {/* Handle array format */}
+                    {Array.isArray(currentDbsDocUrl) ? (
+                      currentDbsDocUrl.map((docUrl, idx) => (
+                        <Button
+                          key={idx}
+                          variant="outline"
+                          className="w-full"
+                          onClick={() => window.open(docUrl, '_blank')}
+                        >
+                          <Eye className="mr-2 h-4 w-4" />
+                          View Certificate {currentDbsDocUrl.length > 1 ? idx + 1 : ''}
+                        </Button>
+                      ))
+                    ) : (
+                      /* Handle legacy string format fallback */
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => window.open(currentDbsDocUrl, '_blank')}
+                      >
+                        <Eye className="mr-2 h-4 w-4" />
+                        View Certificate
+                      </Button>
+                    )}
+                  </div>
                 )}
 
                 <Button
@@ -409,80 +426,83 @@ function DbsTab() {
             </h2>
 
             <div className="overflow-hidden rounded-md border border-gray-100">
-               <Table>
-                              <TableHeader>
-                                <TableRow>
-                                  {/* Date & Time Column Removed */}
-                                  <TableHead>Activity</TableHead>
-                                  <TableHead >Updated By</TableHead>
-                                  <TableHead className="text-right">Document</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {history.length === 0 ? (
-                                  <TableRow>
-                                    <TableCell
-                                      colSpan={3} // Adjusted colspan from 4 to 3
-                                      className="py-8 text-center italic text-gray-500"
-                                    >
-                                      No history records found.
-                                    </TableCell>
-                                  </TableRow>
-                                ) : (
-                                  history
-                                    .slice()
-                                    .sort(
-                                      (a, b) =>
-                                        new Date(b.date).getTime() -
-                                        new Date(a.date).getTime()
-                                    )
-                                    .map((entry) => (
-                                      <TableRow key={entry._id} className="hover:bg-gray-50">
-                                        {/* Date Cell Removed */}
-              
-                                        <TableCell className="font-medium text-gray-900">
-                                          {entry.title || 'Update'}
-                                        </TableCell>
-              
-                                        <TableCell className="">
-                                          <div className='flex '>
-                                          <div className="flex flex-col">
-                                            <span className="font-medium">
-                                              {entry.updatedBy &&
-                                              typeof entry.updatedBy === 'object'
-                                                ? entry.updatedBy.name ||
-                                                  `${entry.updatedBy.firstName ?? ''} ${entry.updatedBy.lastName ?? ''}`.trim()
-                                                : 'System'}
-                                            </span>
-                                            {/* Date moved here underneath the name */}
-                                            <span className="text-xs ">
-                                              {moment(entry.date).format('DD MMM YYYY')}
-                                            </span>
-                                          </div>
-                                          </div>
-                                        </TableCell>
-              
-                                        <TableCell className="text-right">
-                                          {entry.document ? (
-                                            <Button
-                                              size="sm"
-                                              className="h-8"
-                                              onClick={() =>
-                                                window.open(entry.document, '_blank')
-                                              }
-                                            >
-                                              <Eye className="mr-2 h-4 w-4" />
-                                              View
-                                            </Button>
-                                          ) : (
-                                            <span className="text-gray-300">-</span>
-                                          )}
-                                        </TableCell>
-                                      </TableRow>
-                                    ))
-                                )}
-                              </TableBody>
-                            </Table>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Activity</TableHead>
+                    <TableHead>Updated By</TableHead>
+                    <TableHead className="text-right">Document</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {history.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={3} className="py-8 text-center italic text-gray-500">
+                        No history records found.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    history
+                      .slice()
+                      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                      .map((entry) => (
+                        <TableRow key={entry._id} className="hover:bg-gray-50">
+                          <TableCell className="font-medium text-gray-900">
+                            {entry.title || 'Update'}
+                          </TableCell>
+
+                          <TableCell>
+                            <div className="flex">
+                              <div className="flex flex-col">
+                                <span className="font-medium">
+                                  {entry.updatedBy && typeof entry.updatedBy === 'object'
+                                    ? entry.updatedBy.name ||
+                                      `${entry.updatedBy.firstName ?? ''} ${entry.updatedBy.lastName ?? ''}`.trim()
+                                    : 'System'}
+                                </span>
+                                <span className="text-xs">
+                                  {moment(entry.date).format('DD MMM YYYY')}
+                                </span>
+                              </div>
+                            </div>
+                          </TableCell>
+
+                          <TableCell className="text-right">
+                            <div className="flex flex-col items-end gap-1">
+                              {/* Handle array format */}
+                              {Array.isArray(entry.document) && entry.document.length > 0 ? (
+                                entry.document.map((docUrl, idx) => (
+                                  <Button
+                                    key={idx}
+                                    size="sm"
+                                    className="h-8"
+                                    onClick={() => window.open(docUrl, '_blank')}
+                                  >
+                                    <Eye className="mr-2 h-4 w-4" />
+                                    Document {entry.document!.length > 1 ? idx + 1 : ''}
+                                  </Button>
+                                ))
+                              ) 
+                              /* Handle legacy string format fallback */
+                              : entry.document && typeof entry.document === 'string' ? (
+                                <Button
+                                  size="sm"
+                                  className="h-8"
+                                  onClick={() => window.open(entry.document as string, '_blank')}
+                                >
+                                  <Eye className="mr-2 h-4 w-4" />
+                                  Document
+                                </Button>
+                              ) : (
+                                <span className="text-gray-300">-</span>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                  )}
+                </TableBody>
+              </Table>
             </div>
           </div>
         </div>
@@ -523,7 +543,6 @@ function DbsTab() {
                   showMonthDropdown
                   showYearDropdown
                   dropdownMode="select"
-                  // Min date = Previous Expiry Date if preferred
                   minDate={
                     currentExpiryDate ? new Date(currentExpiryDate) : undefined
                   }
@@ -556,24 +575,48 @@ function DbsTab() {
             </div>
 
             {/* Document Upload */}
-            <div className="space-y-2 pt-2">
+            <div className="space-y-3 pt-2">
               <Label className="text-sm font-medium text-gray-700">
                 DBS Certificate Scan <span className="text-red-500">*</span>
               </Label>
 
+              {/* Uploaded Files List */}
+              {uploadedFiles.length > 0 && (
+                <div className="space-y-2 max-h-32 overflow-y-auto pr-1">
+                  {uploadedFiles.map((file, index) => (
+                    <div key={index} className="flex w-full items-center justify-between rounded-md border border-green-200 bg-green-50 p-2">
+                      <div className="flex items-center gap-2 overflow-hidden">
+                        <FileText className="h-5 w-5 flex-shrink-0 text-green-600" />
+                        <p className="truncate text-xs font-medium text-green-700" title={file.name}>
+                          {file.name}
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleRemoveFile(index)}
+                        className="h-8 w-8 flex-shrink-0 hover:bg-red-100 hover:text-red-600"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Upload Dropzone */}
               <div
                 className={cn(
                   'relative flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 transition-colors',
-                  uploadedFileUrl
-                    ? 'border-green-500 bg-green-50'
-                    : isUploading
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-300 bg-gray-50 hover:bg-gray-100'
+                  isUploading
+                    ? 'border-blue-500 bg-blue-50'
+                    : 'border-gray-300 bg-gray-50 hover:bg-gray-100'
                 )}
               >
                 <input
                   ref={fileInputRef}
                   type="file"
+                  multiple
                   accept=".pdf,application/pdf,image/*"
                   onChange={handleFileSelect}
                   className="absolute inset-0 cursor-pointer opacity-0"
@@ -585,41 +628,17 @@ function DbsTab() {
                     <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent"></div>
                     <p className="text-xs text-blue-600">Uploading...</p>
                   </div>
-                ) : uploadedFileUrl ? (
-                  <div className="flex w-full items-center justify-between">
-                    <div className="flex items-center gap-2 overflow-hidden">
-                      <FileText className="h-5 w-5 flex-shrink-0 text-green-600" />
-                      <div className="overflow-hidden">
-                        <p className="text-sm font-medium text-green-700">
-                          File attached
-                        </p>
-                        <p className="max-w-[150px] truncate text-xs text-gray-500">
-                          {selectedFileName}
-                        </p>
-                      </div>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleRemoveFile();
-                      }}
-                      className="h-8 w-8 hover:bg-red-50 hover:text-red-600"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
                 ) : (
                   <div className="flex flex-col items-center gap-1 text-center">
                     <Upload className="h-6 w-6 text-gray-400" />
                     <span className="text-sm font-medium text-gray-600">
                       Upload Certificate
                     </span>
-                    <span className="text-xs text-gray-400">PDF/Image</span>
+                    <span className="text-xs text-gray-400">PDF/Images (Max 5MB each)</span>
                   </div>
                 )}
               </div>
+              
               {uploadError && (
                 <p className="text-xs text-red-500">{uploadError}</p>
               )}
@@ -640,7 +659,7 @@ function DbsTab() {
               disabled={
                 isSubmitting ||
                 isUploading ||
-                !uploadedFileUrl ||
+                uploadedFiles.length === 0 ||
                 !newExpiryDate ||
                 !newDateOfIssue ||
                 !newDisclosureNumber

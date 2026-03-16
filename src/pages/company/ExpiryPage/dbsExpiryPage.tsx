@@ -408,7 +408,7 @@ const DbsExpiryPage = () => {
                           <TableCell className="text-right">
                             <Button
                               size="sm"
-                              onClick={(e) => handleUpdateClick(e, emp, status)}
+                              // onClick={(e) => handleUpdateClick(e, emp, status)}
                               className="bg-theme text-white hover:bg-theme/90"
                             >
                               Update

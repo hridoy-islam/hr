@@ -55,7 +55,7 @@ const RtwExpiryPage = () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { user } = useSelector((state: any) => state.auth);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   const { refetchStatus } = useScheduleStatus();
 
   const [loading, setLoading] = useState(true);
@@ -67,7 +67,7 @@ const RtwExpiryPage = () => {
   // Modal & Form State
   const [selectedEmployee, setSelectedEmployee] =
     useState<ComplianceRow | null>(null);
-  
+
   const [newCheckDate, setNewCheckDate] = useState<Date | null>(null);
 
   // File Upload State
@@ -76,14 +76,12 @@ const RtwExpiryPage = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const {id} = useParams()
+  const { id } = useParams();
   // --- 1. Fetch Schedule Settings ---
   const fetchScheduleSettings = async () => {
     if (!id) return;
     try {
-      const res = await axiosInstance.get(
-        `/schedule-check?companyId=${id}`
-      );
+      const res = await axiosInstance.get(`/schedule-check?companyId=${id}`);
       const result = res.data?.data?.result;
       if (result && result.length > 0) {
         // Use rtwCheckDate from settings
@@ -136,7 +134,7 @@ const RtwExpiryPage = () => {
           lastName: userObj.lastName || '',
           email: userObj.email || '',
           // Map 'nextCheckDate' from API
-          nextCheckDate: item.nextCheckDate || null 
+          nextCheckDate: item.nextCheckDate || null
         };
       });
 
@@ -206,7 +204,7 @@ const RtwExpiryPage = () => {
 
     // Otherwise open modal
     setSelectedEmployee(employee);
-    
+
     // Pre-fill existing date
     setNewCheckDate(
       employee.nextCheckDate ? new Date(employee.nextCheckDate) : null
@@ -272,12 +270,7 @@ const RtwExpiryPage = () => {
 
   // --- Submit Update ---
   const handleSubmitUpdate = async () => {
-    if (
-      !selectedEmployee ||
-      !newCheckDate ||
-      !uploadedFileUrl
-    )
-      return;
+    if (!selectedEmployee || !newCheckDate || !uploadedFileUrl) return;
 
     setIsSubmitting(true);
     try {
@@ -306,7 +299,8 @@ const RtwExpiryPage = () => {
       console.error(err);
       toast({
         title: 'Error',
-        description: err.response?.data?.message || 'Failed to update RTW check',
+        description:
+          err.response?.data?.message || 'Failed to update RTW check',
         variant: 'destructive'
       });
     } finally {
@@ -334,7 +328,7 @@ const RtwExpiryPage = () => {
               variant="outline"
               size="sm"
               onClick={() => navigate(-1)}
-              className="bg-theme hover:bg-theme/90 flex items-center space-x-2 border-none text-white"
+              className="flex items-center space-x-2 border-none bg-theme text-white hover:bg-theme/90"
             >
               <ArrowLeft className="h-4 w-4" />
               <span>Back</span>
@@ -390,8 +384,9 @@ const RtwExpiryPage = () => {
                           <TableCell className="text-right">
                             <Button
                               size="sm"
-                              onClick={(e) => handleUpdateClick(e, emp, status)}
-                              className="bg-theme hover:bg-theme/90 text-white"
+                              // onClick={(e) => handleUpdateClick(e, emp, status)}
+                              onClick={() => handleEmployeeClick(emp._id)}
+                              className="bg-theme text-white hover:bg-theme/90"
                             >
                               Update
                             </Button>
@@ -430,7 +425,9 @@ const RtwExpiryPage = () => {
                 <p>
                   Current check expires on{' '}
                   <span className="font-semibold">
-                    {moment(selectedEmployee.nextCheckDate).format('DD MMM YYYY')}
+                    {moment(selectedEmployee.nextCheckDate).format(
+                      'DD MMM YYYY'
+                    )}
                   </span>
                   .
                 </p>
@@ -452,7 +449,7 @@ const RtwExpiryPage = () => {
                 showMonthDropdown
                 dropdownMode="select"
                 minDate={new Date()} // Check date cannot be in the past
-                className="focus:ring-theme w-full rounded-md border border-gray-300 p-2.5 outline-none focus:border-transparent focus:ring-2"
+                className="w-full rounded-md border border-gray-300 p-2.5 outline-none focus:border-transparent focus:ring-2 focus:ring-theme"
                 preventOpenOnFocus
               />
             </div>
@@ -539,12 +536,8 @@ const RtwExpiryPage = () => {
             </Button>
             <Button
               onClick={handleSubmitUpdate}
-              disabled={
-                isSubmitting ||
-                !newCheckDate ||
-                !uploadedFileUrl
-              }
-              className="bg-theme hover:bg-theme/90 text-white"
+              disabled={isSubmitting || !newCheckDate || !uploadedFileUrl}
+              className="bg-theme text-white hover:bg-theme/90"
             >
               {isSubmitting ? 'Updating...' : 'Save Changes'}
             </Button>

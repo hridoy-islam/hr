@@ -391,7 +391,7 @@ const { status, loading: loadingStats, refetchStatus } = useScheduleStatus();
                           <TableCell className="text-right">
                             <Button
                               size="sm"
-                              onClick={(e) => handleUpdateClick(e, emp, status)}
+                              // onClick={(e) => handleUpdateClick(e, emp, status)}
                               className="bg-theme hover:bg-theme/90 text-white"
                             >
                               Update

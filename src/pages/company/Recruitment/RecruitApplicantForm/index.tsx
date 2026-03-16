@@ -247,7 +247,7 @@ const RecruitApplicantForm = () => {
             nextCheckDate: newUser?.rtwCheckDate,
             employeeId: newUser._id,
             updatedBy: user?._id,
-            document: newUser?.rightToWork
+            document: [newUser?.rightToWork]
           });
         }
       } catch (rtwError) {
@@ -261,7 +261,7 @@ const RecruitApplicantForm = () => {
             userId: newUser._id,
             passportNumber: newUser.passportNo,
             passportExpiryDate: newUser.passportExpiry,
-            document: newUser.passport
+            document: [newUser.passport]
           });
         }
       } catch (passportError) {
