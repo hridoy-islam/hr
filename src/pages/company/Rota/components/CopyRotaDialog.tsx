@@ -8,6 +8,7 @@ import 'react-datepicker/dist/react-datepicker.css';
 import { AlertTriangle, X, CalendarIcon, ArrowRight } from 'lucide-react';
 
 // Custom Input Component
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const RangeInput = React.forwardRef<HTMLInputElement, any>(
   ({ onClick, placeholder, displayValue, iconColor }, ref) => (
     <div className="relative w-full" onClick={onClick}>
@@ -36,7 +37,7 @@ export default function CopyRotaDialog({
   setGlobalSkippedRecords
 }: any) {
   const { toast } = useToast();
-  const [copyType, setCopyType] = useState<'week' | 'month'>('week');
+  const [copyType, setCopyType] = useState<'day' | 'week' | 'month'>('week');
   const [sourceDate, setSourceDate] = useState<Date | null>(null);
   const [targetDate, setTargetDate] = useState<Date | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -60,10 +61,10 @@ export default function CopyRotaDialog({
         companyId,
         type: copyType,
         sourceStart: moment(sourceDate)
-          .startOf(copyType === 'week' ? 'week' : 'month')
+          .startOf(copyType) // Moment neatly accepts 'day', 'week', or 'month'
           .format('YYYY-MM-DD'),
         targetStart: moment(targetDate)
-          .startOf(copyType === 'week' ? 'week' : 'month')
+          .startOf(copyType)
           .format('YYYY-MM-DD')
       });
 
@@ -80,6 +81,7 @@ export default function CopyRotaDialog({
 
       onSuccess();
       onClose();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -94,15 +96,22 @@ export default function CopyRotaDialog({
   const getRangeText = (date: Date | null) => {
     if (!date) return '';
 
-    const start = moment(date)
-      .startOf(copyType === 'week' ? 'week' : 'month')
-      .format('DD-MM-YYYY');
+    // If day, just show the exact day.
+    if (copyType === 'day') {
+      return moment(date).format('DD-MM-YYYY');
+    }
 
-    const end = moment(date)
-      .endOf(copyType === 'week' ? 'week' : 'month')
-      .format('DD-MM-YYYY');
+    // If week or month, show the range
+    const start = moment(date).startOf(copyType).format('DD-MM-YYYY');
+    const end = moment(date).endOf(copyType).format('DD-MM-YYYY');
 
     return `${start}  to  ${end}`;
+  };
+
+  const resetDatesOnTypeChange = (type: 'day' | 'week' | 'month') => {
+    setCopyType(type);
+    setSourceDate(new Date());
+    setTargetDate(null);
   };
 
   if (!isOpen) return null;
@@ -113,7 +122,7 @@ export default function CopyRotaDialog({
         {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-100 p-5">
           <h2 className="text-lg font-bold text-gray-900">
-            Copy {copyType === 'week' ? 'Weekly' : 'Monthly'} Shifts
+            Copy {copyType === 'day' ? 'Daily' : copyType === 'week' ? 'Weekly' : 'Monthly'} Shifts
           </h2>
           <button
             onClick={onClose}
@@ -127,26 +136,27 @@ export default function CopyRotaDialog({
           {/* Mode Toggle */}
           <div className="flex rounded-lg bg-gray-100 p-1">
             <button
-              onClick={() => {
-                setCopyType('week');
-                setSourceDate(new Date());
-                setTargetDate(null);
-              }}
-              className={`flex-1 rounded-md py-2 text-sm font-semibold ${
-                copyType === 'week' ? 'bg-theme text-white' : 'text-gray-500'
+              onClick={() => resetDatesOnTypeChange('day')}
+              className={`flex-1 rounded-md py-2 text-sm font-semibold transition-colors ${
+                copyType === 'day' ? 'bg-theme text-white' : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Copy by Day
+            </button>
+
+            <button
+              onClick={() => resetDatesOnTypeChange('week')}
+              className={`flex-1 rounded-md py-2 text-sm font-semibold transition-colors ${
+                copyType === 'week' ? 'bg-theme text-white' : 'text-gray-500 hover:text-gray-700'
               }`}
             >
               Copy by Week
             </button>
 
             <button
-              onClick={() => {
-                setCopyType('month');
-                setSourceDate(new Date());
-                setTargetDate(null);
-              }}
-              className={`flex-1 rounded-md py-2 text-sm font-semibold ${
-                copyType === 'month' ? 'bg-theme text-white' : 'text-gray-500'
+              onClick={() => resetDatesOnTypeChange('month')}
+              className={`flex-1 rounded-md py-2 text-sm font-semibold transition-colors ${
+                copyType === 'month' ? 'bg-theme text-white' : 'text-gray-500 hover:text-gray-700'
               }`}
             >
               Copy by Month
@@ -156,7 +166,7 @@ export default function CopyRotaDialog({
           {/* Date Pickers */}
           <div className="flex items-center gap-3">
             <div className="flex-1">
-              <label className="mb-2 block text-[11px] font-bold uppercase">
+              <label className="mb-2 block text-[11px] font-bold uppercase text-gray-600">
                 Source {copyType}
               </label>
               <DatePicker
@@ -174,10 +184,10 @@ export default function CopyRotaDialog({
               />
             </div>
 
-            <ArrowRight className="mt-6 h-5 w-5 text-gray-300" />
+            <ArrowRight className="mt-6 h-5 w-5 text-gray-300 flex-shrink-0" />
 
             <div className="flex-1">
-              <label className="mb-2 block text-[11px] font-bold uppercase">
+              <label className="mb-2 block text-[11px] font-bold uppercase text-gray-600">
                 Target {copyType}
               </label>
               <DatePicker
@@ -200,12 +210,12 @@ export default function CopyRotaDialog({
           {/* Warning Box */}
           <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-4 text-amber-800">
             <div className="flex gap-3">
-              <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-600" />
+              <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-600" />
               <div>
                 <h4 className="text-sm font-bold text-amber-900">
                   Conflict Warning
                 </h4>
-                <p className="text-xs text-amber-700">
+                <p className="text-xs text-amber-700 mt-1">
                   Existing shifts in the target {copyType} will be preserved.
                   Copied shifts will be added alongside existing ones.
                 </p>

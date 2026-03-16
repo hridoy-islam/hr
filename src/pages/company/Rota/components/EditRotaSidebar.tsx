@@ -144,15 +144,23 @@ export default function EditRotaSidebar({
     }
   }, [isOpen, rota, form]);
 
+  // useEffect(() => {
+  //   if (watchLeaveType) {
+  //     const currentSlots = form.getValues('slots') || [];
+  //     currentSlots.forEach((_, idx) => {
+  //       form.setValue(`slots.${idx}.startTime`, '');
+  //       form.setValue(`slots.${idx}.endTime`, '');
+  //     });
+  //     form.setValue('shiftName', watchLeaveType);
+  //     form.setValue('color', '');
+  //   }
+  // }, [watchLeaveType, form]);
+
   useEffect(() => {
     if (watchLeaveType) {
-      const currentSlots = form.getValues('slots') || [];
-      currentSlots.forEach((_, idx) => {
-        form.setValue(`slots.${idx}.startTime`, '');
-        form.setValue(`slots.${idx}.endTime`, '');
-      });
       form.setValue('shiftName', watchLeaveType);
       form.setValue('color', '');
+      // Do NOT clear startTime/endTime here — clearing happens only on submit
     }
   }, [watchLeaveType, form]);
 
@@ -195,11 +203,9 @@ export default function EditRotaSidebar({
           payload.color = values.color || '';
         }
 
-        // Check if updating existing or inserting new slot via UI
         if (slot._id) {
           return axiosInstance.patch(`/rota/${slot._id}`, payload);
         } else {
-          // New Slot Requires companyId, departmentId, and employeeId logic
           payload.employeeId = employee?._id;
           payload.companyId = baseRota?.companyId;
           payload.departmentId = baseRota?.departmentId;
@@ -220,7 +226,6 @@ export default function EditRotaSidebar({
 
   const handleDeleteSlot = async (index: number, rotaId?: string) => {
     if (!rotaId) {
-      // It's a newly added slot that hasn't been saved yet
       remove(index);
       return;
     }
@@ -250,7 +255,6 @@ export default function EditRotaSidebar({
     }
   };
 
-  // Append new empty slot logic
   const handleAddSlot = () => {
     const baseDate =
       fields.length > 0 ? form.getValues(`slots.0.startDate`) : new Date();
@@ -366,11 +370,7 @@ export default function EditRotaSidebar({
                   <div className="flex items-center justify-between">
                     <h3 className="text-sm font-bold">Shift Details</h3>
                     {isStandard && (
-                      <Button
-                        type="button"
-                        size="sm"
-                        onClick={handleAddSlot}
-                      >
+                      <Button type="button" size="sm" onClick={handleAddSlot}>
                         <Plus className="mr-1 h-3 w-3" />
                         Add Slot
                       </Button>
@@ -398,7 +398,6 @@ export default function EditRotaSidebar({
                         key={slot.id}
                         className="relative space-y-4 rounded-lg border border-gray-100 bg-gray-50/50 p-4"
                       >
-                        {/* Slot Delete Button with Confirmation Box */}
                         <div className="absolute right-4 top-4 flex justify-between">
                           {fields.length > 1 &&
                             (slot._id ? (
@@ -439,7 +438,6 @@ export default function EditRotaSidebar({
                                 </AlertDialogContent>
                               </AlertDialog>
                             ) : (
-                              // Fast delete without alert for unsaved newly added slots
                               <button
                                 type="button"
                                 onClick={() =>
@@ -507,97 +505,98 @@ export default function EditRotaSidebar({
                           </div>
                         </div>
 
-                        <div className="flex gap-4">
-                          <div className="flex-1">
-                            <FormField
-                              control={form.control}
-                              name={`slots.${index}.startTime`}
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel className="text-xs font-bold uppercase">
-                                    Start Time
-                                  </FormLabel>
-                                  <FormControl>
-                                    <Input
-                                      {...field}
-                                      placeholder="09:00"
-                                      maxLength={5}
-                                      className="font-mono"
-                                      disabled={!isStandard}
-                                      onChange={(e) => {
-                                        let val = e.target.value
-                                          .replace(/[^0-9:]/g, '')
-                                          .slice(0, 5);
-                                        if (
-                                          val.length === 2 &&
-                                          field.value?.length === 1 &&
-                                          !val.includes(':')
-                                        ) {
-                                          val += ':';
+                        {isStandard && (
+                          <div className="flex gap-4">
+                            <div className="flex-1">
+                              <FormField
+                                control={form.control}
+                                name={`slots.${index}.startTime`}
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel className="text-xs font-bold uppercase">
+                                      Start Time
+                                    </FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        {...field}
+                                        placeholder="09:00"
+                                        maxLength={5}
+                                        className="font-mono"
+                                        onChange={(e) => {
+                                          let val = e.target.value
+                                            .replace(/[^0-9:]/g, '')
+                                            .slice(0, 5);
+                                          if (
+                                            val.length === 2 &&
+                                            field.value?.length === 1 &&
+                                            !val.includes(':')
+                                          ) {
+                                            val += ':';
+                                          }
+                                          field.onChange(val);
+                                        }}
+                                        onBlur={(e) =>
+                                          handleTimeBlur(
+                                            e.target.value,
+                                            field.onChange
+                                          )
                                         }
-                                        field.onChange(val);
-                                      }}
-                                      onBlur={(e) =>
-                                        handleTimeBlur(
-                                          e.target.value,
-                                          field.onChange
-                                        )
-                                      }
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                          </div>
-                          <div className="flex-1">
-                            <FormField
-                              control={form.control}
-                              name={`slots.${index}.endTime`}
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel className="text-xs font-bold uppercase">
-                                    End Time
-                                  </FormLabel>
-                                  <FormControl>
-                                    <Input
-                                      {...field}
-                                      placeholder="17:00"
-                                      maxLength={5}
-                                      className="font-mono"
-                                      disabled={!isStandard}
-                                      onChange={(e) => {
-                                        let val = e.target.value
-                                          .replace(/[^0-9:]/g, '')
-                                          .slice(0, 5);
-                                        if (
-                                          val.length === 2 &&
-                                          field.value?.length === 1 &&
-                                          !val.includes(':')
-                                        ) {
-                                          val += ':';
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </div>
+                            <div className="flex-1">
+                              <FormField
+                                control={form.control}
+                                name={`slots.${index}.endTime`}
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel className="text-xs font-bold uppercase">
+                                      End Time
+                                    </FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        {...field}
+                                        placeholder="17:00"
+                                        maxLength={5}
+                                        className="font-mono"
+                                        onChange={(e) => {
+                                          let val = e.target.value
+                                            .replace(/[^0-9:]/g, '')
+                                            .slice(0, 5);
+                                          if (
+                                            val.length === 2 &&
+                                            field.value?.length === 1 &&
+                                            !val.includes(':')
+                                          ) {
+                                            val += ':';
+                                          }
+                                          field.onChange(val);
+                                        }}
+                                        onBlur={(e) =>
+                                          handleTimeBlur(
+                                            e.target.value,
+                                            field.onChange
+                                          )
                                         }
-                                        field.onChange(val);
-                                      }}
-                                      onBlur={(e) =>
-                                        handleTimeBlur(
-                                          e.target.value,
-                                          field.onChange
-                                        )
-                                      }
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </div>
                           </div>
-                        </div>
+                        )}
                       </div>
                     );
                   })}
                 </div>
 
+                {/* Color picker: only show when no leave type selected */}
                 {isStandard && (
                   <FormField
                     control={form.control}
@@ -624,37 +623,36 @@ export default function EditRotaSidebar({
                   />
                 )}
 
-                {!isStandard && (
-                  <div className="space-y-3 border-t border-gray-100 pt-4">
-                    <label className="text-xs font-bold uppercase text-gray-900">
-                      Leave Type
-                    </label>
-                    <div className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-md border border-gray-100 bg-gray-50/50 p-4">
-                      {leaveOptions.map((option) => (
-                        <FormField
-                          key={option.id}
-                          control={form.control}
-                          name="leaveType"
-                          render={({ field }) => (
-                            <FormItem className="flex flex-row items-center space-x-2 space-y-0">
-                              <FormControl>
-                                <Checkbox
-                                  checked={field.value === option.id}
-                                  onCheckedChange={(checked) =>
-                                    field.onChange(checked ? option.id : '')
-                                  }
-                                />
-                              </FormControl>
-                              <FormLabel className="cursor-pointer text-xs font-medium leading-none">
-                                {option.label}
-                              </FormLabel>
-                            </FormItem>
-                          )}
-                        />
-                      ))}
-                    </div>
+                {/* ✅ Leave Type section — always visible */}
+                <div className="space-y-3 border-t border-gray-100 pt-4">
+                  <label className="text-xs font-bold uppercase text-gray-900">
+                    Leave Type
+                  </label>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-md border border-gray-100 bg-gray-50/50 p-4">
+                    {leaveOptions.map((option) => (
+                      <FormField
+                        key={option.id}
+                        control={form.control}
+                        name="leaveType"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center space-x-2 space-y-0">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value === option.id}
+                                onCheckedChange={(checked) =>
+                                  field.onChange(checked ? option.id : '')
+                                }
+                              />
+                            </FormControl>
+                            <FormLabel className="cursor-pointer text-xs font-medium leading-none">
+                              {option.label}
+                            </FormLabel>
+                          </FormItem>
+                        )}
+                      />
+                    ))}
                   </div>
-                )}
+                </div>
               </TabsContent>
 
               <TabsContent value="note" className="flex-1 overflow-y-auto p-5">

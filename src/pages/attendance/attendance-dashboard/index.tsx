@@ -27,7 +27,7 @@ import { BlinkingDots } from '@/components/shared/blinking-dots';
 
 export default function AttendanceScanner() {
   const [inputValue, setInputValue] = useState('');
-  const [scanMode, setScanMode] = useState<'qr' | 'dob' | 'visitor'>('qr');
+  const [scanMode, setScanMode] = useState<'qr' | 'dob' | 'visitor'|'serviceuser'>('qr');
   const [isSidebarLoading, setIsSidebarLoading] = useState(true);
   // DOB States
   const [selectedDob, setSelectedDob] = useState<Date | null>(null);
@@ -303,10 +303,10 @@ export default function AttendanceScanner() {
         {/* LEFT/TOP: BUTTONS + MAIN SCANNER UI */}
         <div className="flex flex-1 flex-col gap-4">
           {/* THE 3 SELECTION BUTTONS (Outside the card) */}
-          <div className="z-20 grid w-full grid-cols-3 gap-3">
+          <div className="z-20 grid w-full grid-cols-4 gap-3">
             <Button
               variant={scanMode === 'dob' ? 'default' : 'outline'}
-              className={`border-gray-300 bg-white text-xs shadow-sm sm:text-sm ${
+              className={`border-gray-300 bg-white text-xs py-8 shadow-sm sm:text-lg ${
                 scanMode === 'dob'
                   ? 'border-theme bg-theme text-white'
                   : 'text-slate-700'
@@ -322,7 +322,7 @@ export default function AttendanceScanner() {
 
             <Button
               variant={scanMode === 'visitor' ? 'default' : 'outline'}
-              className={`border-gray-300 bg-white text-xs shadow-sm sm:text-sm ${
+              className={`border-gray-300 bg-white text-xs  py-8 shadow-sm sm:text-lg ${
                 scanMode === 'visitor'
                   ? 'border-theme bg-theme text-white'
                   : 'text-slate-700'
@@ -335,10 +335,25 @@ export default function AttendanceScanner() {
             >
               Visitor
             </Button>
+            <Button
+              variant={scanMode === 'serviceuser' ? 'default' : 'outline'}
+              className={`border-gray-300 bg-white text-xs  py-8 shadow-sm sm:text-lg ${
+                scanMode === 'serviceuser'
+                  ? 'border-theme bg-theme text-white'
+                  : 'text-slate-700'
+              }`}
+              onClick={() => {
+                setScanMode('serviceuser');
+                setMatchedUser(null);
+                setSelectedDob(null);
+              }}
+            >
+              Service User
+            </Button>
 
             <Button
               variant={scanMode === 'qr' ? 'default' : 'outline'}
-              className={`border-gray-300 bg-white text-xs shadow-sm sm:text-sm ${
+              className={`border-gray-300 bg-white text-xs  py-8 shadow-sm sm:text-lg ${
                 scanMode === 'qr'
                   ? 'border-theme bg-theme text-white'
                   : 'text-slate-700'
@@ -478,7 +493,7 @@ export default function AttendanceScanner() {
                               <ClipboardList className="h-10 w-10 text-theme" />
                             </div>
                             <h2 className="text-2xl font-bold text-slate-800">
-                              Visitor Attendance
+                              reason for Visit
                             </h2>
                             <p className="mt-2 text-sm text-slate-500">
                               Please enter your details to clock in or out.
@@ -499,7 +514,7 @@ export default function AttendanceScanner() {
                               />
                             </div>
                             <div className="space-y-2">
-                              <Label>Phone Number (Optional)</Label>
+                              <Label>Reason for visit</Label>
                               <Input
                                 placeholder="e.g. +44 7700 900000"
                                 value={visitorPhone}
@@ -631,7 +646,7 @@ export default function AttendanceScanner() {
             <div className="flex items-center border-b border-slate-100 bg-slate-50 p-4">
               <h2 className="flex items-center text-lg font-bold text-slate-800">
                 <Users className="mr-2 h-5 w-5 text-theme" />
-                Employee Status
+                Active Employee
               </h2>
             </div>
 
