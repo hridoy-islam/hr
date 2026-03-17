@@ -96,6 +96,8 @@ import AttendanceAccountPage from '@/pages/company/attendance-account';
 import AttendanceScanner from '@/pages/attendance/attendance-dashboard';
 import AttendanceDetails from '@/pages/company/Attendance/Attendance-details';
 import ServiceUserPage from '@/pages/company/serviceUser';
+import VisitorAttendancePage from '@/pages/company/Attendance/VisitorAttendanceList';
+import ServiceUserAttendancePage from '@/pages/company/Attendance/ServiceUserAttendanceList';
 
 const SignInPage = lazy(() => import('@/pages/auth/signin'));
 
@@ -203,6 +205,8 @@ export default function AppRouter() {
         { path: 'attendance', element: <AttendancePage /> },
         { path: 'attendance/:aid', element: <AttendanceDetails /> },
         { path: 'attendance-list', element: <AttendanceList /> },
+        { path: 'visitor-attendance', element: <VisitorAttendancePage /> },
+        { path: 'serviceuser-attendance', element: <ServiceUserAttendancePage /> },
         { path: 'csv-attendance', element: <BulkAttendancePage /> },
         { path: 'attendance-entry', element: <EntryAttendance /> },
 

@@ -277,6 +277,18 @@ const navItems = [
     roles: ['company'],
     subItems: [
       {
+        icon: FileSpreadsheet,
+        label: 'Visitor Attendance',
+        href: 'visitor-attendance',
+        roles: ['company']
+      },
+      {
+        icon: FileSpreadsheet,
+        label: 'Service User Attendance',
+        href: 'serviceuser-attendance',
+        roles: ['company']
+      },
+      {
         icon: FileCheck2,
         label: 'Attendance List',
         href: 'attendance',
