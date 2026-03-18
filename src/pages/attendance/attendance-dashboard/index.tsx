@@ -153,7 +153,7 @@ export default function AttendanceScanner() {
         inputRef.current &&
         document.activeElement !== inputRef.current &&
         !logoutTarget &&
-        !isMenuOpen // Do not steal focus if modals are open
+        !isMenuOpen
       ) {
         inputRef.current.focus();
       }
@@ -181,7 +181,6 @@ export default function AttendanceScanner() {
         if (payload.userType === 'visitor') {
           name = payload.visitorName;
         } else if (payload.userType === 'service_user') {
-          // Find the actual service user from allServiceUsers to get just the name
           const su = allServiceUsers.find((s) => s._id === payload.userId);
           name = su
             ? su.name || `${su.firstName || ''} ${su.lastName || ''}`.trim()
@@ -224,7 +223,7 @@ export default function AttendanceScanner() {
           soundToPlay.play().catch(console.log);
         }
 
-        fetchSidebarData(); // Refresh all sidebar lists
+        fetchSidebarData();
       } else {
         throw new Error('Verification Failed');
       }
@@ -241,12 +240,13 @@ export default function AttendanceScanner() {
       errorSound.currentTime = 0;
       errorSound.play().catch(console.log);
     } finally {
-      // Reset forms
+      // THE FIX: Properly clear all forms INCLUDING inputValue
       setMatchedUser(null);
       setSelectedDob(null);
       setVisitorName('');
       setVisitReason('');
       setSelectedServiceUser(null);
+      setInputValue(''); // <--- Added this to reset DOB input
 
       setTimeout(() => {
         setStatus('idle');
@@ -347,7 +347,6 @@ export default function AttendanceScanner() {
     });
   };
 
-  // Confirm logout triggered from sidebar
   const handleConfirmSidebarLogout = () => {
     if (!logoutTarget) return;
     isProcessing.current = true;
@@ -367,7 +366,6 @@ export default function AttendanceScanner() {
     setLogoutTarget(null);
   };
 
-  // Dynamic Checks for Buttons
   const matchedActiveVisitor = activeVisitors.find(
     (v) => v.visitorName.toLowerCase() === visitorName.trim().toLowerCase()
   );
@@ -377,7 +375,6 @@ export default function AttendanceScanner() {
     selectedServiceUser &&
     activeServiceUsers.some((su) => su._id === selectedServiceUser.value);
 
-  // Dynamic Sidebar Configuration
   let sidebarTitle = 'Active Employees';
   let sidebarData = employees;
   let SidebarIcon = Users;
@@ -391,6 +388,40 @@ export default function AttendanceScanner() {
     sidebarData = activeServiceUsers;
     SidebarIcon = Users;
   }
+
+  // 1. Add this ref at the top of your component
+  const dobInputRef = useRef<HTMLInputElement>(null);
+
+  // 2. Add this useEffect in your component
+  useEffect(() => {
+    const input = dobInputRef.current;
+    if (!input) return;
+
+    const handleInput = (e: Event) => {
+      const target = e.target as HTMLInputElement;
+
+      // Strip all non-digits
+      const digits = target.value.replace(/\D/g, '').slice(0, 8);
+
+      // Rebuild with hyphens
+      let formatted = '';
+      if (digits.length <= 2) {
+        formatted = digits;
+      } else if (digits.length <= 4) {
+        formatted = digits.slice(0, 2) + '-' + digits.slice(2);
+      } else {
+        formatted =
+          digits.slice(0, 2) + '-' + digits.slice(2, 4) + '-' + digits.slice(4);
+      }
+
+      // Directly set the input value
+      target.value = formatted;
+      setInputValue(formatted);
+    };
+
+    input.addEventListener('input', handleInput);
+    return () => input.removeEventListener('input', handleInput);
+  }, []);
 
   return (
     <div className="relative flex min-h-screen flex-col gap-6 overflow-hidden bg-slate-50 p-4 md:p-6">
@@ -429,7 +460,6 @@ export default function AttendanceScanner() {
                   <LogOut className="h-6 w-6" />
                   Logout
                 </Button>
-                {/* Additional menu items can be added here */}
               </div>
             </motion.div>
           </>
@@ -444,7 +474,7 @@ export default function AttendanceScanner() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-md rounded-3xl bg-white p-8 shadow-2xl"
+              className="h-[40vh] w-full max-w-2xl rounded-3xl bg-white p-8 shadow-2xl"
             >
               <h3 className="mb-4 text-3xl font-bold text-slate-800">
                 Confirm Logout
@@ -453,7 +483,7 @@ export default function AttendanceScanner() {
                 Are you sure you want to log out{' '}
                 <strong className="text-slate-900">{logoutTarget.name}</strong>?
               </p>
-              <div className="flex justify-end gap-4">
+              <div className="mt-16 flex justify-between gap-4">
                 <Button
                   variant="outline"
                   className="h-14 px-6 text-lg font-semibold"
@@ -483,68 +513,70 @@ export default function AttendanceScanner() {
         </Button>
       </div>
 
-      <div className="flex h-full flex-1 flex-col gap-2 lg:flex-row">
+      {/* 4 FULL-WIDTH BUTTONS */}
+      <div className="z-20 grid w-full grid-cols-2 gap-3 lg:grid-cols-4">
+        <Button
+          className={`h-16 w-full rounded-xl text-sm font-bold shadow-sm transition-all sm:h-20 sm:text-base md:text-sm lg:text-xl ${
+            scanMode === 'qr'
+              ? 'bg-theme text-white ring-2 ring-theme/50'
+              : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
+          }`}
+          onClick={() => {
+            setScanMode('qr');
+          }}
+        >
+          QR Code
+        </Button>
+        <Button
+          className={`h-16 w-full rounded-xl text-sm font-bold shadow-sm transition-all sm:h-20 sm:text-base md:text-sm lg:text-xl ${
+            scanMode === 'dob'
+              ? 'bg-theme text-white ring-2 ring-theme/50'
+              : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+          }`}
+          onClick={() => {
+            setScanMode('dob');
+            setMatchedUser(null);
+            setSelectedDob(null);
+            setInputValue('');
+          }}
+        >
+          <span className="leading-tight">
+            Clock In
+            <br className="md:hidden lg:hidden" /> By DOB
+          </span>
+        </Button>
+        <Button
+          className={`h-16 w-full rounded-xl text-sm font-bold shadow-sm transition-all sm:h-20 sm:text-base md:text-sm lg:text-xl ${
+            scanMode === 'serviceuser'
+              ? 'bg-theme text-white ring-2 ring-theme/50'
+              : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+          }`}
+          onClick={() => {
+            setScanMode('serviceuser');
+            setSelectedServiceUser(null);
+          }}
+        >
+          Service User
+        </Button>
+        <Button
+          className={`h-16 w-full rounded-xl text-sm font-bold shadow-sm transition-all sm:h-20 sm:text-base md:text-sm lg:text-xl ${
+            scanMode === 'visitor'
+              ? 'bg-theme text-white ring-2 ring-theme/50'
+              : 'bg-green-100 text-green-700 hover:bg-green-200'
+          }`}
+          onClick={() => {
+            setScanMode('visitor');
+            setVisitorName('');
+            setVisitReason('');
+          }}
+        >
+          Visitor
+        </Button>
+      </div>
+
+      <div className="flex h-full flex-1 flex-col gap-4 lg:flex-row lg:items-stretch">
         {/* SCANNER CONTROLS */}
         <div className="flex flex-1 flex-col gap-4">
-          <div className="z-20 grid w-full grid-cols-2 gap-3 md:grid-cols-2 lg:grid-cols-4">
-            <Button
-              className={`h-16 rounded-xl text-sm font-bold shadow-sm transition-all sm:h-20 sm:text-lg lg:text-xl ${
-                scanMode === 'dob'
-                  ? 'bg-theme text-white ring-2 ring-theme/50'
-                  : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-              }`}
-              onClick={() => {
-                setScanMode('dob');
-                setMatchedUser(null);
-                setSelectedDob(null);
-              }}
-            >
-              Try Another Way
-            </Button>
-
-            <Button
-              className={`h-16 rounded-xl text-sm font-bold shadow-sm transition-all sm:h-20 sm:text-lg lg:text-xl ${
-                scanMode === 'visitor'
-                  ? 'bg-theme text-white ring-2 ring-theme/50'
-                  : 'bg-green-100 text-green-700 hover:bg-green-200'
-              }`}
-              onClick={() => {
-                setScanMode('visitor');
-                setVisitorName('');
-                setVisitReason('');
-              }}
-            >
-              Visitor
-            </Button>
-
-            <Button
-              className={`h-16 rounded-xl text-sm font-bold shadow-sm transition-all sm:h-20 sm:text-lg lg:text-xl ${
-                scanMode === 'serviceuser'
-                  ? 'bg-theme text-white ring-2 ring-theme/50'
-                  : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
-              }`}
-              onClick={() => {
-                setScanMode('serviceuser');
-                setSelectedServiceUser(null);
-              }}
-            >
-              Service User
-            </Button>
-
-            <Button
-              className={`h-16 rounded-xl text-sm font-bold shadow-sm transition-all sm:h-20 sm:text-lg lg:text-xl ${
-                scanMode === 'qr'
-                  ? 'bg-theme text-white ring-2 ring-theme/50'
-                  : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
-              }`}
-              onClick={() => {
-                setScanMode('qr');
-              }}
-            >
-              QR Code
-            </Button>
-          </div>
-
           <div className="relative flex min-h-[500px] flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
             <div className="pointer-events-none absolute left-[-10%] top-[-10%] h-[40%] w-[40%] rounded-full bg-theme/5 blur-[100px]" />
 
@@ -566,42 +598,136 @@ export default function AttendanceScanner() {
                       {/* --- DOB MODE --- */}
                       {scanMode === 'dob' && (
                         <div className="w-full space-y-6">
-                          <div className="flex flex-col items-center">
-                            <div className="mb-4 flex h-24 w-24 items-center justify-center rounded-3xl bg-theme/10">
-                              <Calendar className="h-12 w-12 text-theme" />
+                          {!matchedUser && (
+                            <div className="flex flex-col items-center">
+                              <div className="mb-4 flex h-24 w-24 items-center justify-center rounded-3xl bg-theme/10">
+                                <Calendar className="h-12 w-12 text-theme" />
+                              </div>
+                              <h2 className="text-2xl font-bold text-slate-800 lg:text-3xl">
+                                Clock In/Out Via Date of Birth (DD-MM-YYYY)
+                              </h2>
                             </div>
-                            <h2 className="text-2xl font-bold text-slate-800 lg:text-3xl">
-                              Clock In/Out Via Date of Birth (DD-MM-YYYY)
-                            </h2>
-                          </div>
+                          )}
 
                           {!matchedUser ? (
                             <div className="relative z-50 flex w-full flex-col gap-3 sm:flex-row">
-                              <div className="flex-1">
+                         <div className="flex-1 [&_.react-datepicker-wrapper]:w-full">
                                 <DatePicker
                                   selected={selectedDob}
-                                  onChange={(date) => setSelectedDob(date)}
-                                  onSelect={(date) => submitDobSearch(date)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                      e.preventDefault();
-                                      submitDobSearch(selectedDob);
+                                  onChange={(date: Date | null) => {
+                                    setSelectedDob(date);
+                                    if (date) {
+                                      setInputValue(moment(date).format('DD-MM-YYYY'));
+                                    } else {
+                                      setInputValue('');
                                     }
                                   }}
-                                  maxDate={new Date()}
-                                  showMonthDropdown
-                                  showYearDropdown
-                                  dropdownMode="select"
+                                  onChangeRaw={(e: any) => {
+                                    // THE FIX: Safety check to prevent crash when selecting from calendar
+                                    if (!e || !e.target || typeof e.target.value !== 'string') {
+                                      return;
+                                    }
+                                    
+                                    let val = e.target.value;
+                                    
+                                    // Detect if user is pressing backspace
+                                    const inputType = e.nativeEvent?.inputType;
+                                    const isDeleting = inputType === 'deleteContentBackward' || inputType === 'deleteContentForward';
+
+                                    // 1. Clean out letters and consecutive hyphens
+                                    val = val.replace(/[^0-9-]/g, '');
+                                    val = val.replace(/--+/g, '-');
+
+                                    // 2. Split into Day, Month, Year chunks
+                                    let parts = val.split('-');
+
+                                    // 3. Smart Overflow Handling:
+                                    if (parts[0] && parts[0].length > 2) {
+                                      parts[1] = parts[0].slice(2) + (parts[1] || '');
+                                      parts[0] = parts[0].slice(0, 2);
+                                    }
+                                    if (parts[1] && parts[1].length > 2) {
+                                      parts[2] = parts[1].slice(2) + (parts[2] || '');
+                                      parts[1] = parts[1].slice(0, 2);
+                                    }
+                                    if (parts[2] && parts[2].length > 4) {
+                                      parts[2] = parts[2].slice(0, 4);
+                                    }
+
+                                    // Re-assemble the string
+                                    val = parts.join('-');
+
+                                    // 4. Auto-append hyphen instantly as you type forward
+                                    if (!isDeleting) {
+                                      if (val.length === 2 && !val.includes('-')) {
+                                        val += '-';
+                                      } else if (val.length === 5 && val.split('-').length === 2) {
+                                        val += '-';
+                                      }
+                                    }
+
+                                    // 5. Restrict overall length
+                                    if (val.length > 10) val = val.slice(0, 10);
+
+                                    // Force update DOM so DatePicker reads the safely formatted string
+                                    e.target.value = val;
+                                    setInputValue(val);
+
+                                    // 6. Keep calendar synced if valid string is formed
+                                    if (val.length === 10) {
+                                      const [dd, mm, yyyy] = val.split('-');
+                                      if (dd?.length === 2 && mm?.length === 2 && yyyy?.length === 4) {
+                                        const date = new Date(`${yyyy}-${mm}-${dd}`);
+                                        if (!isNaN(date.getTime())) {
+                                          setSelectedDob(date);
+                                        }
+                                      }
+                                    } else if (selectedDob !== null) {
+                                      setSelectedDob(null);
+                                    }
+                                  }}
                                   dateFormat="dd-MM-yyyy"
-                                  className="h-16 w-full rounded-2xl border-2 border-slate-200 px-6 py-4 text-center text-2xl font-semibold shadow-sm focus:border-theme focus:outline-none focus:ring-0"
-                                  placeholderText="Select DOB (DD-MM-YYYY)"
+                                  showYearDropdown
+                                  showMonthDropdown
+                                  dropdownMode="select"
+                                  maxDate={new Date()}
                                   wrapperClassName="w-full"
+                                  customInput={
+                                    <input
+                                      type="text"
+                                      value={inputValue}
+                                      onChange={(e) => setInputValue(e.target.value)} 
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                          e.preventDefault();
+                                          if (inputValue.length === 10) {
+                                            const [dd, mm, yyyy] = inputValue.split('-');
+                                            const date = new Date(`${yyyy}-${mm}-${dd}`);
+                                            if (!isNaN(date.getTime())) submitDobSearch(date);
+                                          }
+                                        }
+                                      }}
+                                      maxLength={10}
+                                      placeholder="DD-MM-YYYY"
+                                      className="h-16 w-full rounded-2xl border-2 border-slate-200 px-6 py-4 text-center text-2xl font-semibold shadow-sm focus:border-theme focus:outline-none focus:ring-0"
+                                    />
+                                  }
                                 />
                               </div>
                               <Button
-                                disabled={!selectedDob}
+                                disabled={inputValue.length !== 10}
                                 className="h-16 rounded-2xl bg-theme px-10 text-xl font-bold text-white shadow-sm transition-colors hover:bg-theme/90 sm:w-auto"
-                                onClick={() => submitDobSearch(selectedDob)}
+                                onClick={() => {
+                                  if (inputValue.length === 10) {
+                                    const [dd, mm, yyyy] =
+                                      inputValue.split('-');
+                                    const date = new Date(
+                                      `${yyyy}-${mm}-${dd}`
+                                    );
+                                    if (!isNaN(date.getTime()))
+                                      submitDobSearch(date);
+                                  }
+                                }}
                               >
                                 Next
                               </Button>
@@ -650,6 +776,7 @@ export default function AttendanceScanner() {
                                 onClick={() => {
                                   setMatchedUser(null);
                                   setSelectedDob(null);
+                                  setInputValue('');
                                 }}
                               >
                                 No, try again
@@ -694,25 +821,12 @@ export default function AttendanceScanner() {
                             </div>
 
                             <div className="flex w-full pt-6">
-                              {isVisitorClockedIn ? (
-                                <Button
-                                  className="h-20 w-full rounded-2xl bg-red-600 text-2xl font-bold text-white shadow-lg transition-transform hover:scale-[1.02] hover:bg-red-700"
-                                  onClick={() =>
-                                    handleVisitorSubmit('clock_out')
-                                  }
-                                >
-                                  Log Out
-                                </Button>
-                              ) : (
-                                <Button
-                                  className="h-20 w-full rounded-2xl bg-green-600 text-2xl font-bold text-white shadow-lg transition-transform hover:scale-[1.02] hover:bg-green-700"
-                                  onClick={() =>
-                                    handleVisitorSubmit('clock_in')
-                                  }
-                                >
-                                  Log In
-                                </Button>
-                              )}
+                              <Button
+                                className="h-20 w-full rounded-2xl bg-green-600 text-2xl font-bold text-white shadow-lg transition-transform hover:scale-[1.02] hover:bg-green-700"
+                                onClick={() => handleVisitorSubmit('clock_in')}
+                              >
+                                Log In
+                              </Button>
                             </div>
                           </div>
                         </div>
@@ -722,9 +836,6 @@ export default function AttendanceScanner() {
                       {scanMode === 'serviceuser' && (
                         <div className="w-full space-y-6">
                           <div className="flex flex-col items-center">
-                            {/* <div className="mb-4 flex h-24 w-24 items-center justify-center rounded-3xl bg-theme/10">
-                              <Users className="h-12 w-12 text-theme" />
-                            </div> */}
                             <h2 className="text-3xl font-bold text-slate-800">
                               Service User Log-In / Out
                             </h2>
@@ -732,10 +843,6 @@ export default function AttendanceScanner() {
 
                           <div className="relative z-50 space-y-6 text-left">
                             <div className="space-y-3">
-                              <Label className="text-2xl font-semibold">
-                                Select Service User{' '}
-                                <span className="text-red-500">*</span>
-                              </Label>
                               <Select
                                 options={allServiceUsers.map((su) => ({
                                   value: su._id,
@@ -812,8 +919,8 @@ export default function AttendanceScanner() {
                               disabled={status !== 'idle'}
                               value={inputValue}
                               onChange={(e) => setInputValue(e.target.value)}
-                              className="h-20 w-full rounded-2xl border-4 border-theme bg-slate-50 px-8 py-4 text-center font-mono text-4xl font-bold tracking-[0.1em] text-slate-800 shadow-md transition-all placeholder:text-slate-300 focus:border-theme focus:outline-none focus:ring-0"
-                              placeholder="Type your ID..."
+                              className="h-20 w-full rounded-2xl border-4 border-theme bg-slate-50 px-8 py-4 text-center font-mono text-3xl font-bold tracking-[0.1em] text-slate-800 shadow-md transition-all placeholder:text-slate-300 focus:border-theme focus:outline-none focus:ring-0"
+                              placeholder=""
                             />
                           </form>
                         </>
@@ -881,7 +988,7 @@ export default function AttendanceScanner() {
         </div>
 
         {/* DYNAMIC RIGHT SIDEBAR */}
-        <div className="flex max-h-[600px] min-h-[400px] w-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm lg:max-h-full lg:w-[350px]">
+        <div className="flex w-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm lg:w-[35%] lg:self-stretch">
           <div className="flex items-center border-b border-slate-100 bg-slate-50 p-4">
             <h2 className="flex items-center text-lg font-bold text-slate-800">
               <SidebarIcon className="mr-2 h-5 w-5 text-theme" />
@@ -889,8 +996,8 @@ export default function AttendanceScanner() {
             </h2>
           </div>
 
-          <ScrollArea className="max-h-[74vh] flex-1">
-            <div className="space-y-3 p-4">
+          <ScrollArea className="max-h-[58vh] flex-1">
+            <div className="space-y-3 p-2">
               {isSidebarLoading ? (
                 <div className="flex flex-col items-center justify-center py-10 text-slate-400">
                   <BlinkingDots size="medium" color="bg-theme" />
@@ -904,7 +1011,7 @@ export default function AttendanceScanner() {
                         className="flex flex-col rounded-xl border border-slate-100 bg-white p-3 transition-colors hover:bg-slate-50"
                       >
                         <div className="flex items-center justify-between ">
-                          <div className="flex flex-row items-center gap-2 max-w-[70%] ">
+                          <div className="flex max-w-[70%] flex-row items-center gap-2 ">
                             <p className="text-sm font-semibold text-slate-800">
                               {item.visitorName}
                             </p>{' '}
@@ -935,6 +1042,7 @@ export default function AttendanceScanner() {
                     const suName =
                       item.name ||
                       `${item.firstName || ''} ${item.lastName || ''}`.trim();
+                    const room = item.room && `Room: ${' '} ${item.room} `;
                     return (
                       <div
                         key={item._id}
@@ -942,6 +1050,9 @@ export default function AttendanceScanner() {
                       >
                         <div className="flex items-center gap-3">
                           <p className="text-sm font-medium text-slate-800">
+                            <span className="mr-2  rounded-full  bg-theme px-2 py-1 font-semibold text-white">
+                              {room}
+                            </span>{' '}
                             {suName}
                           </p>{' '}
                           <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">

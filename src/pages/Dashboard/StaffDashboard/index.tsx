@@ -466,7 +466,7 @@ const StaffDashboardPage = () => {
                     <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
                       <Calendar className="h-3.5 w-3.5" />
                       <span>
-                        {moment(notice.noticeDate).format('MMM DD, YYYY')}
+                        {moment(notice.noticeDate).format('DD MMM, YYYY')}
                       </span>
                     </div>
 

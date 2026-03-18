@@ -18,7 +18,11 @@ import {
   AlertTriangle,
   X,
   File,
-  GripVertical
+  GripVertical,
+  CalendarRange,
+  Send,
+  Clock,
+  CheckCircle2
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import axiosInstance from '@/lib/axios';
@@ -66,7 +70,7 @@ type HierarchicalGroup = {
 
 const DRAG_TYPE = 'ROW';
 const DEPT_DRAG_TYPE = 'DEPARTMENT';
-const CHILD_DEPT_DRAG_TYPE = 'CHILD_DEPARTMENT'; // New Drag Type
+const CHILD_DEPT_DRAG_TYPE = 'CHILD_DEPARTMENT';
 
 const getInitials = (firstName?: string, lastName?: string, name?: string) => {
   if (firstName && lastName)
@@ -109,7 +113,8 @@ const ShiftBlock = ({
   startTime,
   endTime,
   colors,
-  extraSlots
+  extraSlots,
+  isPending
 }: {
   leaveType?: string;
   shiftName?: string;
@@ -117,6 +122,7 @@ const ShiftBlock = ({
   endTime?: string;
   colors: 'theme' | { bg: string; border: string; text: string };
   extraSlots?: TimeSlot[];
+  isPending?: boolean;
 }) => {
   const title = leaveType || shiftName || '';
   const isTheme = colors === 'theme';
@@ -137,9 +143,18 @@ const ShiftBlock = ({
             }
           : undefined
       }
-      className={`group/shift relative mx-auto flex min-h-[44px] w-full min-w-[50px] cursor-pointer flex-col items-center justify-center rounded-md border p-1 shadow-sm transition-all duration-200 hover:scale-105 hover:brightness-105 ${isTheme ? 'border-theme bg-theme text-white' : ''}`}
+      className={`group/shift relative mx-auto flex min-h-[44px] w-full min-w-[50px] cursor-pointer flex-col items-center justify-center rounded-md border p-1 shadow-sm transition-all duration-200 hover:scale-105 hover:brightness-105 ${isTheme ? 'border-theme bg-theme text-white' : ''} ${isPending ? 'opacity-80' : ''}`}
     >
       <div className="pointer-events-none absolute inset-0 rounded-md bg-white/40 opacity-0 transition-opacity group-hover/shift:opacity-100" />
+      {/* Pending indicator */}
+      {isPending && (
+        <div
+          className="absolute -right-1 -top-1 z-10 flex h-4 w-4 items-center justify-center rounded-full bg-amber-400 shadow"
+          title="Pending – not yet published"
+        >
+          <Clock className="h-2.5 w-2.5 text-white" />
+        </div>
+      )}
       <span className="text-md w-full truncate text-center font-bold uppercase leading-tight tracking-widest">
         {title}
       </span>
@@ -155,6 +170,219 @@ const ShiftBlock = ({
             </span>
           )
       )}
+    </div>
+  );
+};
+
+// PublishRotaModal
+interface PublishRotaModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  daysArray: moment.Moment[];
+  rotas: any[];
+  companyId: string | undefined;
+  onPublishSuccess: (publishedIds: string[]) => void;
+}
+
+const PublishRotaModal: React.FC<PublishRotaModalProps> = ({
+  isOpen,
+  onClose,
+  daysArray,
+  rotas,
+  companyId,
+  onPublishSuccess
+}) => {
+  const { toast } = useToast();
+  const [selectedDates, setSelectedDates] = useState<string[]>([]);
+  const [isPublishing, setIsPublishing] = useState(false);
+
+  const pendingByDate = useMemo(() => {
+    const map: Record<string, number> = {};
+    rotas.forEach((r) => {
+      if (r.status === 'pending') {
+        const key = moment(r.startDate).format('YYYY-MM-DD');
+        map[key] = (map[key] || 0) + 1;
+      }
+    });
+    return map;
+  }, [rotas]);
+
+  const datesWithPending = useMemo(
+    () => daysArray.filter((d) => pendingByDate[d.format('YYYY-MM-DD')] > 0),
+    [daysArray, pendingByDate]
+  );
+
+  const toggleDate = (dateKey: string) => {
+    setSelectedDates((prev) =>
+      prev.includes(dateKey) ? prev.filter((d) => d !== dateKey) : [...prev, dateKey]
+    );
+  };
+
+  const selectAll = () =>
+    setSelectedDates(datesWithPending.map((d) => d.format('YYYY-MM-DD')));
+  const clearAll = () => setSelectedDates([]);
+
+  const totalToPublish = useMemo(
+    () => selectedDates.reduce((sum, d) => sum + (pendingByDate[d] || 0), 0),
+    [selectedDates, pendingByDate]
+  );
+
+  const handlePublish = async () => {
+    if (!selectedDates.length) return;
+    setIsPublishing(true);
+    try {
+      const rotasToPublish = rotas.filter(
+        (r) =>
+          r.status === 'pending' &&
+          selectedDates.includes(moment(r.startDate).format('YYYY-MM-DD'))
+      );
+      await Promise.all(
+        rotasToPublish.map((r) =>
+          axiosInstance.patch(`/rota/${r._id}`, { status: 'publish' })
+        )
+      );
+      onPublishSuccess(rotasToPublish.map((r) => r._id));
+      toast({
+        title: `${selectedDates.length} day${selectedDates.length !== 1 ? 's' : ''} rota published successfully`
+      });
+      setSelectedDates([]);
+      onClose();
+    } catch (e) {
+      toast({ title: 'Failed to publish rotas', variant: 'destructive' });
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!isOpen) setSelectedDates([]);
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="relative w-full max-w-7xl rounded-2xl bg-white p-6 shadow-2xl">
+        {/* Header */}
+        <div className="mb-5 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-100">
+              <Send className="h-4 w-4 text-theme" />
+            </div>
+            <div>
+              <h2 className="text-base font-extrabold text-gray-900">Publish Rota</h2>
+              <p className="text-xs text-gray-500">Select dates to make rotas visible to staff</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="flex h-8 w-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {datesWithPending.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-10 text-center">
+            <CheckCircle2 className="mb-3 h-12 w-12 text-emerald-400" />
+            <p className="text-sm font-semibold text-gray-600">All rotas are already published!</p>
+            <p className="mt-1 text-xs text-gray-400">
+              There are no pending rotas in the current view.
+            </p>
+          </div>
+        ) : (
+          <>
+            {/* Select all / clear */}
+            <div className="mb-3 flex items-center justify-between">
+              <span className="text-xs font-semibold text-gray-500 uppercase tracking-widest">
+                Dates with pending rotas
+              </span>
+              <div className="flex gap-2">
+                <button
+                  onClick={selectAll}
+                  className="text-xs font-semibold text-theme hover:underline"
+                >
+                  Select all
+                </button>
+                <span className="text-gray-300">|</span>
+                <button
+                  onClick={clearAll}
+                  className="text-xs font-semibold text-red-600 hover:underline"
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+
+            {/* Date list */}
+            <div className="custom-scrollbar max-h-[80vh] overflow-y-auto rounded-xl border border-gray-100 bg-gray-50 p-2">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-7">
+                {datesWithPending.map((day) => {
+                  const key = day.format('YYYY-MM-DD');
+                  const count = pendingByDate[key] || 0;
+                  const isSelected = selectedDates.includes(key);
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => toggleDate(key)}
+                      className={`flex flex-col items-start rounded-lg border px-3 py-2 text-left transition-all ${
+                        isSelected
+                          ? 'border-blue-400 bg-blue-50 shadow-sm'
+                          : 'border-gray-200 bg-white hover:border-blue-200 hover:bg-blue-50/50'
+                      }`}
+                    >
+                      <span className="text-xs font-extrabold text-gray-800">
+                        {day.format('ddd, DD MMM')}
+                      </span>
+                      <span
+                        className={`mt-0.5 flex items-center gap-1 text-[10px] font-semibold ${
+                          isSelected ? 'text-theme' : 'text-amber-500'
+                        }`}
+                      >
+                        <Clock className="h-2.5 w-2.5" />
+                         pending
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="mt-5 flex items-center justify-between">
+              <span className="text-xs font-medium text-gray-500">
+                {selectedDates.length > 0 ? (
+                  <>
+                    <span className="font-bold text-gray-800">{selectedDates.length}</span> days  rota
+                    {totalToPublish !== 1 ? 's' : ''} will be published
+                  </>
+                ) : (
+                  'No dates selected'
+                )}
+              </span>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={onClose} className="h-9">
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handlePublish}
+                  disabled={!selectedDates.length || isPublishing}
+                  className="h-9 gap-2 bg-theme text-white hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {isPublishing ? (
+                    <BlinkingDots size="small" color="bg-white" />
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4" />
+                      Publish
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 };
@@ -177,6 +405,7 @@ interface DraggableRowProps {
     day: moment.Moment,
     departmentId: string
   ) => void;
+  pendingDates: Set<string>;
 }
 
 const DraggableRow: React.FC<DraggableRowProps> = ({
@@ -187,7 +416,8 @@ const DraggableRow: React.FC<DraggableRowProps> = ({
   daysArray,
   rotaMap,
   leaveTypeColors,
-  handleCellClick
+  handleCellClick,
+  pendingDates
 }) => {
   const ref = useRef<HTMLTableRowElement>(null);
   const [{ isDragging }, drag, dragPreview] = useDrag({
@@ -266,11 +496,13 @@ const DraggableRow: React.FC<DraggableRowProps> = ({
               : r.departmentId) === departmentId
         );
 
+        const hasPendingCol = pendingDates.has(dateKey);
+
         return (
           <td
             key={idx}
             onClick={() => handleCellClick(user, day, departmentId)}
-            className="group min-w-[65px] cursor-pointer border-b border-r border-gray-200 p-1 text-center hover:bg-slate-100/80"
+            className={`group min-w-[65px] cursor-pointer border-b border-r border-gray-200 p-1 text-center hover:bg-amber-100/60 ${hasPendingCol ? 'bg-amber-50' : 'hover:bg-slate-100/80'}`}
           >
             {rotaList.length > 0 ? (
               <div className="flex flex-col gap-0.5">
@@ -304,6 +536,7 @@ const DraggableRow: React.FC<DraggableRowProps> = ({
                       endTime={firstRota.endTime}
                       colors={shiftColors}
                       extraSlots={extraSlots}
+                      isPending={firstRota.status === 'pending'}
                     />
                   );
                 })()}
@@ -320,7 +553,7 @@ const DraggableRow: React.FC<DraggableRowProps> = ({
   );
 };
 
-// --- NEW COMPONENT: Draggable Child Group ---
+// DraggableChildGroup
 interface DraggableChildGroupProps {
   childGroup: DeptGroup;
   childIndex: number;
@@ -343,6 +576,7 @@ interface DraggableChildGroupProps {
     day: moment.Moment,
     departmentId: string
   ) => void;
+  pendingDates: Set<string>;
 }
 
 const DraggableChildGroup: React.FC<DraggableChildGroupProps> = ({
@@ -354,7 +588,8 @@ const DraggableChildGroup: React.FC<DraggableChildGroupProps> = ({
   rotaMap,
   leaveTypeColors,
   moveRow,
-  handleCellClick
+  handleCellClick,
+  pendingDates
 }) => {
   const ref = useRef<HTMLTableRowElement>(null);
 
@@ -369,22 +604,18 @@ const DraggableChildGroup: React.FC<DraggableChildGroupProps> = ({
     collect: (monitor) => ({ isOver: monitor.isOver() }),
     hover(item: any, monitor) {
       if (!ref.current) return;
-      if (item.parentId !== parentId) return; // Prevent dragging into a different parent
-
+      if (item.parentId !== parentId) return;
       const dragIndex = item.childIndex;
       const hoverIndex = childIndex;
       if (dragIndex === hoverIndex) return;
-
       const hoverBoundingRect = ref.current.getBoundingClientRect();
       const hoverMiddleY =
         (hoverBoundingRect.bottom - hoverBoundingRect.top) / 2;
       const clientOffset = monitor.getClientOffset();
       if (!clientOffset) return;
       const hoverClientY = clientOffset.y - hoverBoundingRect.top;
-
       if (dragIndex < hoverIndex && hoverClientY < hoverMiddleY) return;
       if (dragIndex > hoverIndex && hoverClientY > hoverMiddleY) return;
-
       moveChildGroup(parentId, dragIndex, hoverIndex);
       item.childIndex = hoverIndex;
     }
@@ -402,13 +633,13 @@ const DraggableChildGroup: React.FC<DraggableChildGroupProps> = ({
           <div className="flex items-center gap-2 pl-4">
             <div
               ref={drag as any}
-              className="flex-shrink-0 cursor-grab  text-slate-400 transition-colors hover:text-slate-600 active:cursor-grabbing"
+              className="flex-shrink-0 cursor-grab text-slate-400 transition-colors hover:text-slate-600 active:cursor-grabbing"
               title="Drag to reorder child department"
             >
               <GripVertical className="h-4 w-4" />
             </div>
             <span className="text-bold text-theme">└─</span>
-            <span className="text-xs font-bold uppercase tracking-widest ">
+            <span className="text-xs font-bold uppercase tracking-widest">
               {childGroup.department.departmentName}
             </span>
           </div>
@@ -428,13 +659,14 @@ const DraggableChildGroup: React.FC<DraggableChildGroupProps> = ({
           rotaMap={rotaMap}
           leaveTypeColors={leaveTypeColors}
           handleCellClick={handleCellClick}
+          pendingDates={pendingDates}
         />
       ))}
     </>
   );
 };
 
-// Draggable Hierarchy Block
+// DraggableHierarchyBlock
 interface DraggableHierarchyBlockProps {
   hierarchy: HierarchicalGroup;
   deptIndex: number;
@@ -457,6 +689,7 @@ interface DraggableHierarchyBlockProps {
     day: moment.Moment,
     departmentId: string
   ) => void;
+  pendingDates: Set<string>;
 }
 
 const DraggableHierarchyBlock: React.FC<DraggableHierarchyBlockProps> = ({
@@ -468,7 +701,8 @@ const DraggableHierarchyBlock: React.FC<DraggableHierarchyBlockProps> = ({
   rotaMap,
   leaveTypeColors,
   moveRow,
-  handleCellClick
+  handleCellClick,
+  pendingDates
 }) => {
   const ref = useRef<HTMLTableSectionElement>(null);
 
@@ -501,7 +735,6 @@ const DraggableHierarchyBlock: React.FC<DraggableHierarchyBlockProps> = ({
       const hoverClientY = clientOffset.y - hoverBoundingRect.top;
       if (dragIndex < hoverIndex && hoverClientY < hoverMiddleY) return;
       if (dragIndex > hoverIndex && hoverClientY > hoverMiddleY) return;
-
       moveDepartment(dragIndex, hoverIndex);
       item.deptIndex = hoverIndex;
     }
@@ -514,7 +747,6 @@ const DraggableHierarchyBlock: React.FC<DraggableHierarchyBlockProps> = ({
       ref={ref}
       className={`transition-all ${isDragging ? 'opacity-40' : ''}`}
     >
-      {/* 1. Parent Header Row */}
       <tr
         className={`border-b border-t border-gray-300 transition-colors ${isOver && !isUnassigned ? 'bg-theme' : 'bg-slate-200'}`}
       >
@@ -531,7 +763,7 @@ const DraggableHierarchyBlock: React.FC<DraggableHierarchyBlockProps> = ({
             ) : (
               <div className="w-4 flex-shrink-0" />
             )}
-            <span className="text-xs font-extrabold uppercase tracking-widest ">
+            <span className="text-xs font-extrabold uppercase tracking-widest">
               {hierarchy.parentGroup.department.departmentName}
             </span>
           </div>
@@ -541,7 +773,6 @@ const DraggableHierarchyBlock: React.FC<DraggableHierarchyBlockProps> = ({
         ))}
       </tr>
 
-      {/* 2. Parent Users */}
       {hierarchy.parentGroup.users.map((user, rowIdx) => (
         <DraggableRow
           key={`${hierarchy.parentGroup.department._id}-${user._id}`}
@@ -553,10 +784,10 @@ const DraggableHierarchyBlock: React.FC<DraggableHierarchyBlockProps> = ({
           rotaMap={rotaMap}
           leaveTypeColors={leaveTypeColors}
           handleCellClick={handleCellClick}
+          pendingDates={pendingDates}
         />
       ))}
 
-      {/* 3. Children Headers and Users via Sub-Component */}
       {hierarchy.childrenGroups.map((childGroup, childIndex) => (
         <DraggableChildGroup
           key={childGroup.department._id}
@@ -569,6 +800,7 @@ const DraggableHierarchyBlock: React.FC<DraggableHierarchyBlockProps> = ({
           leaveTypeColors={leaveTypeColors}
           moveRow={moveRow}
           handleCellClick={handleCellClick}
+          pendingDates={pendingDates}
         />
       ))}
     </tbody>
@@ -600,6 +832,20 @@ export default function CompanyRota() {
   const [isBulkAssignOpen, setIsBulkAssignOpen] = useState(false);
   const [isCopyRotaOpen, setIsCopyRotaOpen] = useState(false);
   const [companyColor, setCompanyColor] = useState(null);
+  const [isPublishOpen, setIsPublishOpen] = useState(false);
+
+  const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([
+    null,
+    null
+  ]);
+  const [rangeStart, rangeEnd] = dateRange;
+  const [isCustomMode, setIsCustomMode] = useState(false);
+  const [appliedRange, setAppliedRange] = useState<[Date | null, Date | null]>([
+    null,
+    null
+  ]);
+  const [appliedStart, appliedEnd] = appliedRange;
+  const isCustomRange = !!(appliedStart && appliedEnd);
 
   const fetchUsersAndRotas = useCallback(
     async (isInitial = false) => {
@@ -731,6 +977,21 @@ export default function CompanyRota() {
     NT: { bg: '#ECEFF1', border: '#CFD8DC', text: '#37474F' }
   };
 
+  // Count pending rotas in the current view
+  const pendingRotasCount = useMemo(
+    () => rotas.filter((r) => r.status === 'pending').length,
+    [rotas]
+  );
+
+  // Set of date keys (YYYY-MM-DD) that have at least one pending rota
+  const pendingDates = useMemo(() => {
+    const s = new Set<string>();
+    rotas.forEach((r) => {
+      if (r.status === 'pending') s.add(moment(r.startDate).format('YYYY-MM-DD'));
+    });
+    return s;
+  }, [rotas]);
+
   const groupedByDepartment = useMemo(() => {
     const hierarchies: HierarchicalGroup[] = [];
     const getDeptUsers = (dept: Department) =>
@@ -817,9 +1078,7 @@ export default function CompanyRota() {
                 .map((g, i) =>
                   axiosInstance.patch(
                     `/hr/department/${g.parentGroup.department._id}`,
-                    {
-                      index: i
-                    }
+                    { index: i }
                   )
                 )
             );
@@ -837,7 +1096,6 @@ export default function CompanyRota() {
     [toast]
   );
 
-  // --- NEW HANDLER: Move Child Groups ---
   const moveChildGroup = useCallback(
     (parentId: string, dragIndex: number, hoverIndex: number) => {
       setOrderedGroups((prev) => {
@@ -883,17 +1141,45 @@ export default function CompanyRota() {
   );
 
   const daysArray = useMemo(() => {
+    if (isCustomRange && appliedStart && appliedEnd) {
+      const days = [];
+      let current = moment(appliedStart).clone();
+      const end = moment(appliedEnd);
+      while (current.isSameOrBefore(end, 'day')) {
+        days.push(current.clone());
+        current.add(1, 'day');
+      }
+      return days;
+    }
     const count = currentDate.daysInMonth();
     return Array.from({ length: count }, (_, i) =>
       currentDate.clone().date(i + 1)
     );
-  }, [currentDate]);
+  }, [currentDate, isCustomRange, appliedStart, appliedEnd]);
 
   const prevMonth = () => setCurrentDate((d) => d.clone().subtract(1, 'month'));
   const nextMonth = () => setCurrentDate((d) => d.clone().add(1, 'month'));
+
   const handlePickerChange = (date: Date | null) => {
     if (date) setCurrentDate(moment(date));
     setPickerOpen(false);
+  };
+
+  const handleRangeChange = (update: [Date | null, Date | null]) => {
+    setDateRange(update);
+  };
+
+  const handleApply = () => {
+    if (rangeStart && rangeEnd) {
+      setAppliedRange([rangeStart, rangeEnd]);
+      setIsCustomMode(false);
+    }
+  };
+
+  const clearRange = () => {
+    setDateRange([null, null]);
+    setAppliedRange([null, null]);
+    setIsCustomMode(false);
   };
 
   const handleAddRotaSuccess = (newRota: any) => {
@@ -907,13 +1193,11 @@ export default function CompanyRota() {
         ? updatedRota
         : [updatedRota];
       let newRotas = [...prev];
-
       updatedArray.forEach((updatedItem) => {
         const index = newRotas.findIndex((r) => r._id === updatedItem._id);
         if (index !== -1) newRotas[index] = updatedItem;
         else newRotas.push(updatedItem);
       });
-
       return newRotas;
     });
   };
@@ -940,6 +1224,15 @@ export default function CompanyRota() {
     } else setIsCreateOpen(true);
   };
 
+  // Handle successful publish: update local rota statuses
+  const handlePublishSuccess = (publishedIds: string[]) => {
+    setRotas((prev) =>
+      prev.map((r) =>
+        publishedIds.includes(r._id) ? { ...r, status: 'publish' } : r
+      )
+    );
+  };
+
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="flex h-full w-full max-w-[100vw] flex-col overflow-hidden rounded-md bg-white p-4 text-black shadow-sm">
@@ -958,54 +1251,139 @@ export default function CompanyRota() {
           <div className="flex items-center gap-3">
             <h1 className="text-lg font-bold">Staff Rota</h1>
           </div>
-          <div className="flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50/50 p-1">
-            <Button
-              variant="ghost"
-              onClick={prevMonth}
-              size="icon"
-              className="h-8 w-8 rounded-full hover:bg-theme hover:text-white"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <div className="relative">
-              <button
-                ref={pickerAnchorRef}
-                onClick={() => setPickerOpen((o) => !o)}
-                className="flex w-36 items-center justify-center gap-2 border-none text-sm font-bold uppercase text-black"
-              >
-                <CalendarDays className="h-4 w-4" />
-                {currentDate.format('MMM YYYY')}
-              </button>
-              {pickerOpen && (
-                <div className="absolute left-1/2 z-50 -translate-x-1/2 rounded-lg border-none">
-                  <DatePicker
-                    selected={currentDate.toDate()}
-                    onChange={handlePickerChange}
-                    dateFormat="MM/yyyy"
-                    showMonthYearPicker
-                    inline
-                    onClickOutside={() => setPickerOpen(false)}
-                  />
+          <div className="flex items-center gap-2">
+            {isCustomRange && !isCustomMode ? (
+              <div className="flex items-center gap-1 rounded-full border border-theme/30 bg-theme/5 p-1">
+                <button
+                  onClick={() => setIsCustomMode(true)}
+                  className="flex items-center gap-2 px-3 py-1 text-xs font-semibold text-theme transition-all hover:text-blue-900"
+                >
+                  <CalendarRange className="h-3.5 w-3.5 flex-shrink-0" />
+                  {moment(appliedStart).format('DD MMM YYYY')}
+                  {' → '}
+                  {moment(appliedEnd).format('DD MMM YYYY')}
+                </button>
+                <button
+                  onClick={clearRange}
+                  title="Back to month view"
+                  className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-100 text-theme transition-all hover:bg-red-100 hover:text-red-500"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ) : isCustomMode ? (
+              <div className="rota-range-picker flex items-center gap-2 rounded-full border border-blue-300 bg-white p-1 shadow-sm">
+                <CalendarRange className="ml-2 h-3.5 w-3.5 flex-shrink-0 text-theme" />
+                <DatePicker
+                  selectsRange
+                  startDate={rangeStart}
+                  endDate={rangeEnd}
+                  onChange={handleRangeChange}
+                  dateFormat="dd MMM yyyy"
+                  placeholderText="Select date range..."
+                  isClearable={false}
+                  className="w-52 border-none bg-transparent text-xs font-semibold text-gray-700 outline-none placeholder:text-gray-400"
+                />
+                <button
+                  onClick={handleApply}
+                  disabled={!rangeStart || !rangeEnd}
+                  className="flex h-7 items-center gap-1 rounded-full bg-theme px-3 text-[11px] font-bold text-white transition-all hover:bg-theme/90 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Apply
+                </button>
+                <button
+                  onClick={() => {
+                    setIsCustomMode(false);
+                    if (!isCustomRange) setDateRange([null, null]);
+                  }}
+                  className="mr-1 flex h-7 w-7 items-center justify-center rounded-full text-gray-400 transition-all hover:bg-gray-100 hover:text-gray-600"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50/50 p-1">
+                <Button
+                  variant="ghost"
+                  onClick={prevMonth}
+                  size="icon"
+                  className="h-8 w-8 rounded-full hover:bg-theme hover:text-white"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <div className="relative">
+                  <button
+                    ref={pickerAnchorRef}
+                    onClick={() => setPickerOpen((o) => !o)}
+                    className="flex w-36 items-center justify-center gap-2 border-none text-sm font-bold uppercase text-black"
+                  >
+                    <CalendarDays className="h-4 w-4" />
+                    {currentDate.format('MMM YYYY')}
+                  </button>
+                  {pickerOpen && (
+                    <div className="absolute left-1/2 z-50 -translate-x-1/2 rounded-lg border-none">
+                      <DatePicker
+                        selected={currentDate.toDate()}
+                        onChange={handlePickerChange}
+                        dateFormat="MM/yyyy"
+                        showMonthYearPicker
+                        inline
+                        onClickOutside={() => setPickerOpen(false)}
+                      />
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-            <Button
-              variant="ghost"
-              onClick={nextMonth}
-              size="icon"
-              className="h-8 w-8 rounded-full hover:bg-theme hover:text-white"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
+                <Button
+                  variant="ghost"
+                  onClick={nextMonth}
+                  size="icon"
+                  className="h-8 w-8 rounded-full hover:bg-theme hover:text-white"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <button
+                  onClick={() => setIsCustomMode(true)}
+                  className="ml-1 flex h-8 items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 text-[11px] font-semibold text-gray-500 shadow-sm transition-all hover:border-theme hover:bg-theme/5 hover:text-theme"
+                >
+                  <CalendarRange className="h-3 w-3" />
+                  Custom
+                </button>
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-2">
-            <Button
+             <Button
               onClick={() => navigate(-1)}
               variant="outline"
               className="h-9 gap-2"
             >
               <MoveLeft className="h-4 w-4" /> Back
             </Button>
+            {/* Pending helper text + publish button */}
+           
+              <div className="flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5">
+                <span className="text-xs font-semibold text-amber-700">
+                 Pending Rota
+                </span>
+                <Clock className="h-3.5 w-3.5 flex-shrink-0 text-amber-500" />
+              </div>
+          
+            {/* {pendingRotasCount > 0 && (
+              <div className="flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5">
+                <Clock className="h-3.5 w-3.5 flex-shrink-0 text-amber-500" />
+                <span className="text-xs font-semibold text-amber-700">
+                  {pendingRotasCount} rota{pendingRotasCount !== 1 ? 's' : ''} pending
+                </span>
+              </div>
+            )} */}
+            <Button
+              onClick={() => setIsPublishOpen(true)}
+              variant="outline"
+              className="h-9 gap-2 border-none bg-blue-600 text-white hover:bg-blue-700"
+            >
+              <Send className="h-4 w-4" /> Publish Rota
+            </Button>
+           
             <Button
               onClick={() => setIsCopyRotaOpen(true)}
               variant="outline"
@@ -1098,18 +1476,24 @@ export default function CompanyRota() {
                   {daysArray.map((day) => {
                     const isToday = day.isSame(moment(), 'day');
                     const isWeekend = day.day() === 0 || day.day() === 6;
+                    const isPendingCol = pendingDates.has(day.format('YYYY-MM-DD'));
                     return (
                       <th
                         key={day.format('D')}
-                        className={`min-w-[52px] border-b border-r border-gray-200 py-2 text-center ${isToday ? 'bg-theme/50 text-white' : isWeekend ? 'bg-theme/5' : ''}`}
+                        className={`min-w-[52px] border-b border-r border-gray-200 py-2 text-center ${isToday ? 'bg-theme/50 text-white' : isPendingCol ? 'bg-amber-100' : isWeekend ? 'bg-theme/5' : ''}`}
                       >
-                        <div className="text-xs font-bold uppercase text-black">
-                          {day.format('ddd')}
-                        </div>
-                        <div
-                          className={`text-sm font-black ${isToday ? 'mx-auto flex h-6 w-6 items-center justify-center rounded-full bg-theme text-white' : 'text-black'}`}
-                        >
-                          {day.format('D')}
+                        <div className="flex flex-col items-center gap-0.5">
+                          <div className="text-xs font-bold uppercase text-black">
+                            {day.format('ddd')}
+                          </div>
+                          <div
+                            className={`text-sm font-black ${isToday ? 'mx-auto flex h-6 w-6 items-center justify-center rounded-full bg-theme text-white' : 'text-black'}`}
+                          >
+                            {day.format('D')}
+                          </div>
+                          {isPendingCol && !isToday && (
+                            <Clock className="h-2.5 w-2.5 text-amber-500" />
+                          )}
                         </div>
                       </th>
                     );
@@ -1129,6 +1513,7 @@ export default function CompanyRota() {
                   leaveTypeColors={leaveTypeColors}
                   moveRow={moveRow}
                   handleCellClick={handleCellClick}
+                  pendingDates={pendingDates}
                 />
               ))}
             </table>
@@ -1182,6 +1567,14 @@ export default function CompanyRota() {
           onSuccess={fetchUsersAndRotas}
           setGlobalSkippedRecords={setSkippedRecords}
           companyColor={companyColor}
+        />
+        <PublishRotaModal
+          isOpen={isPublishOpen}
+          onClose={() => setIsPublishOpen(false)}
+          daysArray={daysArray}
+          rotas={rotas}
+          companyId={companyId}
+          onPublishSuccess={handlePublishSuccess}
         />
       </div>
     </DndProvider>

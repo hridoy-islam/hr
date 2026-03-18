@@ -112,11 +112,11 @@ const VisitorAttendancePage = () => {
         <CardContent className="space-y-3 pt-4">
           {/* Filters Row */}
           <div className="grid grid-cols-1 items-end gap-3 lg:grid-cols-5 ">
+              <label className="mb-2 block text-xl font-bold  ">
+               Visitor Attendance 
+              </label>
             {/* Date Range */}
             <div className="w-full ">
-              <label className="mb-2 block text-lg font-semibold uppercase tracking-wider ">
-                Date Range
-              </label>
               <div className="relative w-full">
                 <DatePicker
                   selectsRange={true}
@@ -154,7 +154,7 @@ const VisitorAttendancePage = () => {
                 title="Reset Filters"
                 className="h-10"
               >
-                <RotateCcw className="mr-2 h-4 w-4" /> Reset
+                <RotateCcw className="mr-2 h-4 w-4" /> Reset To Current Month
               </Button>
             </div>
           </div>

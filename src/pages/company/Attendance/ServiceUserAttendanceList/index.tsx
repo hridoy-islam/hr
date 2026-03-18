@@ -111,12 +111,12 @@ const ServiceUserAttendancePage = () => {
       <Card className="w-full bg-white shadow-md">
         <CardContent className="space-y-3 pt-4">
           {/* Filters Row */}
-          <div className="grid grid-cols-1 items-end gap-3 lg:grid-cols-5 ">
+          <div className="flex flex-row items-center gap-4 justify-start">
             {/* Date Range */}
-            <div className="w-full ">
-              <label className="mb-2 block text-lg font-semibold uppercase tracking-wider ">
-                Date Range
+              <label className=" block text-xl font-bold  ">
+                Service User Attendance
               </label>
+            <div className=" ">
               <div className="relative w-full">
                 <DatePicker
                   selectsRange={true}
@@ -124,9 +124,9 @@ const ServiceUserAttendancePage = () => {
                   endDate={endDate}
                   onChange={(update) => setDateRange(update)}
                   isClearable={true}
-                  className="flex h-10 w-full rounded-md border-2 border-gray-600 px-3 py-2 pl-8 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="flex h-10 w-full rounded-md border-2 border-gray-600 px-6 py-2 pl-8 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholderText="Select range"
-                  wrapperClassName="w-full"
+                  wrapperClassName=""
                   dateFormat='dd-MM-YYYY'
                 />
                 <CalendarIcon className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-gray-400" />
@@ -154,7 +154,7 @@ const ServiceUserAttendancePage = () => {
                 title="Reset Filters"
                 className="h-10"
               >
-                <RotateCcw className="mr-2 h-4 w-4" /> Reset
+                <RotateCcw className="mr-2 h-4 w-4" /> Reset To Current Month
               </Button>
             </div>
           </div>

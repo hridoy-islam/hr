@@ -282,6 +282,7 @@ export default function CompanyNoticeBoard() {
                   setDateRange(update);
                 }}
                 popperClassName="z-[99999]"
+                dateFormat={'dd-MM-yyyy'}
                 portalId="root-portal"
                 isClearable={true}
                 placeholderText="Select Date Range"
