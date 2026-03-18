@@ -542,7 +542,7 @@ export default function AttendanceScanner() {
         >
           <span className="leading-tight">
             Clock In
-            <br className="md:hidden lg:hidden" /> By DOB
+            <br className="md:hidden lg:hidden" /> by DoB
           </span>
         </Button>
         <Button
