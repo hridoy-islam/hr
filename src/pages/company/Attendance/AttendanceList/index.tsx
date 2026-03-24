@@ -121,11 +121,18 @@ const AttendancePage = () => {
   const [designationsOptions, setDesignationsOptions] = useState<any[]>([]);
   const [departmentsOptions, setDepartmentsOptions] = useState<any[]>([]);
   const [usersOptions, setUsersOptions] = useState<any[]>([]);
+  
+  // Approval Options
+  const approvalOptions = [
+    { value: false, label: 'Admin Needs to Approve' },
+    { value: true, label: 'Already Approved' }
+  ];
 
   // Filters State
   const [selectedDesignation, setSelectedDesignation] = useState<any>(null);
   const [selectedDepartment, setSelectedDepartment] = useState<any>(null);
   const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [selectedApproval, setSelectedApproval] = useState<any>(approvalOptions[0]); // Default: False
 
   const [isLoading, setIsLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -134,6 +141,7 @@ const AttendancePage = () => {
 
   // Reconcile/Edit States
   const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
+  const [approvingRecordId, setApprovingRecordId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<EditFormState>({
     startDate: '',
     endDate: '',
@@ -199,7 +207,7 @@ const AttendancePage = () => {
 
     setIsLoading(true);
     try {
-      const params = {
+      const params: any = {
         companyId: id,
         page,
         limit,
@@ -210,6 +218,11 @@ const AttendancePage = () => {
         userId: selectedUser?.value,
         userType: 'employee'
       };
+
+      // Add isApproved filter
+      if (selectedApproval !== null) {
+        params.isApproved = selectedApproval.value;
+      }
 
       const res = await axiosInstance.get(`/hr/attendance`, { params });
       const apiResponse = res.data;
@@ -227,13 +240,14 @@ const AttendancePage = () => {
 
   useEffect(() => {
     fetchAttendance(currentPage, entriesPerPage);
-  }, [id, currentPage, entriesPerPage]);
+  }, [id, currentPage, entriesPerPage]); // Re-fetch when approval filter changes
 
   // Reset Filters
   const handleReset = () => {
     setSelectedUser(null);
     setSelectedDesignation(null);
     setSelectedDepartment(null);
+    setSelectedApproval(approvalOptions[0]); // Reset to "Admin Needs to Approve"
     setDateRange([
       moment().startOf('month').toDate(),
       moment().endOf('month').toDate()
@@ -259,7 +273,8 @@ const AttendancePage = () => {
           employeeId,
           startDate: fromDate,
           endDate: toDate,
-          limit: 'all'
+          limit: 'all',
+          status:'publish'
         }
       });
       const result = res.data?.data?.result || [];
@@ -312,7 +327,6 @@ const handleEditClick = (record: any) => {
   setEditError(null);
 
   // Fetch rotas using attendance's own clockInDate and clockOutDate
-  // If clockOutDate is missing, use clockInDate as both from and to
   const employeeId = record.userId?._id || record.userId;
   if (employeeId) {
     const from = clockInDate
@@ -321,7 +335,7 @@ const handleEditClick = (record: any) => {
 
     const to = clockOutDate
       ? moment(clockOutDate).format('YYYY-MM-DD')
-      : from; // fallback: same as clockInDate if no clockOutDate
+      : from; 
 
     fetchRotasForEmployee(employeeId, from, to);
   }
@@ -359,7 +373,6 @@ const handleEditClick = (record: any) => {
     setEditError(null);
   };
 
-  // When shift (rota) changes: update form + reflect department in live table state instantly
   const handleRotaChange = useCallback((opt: any) => {
     const newRotaId = opt?.value || '';
     setEditForm((prev) => ({ ...prev, rotaId: newRotaId }));
@@ -370,15 +383,12 @@ const handleEditClick = (record: any) => {
         if (r._id !== editingRecordId) return r;
 
         if (!newRotaId) {
-          // Rota cleared — null out rotaId so department shows '--'
           return { ...r, rotaId: null };
         }
 
         const rawRota = rotaRawMap[newRotaId];
         if (!rawRota) return r;
 
-        // Fix: If the rota API only returned a string ID, re-populate it manually 
-        // using the departmentsOptions so the UI can read .departmentName
         let populatedDept = rawRota.departmentId;
         if (typeof populatedDept === 'string') {
           const foundDept = departmentsOptions.find((d) => d.value === populatedDept);
@@ -388,7 +398,6 @@ const handleEditClick = (record: any) => {
           };
         }
 
-        // Mirror the populated rotaId shape the API returns
         return {
           ...r,
           rotaId: {
@@ -400,7 +409,7 @@ const handleEditClick = (record: any) => {
         };
       })
     );
-  }, [editingRecordId, rotaRawMap, departmentsOptions]); // Added departmentsOptions here
+  }, [editingRecordId, rotaRawMap, departmentsOptions]);
 
   const handleTimeBlur = (field: keyof EditFormState, value: string) => {
     let cleanValue = value.trim();
@@ -416,7 +425,6 @@ const handleEditClick = (record: any) => {
     setIsUpdating(true);
     setEditError(null);
 
-    // Find the record being edited to get employeeId
     const record = attendanceData.find((r) => r._id === editingRecordId);
     const employeeId = record?.userId?._id || record?.userId;
 
@@ -430,13 +438,11 @@ const handleEditClick = (record: any) => {
         ...(employeeId ? { employeeId } : {})
       });
 
-      // Update local state optimistically
      setAttendanceData((prevData) =>
         prevData.map((r) => {
           if (r._id !== editingRecordId) return r;
           const rawRota = editForm.rotaId ? rotaRawMap[editForm.rotaId] : null;
 
-          // Re-populate the department locally for the optimistic update
           let populatedDept = rawRota?.departmentId;
           if (rawRota && typeof populatedDept === 'string') {
             const foundDept = departmentsOptions.find((d) => d.value === populatedDept);
@@ -476,6 +482,32 @@ const handleEditClick = (record: any) => {
     }
   };
 
+  // --- Approve Handler ---
+  const handleApprove = async (recordId: string) => {
+    setApprovingRecordId(recordId);
+    try {
+      await axiosInstance.patch(`/hr/attendance/${recordId}`, {
+        isApproved: true
+      });
+      toast({ title: 'Attendance Approved Successfully' });
+      
+      // Optimistically remove from view if we are filtering by "Needs Approve"
+      if (selectedApproval?.value === false) {
+        setAttendanceData((prev) => prev.filter((r) => r._id !== recordId));
+      } else {
+        // Otherwise, just update the property in local state
+        setAttendanceData((prev) =>
+          prev.map((r) => (r._id === recordId ? { ...r, isApproved: true } : r))
+        );
+      }
+    } catch (error: any) {
+      const msg = error?.response?.data?.message || 'Failed to approve attendance';
+      toast({ title: msg, variant: 'destructive' });
+    } finally {
+      setApprovingRecordId(null);
+    }
+  };
+
   return (
     <div className="space-y-3">
       <Card className="w-full bg-white shadow-md">
@@ -512,8 +544,23 @@ const handleEditClick = (record: any) => {
               />
             </div>
 
+            {/* Approval Filter */}
+            <div>
+              <label className="mb-2 block text-xs font-semibold uppercase tracking-wider">
+                Status
+              </label>
+              <Select
+                options={approvalOptions}
+                value={selectedApproval}
+                onChange={setSelectedApproval}
+                placeholder="Select Status"
+                isClearable={false} 
+                className="text-xs"
+              />
+            </div>
+
             {/* Date Range */}
-            <div className="w-full">
+            <div className="w-full  ">
               <label className="mb-2 block text-xs font-semibold uppercase tracking-wider">
                 Date Range
               </label>
@@ -525,11 +572,13 @@ const handleEditClick = (record: any) => {
                   onChange={(update) => setDateRange(update)}
                   isClearable={true}
                   dateFormat="dd-MM-yyyy"
-                  className="flex w-full h-10 rounded-md border border-gray-300 px-3 py-2 pl-8 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="flex w-full  h-10 rounded-md border border-gray-300 px-3 py-2  text-sm focus:outline-none focus:ring-2 focus:ring-theme"
                   placeholderText="Select range"
-                  wrapperClassName="w-full"
+                  wrapperClassName="w-full" 
+                  showMonthDropdown
+                  showYearDropdown
+                  dropdownMode='select'
                 />
-                <CalendarIcon className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-gray-400" />
               </div>
             </div>
 
@@ -552,9 +601,9 @@ const handleEditClick = (record: any) => {
                 variant="outline"
                 onClick={handleReset}
                 title="Reset Filters"
-                className="h-10"
+                className="h-10 px-3"
               >
-                <RotateCcw className="mr-2 h-4 w-4" /> Reset
+               Reset
               </Button>
             </div>
           </div>
@@ -579,6 +628,7 @@ const handleEditClick = (record: any) => {
               totalPages={totalPages}
               setCurrentPage={setCurrentPage}
               editingRecordId={editingRecordId}
+              approvingRecordId={approvingRecordId}
               editForm={editForm}
               editError={editError}
               isUpdating={isUpdating}
@@ -590,6 +640,7 @@ const handleEditClick = (record: any) => {
               onFormChange={handleFormChange}
               onRotaChange={handleRotaChange}
               onTimeBlur={handleTimeBlur}
+              onApprove={handleApprove}
             />
           </div>
         </CardContent>
@@ -609,6 +660,7 @@ const TableSection = ({
   totalPages,
   setCurrentPage,
   editingRecordId,
+  approvingRecordId,
   editForm,
   editError,
   isUpdating,
@@ -619,7 +671,8 @@ const TableSection = ({
   onSaveEdit,
   onFormChange,
   onRotaChange,
-  onTimeBlur
+  onTimeBlur,
+  onApprove
 }: {
   data: any[];
   loading: boolean;
@@ -630,6 +683,7 @@ const TableSection = ({
   totalPages: number;
   setCurrentPage: (val: number) => void;
   editingRecordId: string | null;
+  approvingRecordId: string | null;
   editForm: EditFormState;
   editError: string | null;
   isUpdating: boolean;
@@ -641,6 +695,7 @@ const TableSection = ({
   onFormChange: (field: keyof EditFormState, value: string) => void;
   onRotaChange: (opt: any) => void;
   onTimeBlur: (field: keyof EditFormState, value: string) => void;
+  onApprove: (id: string) => void;
 }) => {
   if (loading) {
     return (
@@ -694,6 +749,7 @@ const TableSection = ({
             const shiftName = record.rotaId?.shiftName || '--';
 
             const isEditing = editingRecordId === record._id;
+            const isApproving = approvingRecordId === record._id;
 
             // Dates & times — prefer clockIn/Out fields; fall back to date
             const rStartDate = record.clockInDate || record.date || '';
@@ -716,7 +772,6 @@ const TableSection = ({
 
             let dCalc;
             if (isEditing) {
-              // If currently editing this row, use the live form values
               dCalc = calculateDuration(
                 editForm.startDate,
                 editForm.startTime,
@@ -724,7 +779,6 @@ const TableSection = ({
                 editForm.endTime
               );
             } else {
-              // If not editing, use the saved record values
               dCalc = calculateDuration(
                 record.clockInDate,
                 record.clockIn,
@@ -733,10 +787,8 @@ const TableSection = ({
               );
             }
 
-            // Ensure duration is valid when editing
             const isDurationValid = isEditing ? dCalc.minutes > 0 : true;
 
-            // Current rota option for the Select
             const selectedRotaOption =
               rotaOptions.find((o) => o.value === editForm.rotaId) || null;
 
@@ -920,6 +972,7 @@ const TableSection = ({
                       </>
                     ) : (
                       <div className="flex items-center gap-2">
+                        {/* Show Reconcile Button */}
                         <Button
                           size="sm"
                           variant="outline"
@@ -928,14 +981,25 @@ const TableSection = ({
                         >
                           Reconcile
                         </Button>
-                        {/* <Button
-                          size="sm"
-                          onClick={() => onViewClick(record._id)}
-                          className="h-8 px-2"
-                        >
-                          <Eye className="mr-1 h-3.5 w-3.5" />
-                          View
-                        </Button> */}
+
+                        {/* Show Approve Button only if not approved */}
+                        {!record.isApproved && (
+                          <Button
+                            size="sm"
+                            onClick={() => onApprove(record._id)}
+                            disabled={isApproving || !rEndDate || !rEndTime || rEndTime === '--'}
+                            title={
+                              !rEndDate || !rEndTime || rEndTime === '--'
+                                ? 'Cannot approve: Missing End Date or End Time'
+                                : 'Approve Attendance'
+                            }
+                          >
+                            {isApproving && (
+                              <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                            )}
+                            Approve
+                          </Button>
+                        )}
                       </div>
                     )}
                   </div>
