@@ -214,7 +214,9 @@ const PublishRotaModal: React.FC<PublishRotaModalProps> = ({
 
   const toggleDate = (dateKey: string) => {
     setSelectedDates((prev) =>
-      prev.includes(dateKey) ? prev.filter((d) => d !== dateKey) : [...prev, dateKey]
+      prev.includes(dateKey)
+        ? prev.filter((d) => d !== dateKey)
+        : [...prev, dateKey]
     );
   };
 
@@ -270,8 +272,12 @@ const PublishRotaModal: React.FC<PublishRotaModalProps> = ({
               <Send className="h-4 w-4 text-theme" />
             </div>
             <div>
-              <h2 className="text-base font-extrabold text-gray-900">Publish Rota</h2>
-              <p className="text-xs text-gray-500">Select dates to make rotas visible to staff</p>
+              <h2 className="text-base font-extrabold text-gray-900">
+                Publish Rota
+              </h2>
+              <p className="text-xs text-gray-500">
+                Select dates to make rotas visible to staff
+              </p>
             </div>
           </div>
           <button
@@ -285,7 +291,9 @@ const PublishRotaModal: React.FC<PublishRotaModalProps> = ({
         {datesWithPending.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-10 text-center">
             <CheckCircle2 className="mb-3 h-12 w-12 text-emerald-400" />
-            <p className="text-sm font-semibold text-gray-600">All rotas are already published!</p>
+            <p className="text-sm font-semibold text-gray-600">
+              All rotas are already published!
+            </p>
             <p className="mt-1 text-xs text-gray-400">
               There are no pending rotas in the current view.
             </p>
@@ -294,7 +302,7 @@ const PublishRotaModal: React.FC<PublishRotaModalProps> = ({
           <>
             {/* Select all / clear */}
             <div className="mb-3 flex items-center justify-between">
-              <span className="text-xs font-semibold text-gray-500 uppercase tracking-widest">
+              <span className="text-xs font-semibold uppercase tracking-widest text-gray-500">
                 Dates with pending rotas
               </span>
               <div className="flex gap-2">
@@ -340,7 +348,7 @@ const PublishRotaModal: React.FC<PublishRotaModalProps> = ({
                         }`}
                       >
                         <Clock className="h-2.5 w-2.5" />
-                         pending
+                        pending
                       </span>
                     </button>
                   );
@@ -353,7 +361,10 @@ const PublishRotaModal: React.FC<PublishRotaModalProps> = ({
               <span className="text-xs font-medium text-gray-500">
                 {selectedDates.length > 0 ? (
                   <>
-                    <span className="font-bold text-gray-800">{selectedDates.length}</span> days  rota
+                    <span className="font-bold text-gray-800">
+                      {selectedDates.length}
+                    </span>{' '}
+                    days rota
                     {totalToPublish !== 1 ? 's' : ''} will be published
                   </>
                 ) : (
@@ -950,6 +961,15 @@ export default function CompanyRota() {
     },
     [toast]
   );
+  const publishedDates = useMemo(() => {
+    const s = new Set<string>();
+    rotas.forEach((r) => {
+      if (r.status === 'publish') {
+        s.add(moment(r.startDate).format('YYYY-MM-DD'));
+      }
+    });
+    return s;
+  }, [rotas]);
 
   const rotaMap = useMemo(() => {
     const map: Record<string, Record<string, any[]>> = {};
@@ -987,7 +1007,8 @@ export default function CompanyRota() {
   const pendingDates = useMemo(() => {
     const s = new Set<string>();
     rotas.forEach((r) => {
-      if (r.status === 'pending') s.add(moment(r.startDate).format('YYYY-MM-DD'));
+      if (r.status === 'pending')
+        s.add(moment(r.startDate).format('YYYY-MM-DD'));
     });
     return s;
   }, [rotas]);
@@ -1352,7 +1373,7 @@ export default function CompanyRota() {
             )}
           </div>
           <div className="flex items-center gap-2">
-             <Button
+            <Button
               onClick={() => navigate(-1)}
               variant="outline"
               className="h-9 gap-2"
@@ -1360,14 +1381,14 @@ export default function CompanyRota() {
               <MoveLeft className="h-4 w-4" /> Back
             </Button>
             {/* Pending helper text + publish button */}
-           
-              <div className="flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5">
-                <span className="text-xs font-semibold text-amber-700">
-                 Pending Rota
-                </span>
-                <Clock className="h-3.5 w-3.5 flex-shrink-0 text-amber-500" />
-              </div>
-          
+
+            <div className="flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5">
+              <span className="text-xs font-semibold text-amber-700">
+                Pending Rota
+              </span>
+              <Clock className="h-3.5 w-3.5 flex-shrink-0 text-amber-500" />
+            </div>
+
             {/* {pendingRotasCount > 0 && (
               <div className="flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5">
                 <Clock className="h-3.5 w-3.5 flex-shrink-0 text-amber-500" />
@@ -1383,7 +1404,7 @@ export default function CompanyRota() {
             >
               <Send className="h-4 w-4" /> Publish Rota
             </Button>
-           
+
             <Button
               onClick={() => setIsCopyRotaOpen(true)}
               variant="outline"
@@ -1476,7 +1497,9 @@ export default function CompanyRota() {
                   {daysArray.map((day) => {
                     const isToday = day.isSame(moment(), 'day');
                     const isWeekend = day.day() === 0 || day.day() === 6;
-                    const isPendingCol = pendingDates.has(day.format('YYYY-MM-DD'));
+                    const isPendingCol = pendingDates.has(
+                      day.format('YYYY-MM-DD')
+                    );
                     return (
                       <th
                         key={day.format('D')}
@@ -1531,6 +1554,7 @@ export default function CompanyRota() {
           companyColor={companyColor}
           departments={departments}
           preselectedDepartmentId={selectedContext.departmentId}
+          publishedDates={publishedDates}
         />
         <EditRotaSidebar
           isOpen={isEditOpen}
@@ -1540,6 +1564,7 @@ export default function CompanyRota() {
           onSuccess={handleUpdateRotaSuccess}
           onDeleteSuccess={handleDeleteRotaSuccess}
           companyColor={companyColor}
+          publishedDates={publishedDates}
         />
         <AddRotaDialog
           isOpen={isAddRotaOpen}
@@ -1549,6 +1574,7 @@ export default function CompanyRota() {
           onSuccess={handleAddRotaSuccess}
           companyColor={companyColor}
           departments={departments}
+          publishedDates={publishedDates}
         />
         <BulkAssignDialog
           isOpen={isBulkAssignOpen}

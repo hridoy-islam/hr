@@ -61,7 +61,8 @@ export default function AddRotaDialog({
   companyId,
   onSuccess,
   companyColor,
-  departments = []
+  departments = [],
+  publishedDates
 }: any) {
   const { toast } = useToast();
 
@@ -237,6 +238,10 @@ export default function AddRotaDialog({
 
     const startDate = moment(values.date).format('YYYY-MM-DD');
 
+    // --- NEW: Check if the date is already published ---
+    const isPublished = publishedDates?.has(startDate);
+    const extraPayload = isPublished ? { status: 'publish' } : {};
+
     try {
       if (!isStandardShift) {
         const payload: any = {
@@ -247,7 +252,8 @@ export default function AddRotaDialog({
           startDate,
           endDate: startDate,
           leaveType: values.leaveType,
-          shiftName: values.leaveType
+          shiftName: values.leaveType,
+          ...extraPayload // <--- ADDED
         };
         const response = await axiosInstance.post('/rota', payload);
         toast({ title: 'Rota created successfully' });
@@ -274,7 +280,8 @@ export default function AddRotaDialog({
             shiftName: values.shiftName,
             startTime: shift.startTime,
             endTime: shift.endTime,
-            color: values.color
+            color: values.color,
+            ...extraPayload // <--- ADDED
           };
           const response = await axiosInstance.post('/rota', payload);
           results.push(response.data.data);

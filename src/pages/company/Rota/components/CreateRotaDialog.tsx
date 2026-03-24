@@ -51,7 +51,8 @@ export default function CreateRotaDialog({
   onSuccess,
   companyColor,
   departments = [],
-  preselectedDepartmentId
+  preselectedDepartmentId,
+  publishedDates
 }: any) {
   const { toast } = useToast();
 
@@ -170,6 +171,10 @@ export default function CreateRotaDialog({
       return;
     }
 
+    // --- NEW: Check if the date is already published ---
+    const isPublished = publishedDates?.has(startDate);
+    const extraPayload = isPublished ? { status: 'publish' } : {};
+
     try {
       if (!isStandardShift) {
         // Single leave entry
@@ -181,7 +186,8 @@ export default function CreateRotaDialog({
           endDate: startDate,
           leaveType: values.leaveType,
           shiftName: values.leaveType,
-          departmentId
+          departmentId,
+          ...extraPayload // <--- ADDED
         };
         const response = await axiosInstance.post('/rota', payload);
         toast({ title: 'Shift created successfully' });
@@ -209,7 +215,8 @@ export default function CreateRotaDialog({
             startTime: shift.startTime,
             endTime: shift.endTime,
             color: values.color,
-            departmentId
+            departmentId,
+            ...extraPayload // <--- ADDED
           };
           const response = await axiosInstance.post('/rota', payload);
           results.push(response.data.data);

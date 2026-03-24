@@ -135,7 +135,9 @@ const AttendancePage = () => {
   const [selectedApproval, setSelectedApproval] = useState<any>(
     approvalOptions[0]
   ); // Default: False
-const [fetchedApproval, setFetchedApproval] = useState<any>(approvalOptions[0]);
+  const [fetchedApproval, setFetchedApproval] = useState<any>(
+    approvalOptions[0]
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -639,19 +641,19 @@ const [fetchedApproval, setFetchedApproval] = useState<any>(approvalOptions[0]);
                 <span> - {moment(endDate).format('MMM DD, YYYY')}</span>
               )}
             </div>
-           {fetchedApproval && (
-  <div className="mt-2 flex items-center">
-    <span
-      className={`inline-flex items-center rounded-full border px-3 py-0.5 text-sm font-medium ${
-        fetchedApproval.label === 'Already Approved'
-          ? 'border-green-200 bg-green-100 text-green-700'
-          : 'border-orange-200 bg-yellow-100 text-orange-700'
-      }`}
-    >
-      {fetchedApproval.label}
-    </span>
-  </div>
-)}
+            {fetchedApproval && (
+              <div className="mt-2 flex items-center">
+                <span
+                  className={`inline-flex items-center rounded-full border px-3 py-0.5 text-sm font-medium ${
+                    fetchedApproval.label === 'Already Approved'
+                      ? 'border-green-200 bg-green-100 text-green-700'
+                      : 'border-orange-200 bg-yellow-100 text-orange-700'
+                  }`}
+                >
+                  {fetchedApproval.label}
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="rounded-md">

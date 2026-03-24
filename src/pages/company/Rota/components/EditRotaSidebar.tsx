@@ -102,7 +102,8 @@ export default function EditRotaSidebar({
   rota,
   employee,
   onSuccess,
-  onDeleteSuccess
+  onDeleteSuccess,
+  publishedDates
 }: any) {
   const { toast } = useToast();
 
@@ -164,7 +165,7 @@ export default function EditRotaSidebar({
     }
   }, [watchLeaveType, form]);
 
-  const onSubmit = async (values: FormValues) => {
+ const onSubmit = async (values: FormValues) => {
     try {
       const baseRota = Array.isArray(rota) ? rota[0] : rota;
 
@@ -183,10 +184,14 @@ export default function EditRotaSidebar({
             .format('YYYY-MM-DD');
         }
 
+        // --- NEW: Check if the date is already published ---
+        const isPublished = publishedDates?.has(startDateStr);
+
         const payload: any = {
           startDate: startDateStr,
           endDate: endDateStr,
-          note: values.note || ''
+          note: values.note || '',
+          ...(isPublished ? { status: 'publish' } : {}) // <--- ADDED
         };
 
         if (!isStandard) {
