@@ -726,7 +726,7 @@ const TableSection = ({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Shift</TableHead>
+            <TableHead>Shift Name</TableHead>
             <TableHead>Employee</TableHead>
             <TableHead>Department</TableHead>
             <TableHead className="w-[9%]">Start Date</TableHead>
