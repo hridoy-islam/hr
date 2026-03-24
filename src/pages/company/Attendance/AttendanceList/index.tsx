@@ -74,34 +74,34 @@ const calculateDynamicDuration = (logs: any[]) => {
 };
 
 const calculateDuration = (
-    startDate: string,
-    startTime: string,
-    endDate: string,
-    endTime: string
-  ) => {
-    if (!startDate || !startTime || !endDate || !endTime) {
-      return { display: "00:00", minutes: 0 };
-    }
+  startDate: string,
+  startTime: string,
+  endDate: string,
+  endTime: string
+) => {
+  if (!startDate || !startTime || !endDate || !endTime) {
+    return { display: '00:00', minutes: 0 };
+  }
 
-    const start = moment(`${startDate} ${startTime}`, 'YYYY-MM-DD HH:mm');
-    const end = moment(`${endDate} ${endTime}`, 'YYYY-MM-DD HH:mm');
+  const start = moment(`${startDate} ${startTime}`, 'YYYY-MM-DD HH:mm');
+  const end = moment(`${endDate} ${endTime}`, 'YYYY-MM-DD HH:mm');
 
-    if (!start.isValid() || !end.isValid()) {
-      return { display: "00:00", minutes: 0 };
-    }
+  if (!start.isValid() || !end.isValid()) {
+    return { display: '00:00', minutes: 0 };
+  }
 
-    const diffMinutes = end.diff(start, 'minutes');
-    if (diffMinutes <= 0) {
-      return { display: "00:00", minutes: 0 };
-    }
+  const diffMinutes = end.diff(start, 'minutes');
+  if (diffMinutes <= 0) {
+    return { display: '00:00', minutes: 0 };
+  }
 
-    const hrs = Math.floor(diffMinutes / 60);
-    const mins = diffMinutes % 60;
-    return {
-      display: `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`,
-      minutes: diffMinutes
-    };
+  const hrs = Math.floor(diffMinutes / 60);
+  const mins = diffMinutes % 60;
+  return {
+    display: `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`,
+    minutes: diffMinutes
   };
+};
 
 const AttendancePage = () => {
   const user = useSelector((state: RootState) => state.auth?.user) || null;
@@ -121,7 +121,7 @@ const AttendancePage = () => {
   const [designationsOptions, setDesignationsOptions] = useState<any[]>([]);
   const [departmentsOptions, setDepartmentsOptions] = useState<any[]>([]);
   const [usersOptions, setUsersOptions] = useState<any[]>([]);
-  
+
   // Approval Options
   const approvalOptions = [
     { value: false, label: 'Admin Needs to Approve' },
@@ -132,8 +132,10 @@ const AttendancePage = () => {
   const [selectedDesignation, setSelectedDesignation] = useState<any>(null);
   const [selectedDepartment, setSelectedDepartment] = useState<any>(null);
   const [selectedUser, setSelectedUser] = useState<any>(null);
-  const [selectedApproval, setSelectedApproval] = useState<any>(approvalOptions[0]); // Default: False
-
+  const [selectedApproval, setSelectedApproval] = useState<any>(
+    approvalOptions[0]
+  ); // Default: False
+const [fetchedApproval, setFetchedApproval] = useState<any>(approvalOptions[0]);
   const [isLoading, setIsLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -141,7 +143,9 @@ const AttendancePage = () => {
 
   // Reconcile/Edit States
   const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
-  const [approvingRecordId, setApprovingRecordId] = useState<string | null>(null);
+  const [approvingRecordId, setApprovingRecordId] = useState<string | null>(
+    null
+  );
   const [editForm, setEditForm] = useState<EditFormState>({
     startDate: '',
     endDate: '',
@@ -160,7 +164,9 @@ const AttendancePage = () => {
   // Memo: map rotaId -> raw rota object for instant department lookup
   const rotaRawMap = useMemo(() => {
     const map: Record<string, any> = {};
-    rotaRawList.forEach((r) => { map[r._id] = r; });
+    rotaRawList.forEach((r) => {
+      map[r._id] = r;
+    });
     return map;
   }, [rotaRawList]);
 
@@ -173,7 +179,9 @@ const AttendancePage = () => {
         const [desRes, deptRes, usersRes] = await Promise.all([
           axiosInstance.get(`/hr/designation?companyId=${companyId}&limit=all`),
           axiosInstance.get(`/hr/department?companyId=${companyId}&limit=all`),
-          axiosInstance.get(`/users?company=${companyId}&limit=all&role=employee`)
+          axiosInstance.get(
+            `/users?company=${companyId}&limit=all&role=employee`
+          )
         ]);
 
         setDesignationsOptions(
@@ -211,7 +219,9 @@ const AttendancePage = () => {
         companyId: id,
         page,
         limit,
-        fromDate: startDate ? moment(startDate).format('YYYY-MM-DD') : undefined,
+        fromDate: startDate
+          ? moment(startDate).format('YYYY-MM-DD')
+          : undefined,
         toDate: endDate ? moment(endDate).format('YYYY-MM-DD') : undefined,
         designationId: selectedDesignation?.value,
         departmentId: selectedDepartment?.value,
@@ -230,6 +240,7 @@ const AttendancePage = () => {
       if (apiResponse.success && apiResponse.data) {
         setAttendanceData(apiResponse.data.result || []);
         setTotalPages(apiResponse.data.meta?.totalPage || 1);
+        setFetchedApproval(selectedApproval);
       }
     } catch (error) {
       console.error('Error fetching attendance:', error);
@@ -252,6 +263,7 @@ const AttendancePage = () => {
       moment().startOf('month').toDate(),
       moment().endOf('month').toDate()
     ]);
+    setFetchedApproval(approvalOptions[0]);
   };
 
   const handleView = (recordId: string) => {
@@ -274,7 +286,7 @@ const AttendancePage = () => {
           startDate: fromDate,
           endDate: toDate,
           limit: 'all',
-          status:'publish'
+          status: 'publish'
         }
       });
       const result = res.data?.data?.result || [];
@@ -282,7 +294,7 @@ const AttendancePage = () => {
       setRotaOptions(
         result.map((rota: any) => ({
           value: rota._id,
-          label: `${rota.shiftName || 'Shift'} (${rota.startTime || ''} – ${rota.endTime || ''})`
+          label: `${rota.shiftName || ''} (${rota.startTime || ''} – ${rota.endTime || ''})`
         }))
       );
     } catch (error) {
@@ -295,51 +307,51 @@ const AttendancePage = () => {
   };
 
   // --- Inline Edit Handlers ---
-const handleEditClick = (record: any) => {
-  setEditingRecordId(record._id);
+  const handleEditClick = (record: any) => {
+    setEditingRecordId(record._id);
 
-  const extractDate = (val: string, fallback: string) =>
-    val ? moment(val).format('YYYY-MM-DD') : fallback;
+    const extractDate = (val: string, fallback: string) =>
+      val ? moment(val).format('YYYY-MM-DD') : fallback;
 
-  const extractTime = (val: string) => {
-    if (!val) return '';
-    if (val.includes('T')) return moment(val).format('HH:mm');
-    if (val.length >= 5) return val.substring(0, 5);
-    return val;
+    const extractTime = (val: string) => {
+      if (!val) return '';
+      if (val.includes('T')) return moment(val).format('HH:mm');
+      if (val.length >= 5) return val.substring(0, 5);
+      return val;
+    };
+
+    const firstLog = record.attendanceLogs?.[0];
+    const clockIn = firstLog?.clockIn || record.clockIn || '';
+    const clockOut = firstLog?.clockOut || record.clockOut || '';
+
+    const clockInDate = record.clockInDate || record.date || '';
+    const clockOutDate = record.clockOutDate || record.date || '';
+
+    const form: EditFormState = {
+      startDate: extractDate(clockInDate, moment().format('YYYY-MM-DD')),
+      endDate: extractDate(clockOutDate, moment().format('YYYY-MM-DD')),
+      startTime: extractTime(clockIn),
+      endTime: extractTime(clockOut),
+      rotaId: record.rotaId?._id || record.rotaId || ''
+    };
+
+    setEditForm(form);
+    setEditError(null);
+
+    // Fetch rotas using attendance's own clockInDate and clockOutDate
+    const employeeId = record.userId?._id || record.userId;
+    if (employeeId) {
+      const from = clockInDate
+        ? moment(clockInDate).format('YYYY-MM-DD')
+        : moment().format('YYYY-MM-DD');
+
+      const to = clockOutDate
+        ? moment(clockOutDate).format('YYYY-MM-DD')
+        : from;
+
+      fetchRotasForEmployee(employeeId, from, to);
+    }
   };
-
-  const firstLog = record.attendanceLogs?.[0];
-  const clockIn = firstLog?.clockIn || record.clockIn || '';
-  const clockOut = firstLog?.clockOut || record.clockOut || '';
-
-  const clockInDate = record.clockInDate || record.date || '';
-  const clockOutDate = record.clockOutDate || record.date || '';
-
-  const form: EditFormState = {
-    startDate: extractDate(clockInDate, moment().format('YYYY-MM-DD')),
-    endDate: extractDate(clockOutDate, moment().format('YYYY-MM-DD')),
-    startTime: extractTime(clockIn),
-    endTime: extractTime(clockOut),
-    rotaId: record.rotaId?._id || record.rotaId || ''
-  };
-
-  setEditForm(form);
-  setEditError(null);
-
-  // Fetch rotas using attendance's own clockInDate and clockOutDate
-  const employeeId = record.userId?._id || record.userId;
-  if (employeeId) {
-    const from = clockInDate
-      ? moment(clockInDate).format('YYYY-MM-DD')
-      : moment().format('YYYY-MM-DD');
-
-    const to = clockOutDate
-      ? moment(clockOutDate).format('YYYY-MM-DD')
-      : from; 
-
-    fetchRotasForEmployee(employeeId, from, to);
-  }
-};
 
   const handleCancelEdit = () => {
     setEditingRecordId(null);
@@ -373,43 +385,48 @@ const handleEditClick = (record: any) => {
     setEditError(null);
   };
 
-  const handleRotaChange = useCallback((opt: any) => {
-    const newRotaId = opt?.value || '';
-    setEditForm((prev) => ({ ...prev, rotaId: newRotaId }));
-    setEditError(null);
+  const handleRotaChange = useCallback(
+    (opt: any) => {
+      const newRotaId = opt?.value || '';
+      setEditForm((prev) => ({ ...prev, rotaId: newRotaId }));
+      setEditError(null);
 
-    setAttendanceData((prevData) =>
-      prevData.map((r) => {
-        if (r._id !== editingRecordId) return r;
+      setAttendanceData((prevData) =>
+        prevData.map((r) => {
+          if (r._id !== editingRecordId) return r;
 
-        if (!newRotaId) {
-          return { ...r, rotaId: null };
-        }
-
-        const rawRota = rotaRawMap[newRotaId];
-        if (!rawRota) return r;
-
-        let populatedDept = rawRota.departmentId;
-        if (typeof populatedDept === 'string') {
-          const foundDept = departmentsOptions.find((d) => d.value === populatedDept);
-          populatedDept = {
-            _id: populatedDept,
-            departmentName: foundDept ? foundDept.label : '--'
-          };
-        }
-
-        return {
-          ...r,
-          rotaId: {
-            ...rawRota,
-            _id: rawRota._id,
-            shiftName: rawRota.shiftName,
-            departmentId: populatedDept
+          if (!newRotaId) {
+            return { ...r, rotaId: null };
           }
-        };
-      })
-    );
-  }, [editingRecordId, rotaRawMap, departmentsOptions]);
+
+          const rawRota = rotaRawMap[newRotaId];
+          if (!rawRota) return r;
+
+          let populatedDept = rawRota.departmentId;
+          if (typeof populatedDept === 'string') {
+            const foundDept = departmentsOptions.find(
+              (d) => d.value === populatedDept
+            );
+            populatedDept = {
+              _id: populatedDept,
+              departmentName: foundDept ? foundDept.label : '--'
+            };
+          }
+
+          return {
+            ...r,
+            rotaId: {
+              ...rawRota,
+              _id: rawRota._id,
+              shiftName: rawRota.shiftName,
+              departmentId: populatedDept
+            }
+          };
+        })
+      );
+    },
+    [editingRecordId, rotaRawMap, departmentsOptions]
+  );
 
   const handleTimeBlur = (field: keyof EditFormState, value: string) => {
     let cleanValue = value.trim();
@@ -438,14 +455,16 @@ const handleEditClick = (record: any) => {
         ...(employeeId ? { employeeId } : {})
       });
 
-     setAttendanceData((prevData) =>
+      setAttendanceData((prevData) =>
         prevData.map((r) => {
           if (r._id !== editingRecordId) return r;
           const rawRota = editForm.rotaId ? rotaRawMap[editForm.rotaId] : null;
 
           let populatedDept = rawRota?.departmentId;
           if (rawRota && typeof populatedDept === 'string') {
-            const foundDept = departmentsOptions.find((d) => d.value === populatedDept);
+            const foundDept = departmentsOptions.find(
+              (d) => d.value === populatedDept
+            );
             populatedDept = {
               _id: populatedDept,
               departmentName: foundDept ? foundDept.label : '--'
@@ -459,11 +478,11 @@ const handleEditClick = (record: any) => {
             clockIn: editForm.startTime,
             clockOut: editForm.endTime,
             rotaId: rawRota
-              ? { 
-                  ...rawRota, 
-                  _id: rawRota._id, 
-                  shiftName: rawRota.shiftName, 
-                  departmentId: populatedDept 
+              ? {
+                  ...rawRota,
+                  _id: rawRota._id,
+                  shiftName: rawRota.shiftName,
+                  departmentId: populatedDept
                 }
               : null
           };
@@ -490,7 +509,7 @@ const handleEditClick = (record: any) => {
         isApproved: true
       });
       toast({ title: 'Attendance Approved Successfully' });
-      
+
       // Optimistically remove from view if we are filtering by "Needs Approve"
       if (selectedApproval?.value === false) {
         setAttendanceData((prev) => prev.filter((r) => r._id !== recordId));
@@ -501,7 +520,8 @@ const handleEditClick = (record: any) => {
         );
       }
     } catch (error: any) {
-      const msg = error?.response?.data?.message || 'Failed to approve attendance';
+      const msg =
+        error?.response?.data?.message || 'Failed to approve attendance';
       toast({ title: msg, variant: 'destructive' });
     } finally {
       setApprovingRecordId(null);
@@ -511,7 +531,7 @@ const handleEditClick = (record: any) => {
   return (
     <div className="space-y-3">
       <Card className="w-full bg-white shadow-md">
-        <CardContent className="space-y-3 pt-4">
+        <CardContent className="space-y-3 p-2 pt-4">
           {/* Filters Row */}
           <div className="grid grid-cols-1 items-end gap-3 lg:grid-cols-5">
             {/* Employee Filter */}
@@ -554,7 +574,7 @@ const handleEditClick = (record: any) => {
                 value={selectedApproval}
                 onChange={setSelectedApproval}
                 placeholder="Select Status"
-                isClearable={false} 
+                isClearable={false}
                 className="text-xs"
               />
             </div>
@@ -562,7 +582,7 @@ const handleEditClick = (record: any) => {
             {/* Date Range */}
             <div className="w-full  ">
               <label className="mb-2 block text-xs font-semibold uppercase tracking-wider">
-                Date Range
+                Date Range (DD-MM-YYYY)
               </label>
               <div className="relative w-full">
                 <DatePicker
@@ -572,12 +592,12 @@ const handleEditClick = (record: any) => {
                   onChange={(update) => setDateRange(update)}
                   isClearable={true}
                   dateFormat="dd-MM-yyyy"
-                  className="flex w-full  h-10 rounded-md border border-gray-300 px-3 py-2  text-sm focus:outline-none focus:ring-2 focus:ring-theme"
+                  className="flex h-10  w-full rounded-md border border-gray-300 px-3 py-2  text-sm focus:outline-none focus:ring-2 focus:ring-theme"
                   placeholderText="Select range"
-                  wrapperClassName="w-full" 
+                  wrapperClassName="w-full"
                   showMonthDropdown
                   showYearDropdown
-                  dropdownMode='select'
+                  dropdownMode="select"
                 />
               </div>
             </div>
@@ -603,18 +623,35 @@ const handleEditClick = (record: any) => {
                 title="Reset Filters"
                 className="h-10 px-3"
               >
-               Reset
+                Reset
               </Button>
             </div>
           </div>
 
           {/* Table Header Summary */}
-          <div className="mt-2 text-lg font-semibold text-gray-600">
-            Attendance:{' '}
-            <span>
-              {startDate ? moment(startDate).format('MMM DD, YYYY') : '...'}
-            </span>
-            {endDate && <span> - {moment(endDate).format('MMM DD, YYYY')}</span>}
+          <div className="flex flex-row items-center gap-4">
+            <div className="mt-2 text-lg font-semibold text-gray-600">
+              Attendance:{' '}
+              <span>
+                {startDate ? moment(startDate).format('MMM DD, YYYY') : '...'}
+              </span>
+              {endDate && (
+                <span> - {moment(endDate).format('MMM DD, YYYY')}</span>
+              )}
+            </div>
+           {fetchedApproval && (
+  <div className="mt-2 flex items-center">
+    <span
+      className={`inline-flex items-center rounded-full border px-3 py-0.5 text-sm font-medium ${
+        fetchedApproval.label === 'Already Approved'
+          ? 'border-green-200 bg-green-100 text-green-700'
+          : 'border-orange-200 bg-yellow-100 text-orange-700'
+      }`}
+    >
+      {fetchedApproval.label}
+    </span>
+  </div>
+)}
           </div>
 
           <div className="rounded-md">
@@ -710,7 +747,9 @@ const TableSection = ({
         <div className="mb-4 rounded-full bg-gray-50 p-4">
           <Search className="h-8 w-8 text-gray-400" />
         </div>
-        <h3 className="text-lg font-semibold text-gray-900">No records found</h3>
+        <h3 className="text-lg font-semibold text-gray-900">
+          No records found
+        </h3>
         <p className="max-w-[250px] text-sm text-gray-500">
           Try adjusting your filters or date range.
         </p>
@@ -719,7 +758,7 @@ const TableSection = ({
   }
 
   const datePickerClass =
-    'flex h-8 w-28 rounded-md border border-gray-300 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-theme';
+    'flex h-8 w-24 rounded-md border border-gray-300 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-theme';
 
   return (
     <div className="space-y-2">
@@ -746,8 +785,9 @@ const TableSection = ({
 
             const departmentName =
               record.rotaId?.departmentId?.departmentName || '--';
-            const shiftName = record.rotaId?.shiftName || '--';
-
+            const shiftName = record.rotaId?.shiftName || '';
+            const rotaStartTime = record.rotaId?.startTime || '';
+            const rotaEndTime = record.rotaId?.endTime || '';
             const isEditing = editingRecordId === record._id;
             const isApproving = approvingRecordId === record._id;
 
@@ -795,15 +835,17 @@ const TableSection = ({
             return (
               <TableRow key={record._id}>
                 {/* Shift */}
-                <TableCell className="font-medium text-sm">
+                <TableCell className="text-sm font-medium">
                   {isEditing ? (
-                    <div className="min-w-[180px]">
+                    <div className="min-w-[150px]">
                       <Select
                         options={rotaOptions}
                         value={selectedRotaOption}
                         onChange={(opt: any) => onRotaChange(opt)}
                         placeholder={
-                          isLoadingRotas ? 'Loading shifts...' : 'Select shift...'
+                          isLoadingRotas
+                            ? 'Loading shifts...'
+                            : 'Select shift...'
                         }
                         isLoading={isLoadingRotas}
                         isClearable
@@ -825,7 +867,21 @@ const TableSection = ({
                       />
                     </div>
                   ) : (
-                    shiftName
+                    <div className="flex flex-col whitespace-nowrap">
+                      {/* Main Title: Show Shift Name, or fallback to Times if no name exists */}
+                      <span className="text-sm font-bold text-gray-900">
+                        {shiftName
+                          ? shiftName
+                          : `${rotaStartTime} - ${rotaEndTime}`}
+                      </span>
+
+                      {/* Sub Title: Show Times under the Shift Name (only if Shift Name exists) */}
+                      {shiftName && (
+                        <span className="mt-0.5 text-xs font-semibold tracking-wide text-gray-800">
+                          {rotaStartTime} - {rotaEndTime}
+                        </span>
+                      )}
+                    </div>
                   )}
                 </TableCell>
 
@@ -843,7 +899,7 @@ const TableSection = ({
                 {/* --- Start Date --- */}
                 <TableCell className="text-sm">
                   {isEditing ? (
-                    <div className="relative">
+                    <div className="relative max-w-[110px]">
                       <DatePicker
                         selected={
                           editForm.startDate
@@ -872,7 +928,9 @@ const TableSection = ({
                   {isEditing ? (
                     <Input
                       value={editForm.startTime}
-                      onChange={(e) => onFormChange('startTime', e.target.value)}
+                      onChange={(e) =>
+                        onFormChange('startTime', e.target.value)
+                      }
                       onBlur={(e) => onTimeBlur('startTime', e.target.value)}
                       placeholder="HH:mm"
                       className="h-8 w-20 font-mono text-xs"
@@ -886,7 +944,7 @@ const TableSection = ({
                 {/* --- End Date --- */}
                 <TableCell className="text-sm">
                   {isEditing ? (
-                    <div className="relative">
+                    <div className="relative max-w-[110px]">
                       <DatePicker
                         selected={
                           editForm.endDate
@@ -987,7 +1045,12 @@ const TableSection = ({
                           <Button
                             size="sm"
                             onClick={() => onApprove(record._id)}
-                            disabled={isApproving || !rEndDate || !rEndTime || rEndTime === '--'}
+                            disabled={
+                              isApproving ||
+                              !rEndDate ||
+                              !rEndTime ||
+                              rEndTime === '--'
+                            }
                             title={
                               !rEndDate || !rEndTime || rEndTime === '--'
                                 ? 'Cannot approve: Missing End Date or End Time'

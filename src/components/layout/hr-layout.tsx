@@ -11,7 +11,7 @@ export default function HrLayout() {
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 py-2 ">
+      <main className="flex-1 py-2 overflow-auto">
         <Outlet />
       </main>
        <Toaster />

@@ -397,7 +397,8 @@ const NavItem = ({
   basePath,
   status,
   companyId,
-  effectiveRole // Added effectiveRole prop to help structure targetPath appropriately
+  effectiveRole ,
+  onNavClick
 }: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   item: any;
@@ -410,6 +411,7 @@ const NavItem = ({
   status?: any;
   companyId?: string | null;
   effectiveRole?: string;
+  onNavClick?: () => void;
 }) => {
   const location = useLocation();
   const isExpanded = expandedItems[item.label];
@@ -493,6 +495,7 @@ const NavItem = ({
                 basePath={basePath}
                 status={status}
                 companyId={companyId}
+                onNavClick={onNavClick}
                 effectiveRole={effectiveRole}
               />
             ))}
@@ -505,6 +508,7 @@ const NavItem = ({
   return (
     <Link
       to={targetPath}
+      onClick={onNavClick}
       className={cn(
         'group flex w-full items-center space-x-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 hover:bg-theme hover:text-white',
 
@@ -742,6 +746,7 @@ export function SideNav() {
             status={status}
             companyId={companyId}
             effectiveRole={effectiveRole}
+             onNavClick={() => setIsMobileMenuOpen(false)}
           />
         ))}
       </nav>
