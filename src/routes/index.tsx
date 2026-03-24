@@ -98,6 +98,7 @@ import AttendanceDetails from '@/pages/company/Attendance/Attendance-details';
 import ServiceUserPage from '@/pages/company/serviceUser';
 import VisitorAttendancePage from '@/pages/company/Attendance/VisitorAttendanceList';
 import ServiceUserAttendancePage from '@/pages/company/Attendance/ServiceUserAttendanceList';
+import SignatureDoc from '@/pages/company/SignatureDoc';
 
 const SignInPage = lazy(() => import('@/pages/auth/signin'));
 
@@ -260,7 +261,8 @@ export default function AppRouter() {
         { path: 'schedule-check', element: <CompanyScheduleCheckPage /> },
         { path: 'leave-approval', element: <CompanyLeaveApprovalPage /> },
         { path: 'attendance-account', element: <AttendanceAccountPage /> },
-        { path: 'service-user', element: <ServiceUserPage /> }
+        { path: 'service-user', element: <ServiceUserPage /> },
+        { path: 'signature-document', element: <SignatureDoc /> }
       ]
     }
   ];

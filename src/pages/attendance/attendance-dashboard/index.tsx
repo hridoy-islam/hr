@@ -1053,7 +1053,7 @@ export default function AttendanceScanner() {
                             <span className="mr-2  rounded-full  bg-theme px-2 py-1 font-semibold text-white">
                               {room}
                             </span>{' '}
-                            {suName}
+                            {/* {suName} */}
                           </p>{' '}
                           <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">
                             Active

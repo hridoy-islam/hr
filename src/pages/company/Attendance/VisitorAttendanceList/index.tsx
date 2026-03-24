@@ -8,12 +8,16 @@ import {
   Calendar as CalendarIcon,
   Loader2,
   RotateCcw,
-  Eye
+  Eye,
+  Pencil,
+  Check,
+  X as XIcon
 } from 'lucide-react';
 
 // Shadcn UI Imports
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import {
   Table,
   TableBody,
@@ -28,6 +32,7 @@ import axiosInstance from '@/lib/axios';
 import { useNavigate, useParams } from 'react-router-dom';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 import { DynamicPagination } from '@/components/shared/DynamicPagination';
+import { useToast } from '@/components/ui/use-toast';
 
 // --- Types ---
 interface RootState {
@@ -40,11 +45,70 @@ interface RootState {
   };
 }
 
+interface EditFormState {
+  startDate: string;
+  endDate: string;
+  startTime: string;
+  endTime: string;
+}
+
+// --- Helpers ---
+const calculateDuration = (
+  startDate: string,
+  startTime: string,
+  endDate: string,
+  endTime: string
+) => {
+  // Normalize Time to "HH:mm"
+  const normalizeTime = (t: string) => {
+    if (!t || t === '--') return null;
+    if (t.includes('T')) return moment(t).format('HH:mm');
+    // Handle cases like "0930" -> "09:30"
+    if (!t.includes(':') && t.length >= 3) {
+      const m = moment(t, ['HHmm', 'Hmm']);
+      if (m.isValid()) return m.format('HH:mm');
+    }
+    if (t.includes(':')) return t.substring(0, 5);
+    return t;
+  };
+
+  const cleanSTime = normalizeTime(startTime);
+  const cleanETime = normalizeTime(endTime);
+
+  if (!startDate || !endDate || !cleanSTime || !cleanETime) {
+    return { display: '--', minutes: 0 };
+  }
+
+  const start = moment(`${startDate} ${cleanSTime}`, 'YYYY-MM-DD HH:mm');
+  const end = moment(`${endDate} ${cleanETime}`, 'YYYY-MM-DD HH:mm');
+
+  if (!start.isValid() || !end.isValid()) {
+    return { display: '--', minutes: 0 };
+  }
+
+  const diffMs = end.diff(start);
+  const duration = moment.duration(diffMs);
+  const totalMinutes = duration.asMinutes();
+
+  // If negative or zero, return invalid
+  if (totalMinutes <= 0) {
+    return { display: '--', minutes: 0 };
+  }
+
+  const hours = Math.floor(duration.asHours());
+  const mins = duration.minutes();
+
+  // Format with leading zeros: HH:mm (e.g., 01:05)
+  const display = `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+
+  return { display, minutes: totalMinutes };
+};
+
 const VisitorAttendancePage = () => {
   const user = useSelector((state: RootState) => state.auth?.user) || null;
   const navigate = useNavigate();
   const { id } = useParams();
-
+  const {toast} = useToast()
   // State: Default range is Full Current Month
   const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([
     moment().startOf('month').toDate(),
@@ -56,8 +120,18 @@ const VisitorAttendancePage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [entriesPerPage, setEntriesPerPage] = useState(100);
-
   const [isLoading, setIsLoading] = useState(false);
+
+  // Reconcile/Edit States
+  const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<EditFormState>({
+    startDate: '',
+    endDate: '',
+    startTime: '',
+    endTime: ''
+  });
+  const [editError, setEditError] = useState<string | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   // Fetch Attendance Data
   const fetchAttendance = async (page: number, limit: number) => {
@@ -106,15 +180,120 @@ const VisitorAttendancePage = () => {
     navigate(`${recordId}`);
   };
 
+  // --- Inline Edit Handlers ---
+  const handleEditClick = (record: any) => {
+    setEditingRecordId(record._id);
+
+    const extractDate = (val: string, fallback: string) =>
+      val ? moment(val).format('YYYY-MM-DD') : fallback;
+
+    const extractTime = (val: string) => {
+      if (!val) return '';
+      if (val.includes('T')) return moment(val).format('HH:mm');
+      if (val.length >= 5) return val.substring(0, 5);
+      return val;
+    };
+
+    setEditForm({
+      startDate: extractDate(record.clockInDate, moment().format('YYYY-MM-DD')),
+      endDate: extractDate(record.clockOutDate, moment().format('YYYY-MM-DD')),
+      startTime: extractTime(record.clockIn),
+      endTime: extractTime(record.clockOut)
+    });
+    setEditError(null);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingRecordId(null);
+    setEditForm({ startDate: '', endDate: '', startTime: '', endTime: '' });
+    setEditError(null);
+  };
+
+  const handleFormChange = (field: keyof EditFormState, value: string) => {
+    let processedValue = value;
+
+    if (field === 'startTime' || field === 'endTime') {
+      processedValue = processedValue.replace(/[^0-9:]/g, '').slice(0, 5);
+      if (
+        processedValue.length === 2 &&
+        editForm[field].length === 1 &&
+        !processedValue.includes(':')
+      ) {
+        processedValue += ':';
+      }
+    }
+
+    setEditForm({ ...editForm, [field]: processedValue });
+    setEditError(null);
+  };
+
+  const handleTimeBlur = (field: keyof EditFormState, value: string) => {
+    let cleanValue = value.trim();
+    if (cleanValue) {
+      const m = moment(cleanValue, ['HH:mm', 'H:mm', 'HHmm', 'Hmm', 'H']);
+      if (m.isValid()) {
+        cleanValue = m.format('HH:mm');
+      }
+    }
+    setEditForm((prev) => ({ ...prev, [field]: cleanValue }));
+  };
+
+ const handleSaveEdit = async () => {
+    if (!editingRecordId) return;
+    setIsUpdating(true);
+    setEditError(null);
+
+    try {
+      // 1. Send the patch request to the backend
+      await axiosInstance.patch(`/hr/attendance/${editingRecordId}`, {
+        clockInDate: editForm.startDate,
+        clockOutDate: editForm.endDate,
+        clockIn: editForm.startTime,
+        clockOut: editForm.endTime
+      });
+
+      // 2. Update the local state instead of re-fetching
+      setAttendanceData((prevData) =>
+        prevData.map((record) =>
+          record._id === editingRecordId
+            ? {
+                ...record,
+                clockInDate: editForm.startDate,
+                clockOutDate: editForm.endDate,
+                clockIn: editForm.startTime,
+                clockOut: editForm.endTime
+              }
+            : record
+        )
+      );
+
+      // 3. Close the inline editor
+      handleCancelEdit();
+      toast({
+        title:"Attendance Updated Successfully"
+      })
+    } catch (error: any) {
+      setEditError(
+        error?.response?.data?.message || 'Failed to update attendance record'
+      );
+      toast({
+        title:  error?.response?.data?.message || 'Failed to update attendance record',
+        variant:"destructive"
+      })
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   return (
     <div className="space-y-3">
       <Card className="w-full bg-white shadow-md">
         <CardContent className="space-y-3 pt-4">
           {/* Filters Row */}
           <div className="grid grid-cols-1 items-end gap-3 lg:grid-cols-5 ">
-              <label className="mb-2 block text-xl font-bold  ">
-               Visitor Attendance 
-              </label>
+            <label className="mb-2 block text-xl font-bold  ">
+              Visitor Attendance
+            </label>
             {/* Date Range */}
             <div className="w-full ">
               <div className="relative w-full">
@@ -127,7 +306,7 @@ const VisitorAttendancePage = () => {
                   className="flex h-10 w-full rounded-md border-2 border-gray-600 px-3 py-2 pl-8 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholderText="Select range"
                   wrapperClassName="w-full"
-                  dateFormat='dd-MM-YYYY'
+                  dateFormat="dd-MM-yyyy"
                 />
                 <CalendarIcon className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-gray-400" />
               </div>
@@ -174,12 +353,20 @@ const VisitorAttendancePage = () => {
             <TableSection
               data={attendanceData}
               loading={isLoading}
-              onViewClick={handleView}
               entriesPerPage={entriesPerPage}
               setEntriesPerPage={setEntriesPerPage}
               currentPage={currentPage}
               totalPages={totalPages}
               setCurrentPage={setCurrentPage}
+              editingRecordId={editingRecordId}
+              editForm={editForm}
+              editError={editError}
+              isUpdating={isUpdating}
+              onEditClick={handleEditClick}
+              onCancelEdit={handleCancelEdit}
+              onSaveEdit={handleSaveEdit}
+              onFormChange={handleFormChange}
+              onTimeBlur={handleTimeBlur}
             />
           </div>
         </CardContent>
@@ -192,21 +379,37 @@ const VisitorAttendancePage = () => {
 const TableSection = ({
   data,
   loading,
-  onViewClick,
   entriesPerPage,
   setEntriesPerPage,
   currentPage,
   totalPages,
-  setCurrentPage
+  setCurrentPage,
+  editingRecordId,
+  editForm,
+  editError,
+  isUpdating,
+  onEditClick,
+  onCancelEdit,
+  onSaveEdit,
+  onFormChange,
+  onTimeBlur
 }: {
   data: any[];
   loading: boolean;
-  onViewClick: (recordId: string) => void;
   entriesPerPage: number;
   setEntriesPerPage: (val: number) => void;
   currentPage: number;
   totalPages: number;
   setCurrentPage: (val: number) => void;
+  editingRecordId: string | null;
+  editForm: EditFormState;
+  editError: string | null;
+  isUpdating: boolean;
+  onEditClick: (rec: any) => void;
+  onCancelEdit: () => void;
+  onSaveEdit: () => void;
+  onFormChange: (field: keyof EditFormState, value: string) => void;
+  onTimeBlur: (field: keyof EditFormState, value: string) => void;
 }) => {
   if (loading) {
     return (
@@ -231,36 +434,62 @@ const TableSection = ({
     );
   }
 
+  const datePickerClass =
+    'flex h-8 w-28 rounded-md border border-gray-300 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-theme';
+
   return (
     <div className="space-y-2">
       <Table>
         <TableHeader>
           <TableRow>
             <TableHead>Visitor Name</TableHead>
-            <TableHead>Start Date</TableHead>
-            <TableHead>Start Time</TableHead>
-            <TableHead>End Date</TableHead>
-            <TableHead>End Time</TableHead>
-            <TableHead className="w-[30%]">Reason For Visit</TableHead>
+            <TableHead className='w-[30%]'>Reason For Visit</TableHead>
+            <TableHead className='w-[10%]'>Start Date</TableHead>
+            <TableHead className='w-[10%]'>Start Time</TableHead>
+            <TableHead className='w-[10%]'>End Date</TableHead>
+            <TableHead className='w-[10%]'>End Time</TableHead>
+            <TableHead className='w-[10%]'>Duration</TableHead>
+            <TableHead className="text-right">Action</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {data.map((record: any) => {
-            // Extract Values directly from the schema root
             const visitorName = record.visitorName || 'Unknown';
             const visitReason = record.visitReason || '--';
 
-            // Format Dates
-            const startDate = record.clockInDate
-              ? moment(record.clockInDate).format('DD-MM-YYYY')
-              : '--';
-            const endDate = record.clockOutDate
-              ? moment(record.clockOutDate).format('DD-MM-YYYY')
-              : '--';
+            const isEditing = editingRecordId === record._id;
 
-            // Times
-            const startTime = record.clockIn || '--';
-            const endTime = record.clockOut || '--';
+            // Date Handling
+            const startDate = record.clockInDate || record.date;
+            const endDate = record.clockOutDate || record.date;
+
+            // Time Handling
+            const rStartTime = record.clockIn || '--';
+            const rEndTime = record.clockOut || '--';
+
+            const displayTime = (t: string) => {
+              if (!t || t === '--') return '--';
+              if (t.includes('T')) return moment(t).format('HH:mm');
+              if (t.length >= 5) return t.substring(0, 5);
+              return t;
+            };
+
+            const displayDate = (d: string) => {
+              return d ? moment(d).format('DD-MM-YYYY') : '--';
+            };
+
+            // Calculate Duration dynamically based on display values
+            const dCalc = isEditing
+              ? calculateDuration(
+                  editForm.startDate,
+                  editForm.startTime,
+                  editForm.endDate,
+                  editForm.endTime
+                )
+              : calculateDuration(startDate, rStartTime, endDate, rEndTime);
+
+            // Strict check: Minutes must be > 0
+            const isDurationValid = dCalc.minutes > 0;
 
             return (
               <TableRow key={record._id}>
@@ -268,37 +497,177 @@ const TableSection = ({
                   <span className="text-sm font-medium">{visitorName}</span>
                 </TableCell>
 
-                <TableCell className="text-sm font-medium">
-                  {startDate}
-                </TableCell>
-
-                <TableCell className="text-sm font-medium">
-                  {startTime}
-                </TableCell>
-
-                <TableCell className="text-sm font-medium">{endDate}</TableCell>
-
-                <TableCell className="text-sm  font-medium">
-                  {endTime}
-                </TableCell>
-
-                <TableCell className="truncate  text-xs">
+                <TableCell className="truncate text-xs max-w-[150px]">
                   {visitReason}
+                </TableCell>
+
+                {/* --- Start Date --- */}
+                <TableCell className="text-sm">
+                  {isEditing ? (
+                    <div className="relative">
+                      <DatePicker
+                        selected={
+                          editForm.startDate
+                            ? moment(editForm.startDate).toDate()
+                            : null
+                        }
+                        onChange={(date: Date | null) => {
+                          const val = date ? moment(date).format('YYYY-MM-DD') : '';
+                          onFormChange('startDate', val);
+                        }}
+                        dateFormat="dd-MM-yyyy"
+                        className={datePickerClass}
+                        placeholderText="Start Date"
+                        portalId="root"
+                      />
+                    </div>
+                  ) : (
+                    displayDate(startDate)
+                  )}
+                </TableCell>
+
+                {/* --- Start Time --- */}
+                <TableCell className="font-mono text-sm">
+                  {isEditing ? (
+                    <Input
+                      value={editForm.startTime}
+                      onChange={(e) => onFormChange('startTime', e.target.value)}
+                      onBlur={(e) => onTimeBlur('startTime', e.target.value)}
+                      placeholder="HH:mm"
+                      className="h-8 w-20 font-mono text-xs"
+                      maxLength={5}
+                    />
+                  ) : (
+                    displayTime(rStartTime)
+                  )}
+                </TableCell>
+
+                {/* --- End Date --- */}
+                <TableCell className="text-sm">
+                  {isEditing ? (
+                    <div className="relative">
+                      <DatePicker
+                        selected={
+                          editForm.endDate
+                            ? moment(editForm.endDate).toDate()
+                            : null
+                        }
+                        onChange={(date: Date | null) => {
+                          const val = date ? moment(date).format('YYYY-MM-DD') : '';
+                          onFormChange('endDate', val);
+                        }}
+                        dateFormat="dd-MM-yyyy"
+                        className={datePickerClass}
+                        placeholderText="End Date"
+                        portalId="root"
+                        minDate={
+                          editForm.startDate
+                            ? moment(editForm.startDate).toDate()
+                            : null
+                        }
+                      />
+                    </div>
+                  ) : (
+                    displayDate(endDate)
+                  )}
+                </TableCell>
+
+                {/* --- End Time --- */}
+                <TableCell className="font-mono text-sm">
+                  {isEditing ? (
+                    <Input
+                      value={editForm.endTime}
+                      onChange={(e) => onFormChange('endTime', e.target.value)}
+                      onBlur={(e) => onTimeBlur('endTime', e.target.value)}
+                      placeholder="HH:mm"
+                      className="h-8 w-20 font-mono text-xs"
+                      maxLength={5}
+                    />
+                  ) : (
+                    displayTime(rEndTime)
+                  )}
+                </TableCell>
+
+                {/* --- Duration --- */}
+                <TableCell className="text-sm">
+                  <div
+                    className={`flex items-center gap-1 font-mono text-sm ${
+                      !isDurationValid && isEditing
+                        ? 'font-bold text-red-500'
+                        : 'text-black'
+                    }`}
+                  >
+                    {dCalc.display}
+                  </div>
+                </TableCell>
+
+                {/* --- Action --- */}
+                <TableCell className="text-right">
+                  <div className="flex items-center justify-end gap-2">
+                    {isEditing ? (
+                      <>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={onCancelEdit}
+                          disabled={isUpdating}
+                          className="h-8 px-2"
+                        >
+                          <XIcon className="mr-1 h-3 w-3" />
+                          Cancel
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={onSaveEdit}
+                          disabled={isUpdating || !isDurationValid}
+                          className="h-8 px-2"
+                        >
+                          {isUpdating ? (
+                            <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                          ) : (
+                            <Check className="mr-1 h-3 w-3" />
+                          )}
+                          Save
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => onEditClick(record)}
+                          className="h-8 px-2"
+                        >
+                          Reconcile
+                        </Button>
+                      </>
+                    )}
+                  </div>
                 </TableCell>
               </TableRow>
             );
           })}
         </TableBody>
       </Table>
-      {data.length > 60 && (
-        <DynamicPagination
-          pageSize={entriesPerPage}
-          setPageSize={setEntriesPerPage}
-          currentPage={currentPage}
-          totalPages={totalPages}
-          onPageChange={setCurrentPage}
-        />
-      )}
+      
+      {/* Pagination & Editing Error Display */}
+      <div className="flex flex-col gap-2">
+        {editError && (
+          <div className="rounded border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-500">
+            {editError}
+          </div>
+        )}
+        
+        {data.length > 60 && (
+          <DynamicPagination
+            pageSize={entriesPerPage}
+            setPageSize={setEntriesPerPage}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+          />
+        )}
+      </div>
     </div>
   );
 };

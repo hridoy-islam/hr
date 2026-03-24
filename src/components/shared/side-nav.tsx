@@ -239,6 +239,12 @@ const navItems = [
     href: 'service-user',
     roles: ['company']
   },
+  // {
+  //   icon: FileBadge,
+  //   label: 'Signature Document',
+  //   href: 'signature-document',
+  //   roles: ['company']
+  // },
   {
     icon: FileSpreadsheet,
     label: 'Documents',
