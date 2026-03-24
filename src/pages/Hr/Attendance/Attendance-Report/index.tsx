@@ -39,7 +39,7 @@ import {
   generatePDF,
   generateUserPDF
 } from './components/actions';
-import moment from 'moment';
+import moment from '@/lib/moment-setup';
 
 // Updated Types
 interface AttendanceUser {

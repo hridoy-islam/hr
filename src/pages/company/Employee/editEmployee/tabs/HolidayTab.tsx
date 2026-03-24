@@ -35,7 +35,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 import { useParams } from 'react-router-dom';
-import moment from 'moment';
+import moment from '@/lib/moment-setup';
 
 interface HolidayAPI {
   userId: string;

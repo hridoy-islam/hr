@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axiosInstance from '@/lib/axios';
-import moment from 'moment';
+import moment from '@/lib/moment-setup';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import DatePicker from 'react-datepicker';

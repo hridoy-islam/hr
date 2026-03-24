@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Download } from 'lucide-react';
-import moment from 'moment';
+import moment from '@/lib/moment-setup';
 
 interface CSVExporterProps {
   data: any[];

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import moment from 'moment';
+import moment from '@/lib/moment-setup';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {

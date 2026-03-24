@@ -14,7 +14,7 @@ import {
   FormMessage
 } from '@/components/ui/form';
 import axiosInstance from '@/lib/axios';
-import moment from 'moment';
+import moment from '@/lib/moment-setup';
 import Select from 'react-select';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -253,7 +253,7 @@ export default function AddRotaDialog({
           endDate: startDate,
           leaveType: values.leaveType,
           shiftName: values.leaveType,
-          ...extraPayload // <--- ADDED
+          ...extraPayload 
         };
         const response = await axiosInstance.post('/rota', payload);
         toast({ title: 'Rota created successfully' });

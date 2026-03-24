@@ -34,7 +34,7 @@ import { useSelector } from 'react-redux';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
-import moment from 'moment';
+import moment from '@/lib/moment-setup';
 import { useParams } from 'react-router-dom';
 
 interface HolidayAPI {

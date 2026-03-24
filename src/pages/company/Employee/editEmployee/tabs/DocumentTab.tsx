@@ -35,7 +35,7 @@ import {
   TableRow
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import moment from 'moment';
+import moment from '@/lib/moment-setup';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 
 // --- CONSTANTS ---

@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import moment from 'moment'; // Changed from date-fns to moment
+import moment from '@/lib/moment-setup'; // Changed from date-fns to moment
 import {
   ArrowLeft,
   Building2,

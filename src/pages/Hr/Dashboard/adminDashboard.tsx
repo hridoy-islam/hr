@@ -22,7 +22,7 @@ import { BlinkingDots } from '@/components/shared/blinking-dots';
 import { DynamicPagination } from '@/components/shared/DynamicPagination';
 import axiosInstance from '@/lib/axios';
 import { useNavigate } from 'react-router-dom';
-import moment from 'moment';
+import moment from '@/lib/moment-setup';
 
 // Types
 interface Department {

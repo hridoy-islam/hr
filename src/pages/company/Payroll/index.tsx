@@ -36,7 +36,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'; // Added imports
-import moment from 'moment';
+import moment from '@/lib/moment-setup';
 import { useToast } from '@/components/ui/use-toast';
 import axiosInstance from '@/lib/axios';
 import { Label } from '@/components/ui/label';

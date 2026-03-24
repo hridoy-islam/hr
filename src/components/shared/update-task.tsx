@@ -3,7 +3,7 @@ import { Modal } from '@/components/ui/modal'; // Assuming you have a Modal comp
 import { Input } from '../ui/input';
 import { useForm } from 'react-hook-form';
 import { useEffect } from 'react';
-import moment from 'moment';
+import moment from '@/lib/moment-setup';
 
 const UpdateTask = ({
   task,

@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import moment from 'moment';
+import moment from '@/lib/moment-setup';
 import Select from 'react-select';
 
 import {

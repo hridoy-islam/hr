@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import axiosInstance from '@/lib/axios';
-import moment from 'moment';
+import moment from '@/lib/moment-setup';
+
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { AlertTriangle, X, CalendarIcon, ArrowRight } from 'lucide-react';

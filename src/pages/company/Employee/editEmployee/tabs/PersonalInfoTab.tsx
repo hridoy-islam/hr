@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { EditableField } from '../EditableField';
-import moment from 'moment';
+import moment from '@/lib/moment-setup';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input'; // Make sure this is installed
 import {

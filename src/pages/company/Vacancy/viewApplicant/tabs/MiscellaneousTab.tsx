@@ -1,6 +1,6 @@
 import React from 'react';
 import { EditableField } from '../components/EditableField';
-import moment from 'moment';
+import moment from '@/lib/moment-setup';
 
 interface MiscellaneousTabProps {
   formData: any;

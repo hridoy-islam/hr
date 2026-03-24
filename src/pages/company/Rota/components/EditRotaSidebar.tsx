@@ -25,7 +25,7 @@ import {
   AlertDialogTrigger
 } from '@/components/ui/alert-dialog';
 import axiosInstance from '@/lib/axios';
-import moment from 'moment';
+import moment from '@/lib/moment-setup';
 import { Trash2, CalendarIcon, Plus } from 'lucide-react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';

@@ -37,7 +37,7 @@ import {
   generatePDF,
   generateUserPDF
 } from './components/actions';
-import moment from 'moment';
+import moment from '@/lib/moment-setup';
 import { useSelector } from 'react-redux';
 
 // Updated Types

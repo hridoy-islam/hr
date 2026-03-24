@@ -12,7 +12,7 @@ import {
 import 'react-datepicker/dist/react-datepicker.css';
 import { useSelector } from 'react-redux';
 import axiosInstance from '@/lib/axios'; // Make sure this is configured
-import moment from 'moment';
+import moment from '@/lib/moment-setup';
 
 // Define Attendance type based on your backend model
 interface AttendanceRecord {

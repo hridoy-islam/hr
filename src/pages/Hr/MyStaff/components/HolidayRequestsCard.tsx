@@ -21,7 +21,7 @@ import {
 import axiosInstance from '@/lib/axios';
 import { useToast } from '@/components/ui/use-toast';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
-import moment from 'moment';
+import moment from '@/lib/moment-setup';
 
 // ===== Interfaces =====
 interface Employee {

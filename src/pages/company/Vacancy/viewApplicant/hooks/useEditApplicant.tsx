@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import moment from 'moment';
+import moment from '@/lib/moment-setup';
 import axiosInstance from "@/lib/axios"
 
 // Mock toast hook for demo

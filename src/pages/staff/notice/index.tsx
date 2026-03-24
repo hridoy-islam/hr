@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import moment from 'moment';
+import moment from '@/lib/moment-setup';
 import { Calendar, AlertCircle, UserIcon, Bell, Pin } from 'lucide-react';
 import axiosInstance from '@/lib/axios';
 import { BlinkingDots } from '@/components/shared/blinking-dots';

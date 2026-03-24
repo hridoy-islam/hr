@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axiosInstance from '@/lib/axios';
-import moment from 'moment';
+import moment from '@/lib/moment-setup';
 import { useToast } from '@/components/ui/use-toast';
 import { useSelector } from 'react-redux';
 

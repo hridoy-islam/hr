@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import moment from 'moment';
+import moment from '@/lib/moment-setup';
 import axiosInstance from '@/lib/axios';
 
 const TrainingTab = ({ formData, onUpdate, isFieldSaving }) => {

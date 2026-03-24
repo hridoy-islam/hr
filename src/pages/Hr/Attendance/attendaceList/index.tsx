@@ -17,7 +17,7 @@ import {
 import axiosInstance from '@/lib/axios';
 import { useToast } from '@/components/ui/use-toast';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
-import moment from 'moment';
+import moment from '@/lib/moment-setup';
 import { DynamicPagination } from '@/components/shared/DynamicPagination';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { AttendanceDialog } from './components';

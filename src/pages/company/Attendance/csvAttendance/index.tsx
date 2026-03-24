@@ -33,7 +33,7 @@ import Papa from 'papaparse';
 import axiosInstance from '@/lib/axios';
 import { useSelector } from 'react-redux';
 import { useToast } from '@/components/ui/use-toast';
-import moment from 'moment';
+import moment from '@/lib/moment-setup';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';

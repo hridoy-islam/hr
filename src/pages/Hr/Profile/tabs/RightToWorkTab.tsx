@@ -22,7 +22,7 @@ import {
   TableHeader,
   TableRow
 } from '@/components/ui/table';
-import moment from 'moment';
+import moment from '@/lib/moment-setup';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';

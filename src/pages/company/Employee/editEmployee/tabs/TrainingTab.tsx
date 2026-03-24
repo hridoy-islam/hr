@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/table';
 import { Eye, Plus } from 'lucide-react';
 import axiosInstance from '@/lib/axios';
-import moment from 'moment';
+import moment from '@/lib/moment-setup';
 import ReactSelect from 'react-select';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';

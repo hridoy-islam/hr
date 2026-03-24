@@ -7,7 +7,7 @@ import {
   CardFooter
 } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table';
-import moment from 'moment';
+import moment from '@/lib/moment-setup';
 import {
   User,
   Phone,

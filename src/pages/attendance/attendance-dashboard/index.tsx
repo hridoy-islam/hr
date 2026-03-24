@@ -23,7 +23,7 @@ import 'react-datepicker/dist/react-datepicker.css';
 import axiosInstance from '@/lib/axios';
 import { AppDispatch } from '@/redux/store';
 import { logout } from '@/redux/features/authSlice';
-import moment from 'moment';
+import moment from '@/lib/moment-setup';
 import { useToast } from '@/components/ui/use-toast';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 

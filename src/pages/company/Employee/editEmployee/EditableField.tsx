@@ -8,7 +8,7 @@ import { Loader2 } from 'lucide-react';
 import Select from 'react-select';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-import moment from 'moment';
+import moment from '@/lib/moment-setup';
 
 interface EditableFieldProps {
   id: string;

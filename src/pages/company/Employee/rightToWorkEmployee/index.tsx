@@ -33,7 +33,7 @@ import {
   TableHeader,
   TableRow
 } from '@/components/ui/table';
-import moment from 'moment';
+import moment from '@/lib/moment-setup';
 
 interface HistoryEntry {
   _id: string;

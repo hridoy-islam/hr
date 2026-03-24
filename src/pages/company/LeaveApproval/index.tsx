@@ -40,7 +40,7 @@ import axiosInstance from '@/lib/axios';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
-import moment from 'moment';
+import moment from '@/lib/moment-setup';
 import { DynamicPagination } from '@/components/shared/DynamicPagination';
 
 interface LeaveRequest {

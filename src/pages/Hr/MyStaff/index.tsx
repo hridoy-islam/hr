@@ -7,7 +7,7 @@ import HolidayRequestsCard from './components/HolidayRequestsCard';
 import HolidaysTodayCard from './components/HolidaysTodayCard';
 import axiosInstance from '@/lib/axios';
 import { useToast } from '@/components/ui/use-toast';
-import moment from 'moment';
+import moment from '@/lib/moment-setup';
 
 // ===== Interfaces =====
 interface Employee {

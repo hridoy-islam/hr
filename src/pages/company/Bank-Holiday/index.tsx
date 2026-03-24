@@ -23,7 +23,7 @@ import { Label } from '@/components/ui/label';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
-import moment from 'moment';
+import moment from '@/lib/moment-setup';
 import { useSelector } from 'react-redux';
 import { useParams } from 'react-router-dom';
 

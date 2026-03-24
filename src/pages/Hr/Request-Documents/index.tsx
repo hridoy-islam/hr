@@ -33,7 +33,7 @@ import {
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 import { DynamicPagination } from '@/components/shared/DynamicPagination';
 import axiosInstance from '@/lib/axios';
-import moment from 'moment';
+import moment from '@/lib/moment-setup';
 import { cn } from '@/lib/utils';
 import { useSelector } from 'react-redux';
 

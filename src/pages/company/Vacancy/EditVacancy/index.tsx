@@ -19,7 +19,7 @@ import { Button } from '@/components/ui/button';
 import { MoveLeft } from 'lucide-react';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
-import moment from 'moment';
+import moment from '@/lib/moment-setup';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 

@@ -18,7 +18,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { Input } from '@/components/ui/input';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-import moment from 'moment';
+import moment from '@/lib/moment-setup';
 import { CalendarFold, Clock, User, Briefcase } from 'lucide-react';
 import { useParams } from 'react-router-dom';
 import { Textarea } from '@/components/ui/textarea';

@@ -21,7 +21,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 
 import 'react-datepicker/dist/react-datepicker.css';
 import { useSelector } from 'react-redux';
-import moment from 'moment';
+import moment from '@/lib/moment-setup';
 
 // --- Interfaces ---
 

@@ -13,7 +13,7 @@ import axiosInstance from '@/lib/axios';
 import { useToast } from '@/components/ui/use-toast';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 import { DynamicPagination } from '@/components/shared/DynamicPagination';
-import moment from 'moment';
+import moment from '@/lib/moment-setup';
 import { Input } from '@/components/ui/input';
 import { useRouter } from '@/routes/hooks';
 import { useNavigate } from 'react-router-dom';

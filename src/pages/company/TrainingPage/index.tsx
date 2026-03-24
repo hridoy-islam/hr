@@ -16,7 +16,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 // import { DataTablePagination } from '../students/view/components/data-table-pagination';
 import { Input } from '@/components/ui/input';
-import moment from 'moment';
+import moment from '@/lib/moment-setup';
 import { DynamicPagination } from '@/components/shared/DynamicPagination';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';

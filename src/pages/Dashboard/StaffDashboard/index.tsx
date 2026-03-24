@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import axiosInstance from '@/lib/axios';
 import { useSelector } from 'react-redux';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
-import moment from 'moment';
+import moment from '@/lib/moment-setup';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';

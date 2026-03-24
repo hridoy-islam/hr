@@ -18,7 +18,7 @@ import { EqualityInfomation } from './Components/equality-info-steps';
 import ReviewStep from './Components/review-step';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import axiosInstance from '@/lib/axios';
-import moment from 'moment';
+import moment from '@/lib/moment-setup';
 import { Badge } from '@/components/ui/badge';
 import { useSelector } from 'react-redux';
 

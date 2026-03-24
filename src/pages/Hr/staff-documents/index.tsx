@@ -40,7 +40,7 @@ import 'react-datepicker/dist/react-datepicker.css';
 
 // React Select
 import Select from 'react-select';
-import moment from 'moment';
+import moment from '@/lib/moment-setup';
 import { useSelector } from 'react-redux';
 import axiosInstance from '@/lib/axios'; // ✅ Import axiosInstance
 import { BlinkingDots } from '@/components/shared/blinking-dots';

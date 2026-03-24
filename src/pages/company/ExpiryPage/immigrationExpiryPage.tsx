@@ -33,7 +33,7 @@ import 'react-datepicker/dist/react-datepicker.css';
 import { useSelector } from 'react-redux';
 import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
-import moment from 'moment';
+import moment from '@/lib/moment-setup';
 import { useScheduleStatus } from '@/context/scheduleStatusContext';
 
 // --- Interfaces ---

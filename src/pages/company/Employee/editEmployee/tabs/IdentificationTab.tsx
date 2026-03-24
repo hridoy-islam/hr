@@ -1,6 +1,6 @@
 import React from 'react';
 import { EditableField } from '../EditableField';
-import moment from 'moment';
+import moment from '@/lib/moment-setup';
 import { Loader2, FileText, Globe } from 'lucide-react';
 
 // --- Layout Components ---

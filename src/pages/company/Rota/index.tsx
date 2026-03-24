@@ -6,7 +6,7 @@ import React, {
   useRef
 } from 'react';
 import { Button } from '@/components/ui/button';
-import moment from 'moment';
+import moment from '@/lib/moment-setup';
 import {
   ChevronLeft,
   ChevronRight,

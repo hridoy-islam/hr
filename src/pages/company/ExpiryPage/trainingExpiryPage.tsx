@@ -18,7 +18,7 @@ import { BlinkingDots } from '@/components/shared/blinking-dots';
 import axiosInstance from '@/lib/axios';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import moment from 'moment';
+import moment from '@/lib/moment-setup';
 
 // --- Interfaces ---
 

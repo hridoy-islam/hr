@@ -47,7 +47,7 @@ import {
   SelectValue
 } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
-import moment from 'moment';
+import moment from '@/lib/moment-setup';
 import {
   DropdownMenu,
   DropdownMenuContent,
