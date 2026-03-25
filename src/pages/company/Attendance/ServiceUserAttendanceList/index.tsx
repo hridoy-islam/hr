@@ -104,10 +104,10 @@ const ServiceUserAttendancePage = () => {
   const { toast } = useToast();
 
   // State: Default range is Full Current Month
-  const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([
-    moment().startOf('month').toDate(),
-    moment().endOf('month').toDate()
-  ]);
+ const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([
+  new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+  new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0)
+]);
   const [startDate, endDate] = dateRange;
   const [attendanceData, setAttendanceData] = useState<any[]>([]);
 
@@ -138,10 +138,12 @@ const ServiceUserAttendancePage = () => {
         page,
         limit,
         userType: 'service_user',
-        fromDate: startDate
-          ? moment(startDate).format('YYYY-MM-DD')
-          : undefined,
-        toDate: endDate ? moment(endDate).format('YYYY-MM-DD') : undefined
+       fromDate: startDate
+  ? `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`
+  : undefined,
+toDate: endDate
+  ? `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`
+  : undefined,
       };
 
       const res = await axiosInstance.get(`/hr/attendance`, { params });
@@ -164,11 +166,15 @@ const ServiceUserAttendancePage = () => {
 
   // Reset Filters
   const handleReset = () => {
-    setDateRange([
-      moment().startOf('month').toDate(),
-      moment().endOf('month').toDate()
-    ]);
-  };
+
+  setDateRange([
+    new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+    new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0)
+  ]);
+};
+const formatDisplayDate = (date: Date) =>
+  date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+    .replace(',', '');
 
   // --- Inline Edit Handlers ---
   const handleEditClick = (record: any) => {
@@ -331,15 +337,15 @@ const handleSaveEdit = async () => {
           </div>
 
           {/* Table Header Summary */}
-          <div className="mt-2 text-lg font-semibold">
-            Attendance:{' '}
-            <span>
-              {startDate ? moment(startDate).format('MMM DD, YYYY') : '...'}
-            </span>
-            {endDate && (
-              <span> - {moment(endDate).format('MMM DD, YYYY')}</span>
-            )}
-          </div>
+          <div className="mt-2 text-lg font-semibold text-gray-600">
+  Attendance:{' '}
+  <span>
+    {startDate ? formatDisplayDate(startDate) : '...'}
+  </span>
+  {endDate && (
+    <span> - {formatDisplayDate(endDate)}</span>
+  )}
+</div>
 
           <div className="rounded-md">
             <TableSection

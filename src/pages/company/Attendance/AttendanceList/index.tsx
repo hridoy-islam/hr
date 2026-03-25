@@ -62,12 +62,16 @@ const calculateDynamicDuration = (logs: any[]) => {
   logs.forEach((log) => {
     if (log.clockIn && log.clockOut) {
       // Handle ISO strings directly
-      const start = log.clockIn.includes('T') ? moment(log.clockIn) : moment(log.clockIn, 'HH:mm');
-      const end = log.clockOut.includes('T') ? moment(log.clockOut) : moment(log.clockOut, 'HH:mm');
-      
+      const start = log.clockIn.includes('T')
+        ? moment(log.clockIn)
+        : moment(log.clockIn, 'HH:mm');
+      const end = log.clockOut.includes('T')
+        ? moment(log.clockOut)
+        : moment(log.clockOut, 'HH:mm');
+
       // Add a day if it's the old 'HH:mm' format and spans past midnight
       if (!log.clockOut.includes('T') && end.isBefore(start)) end.add(1, 'day');
-      
+
       if (start.isValid() && end.isValid()) {
         totalMinutes += end.diff(start, 'minutes');
       }
@@ -90,12 +94,12 @@ const calculateDuration = (
   }
 
   // If the times are already ISO strings, parse them directly
-  const start = startTime.includes('T') 
-    ? moment(startTime) 
+  const start = startTime.includes('T')
+    ? moment(startTime)
     : moment(`${startDate} ${startTime}`, 'YYYY-MM-DD HH:mm');
-    
-  const end = endTime.includes('T') 
-    ? moment(endTime) 
+
+  const end = endTime.includes('T')
+    ? moment(endTime)
     : moment(`${endDate} ${endTime}`, 'YYYY-MM-DD HH:mm');
 
   if (!start.isValid() || !end.isValid()) {
@@ -123,8 +127,8 @@ const AttendancePage = () => {
 
   // State: Default range is Full Current Month
   const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([
-    moment().startOf('month').toDate(),
-    moment().endOf('month').toDate()
+    new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+    new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0)
   ]);
   const [startDate, endDate] = dateRange;
   const [attendanceData, setAttendanceData] = useState<any[]>([]);
@@ -234,9 +238,11 @@ const AttendancePage = () => {
         page,
         limit,
         fromDate: startDate
-          ? moment(startDate).format('YYYY-MM-DD')
+          ? `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`
           : undefined,
-        toDate: endDate ? moment(endDate).format('YYYY-MM-DD') : undefined,
+        toDate: endDate
+          ? `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`
+          : undefined,
         designationId: selectedDesignation?.value,
         departmentId: selectedDepartment?.value,
         userId: selectedUser?.value,
@@ -272,10 +278,10 @@ const AttendancePage = () => {
     setSelectedUser(null);
     setSelectedDesignation(null);
     setSelectedDepartment(null);
-    setSelectedApproval(approvalOptions[0]); // Reset to "Admin Needs to Approve"
+    setSelectedApproval(approvalOptions[0]);
     setDateRange([
-      moment().startOf('month').toDate(),
-      moment().endOf('month').toDate()
+      new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+      new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0)
     ]);
     setFetchedApproval(approvalOptions[0]);
   };
@@ -460,10 +466,20 @@ const AttendancePage = () => {
     const employeeId = record?.userId?._id || record?.userId;
 
     // Convert UI states to ISO strings for the payload
-    const payloadClockInDate = moment(editForm.startDate, 'YYYY-MM-DD').startOf('day').toISOString();
-    const payloadClockOutDate = moment(editForm.endDate, 'YYYY-MM-DD').startOf('day').toISOString();
-    const payloadClockIn = moment(`${editForm.startDate} ${editForm.startTime}`, 'YYYY-MM-DD HH:mm').toISOString();
-    const payloadClockOut = moment(`${editForm.endDate} ${editForm.endTime}`, 'YYYY-MM-DD HH:mm').toISOString();
+    const payloadClockInDate = moment(editForm.startDate, 'YYYY-MM-DD')
+      .startOf('day')
+      .toISOString();
+    const payloadClockOutDate = moment(editForm.endDate, 'YYYY-MM-DD')
+      .startOf('day')
+      .toISOString();
+    const payloadClockIn = moment(
+      `${editForm.startDate} ${editForm.startTime}`,
+      'YYYY-MM-DD HH:mm'
+    ).toISOString();
+    const payloadClockOut = moment(
+      `${editForm.endDate} ${editForm.endTime}`,
+      'YYYY-MM-DD HH:mm'
+    ).toISOString();
 
     try {
       await axiosInstance.patch(`/hr/attendance/${editingRecordId}`, {
@@ -547,6 +563,15 @@ const AttendancePage = () => {
       setApprovingRecordId(null);
     }
   };
+
+  const formatDisplayDate = (date: Date) =>
+    date
+      .toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+      })
+      .replace(',', '');
 
   return (
     <div className="space-y-3">
@@ -652,12 +677,8 @@ const AttendancePage = () => {
           <div className="flex flex-row items-center gap-4">
             <div className="mt-2 text-lg font-semibold text-gray-600">
               Attendance:{' '}
-              <span>
-                {startDate ? moment(startDate).format('MMM DD, YYYY') : '...'}
-              </span>
-              {endDate && (
-                <span> - {moment(endDate).format('MMM DD, YYYY')}</span>
-              )}
+              <span>{startDate ? formatDisplayDate(startDate) : '...'}</span>
+              {endDate && <span> - {formatDisplayDate(endDate)}</span>}
             </div>
             {fetchedApproval && (
               <div className="mt-2 flex items-center">

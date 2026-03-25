@@ -108,11 +108,11 @@ const VisitorAttendancePage = () => {
   const user = useSelector((state: RootState) => state.auth?.user) || null;
   const navigate = useNavigate();
   const { id } = useParams();
-  const {toast} = useToast()
+  const { toast } = useToast();
   // State: Default range is Full Current Month
   const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([
-    moment().startOf('month').toDate(),
-    moment().endOf('month').toDate()
+    new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+    new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0)
   ]);
   const [startDate, endDate] = dateRange;
   const [attendanceData, setAttendanceData] = useState<any[]>([]);
@@ -145,9 +145,11 @@ const VisitorAttendancePage = () => {
         limit,
         userType: 'visitor', // Crucial: Only fetch visitors
         fromDate: startDate
-          ? moment(startDate).format('YYYY-MM-DD')
+          ? `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`
           : undefined,
-        toDate: endDate ? moment(endDate).format('YYYY-MM-DD') : undefined
+        toDate: endDate
+          ? `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`
+          : undefined
       };
 
       const res = await axiosInstance.get(`/hr/attendance`, { params });
@@ -171,11 +173,18 @@ const VisitorAttendancePage = () => {
   // Reset Filters
   const handleReset = () => {
     setDateRange([
-      moment().startOf('month').toDate(),
-      moment().endOf('month').toDate()
+      new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+      new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0)
     ]);
   };
-
+  const formatDisplayDate = (date: Date) =>
+    date
+      .toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+      })
+      .replace(',', '');
   const handleView = (recordId: string) => {
     navigate(`${recordId}`);
   };
@@ -238,45 +247,58 @@ const VisitorAttendancePage = () => {
     setEditForm((prev) => ({ ...prev, [field]: cleanValue }));
   };
 
-const handleSaveEdit = async () => {
+  const handleSaveEdit = async () => {
     if (!editingRecordId) return;
     setIsUpdating(true);
     setEditError(null);
 
     try {
       // 1. Convert your raw strings into exact Moment objects
-      const clockInMoment = moment(`${editForm.startDate} ${editForm.startTime}`, 'YYYY-MM-DD HH:mm');
-      const clockOutMoment = moment(`${editForm.endDate} ${editForm.endTime}`, 'YYYY-MM-DD HH:mm');
+      const clockInMoment = moment(
+        `${editForm.startDate} ${editForm.startTime}`,
+        'YYYY-MM-DD HH:mm'
+      );
+      const clockOutMoment = moment(
+        `${editForm.endDate} ${editForm.endTime}`,
+        'YYYY-MM-DD HH:mm'
+      );
 
       // 2. Build the new payload with full ISO strings
       const isoPayload = {
-        clockInDate: moment(editForm.startDate, 'YYYY-MM-DD').startOf('day').toISOString(),
-        clockOutDate: moment(editForm.endDate, 'YYYY-MM-DD').startOf('day').toISOString(),
+        clockInDate: moment(editForm.startDate, 'YYYY-MM-DD')
+          .startOf('day')
+          .toISOString(),
+        clockOutDate: moment(editForm.endDate, 'YYYY-MM-DD')
+          .startOf('day')
+          .toISOString(),
         clockIn: clockInMoment.toISOString(),
         clockOut: clockOutMoment.toISOString()
       };
 
       // 3. Send the ISO strings to the backend (this fixes your payload issue)
-      await axiosInstance.patch(`/hr/attendance/${editingRecordId}`, isoPayload);
+      await axiosInstance.patch(
+        `/hr/attendance/${editingRecordId}`,
+        isoPayload
+      );
 
       // 4. Update the local table UI
       setAttendanceData((prevData) =>
         prevData.map((record) =>
-          record._id === editingRecordId
-            ? { ...record, ...isoPayload }
-            : record
+          record._id === editingRecordId ? { ...record, ...isoPayload } : record
         )
       );
 
       handleCancelEdit();
-      toast({ title: "Attendance Updated Successfully" });
+      toast({ title: 'Attendance Updated Successfully' });
     } catch (error: any) {
       setEditError(
         error?.response?.data?.message || 'Failed to update attendance record'
       );
       toast({
-        title: error?.response?.data?.message || 'Failed to update attendance record',
-        variant: "destructive"
+        title:
+          error?.response?.data?.message ||
+          'Failed to update attendance record',
+        variant: 'destructive'
       });
     } finally {
       setIsUpdating(false);
@@ -336,16 +358,11 @@ const handleSaveEdit = async () => {
           </div>
 
           {/* Table Header Summary */}
-          <div className="mt-2 text-lg font-semibold ">
+          <div className="mt-2 text-lg font-semibold text-gray-600">
             Attendance:{' '}
-            <span className="">
-              {startDate ? moment(startDate).format('MMM DD, YYYY') : '...'}
-            </span>
-            {endDate && (
-              <span> - {moment(endDate).format('MMM DD, YYYY')}</span>
-            )}
+            <span>{startDate ? formatDisplayDate(startDate) : '...'}</span>
+            {endDate && <span> - {formatDisplayDate(endDate)}</span>}
           </div>
-
           <div className="rounded-md">
             <TableSection
               data={attendanceData}
@@ -440,12 +457,12 @@ const TableSection = ({
         <TableHeader>
           <TableRow>
             <TableHead>Visitor Name</TableHead>
-            <TableHead className='w-[30%]'>Reason For Visit</TableHead>
-            <TableHead className='w-[10%]'>Start Date</TableHead>
-            <TableHead className='w-[10%]'>Start Time</TableHead>
-            <TableHead className='w-[10%]'>End Date</TableHead>
-            <TableHead className='w-[10%]'>End Time</TableHead>
-            <TableHead className='w-[10%]'>Duration</TableHead>
+            <TableHead className="w-[30%]">Reason For Visit</TableHead>
+            <TableHead className="w-[10%]">Start Date</TableHead>
+            <TableHead className="w-[10%]">Start Time</TableHead>
+            <TableHead className="w-[10%]">End Date</TableHead>
+            <TableHead className="w-[10%]">End Time</TableHead>
+            <TableHead className="w-[10%]">Duration</TableHead>
             <TableHead className="text-right">Action</TableHead>
           </TableRow>
         </TableHeader>
@@ -494,7 +511,7 @@ const TableSection = ({
                   <span className="text-sm font-medium">{visitorName}</span>
                 </TableCell>
 
-                <TableCell className="truncate text-xs max-w-[150px]">
+                <TableCell className="max-w-[150px] truncate text-xs">
                   {visitReason}
                 </TableCell>
 
@@ -509,7 +526,9 @@ const TableSection = ({
                             : null
                         }
                         onChange={(date: Date | null) => {
-                          const val = date ? moment(date).format('YYYY-MM-DD') : '';
+                          const val = date
+                            ? moment(date).format('YYYY-MM-DD')
+                            : '';
                           onFormChange('startDate', val);
                         }}
                         dateFormat="dd-MM-yyyy"
@@ -528,7 +547,9 @@ const TableSection = ({
                   {isEditing ? (
                     <Input
                       value={editForm.startTime}
-                      onChange={(e) => onFormChange('startTime', e.target.value)}
+                      onChange={(e) =>
+                        onFormChange('startTime', e.target.value)
+                      }
                       onBlur={(e) => onTimeBlur('startTime', e.target.value)}
                       placeholder="HH:mm"
                       className="h-8 w-20 font-mono text-xs"
@@ -550,7 +571,9 @@ const TableSection = ({
                             : null
                         }
                         onChange={(date: Date | null) => {
-                          const val = date ? moment(date).format('YYYY-MM-DD') : '';
+                          const val = date
+                            ? moment(date).format('YYYY-MM-DD')
+                            : '';
                           onFormChange('endDate', val);
                         }}
                         dateFormat="dd-MM-yyyy"
@@ -646,7 +669,7 @@ const TableSection = ({
           })}
         </TableBody>
       </Table>
-      
+
       {/* Pagination & Editing Error Display */}
       <div className="flex flex-col gap-2">
         {editError && (
@@ -654,7 +677,7 @@ const TableSection = ({
             {editError}
           </div>
         )}
-        
+
         {data.length > 60 && (
           <DynamicPagination
             pageSize={entriesPerPage}
