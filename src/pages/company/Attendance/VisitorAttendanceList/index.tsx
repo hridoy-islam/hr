@@ -238,53 +238,50 @@ const VisitorAttendancePage = () => {
     setEditForm((prev) => ({ ...prev, [field]: cleanValue }));
   };
 
- const handleSaveEdit = async () => {
+const handleSaveEdit = async () => {
     if (!editingRecordId) return;
     setIsUpdating(true);
     setEditError(null);
 
     try {
-      // 1. Send the patch request to the backend
-      await axiosInstance.patch(`/hr/attendance/${editingRecordId}`, {
-        clockInDate: editForm.startDate,
-        clockOutDate: editForm.endDate,
-        clockIn: editForm.startTime,
-        clockOut: editForm.endTime
-      });
+      // 1. Convert your raw strings into exact Moment objects
+      const clockInMoment = moment(`${editForm.startDate} ${editForm.startTime}`, 'YYYY-MM-DD HH:mm');
+      const clockOutMoment = moment(`${editForm.endDate} ${editForm.endTime}`, 'YYYY-MM-DD HH:mm');
 
-      // 2. Update the local state instead of re-fetching
+      // 2. Build the new payload with full ISO strings
+      const isoPayload = {
+        clockInDate: moment(editForm.startDate, 'YYYY-MM-DD').startOf('day').toISOString(),
+        clockOutDate: moment(editForm.endDate, 'YYYY-MM-DD').startOf('day').toISOString(),
+        clockIn: clockInMoment.toISOString(),
+        clockOut: clockOutMoment.toISOString()
+      };
+
+      // 3. Send the ISO strings to the backend (this fixes your payload issue)
+      await axiosInstance.patch(`/hr/attendance/${editingRecordId}`, isoPayload);
+
+      // 4. Update the local table UI
       setAttendanceData((prevData) =>
         prevData.map((record) =>
           record._id === editingRecordId
-            ? {
-                ...record,
-                clockInDate: editForm.startDate,
-                clockOutDate: editForm.endDate,
-                clockIn: editForm.startTime,
-                clockOut: editForm.endTime
-              }
+            ? { ...record, ...isoPayload }
             : record
         )
       );
 
-      // 3. Close the inline editor
       handleCancelEdit();
-      toast({
-        title:"Attendance Updated Successfully"
-      })
+      toast({ title: "Attendance Updated Successfully" });
     } catch (error: any) {
       setEditError(
         error?.response?.data?.message || 'Failed to update attendance record'
       );
       toast({
-        title:  error?.response?.data?.message || 'Failed to update attendance record',
-        variant:"destructive"
-      })
+        title: error?.response?.data?.message || 'Failed to update attendance record',
+        variant: "destructive"
+      });
     } finally {
       setIsUpdating(false);
     }
   };
-
   return (
     <div className="space-y-3">
       <Card className="w-full bg-white shadow-md">

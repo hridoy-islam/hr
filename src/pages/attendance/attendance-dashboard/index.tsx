@@ -197,31 +197,41 @@ export default function AttendanceScanner() {
         const isVisitorOrServiceUser =
           payload.userType === 'visitor' || payload.userType === 'service_user';
 
-        if (action === 'clock_in') {
-          setFeedbackMessage({
-            title: `Thank You, ${name}`,
-            description: isVisitorOrServiceUser
-              ? 'You are Logged In'
-              : 'You are Clocked In'
-          });
-          const soundToPlay = isVisitorOrServiceUser
-            ? loggedInSound
-            : clockInSound;
-          soundToPlay.currentTime = 0;
-          soundToPlay.play().catch(console.log);
-        } else {
-          setFeedbackMessage({
-            title: `Thank You, ${name}`,
-            description: isVisitorOrServiceUser
-              ? 'You are Logged Out'
-              : 'You are Clocked Out'
-          });
-          const soundToPlay = isVisitorOrServiceUser
-            ? loggedOutSound
-            : clockOutSound;
-          soundToPlay.currentTime = 0;
-          soundToPlay.play().catch(console.log);
-        }
+       if (action === 'clock_in') {
+  setFeedbackMessage({
+    title: `Thank You, ${name}`,
+    description: isVisitorOrServiceUser
+      ? payload.userType === 'service_user'
+        ? 'You are Logged Out'   // service_user clock_in = logged out message
+        : 'You are Logged In'
+      : 'You are Clocked In'
+  });
+  const soundToPlay =
+    payload.userType === 'service_user'
+      ? loggedOutSound
+      : isVisitorOrServiceUser
+      ? loggedInSound
+      : clockInSound;
+  soundToPlay.currentTime = 0;
+  soundToPlay.play().catch(console.log);
+} else {
+  setFeedbackMessage({
+    title: `Thank You, ${name}`,
+    description: isVisitorOrServiceUser
+      ? payload.userType === 'service_user'
+        ? 'You are Logged In'   // service_user clock_out = logged in message
+        : 'You are Logged Out'
+      : 'You are Clocked Out'
+  });
+  const soundToPlay =
+    payload.userType === 'service_user'
+      ? loggedInSound
+      : isVisitorOrServiceUser
+      ? loggedOutSound
+      : clockOutSound;
+  soundToPlay.currentTime = 0;
+  soundToPlay.play().catch(console.log);
+}
 
         fetchSidebarData();
       } else {
@@ -467,41 +477,45 @@ export default function AttendanceScanner() {
       </AnimatePresence>
 
       {/* LOGOUT CONFIRMATION MODAL */}
-      <AnimatePresence>
-        {logoutTarget && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 px-4 backdrop-blur-sm">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="h-[40vh] w-full max-w-2xl rounded-3xl bg-white p-8 shadow-2xl"
-            >
-              <h3 className="mb-4 text-3xl font-bold text-slate-800">
-                Confirm Logout
-              </h3>
-              <p className="mb-8 text-xl text-slate-600">
-                Are you sure you want to log out{' '}
-                <strong className="text-slate-900">{logoutTarget.name}</strong>?
-              </p>
-              <div className="mt-16 flex justify-between gap-4">
-                <Button
-                  variant="outline"
-                  className="h-14 px-6 text-lg font-semibold"
-                  onClick={() => setLogoutTarget(null)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  className="h-14 bg-red-600 px-8 text-lg font-bold text-white hover:bg-red-700"
-                  onClick={handleConfirmSidebarLogout}
-                >
-                  Yes, Log Out
-                </Button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+     <AnimatePresence>
+  {logoutTarget && (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 px-4 backdrop-blur-sm">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="h-[40vh] w-full max-w-2xl rounded-3xl bg-white p-8 shadow-2xl"
+      >
+        <h3 className="mb-4 text-3xl font-bold text-slate-800">
+          {logoutTarget.type === 'service_user' ? 'Confirm Login' : 'Confirm Logout'}
+        </h3>
+        <p className="mb-8 text-xl text-slate-600">
+          Are you sure you want to {logoutTarget.type === 'service_user' ? 'log in' : 'log out'}{' '}
+          <strong className="text-slate-900">{logoutTarget.name}</strong>?
+        </p>
+        <div className="mt-16 flex justify-between gap-4">
+          <Button
+            variant="outline"
+            className="h-14 px-6 text-lg font-semibold"
+            onClick={() => setLogoutTarget(null)}
+          >
+            Cancel
+          </Button>
+          <Button
+            className={`h-14 px-8 text-lg font-bold text-white transition-colors ${
+              logoutTarget.type === 'service_user' 
+                ? 'bg-green-600 hover:bg-green-700' 
+                : 'bg-red-600 hover:bg-red-700'
+            }`}
+            onClick={handleConfirmSidebarLogout}
+          >
+            Yes, {logoutTarget.type === 'service_user' ? 'Log In' : 'Log Out'}
+          </Button>
+        </div>
+      </motion.div>
+    </div>
+  )}
+</AnimatePresence>
 
       <div className="flex w-full justify-end">
         <Button
@@ -870,25 +884,21 @@ export default function AttendanceScanner() {
 
                             <div className="flex w-full pt-6">
                               {selectedServiceUser &&
-                                (isServiceUserClockedIn ? (
-                                  <Button
-                                    className="h-20 w-full rounded-2xl bg-red-600 text-2xl font-bold text-white shadow-lg transition-transform hover:scale-[1.02] hover:bg-red-700"
-                                    onClick={() =>
-                                      handleServiceUserSubmit('clock_out')
-                                    }
-                                  >
-                                    Log Out
-                                  </Button>
-                                ) : (
-                                  <Button
-                                    className="h-20 w-full rounded-2xl bg-green-600 text-2xl font-bold text-white shadow-lg transition-transform hover:scale-[1.02] hover:bg-green-700"
-                                    onClick={() =>
-                                      handleServiceUserSubmit('clock_in')
-                                    }
-                                  >
-                                    Log In
-                                  </Button>
-                                ))}
+  (isServiceUserClockedIn ? (
+    <Button
+      className="h-20 w-full rounded-2xl bg-green-600 text-2xl font-bold text-white shadow-lg transition-transform hover:scale-[1.02] hover:bg-green-700"
+      onClick={() => handleServiceUserSubmit('clock_in')}
+    >
+      Log In
+    </Button>
+  ) : (
+    <Button
+      className="h-20 w-full rounded-2xl bg-red-600 text-2xl font-bold text-white shadow-lg transition-transform hover:scale-[1.02] hover:bg-red-700"
+      onClick={() => handleServiceUserSubmit('clock_out')}
+    >
+      Log Out
+    </Button>
+  ))}
                             </div>
                           </div>
                         </div>
@@ -1070,7 +1080,7 @@ export default function AttendanceScanner() {
                             }
                             className="text-xs font-semibold  text-red-500 hover:text-red-700"
                           >
-                            Logout
+                            Login
                           </button>
                         </div>
                       </div>

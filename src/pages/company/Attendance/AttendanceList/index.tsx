@@ -61,10 +61,16 @@ const calculateDynamicDuration = (logs: any[]) => {
 
   logs.forEach((log) => {
     if (log.clockIn && log.clockOut) {
-      const start = moment(log.clockIn, 'HH:mm');
-      const end = moment(log.clockOut, 'HH:mm');
-      if (end.isBefore(start)) end.add(1, 'day');
-      totalMinutes += end.diff(start, 'minutes');
+      // Handle ISO strings directly
+      const start = log.clockIn.includes('T') ? moment(log.clockIn) : moment(log.clockIn, 'HH:mm');
+      const end = log.clockOut.includes('T') ? moment(log.clockOut) : moment(log.clockOut, 'HH:mm');
+      
+      // Add a day if it's the old 'HH:mm' format and spans past midnight
+      if (!log.clockOut.includes('T') && end.isBefore(start)) end.add(1, 'day');
+      
+      if (start.isValid() && end.isValid()) {
+        totalMinutes += end.diff(start, 'minutes');
+      }
     }
   });
 
@@ -79,12 +85,18 @@ const calculateDuration = (
   endDate: string,
   endTime: string
 ) => {
-  if (!startDate || !startTime || !endDate || !endTime) {
+  if (!startTime || !endTime) {
     return { display: '00:00', minutes: 0 };
   }
 
-  const start = moment(`${startDate} ${startTime}`, 'YYYY-MM-DD HH:mm');
-  const end = moment(`${endDate} ${endTime}`, 'YYYY-MM-DD HH:mm');
+  // If the times are already ISO strings, parse them directly
+  const start = startTime.includes('T') 
+    ? moment(startTime) 
+    : moment(`${startDate} ${startTime}`, 'YYYY-MM-DD HH:mm');
+    
+  const end = endTime.includes('T') 
+    ? moment(endTime) 
+    : moment(`${endDate} ${endTime}`, 'YYYY-MM-DD HH:mm');
 
   if (!start.isValid() || !end.isValid()) {
     return { display: '00:00', minutes: 0 };
@@ -317,7 +329,7 @@ const AttendancePage = () => {
 
     const extractTime = (val: string) => {
       if (!val) return '';
-      if (val.includes('T')) return moment(val).format('HH:mm');
+      if (val.includes('T')) return moment(val).format('HH:mm'); // Extract HH:mm from ISO
       if (val.length >= 5) return val.substring(0, 5);
       return val;
     };
@@ -447,12 +459,18 @@ const AttendancePage = () => {
     const record = attendanceData.find((r) => r._id === editingRecordId);
     const employeeId = record?.userId?._id || record?.userId;
 
+    // Convert UI states to ISO strings for the payload
+    const payloadClockInDate = moment(editForm.startDate, 'YYYY-MM-DD').startOf('day').toISOString();
+    const payloadClockOutDate = moment(editForm.endDate, 'YYYY-MM-DD').startOf('day').toISOString();
+    const payloadClockIn = moment(`${editForm.startDate} ${editForm.startTime}`, 'YYYY-MM-DD HH:mm').toISOString();
+    const payloadClockOut = moment(`${editForm.endDate} ${editForm.endTime}`, 'YYYY-MM-DD HH:mm').toISOString();
+
     try {
       await axiosInstance.patch(`/hr/attendance/${editingRecordId}`, {
-        clockInDate: editForm.startDate,
-        clockOutDate: editForm.endDate,
-        clockIn: editForm.startTime,
-        clockOut: editForm.endTime,
+        clockInDate: payloadClockInDate,
+        clockOutDate: payloadClockOutDate,
+        clockIn: payloadClockIn,
+        clockOut: payloadClockOut,
         ...(editForm.rotaId ? { rotaId: editForm.rotaId } : {}),
         ...(employeeId ? { employeeId } : {})
       });
@@ -475,10 +493,10 @@ const AttendancePage = () => {
 
           return {
             ...r,
-            clockInDate: editForm.startDate,
-            clockOutDate: editForm.endDate,
-            clockIn: editForm.startTime,
-            clockOut: editForm.endTime,
+            clockInDate: payloadClockInDate,
+            clockOutDate: payloadClockOutDate,
+            clockIn: payloadClockIn,
+            clockOut: payloadClockOut,
             rotaId: rawRota
               ? {
                   ...rawRota,
@@ -804,7 +822,7 @@ const TableSection = ({
 
             const displayTime = (t: string) => {
               if (!t || t === '--') return '--';
-              if (t.includes('T')) return moment(t).format('HH:mm');
+              if (t.includes('T')) return moment(t).format('HH:mm'); // Handle ISO parsing
               if (t.length >= 5) return t.substring(0, 5);
               return t;
             };
@@ -822,10 +840,10 @@ const TableSection = ({
               );
             } else {
               dCalc = calculateDuration(
-                record.clockInDate,
-                record.clockIn,
-                record.clockOutDate,
-                record.clockOut
+                rStartDate,
+                rStartTime,
+                rEndDate,
+                rEndTime
               );
             }
 

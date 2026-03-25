@@ -228,28 +228,33 @@ const ServiceUserAttendancePage = () => {
     setEditForm((prev) => ({ ...prev, [field]: cleanValue }));
   };
 
-  const handleSaveEdit = async () => {
+const handleSaveEdit = async () => {
     if (!editingRecordId) return;
     setIsUpdating(true);
     setEditError(null);
 
     try {
-      await axiosInstance.patch(`/hr/attendance/${editingRecordId}`, {
-        clockInDate: editForm.startDate,
-        clockOutDate: editForm.endDate,
-        clockIn: editForm.startTime,
-        clockOut: editForm.endTime
-      });
+      // 1. Combine Date and Time strings
+      const clockInCombined = `${editForm.startDate} ${editForm.startTime}`;
+      const clockOutCombined = `${editForm.endDate} ${editForm.endTime}`;
 
+      const payload = {
+        clockInDate: moment(editForm.startDate, 'YYYY-MM-DD').startOf('day').format('YYYY-MM-DDTHH:mm:ss.SSSZ'),
+        clockOutDate: moment(editForm.endDate, 'YYYY-MM-DD').startOf('day').format('YYYY-MM-DDTHH:mm:ss.SSSZ'),
+        clockIn: moment(clockInCombined, 'YYYY-MM-DD HH:mm').format('YYYY-MM-DDTHH:mm:ss.SSSZ'),
+        clockOut: moment(clockOutCombined, 'YYYY-MM-DD HH:mm').format('YYYY-MM-DDTHH:mm:ss.SSSZ')
+      };
+
+
+      await axiosInstance.patch(`/hr/attendance/${editingRecordId}`, payload);
+
+      // 4. Update the local state with the newly formatted ISO strings
       setAttendanceData((prevData) =>
         prevData.map((record) =>
           record._id === editingRecordId
             ? {
                 ...record,
-                clockInDate: editForm.startDate,
-                clockOutDate: editForm.endDate,
-                clockIn: editForm.startTime,
-                clockOut: editForm.endTime
+                ...payload
               }
             : record
         )
@@ -430,10 +435,10 @@ const TableSection = ({
         <TableHeader>
           <TableRow>
             <TableHead>Service User Name</TableHead>
-            <TableHead className="w-[10%]">Start Date</TableHead>
-            <TableHead className="w-[10%]">Start Time</TableHead>
-            <TableHead className="w-[10%]">End Date</TableHead>
-            <TableHead className="w-[10%]">End Time</TableHead>
+            <TableHead className="w-[10%]">Logout Date</TableHead>
+            <TableHead className="w-[10%]">Logout Time</TableHead>
+            <TableHead className="w-[10%]">Login Date</TableHead>
+            <TableHead className="w-[10%]">Login Time</TableHead>
             <TableHead className="w-[10%]">Duration</TableHead>
             <TableHead className="text-right">Action</TableHead>
           </TableRow>
