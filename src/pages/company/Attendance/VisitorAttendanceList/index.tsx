@@ -502,9 +502,15 @@ const TableSection = ({
                 )
               : calculateDuration(startDate, rStartTime, endDate, rEndTime);
 
+            // --- ADDED LOGIC HERE ---
+            // If the calculated duration is less than 1 minute, force display to '00:00'
+            if (dCalc && dCalc.minutes < 1) {
+              dCalc.display = '00:00';
+            }
+            // ------------------------
+
             // Strict check: Minutes must be > 0
             const isDurationValid = dCalc.minutes > 0;
-
             return (
               <TableRow key={record._id}>
                 <TableCell>

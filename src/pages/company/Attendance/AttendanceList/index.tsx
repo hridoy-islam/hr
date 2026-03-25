@@ -119,6 +119,14 @@ const calculateDuration = (
   };
 };
 
+const isSameDay = (a: Date | null, b: Date | null) => {
+  if (!a || !b) return false;
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+};
 const AttendancePage = () => {
   const user = useSelector((state: RootState) => state.auth?.user) || null;
   const navigate = useNavigate();
@@ -179,6 +187,26 @@ const AttendancePage = () => {
   const [rotaRawList, setRotaRawList] = useState<any[]>([]); // full rota objects
   const [isLoadingRotas, setIsLoadingRotas] = useState(false);
 
+
+  const [activeDateBtn, setActiveDateBtn] = useState<'today' | 'yesterday' | null>(null);
+
+const handleToday = () => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  setDateRange([today, today]);
+  setActiveDateBtn('today');
+  fetchAttendance(1, entriesPerPage, today, today);
+};
+
+const handleYesterday = () => {
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  yesterday.setHours(0, 0, 0, 0);
+  setDateRange([yesterday, yesterday]);
+  setActiveDateBtn('yesterday');
+  fetchAttendance(1, entriesPerPage, yesterday, yesterday);
+};
+
   // Memo: map rotaId -> raw rota object for instant department lookup
   const rotaRawMap = useMemo(() => {
     const map: Record<string, any> = {};
@@ -228,46 +256,53 @@ const AttendancePage = () => {
   }, [id]);
 
   // Fetch Attendance Data
-  const fetchAttendance = async (page: number, limit: number) => {
-    if (!id) return;
+ const fetchAttendance = async (
+  page: number,
+  limit: number,
+  fromOverride?: Date,
+  toOverride?: Date
+) => {
+  if (!id) return;
 
-    setIsLoading(true);
-    try {
-      const params: any = {
-        companyId: id,
-        page,
-        limit,
-        fromDate: startDate
-          ? `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`
-          : undefined,
-        toDate: endDate
-          ? `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`
-          : undefined,
-        designationId: selectedDesignation?.value,
-        departmentId: selectedDepartment?.value,
-        userId: selectedUser?.value,
-        userType: 'employee'
-      };
+  const from = fromOverride ?? startDate;
+  const to = toOverride ?? endDate;
 
-      // Add isApproved filter
-      if (selectedApproval !== null) {
-        params.isApproved = selectedApproval.value;
-      }
+  setIsLoading(true);
+  try {
+    const params: any = {
+      companyId: id,
+      page,
+      limit,
+      fromDate: from
+        ? `${from.getFullYear()}-${String(from.getMonth() + 1).padStart(2, '0')}-${String(from.getDate()).padStart(2, '0')}`
+        : undefined,
+      toDate: to
+        ? `${to.getFullYear()}-${String(to.getMonth() + 1).padStart(2, '0')}-${String(to.getDate()).padStart(2, '0')}`
+        : undefined,
+      designationId: selectedDesignation?.value,
+      departmentId: selectedDepartment?.value,
+      userId: selectedUser?.value,
+      userType: 'employee'
+    };
 
-      const res = await axiosInstance.get(`/hr/attendance`, { params });
-      const apiResponse = res.data;
-
-      if (apiResponse.success && apiResponse.data) {
-        setAttendanceData(apiResponse.data.result || []);
-        setTotalPages(apiResponse.data.meta?.totalPage || 1);
-        setFetchedApproval(selectedApproval);
-      }
-    } catch (error) {
-      console.error('Error fetching attendance:', error);
-    } finally {
-      setIsLoading(false);
+    if (selectedApproval !== null) {
+      params.isApproved = selectedApproval.value;
     }
-  };
+
+    const res = await axiosInstance.get(`/hr/attendance`, { params });
+    const apiResponse = res.data;
+
+    if (apiResponse.success && apiResponse.data) {
+      setAttendanceData(apiResponse.data.result || []);
+      setTotalPages(apiResponse.data.meta?.totalPage || 1);
+      setFetchedApproval(selectedApproval);
+    }
+  } catch (error) {
+    console.error('Error fetching attendance:', error);
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   useEffect(() => {
     fetchAttendance(currentPage, entriesPerPage);
@@ -284,6 +319,8 @@ const AttendancePage = () => {
       new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0)
     ]);
     setFetchedApproval(approvalOptions[0]);
+    setActiveDateBtn(null);
+
   };
 
   const handleView = (recordId: string) => {
@@ -625,27 +662,31 @@ const AttendancePage = () => {
             </div>
 
             {/* Date Range */}
-            <div className="w-full  ">
-              <label className="mb-2 block text-xs font-semibold uppercase tracking-wider">
-                Date Range (DD-MM-YYYY)
-              </label>
-              <div className="relative w-full">
-                <DatePicker
-                  selectsRange={true}
-                  startDate={startDate}
-                  endDate={endDate}
-                  onChange={(update) => setDateRange(update)}
-                  isClearable={true}
-                  dateFormat="dd-MM-yyyy"
-                  className="flex h-10  w-full rounded-md border border-gray-300 px-3 py-2  text-sm focus:outline-none focus:ring-2 focus:ring-theme"
-                  placeholderText="Select range"
-                  wrapperClassName="w-full"
-                  showMonthDropdown
-                  showYearDropdown
-                  dropdownMode="select"
-                />
-              </div>
-            </div>
+            <div className="w-full">
+  <label className="mb-2 block text-xs font-semibold uppercase tracking-wider">
+    Date Range (DD-MM-YYYY)
+  </label>
+  <div className="relative w-full">
+    <DatePicker
+      selectsRange={true}
+      startDate={startDate}
+      endDate={isSameDay(startDate, endDate) ? null : endDate}
+      onChange={(update) => {
+        setDateRange(update);
+        setActiveDateBtn(null);
+      }}
+      isClearable={true}
+      dateFormat="dd-MM-yyyy"
+      className="flex h-10 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-theme"
+      placeholderText="Select range"
+      wrapperClassName="w-full"
+      showMonthDropdown
+      showYearDropdown
+      dropdownMode="select"
+      portalId='root'
+    />
+  </div>
+</div>
 
             {/* Search & Reset Buttons */}
             <div className="flex gap-2">
@@ -671,29 +712,52 @@ const AttendancePage = () => {
                 Reset
               </Button>
             </div>
+
+            
           </div>
 
           {/* Table Header Summary */}
-          <div className="flex flex-row items-center gap-4">
-            <div className="mt-2 text-lg font-semibold text-gray-600">
-              Attendance:{' '}
-              <span>{startDate ? formatDisplayDate(startDate) : '...'}</span>
-              {endDate && <span> - {formatDisplayDate(endDate)}</span>}
-            </div>
-            {fetchedApproval && (
-              <div className="mt-2 flex items-center">
-                <span
-                  className={`inline-flex items-center rounded-full border px-3 py-0.5 text-sm font-medium ${
-                    fetchedApproval.label === 'Already Approved'
-                      ? 'border-green-200 bg-green-100 text-green-700'
-                      : 'border-orange-200 bg-yellow-100 text-orange-700'
-                  }`}
-                >
-                  {fetchedApproval.label}
-                </span>
-              </div>
-            )}
-          </div>
+         <div className="flex flex-row items-center justify-between">
+  <div className='flex flex-row items-center gap-4'>
+    <div className="mt-2 text-lg font-semibold text-gray-600">
+  Attendance:{' '}
+  <span>{startDate ? formatDisplayDate(startDate) : '...'}</span>
+  {endDate && !isSameDay(startDate, endDate) && (
+    <span> - {formatDisplayDate(endDate)}</span>
+  )}
+</div>
+    {fetchedApproval && (
+      <div className="mt-2 flex items-center">
+        <span
+          className={`inline-flex items-center rounded-full border px-3 py-0.5 text-sm font-medium ${
+            fetchedApproval.label === 'Already Approved'
+              ? 'border-green-200 bg-green-100 text-green-700'
+              : 'border-orange-200 bg-yellow-100 text-orange-700'
+          }`}
+        >
+          {fetchedApproval.label}
+        </span>
+      </div>
+    )}
+  </div>
+
+  <div className='flex gap-4'>
+    <Button
+      size={'sm'}
+      variant={activeDateBtn === 'today' ? 'default' : 'outline'}
+      onClick={handleToday}
+    >
+      Today
+    </Button>
+    <Button
+      size={'sm'}
+      variant={activeDateBtn === 'yesterday' ? 'default' : 'outline'}
+      onClick={handleYesterday}
+    >
+      Yesterday
+    </Button>
+  </div>
+</div>
 
           <div className="rounded-md">
             <TableSection
@@ -819,7 +883,7 @@ const TableSection = ({
         </TableHeader>
         <TableBody>
           {data.map((record: any) => {
-            const firstName = record.userId?.firstName || '';
+         const firstName = record.userId?.firstName || '';
             const lastName = record.userId?.lastName || '';
             const fullName = `${firstName} ${lastName}`.trim() || 'Unknown';
             const email = record.userId?.email || '--';
@@ -867,6 +931,13 @@ const TableSection = ({
                 rEndTime
               );
             }
+
+            // --- ADDED LOGIC HERE ---
+            // If the calculated duration is less than 1 minute, force display to '00:00'
+            if (dCalc && dCalc.minutes < 1) {
+              dCalc.display = '00:00';
+            }
+            // ------------------------
 
             const isDurationValid = isEditing ? dCalc.minutes > 0 : true;
 
