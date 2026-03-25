@@ -87,6 +87,12 @@ const navItems = [
     href: 'notice',
     roles: ['employee']
   },
+  {
+    icon: FileSpreadsheet,
+    label: 'Attendance',
+    href: 'attendance',
+    roles: ['employee']
+  },
 
   // --- Admin Specific ---
   {

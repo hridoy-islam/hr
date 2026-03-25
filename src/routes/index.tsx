@@ -48,7 +48,6 @@ import RtwPage from '@/pages/company/Employee/rightToWorkEmployee';
 import RightToWorkStatusPage from '@/pages/Hr/Dashboard/components/rightToWorkStatus';
 import BankHolidayPage from '@/pages/company/Bank-Holiday';
 import RequestDocumentPage from '@/pages/Hr/Request-Documents';
-import StaffAttendancePage from '@/pages/Hr/StaffAttendance';
 import AdminDashboardPage from '@/pages/Dashboard/AdminDashboard';
 import { CompanyPage } from '@/pages/admin/companyPage';
 import CompanyDashboardPage from '@/pages/Dashboard/CompanyDashboard';
@@ -99,6 +98,7 @@ import ServiceUserPage from '@/pages/company/serviceUser';
 import VisitorAttendancePage from '@/pages/company/Attendance/VisitorAttendanceList';
 import ServiceUserAttendancePage from '@/pages/company/Attendance/ServiceUserAttendanceList';
 import SignatureDoc from '@/pages/company/SignatureDoc';
+import StaffAttendancePage from '@/pages/staff/attendance';
 
 const SignInPage = lazy(() => import('@/pages/auth/signin'));
 
@@ -217,7 +217,7 @@ export default function AppRouter() {
           element: <AttendanceApproveList />
         },
 
-        { path: 'staff-attendance', element: <StaffAttendancePage /> },
+        // { path: 'staff-attendance', element: <StaffAttendancePage /> },
         { path: 'attendance-report', element: <AttendanceReport /> },
 
         { path: 'payroll', element: <AdminPayRoll /> },
@@ -289,7 +289,8 @@ export default function AppRouter() {
         { path: 'upcoming-shifts', element: <UpcomingShiftPage /> },
         { path: 'notice', element: <StaffNoticeBoard /> },
         { path: 'holiday', element: <HolidayPage /> },
-        { path: 'profile', element: <StaffProfile /> }
+        { path: 'profile', element: <StaffProfile /> },
+        { path: 'attendance', element: <StaffAttendancePage /> }
       ]
     }
   ];
