@@ -1,16 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
-  Select,
+  Select as ShadcnSelect,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Table,
   TableBody,
@@ -19,149 +18,120 @@ import {
   TableHeader,
   TableRow
 } from '@/components/ui/table';
-import {
-  Calendar,
-  ChevronDown,
-  CalendarDays,
-  Clock,
-  Users,
-  CheckCircle
-} from 'lucide-react';
-import DatePicker from 'react-datepicker';
-import 'react-datepicker/dist/react-datepicker.css';
+import { CalendarDays, Users, Edit2, Save, X } from 'lucide-react';
 import axiosInstance from '@/lib/axios';
-import { useSelector } from 'react-redux';
-import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 import { useParams } from 'react-router-dom';
 import moment from '@/lib/moment-setup';
 
-interface HolidayAPI {
-  userId: string;
-  startDate: Date;
-  endDate: Date;
-  reason: string;
-  status?: 'pending' | 'approved' | 'rejected';
-  holidayType?: string;
-  title: string;
-  holidayYear: string;
-  totalDays?: number;
-  totalHours?: number;
-  createdAt?: Date;
-  updatedAt?: Date;
+interface HolidayTabProps {
+  formData?: any;
 }
 
-interface HolidayAllowanceAPI {
-  userId: string;
-  year: string;
-  holidayAllowance: number;
-  totalHours: number;
-  usedHours: number;
-  remainingHours: number;
-  hoursPerDay: number;
-  holidaysTaken: Array<{
-    startDate: Date;
-    endDate: Date;
-    totalDays: number;
-    totalHours: number;
-    reason: string | null;
-    status: 'pending' | 'approved' | 'rejected';
-  }>;
-  createdAt?: Date;
-  updatedAt?: Date;
-}
-
-const HolidayTab: React.FC = ({  formData
-}) => {
+const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
   const getCurrentHolidayYear = () => {
     const year = moment().year();
     return `${year}-${year + 1}`;
   };
 
-  // Initialize state
+  // ── State ──
   const [selectedYear, setSelectedYear] = useState(getCurrentHolidayYear());
-  const [selectedType, setSelectedType] = useState('');
-  const [startDate, setStartDate] = useState<Date | undefined>(undefined);
-  const [endDate, setEndDate] = useState<Date | undefined>(undefined);
-  const [title, setTitle] = useState('');
-  const [reason, setReason] = useState('');
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+
   const { toast } = useToast();
-  const { id } = useParams();
-  const [holidays, setHolidays] = useState<HolidayAPI[]>([]);
+  const { id, eid } = useParams(); // target user's ID
+
+  const [holidays, setHolidays] = useState<any[]>([]);
+
+  // To update the record, we need its DB _id
+  const [holidayRecordId, setHolidayRecordId] = useState<string | null>(null);
+
+  // Exact sync with your new DB schema
   const [leaveAllowance, setLeaveAllowance] = useState({
-    openingThisYear: 0,
+    holidayAllowance: 0,
     holidayAccured: 0,
-    bankHolidayAutoBooked: 0,
-    taken: 0,
-    booked: 0,
-    requested: 0,
-    leftThisYear: 0,
+    usedHours: 0,
+    bookedHours: 0,
     requestedHours: 0,
-    remainingHours: 0
+    remainingHours: 0,
+    unpaidLeaveTaken: 0,
+    unpaidBookedHours: 0,
+    unpaidLeaveRequest: 0
   });
 
+  // Edit Allowance States
+  const [isEditingAllowance, setIsEditingAllowance] = useState(false);
+  const [editAllowanceValue, setEditAllowanceValue] = useState<number | string>(
+    0
+  );
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  // ── Data Fetching ──
   const fetchHolidayAllowance = async () => {
     try {
-      const year = selectedYear;
       const response = await axiosInstance.get(
-        `/hr/holidays?userId=${id}&year=${year}`
+        `/hr/holidays?userId=${eid}&year=${selectedYear}&limit=all`
       );
 
       const responseData =
         response.data?.data?.result || response.data?.data || response.data;
-      let holidayRecord = null;
 
+      let holidayRecord = null;
       if (Array.isArray(responseData)) {
-        holidayRecord = responseData.find((item: any) => item.year === year);
-      } else if (responseData?.year === year) {
+        holidayRecord = responseData.find(
+          (item: any) => item.year === selectedYear
+        );
+      } else if (responseData?.year === selectedYear) {
         holidayRecord = responseData;
       }
 
       if (holidayRecord) {
-        const openingThisYear = holidayRecord.holidayAllowance || 0;
-        const holidayAccured = holidayRecord.holidayAccured || 0;
-        const taken = holidayRecord.usedHours || 0;
-        const requested = holidayRecord.requestedHours || 0;
-        const remainingHours = holidayAccured - taken - requested; // ✅ Correct formula
+        setHolidayRecordId(holidayRecord._id); // Save ID for PATCH request
 
         setLeaveAllowance({
-          openingThisYear,
-          holidayAccured,
-          bankHolidayAutoBooked: 0,
-          taken,
-          booked: taken, // assuming booked = taken (approved)
-          requested,
-          requestedHours: requested,
-          remainingHours,
-          leftThisYear: remainingHours // ✅ Sync with remainingHours
+          holidayAllowance: holidayRecord.holidayAllowance || 0,
+          holidayAccured: holidayRecord.holidayAccured || 0,
+          usedHours: holidayRecord.usedHours || 0,
+          bookedHours: holidayRecord.bookedHours || 0,
+          requestedHours: holidayRecord.requestedHours || 0,
+          remainingHours: holidayRecord.remainingHours || 0,
+          unpaidLeaveTaken: holidayRecord.unpaidLeaveTaken || 0,
+          unpaidBookedHours: holidayRecord.unpaidBookedHours || 0,
+          unpaidLeaveRequest: holidayRecord.unpaidLeaveRequest || 0
         });
+        setEditAllowanceValue(holidayRecord.holidayAllowance || 0);
       } else {
+        setHolidayRecordId(null);
         setLeaveAllowance({
-          openingThisYear: 0,
+          holidayAllowance: 0,
           holidayAccured: 0,
-          bankHolidayAutoBooked: 0,
-          taken: 0,
-          booked: 0,
-          requested: 0,
+          usedHours: 0,
+          bookedHours: 0,
           requestedHours: 0,
           remainingHours: 0,
-          leftThisYear: 0
+          unpaidLeaveTaken: 0,
+          unpaidBookedHours: 0,
+          unpaidLeaveRequest: 0
         });
+        setEditAllowanceValue(0);
       }
     } catch (err: any) {
       console.error('Error fetching holiday allowance:', err);
     }
   };
 
-  const fetchLeaveRequests = async () => {
+const fetchLeaveRequests = async () => {
     try {
-      const response = await axiosInstance.get(`/hr/leave?userId=${id}`);
+      // Added holidayYear to the query parameters
+      const response = await axiosInstance.get(
+        `/hr/leave?userId=${eid}&holidayYear=${selectedYear}&limit=all`
+      );
       let data =
         response.data.data?.result || response.data.data || response.data || [];
 
+      // Kept local filter as a safety fallback
       const filteredData = data.filter(
         (item: any) => item.holidayYear === selectedYear
       );
@@ -178,25 +148,6 @@ const HolidayTab: React.FC = ({  formData
       }));
 
       setHolidays(mappedHolidays);
-
-      // Optional: Recalculate locally if you want to include unsaved/draft state
-      // Otherwise, rely on backend values from allowance
-      const totalTaken = mappedHolidays
-        .filter((h) => h.status === 'Approved')
-        .reduce((sum, h) => sum + parseHours(h.hours), 0);
-      const totalRequested = mappedHolidays
-        .filter((h) => h.status === 'Pending')
-        .reduce((sum, h) => sum + parseHours(h.hours), 0);
-
-      setLeaveAllowance((prev) => ({
-        ...prev,
-        taken: totalTaken,
-        booked: totalTaken,
-        requested: totalRequested,
-        requestedHours: totalRequested,
-        leftThisYear: prev.holidayAccured - totalTaken - totalRequested, // ✅ Correct formula
-        remainingHours: prev.holidayAccured - totalTaken - totalRequested // ✅ Keep in sync
-      }));
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to load leave requests');
       console.error('Error fetching leave requests:', err);
@@ -206,16 +157,48 @@ const HolidayTab: React.FC = ({  formData
   useEffect(() => {
     if (id) {
       setLoading(true);
-      // ✅ Fetch allowance FIRST, then requests — to ensure holidayAccured is available
-      fetchHolidayAllowance()
-        .then(() => fetchLeaveRequests())
+      Promise.all([fetchHolidayAllowance(), fetchLeaveRequests()])
         .catch(console.error)
         .finally(() => setLoading(false));
     }
   }, [id, selectedYear]);
 
+  // ── Update Action ──
+  const handleUpdateAllowance = async () => {
+    if (!holidayRecordId) {
+      toast({
+        title: 'No holiday record exists for this year to update yet.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setIsUpdating(true);
+    try {
+      // Patch request to update the holiday allowance opening balance
+      await axiosInstance.patch(`/hr/holidays/${holidayRecordId}`, {
+        holidayAllowance: Number(editAllowanceValue)
+      });
+
+      toast({ title: 'Allowance updated successfully!' });
+      setIsEditingAllowance(false);
+
+      // Refresh the data to get newly calculated remaining balances
+      await fetchHolidayAllowance();
+    } catch (err: any) {
+      toast({
+        title: err.response?.data?.message || 'Failed to update allowance',
+        variant: 'destructive'
+      });
+      console.error('Error updating allowance:', err);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  // ── Helpers ──
   const mapStatus = (status: string): string => {
-    switch (status) {
+    switch (status?.toLowerCase()) {
       case 'approved':
         return 'Approved';
       case 'pending':
@@ -234,20 +217,8 @@ const HolidayTab: React.FC = ({  formData
     return `${h}:${min.toString().padStart(2, '0')}`;
   };
 
-  const parseHours = (timeStr: string): number => {
-    if (!timeStr) return 0;
-    const [h, m] = timeStr.split(':').map(Number);
-    return h + (m || 0) / 60;
-  };
-
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'Bank Holiday Auto Booked':
-        return (
-          <Badge variant="secondary" className="bg-gray-100 text-gray-800">
-            Auto Booked
-          </Badge>
-        );
       case 'Approved':
         return (
           <Badge variant="default" className="bg-green-100 text-green-800">
@@ -266,12 +237,6 @@ const HolidayTab: React.FC = ({  formData
             Rejected
           </Badge>
         );
-      case 'Taken':
-        return (
-          <Badge variant="default" className="bg-blue-100 text-blue-800">
-            Taken
-          </Badge>
-        );
       default:
         return <Badge variant="destructive">{status}</Badge>;
     }
@@ -287,12 +252,73 @@ const HolidayTab: React.FC = ({  formData
     });
   };
 
-  if (loading)
+  const generateHolidayYears = (backward = 20, forward = 50) => {
+    const currentYear = moment().year();
+    const years: string[] = [];
+    for (let i = backward; i > 0; i--) {
+      const start = currentYear - i;
+      years.push(`${start}-${start + 1}`);
+    }
+    years.push(`${currentYear}-${currentYear + 1}`);
+    for (let i = 1; i <= forward; i++) {
+      const start = currentYear + i;
+      years.push(`${start}-${start + 1}`);
+    }
+    return years;
+  };
+
+  const holidayYears = useMemo(() => generateHolidayYears(20, 50), []);
+
+  // ── Memoized Allowance Stats ──
+  const allowanceStatsList = useMemo(
+    () => [
+      {
+        label: 'Holiday Accrued',
+        value: leaveAllowance.holidayAccured,
+        color: 'text-gray-800'
+      },
+      {
+        label: 'Taken',
+        value: leaveAllowance.usedHours,
+        color: 'text-green-600'
+      },
+      {
+        label: 'Booked',
+        value: leaveAllowance.bookedHours,
+        color: 'text-orange-600'
+      },
+      {
+        label: 'Requested',
+        value: leaveAllowance.requestedHours,
+        color: 'text-yellow-600'
+      },
+      {
+        label: 'Unpaid Leave Taken',
+        value: leaveAllowance.unpaidLeaveTaken,
+        color: 'text-cyan-600'
+      },
+      {
+        label: 'Unpaid Booked',
+        value: leaveAllowance.unpaidBookedHours,
+        color: 'text-blue-600'
+      },
+      {
+        label: 'Unpaid Requested',
+        value: leaveAllowance.unpaidLeaveRequest,
+        color: 'text-theme'
+      }
+    ],
+    [leaveAllowance]
+  );
+
+  // ── Render Guards ──
+  if (loading) {
     return (
       <div className="flex justify-center py-12">
         <BlinkingDots size="large" color="bg-theme" />
       </div>
     );
+  }
 
   if (error) {
     return (
@@ -300,7 +326,8 @@ const HolidayTab: React.FC = ({  formData
         <div className="mb-4 text-red-600">Error: {error}</div>
         <Button
           onClick={() => {
-            fetchHolidayAllowance().then(() => fetchLeaveRequests());
+            fetchHolidayAllowance();
+            fetchLeaveRequests();
           }}
         >
           Retry
@@ -309,207 +336,217 @@ const HolidayTab: React.FC = ({  formData
     );
   }
 
-  const generateHolidayYears = (
-    backward: number = 20,
-    forward: number = 50
-  ) => {
-    const currentYear = moment().year();
-    const years: string[] = [];
-
-    // Backward years
-    for (let i = backward; i > 0; i--) {
-      const start = currentYear - i;
-      const end = start + 1;
-      years.push(`${start}-${end}`);
-    }
-
-    // Current year
-    years.push(`${currentYear}-${currentYear + 1}`);
-
-    // Forward years
-    for (let i = 1; i <= forward; i++) {
-      const start = currentYear + i;
-      const end = start + 1;
-      years.push(`${start}-${end}`);
-    }
-
-    return years;
-  };
-
-  const holidayYears = generateHolidayYears(20, 50);
-
+  // ── JSX ──
   return (
     <div className="">
-      <div className="">
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-          {/* My Holidays Section */}
-          <div className="lg:col-span-2">
-            <Card className="shadow-sm">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <CalendarDays className="h-5 w-5 text-blue-600" />
-                  {`${formData?.firstName}${" "}${formData?.lastName}'s`} Leave Requests
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {/* Dropdown Year Selector */}
-                <div className="mb-4 flex items-center justify-start gap-4">
-                  <span className="font-semibold text-gray-700">
-                    Holiday Year:
-                  </span>
-                  <Select value={selectedYear} onValueChange={setSelectedYear}>
-                    <SelectTrigger className="w-48">
-                      <SelectValue placeholder="Select year" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {holidayYears.map((year) => (
-                        <SelectItem key={year} value={year}>
-                          {year}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                {/* Leave Allowance Summary */}
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4 rounded-lg bg-blue-50 p-4 md:grid-cols-4">
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-blue-600">
-                        {leaveAllowance.bankHolidayAutoBooked} h
-                      </div>
-                      <div className="text-sm text-gray-600">Bank Holiday</div>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        {/* ── Left: Leave Requests Table ── */}
+        <div className="lg:col-span-2">
+          <Card className="shadow-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CalendarDays className="h-5 w-5 text-theme" />
+                {`${formData?.firstName || 'User'}'s`} Leave Requests
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="mb-4 flex items-center justify-start gap-4">
+                <span className="font-semibold text-gray-700">
+                  Holiday Year:
+                </span>
+                <ShadcnSelect
+                  value={selectedYear}
+                  onValueChange={setSelectedYear}
+                >
+                  <SelectTrigger className="w-48">
+                    <SelectValue placeholder="Select year" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {holidayYears.map((year) => (
+                      <SelectItem key={year} value={year}>
+                        {year}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </ShadcnSelect>
+              </div>
+
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4 rounded-lg bg-blue-50 p-4 md:grid-cols-4">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-gray-800">
+                      {leaveAllowance.holidayAllowance.toFixed(1)} h
                     </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-green-600">
-                        {leaveAllowance.taken.toFixed(1)} h
-                      </div>
-                      <div className="text-sm text-gray-600">Taken</div>
+                    <div className="text-sm text-gray-600">Total Allowance</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-green-600">
+                      {leaveAllowance.usedHours.toFixed(1)} h
                     </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-orange-600">
-                        {leaveAllowance.booked.toFixed(1)} h
-                      </div>
-                      <div className="text-sm text-gray-600">Booked</div>
+                    <div className="text-sm text-gray-600">Taken</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-orange-600">
+                      {leaveAllowance.bookedHours.toFixed(1)} h
                     </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-purple-600">
-                        {leaveAllowance.remainingHours.toFixed(1)} h
-                      </div>
-                      <div className="text-sm text-gray-600">Balance</div>
-                    </div>
+                    <div className="text-sm text-gray-600">Booked</div>
                   </div>
-                  {/* Holiday Table */}
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Start Date</TableHead>
-                          <TableHead>End Date</TableHead>
-                          <TableHead>Reason</TableHead>
-                          <TableHead>Hours</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {holidays.length > 0 ? (
-                          holidays.map((holiday, index) => (
-                            <TableRow
-                              key={`${holiday.startDate}-${holiday.title}-${index}`}
-                            >
-                              <TableCell>
-                                {getStatusBadge(holiday.status)}
-                              </TableCell>
-                              <TableCell>
-                                {formatDate(holiday.startDate)}
-                              </TableCell>
-                              <TableCell>
-                                {formatDate(holiday.endDate)}
-                              </TableCell>
-                              <TableCell className="font-medium">
-                                {holiday?.reason || '-'}
-                              </TableCell>
-                              <TableCell>{holiday.hours}</TableCell>
-                            </TableRow>
-                          ))
-                        ) : (
-                          <TableRow>
-                            <TableCell
-                              colSpan={5}
-                              className="text-center text-gray-500"
-                            >
-                              No leave requests found for {selectedYear}.
-                            </TableCell>
-                          </TableRow>
-                        )}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-          {/* Right Column */}
-          <div className="space-y-6">
-            {/* My Leave Allowance */}
-            <Card className="shadow-sm">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5 text-green-600" />
-                  {`${formData?.firstName}${" "}${formData?.lastName}'s`} Leave Allowance
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between border-b border-gray-300 py-2">
-                    <span className="text-gray-600">Opening This Year</span>
-                    <span className="font-semibold">
-                      {leaveAllowance.openingThisYear.toFixed(1)} h
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between border-b border-gray-300 py-2">
-                    <span className="text-gray-600">Holiday Accrued</span>
-                    <span className="font-semibold">
-                      {leaveAllowance.holidayAccured.toFixed(1)} h
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between border-b border-gray-300 py-2">
-                    <span className="text-gray-600">
-                      Bank Holiday Auto Booked
-                    </span>
-                    <span className="font-semibold">
-                      {leaveAllowance.bankHolidayAutoBooked.toFixed(1)} h
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between border-b border-gray-300 py-2">
-                    <span className="text-gray-600">Taken</span>
-                    <span className="font-semibold text-green-600">
-                      {leaveAllowance.taken.toFixed(1)} h
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between border-b border-gray-300 py-2">
-                    <span className="text-gray-600">Booked</span>
-                    <span className="font-semibold text-orange-600">
-                      {leaveAllowance.booked.toFixed(1)} h
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between border-b border-gray-300 py-2">
-                    <span className="text-gray-600">Requested</span>
-                    <span className="font-semibold text-yellow-600">
-                      {leaveAllowance.requestedHours.toFixed(1)} h
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between rounded-lg bg-blue-50 px-3 py-2">
-                    <span className="font-semibold text-blue-900">
-                      Left This Year
-                    </span>
-                    <span className="text-lg font-bold text-blue-600">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-purple-600">
                       {leaveAllowance.remainingHours.toFixed(1)} h
-                    </span>
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      Remaining Balance
+                    </div>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
+
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Start Date</TableHead>
+                        <TableHead>End Date</TableHead>
+                        <TableHead className="w-[10vw]">Reason</TableHead>
+                        <TableHead>Hours</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {holidays.length > 0 ? (
+                        holidays.map((holiday, index) => (
+                          <TableRow
+                            key={`${holiday.startDate}-${holiday.title}-${index}`}
+                          >
+                            <TableCell>
+                              {getStatusBadge(holiday.status)}
+                            </TableCell>
+                            <TableCell>
+                              {formatDate(holiday.startDate)}
+                            </TableCell>
+                            <TableCell>{formatDate(holiday.endDate)}</TableCell>
+                            <TableCell className="w-[30%] whitespace-pre-wrap font-medium">
+                              {holiday?.reason || '-'}
+                            </TableCell>
+                            <TableCell>{holiday.hours}</TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell
+                            colSpan={5}
+                            className="text-center text-gray-500"
+                          >
+                            No leave requests found for {selectedYear}.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* ── Right: Allowance & Edit Functionality ── */}
+        <div className="space-y-6">
+          <Card className="shadow-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between gap-2">
+                <div className="flex flex-row items-center gap-2">
+                  <Users className="h-5 w-5 text-green-600" />
+                  Leave Allowance
+                </div>
+                {!isEditingAllowance && (
+                  <Button
+                    size="sm"
+                    onClick={() => setIsEditingAllowance(true)}
+                  >
+                    Edit{' '}
+                  </Button>
+                )}
+              </CardTitle>
+            </CardHeader>
+
+            <CardContent>
+              <div className="space-y-4">
+                {/* Editable Holiday Allowance Row */}
+                {isEditingAllowance ? (
+                  <div className="flex flex-col gap-2 border-b border-gray-300 py-2">
+                    <span className="font-medium text-gray-600">
+                      Opening This Year
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        step="1"
+                        className="h-8 w-48 text-left"
+                        value={editAllowanceValue}
+                        onChange={(e) => setEditAllowanceValue(e.target.value)}
+                        disabled={isUpdating}
+                      />
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8 text-green-600 hover:bg-green-50 hover:text-green-700"
+                        onClick={handleUpdateAllowance}
+                        disabled={isUpdating}
+                      >
+                        <Save className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8 text-red-600 hover:bg-red-50 hover:text-red-700"
+                        onClick={() => {
+                          setIsEditingAllowance(false);
+                          setEditAllowanceValue(
+                            leaveAllowance.holidayAllowance
+                          ); // reset
+                        }}
+                        disabled={isUpdating}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between border-b border-gray-300 py-2">
+                    <span className="font-medium text-gray-600">
+                      Opening This Year
+                    </span>
+                    <span className="font-semibold text-gray-800">
+                      {leaveAllowance.holidayAllowance.toFixed(2)} h
+                    </span>
+                  </div>
+                )}
+
+                {/* Rest of the UI map */}
+                {allowanceStatsList.map(({ label, value, color }) => (
+                  <div
+                    key={label}
+                    className="flex items-center justify-between border-b border-gray-300 py-2"
+                  >
+                    <span className="text-gray-600">{label}</span>
+                    <span className={`font-semibold ${color}`}>
+                      {value.toFixed(2)} h
+                    </span>
+                  </div>
+                ))}
+
+                {/* Remaining Balance Total */}
+                <div className="mt-2 flex items-center justify-between rounded-lg bg-blue-50 px-3 py-2">
+                  <span className="font-semibold text-black">
+                    Balance Remaining
+                  </span>
+                  <span className="text-lg font-bold text-theme">
+                    {leaveAllowance.remainingHours.toFixed(2)} h
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>
