@@ -10,20 +10,22 @@ export default function SignInPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
-  if (!user) return;
+    if (!user) return;
 
-  if (user?.role === 'admin') {
-    navigate('/admin');
-  } else if (user?.role === 'company') {
-    navigate(`/company/${user?._id}`);  
-  }else if (user?.role === 'employee') {
-    navigate(`/company/${user?.company}/staff/${user?._id}`);
-  } else if (user?.role === 'attendance') {
-    navigate(`/company/${user?.company}/employee-attendance`);
-  } else {
-    navigate('/');
-  }
-}, [user, navigate]);
+    if (user?.role === 'admin') {
+      navigate('/admin');
+    } else if (user?.role === 'company') {
+      navigate(`/company/${user?._id}`);
+    } else if (user?.role === 'companyAdmin') {
+      navigate(`/company/${user?.company}`);
+    } else if (user?.role === 'employee') {
+      navigate(`/company/${user?.company}/staff/${user?._id}`);
+    } else if (user?.role === 'attendance') {
+      navigate(`/company/${user?.company}/employee-attendance`);
+    } else {
+      navigate('/');
+    }
+  }, [user, navigate]);
 
   return (
     <div className="flex min-h-screen">
@@ -58,7 +60,7 @@ export default function SignInPage() {
               />
             </div>
             <div className="w-full">
-              <h1 className="mb-3 text-3xl font-bold text-white text-center">
+              <h1 className="mb-3 text-center text-3xl font-bold text-white">
                 A few more clicks to sign in to your account.
               </h1>
             </div>

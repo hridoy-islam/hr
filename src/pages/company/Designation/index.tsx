@@ -147,7 +147,7 @@ const user = useSelector((state: any) => state.auth.user);
                       size="sm"
                       onClick={() => handleEdit(d)}
                     >
-                      Manage Access Control
+                      Edit
                     </Button>
                   </TableCell>
                 </TableRow>

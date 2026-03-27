@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-this-alias */
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSelector } from 'react-redux';
 import DatePicker from 'react-datepicker';
@@ -11,7 +12,8 @@ import {
   RotateCcw,
   Eye,
   Check,
-  X as XIcon
+  X as XIcon,
+  History // <-- Added History Icon
 } from 'lucide-react';
 
 // Shadcn UI Imports
@@ -26,6 +28,13 @@ import {
   TableHeader,
   TableRow
 } from '@/components/ui/table';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle
+} from '@/components/ui/sheet'; // <-- Added Sheet Imports
 
 // Custom Imports
 import axiosInstance from '@/lib/axios';
@@ -61,7 +70,6 @@ const calculateDynamicDuration = (logs: any[]) => {
 
   logs.forEach((log) => {
     if (log.clockIn && log.clockOut) {
-      // Handle ISO strings directly
       const start = log.clockIn.includes('T')
         ? moment(log.clockIn)
         : moment(log.clockIn, 'HH:mm');
@@ -69,7 +77,6 @@ const calculateDynamicDuration = (logs: any[]) => {
         ? moment(log.clockOut)
         : moment(log.clockOut, 'HH:mm');
 
-      // Add a day if it's the old 'HH:mm' format and spans past midnight
       if (!log.clockOut.includes('T') && end.isBefore(start)) end.add(1, 'day');
 
       if (start.isValid() && end.isValid()) {
@@ -93,7 +100,6 @@ const calculateDuration = (
     return { display: '00:00', minutes: 0 };
   }
 
-  // If the times are already ISO strings, parse them directly
   const start = startTime.includes('T')
     ? moment(startTime)
     : moment(`${startDate} ${startTime}`, 'YYYY-MM-DD HH:mm');
@@ -127,13 +133,13 @@ const isSameDay = (a: Date | null, b: Date | null) => {
     a.getDate() === b.getDate()
   );
 };
+
 const AttendancePage = () => {
   const user = useSelector((state: RootState) => state.auth?.user) || null;
   const navigate = useNavigate();
   const { id } = useParams();
   const { toast } = useToast();
 
-  // State: Default range is Full Current Month
   const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([
     new Date(new Date().getFullYear(), new Date().getMonth(), 1),
     new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0)
@@ -141,24 +147,21 @@ const AttendancePage = () => {
   const [startDate, endDate] = dateRange;
   const [attendanceData, setAttendanceData] = useState<any[]>([]);
 
-  // Options State
   const [designationsOptions, setDesignationsOptions] = useState<any[]>([]);
   const [departmentsOptions, setDepartmentsOptions] = useState<any[]>([]);
   const [usersOptions, setUsersOptions] = useState<any[]>([]);
 
-  // Approval Options
   const approvalOptions = [
     { value: false, label: 'Admin Needs to Approve' },
     { value: true, label: 'Already Approved' }
   ];
 
-  // Filters State
   const [selectedDesignation, setSelectedDesignation] = useState<any>(null);
   const [selectedDepartment, setSelectedDepartment] = useState<any>(null);
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [selectedApproval, setSelectedApproval] = useState<any>(
     approvalOptions[0]
-  ); // Default: False
+  );
   const [fetchedApproval, setFetchedApproval] = useState<any>(
     approvalOptions[0]
   );
@@ -167,7 +170,6 @@ const AttendancePage = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [entriesPerPage, setEntriesPerPage] = useState(100);
 
-  // Reconcile/Edit States
   const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
   const [approvingRecordId, setApprovingRecordId] = useState<string | null>(
     null
@@ -182,32 +184,34 @@ const AttendancePage = () => {
   const [editError, setEditError] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
 
-  // Rota options + raw data for the currently editing record
   const [rotaOptions, setRotaOptions] = useState<any[]>([]);
-  const [rotaRawList, setRotaRawList] = useState<any[]>([]); // full rota objects
+  const [rotaRawList, setRotaRawList] = useState<any[]>([]);
   const [isLoadingRotas, setIsLoadingRotas] = useState(false);
 
+  const [activeDateBtn, setActiveDateBtn] = useState<
+    'today' | 'yesterday' | null
+  >(null);
 
-  const [activeDateBtn, setActiveDateBtn] = useState<'today' | 'yesterday' | null>(null);
+  // State for controlling the History Sidebar
+  const [historyRecord, setHistoryRecord] = useState<any | null>(null);
 
-const handleToday = () => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  setDateRange([today, today]);
-  setActiveDateBtn('today');
-  fetchAttendance(1, entriesPerPage, today, today);
-};
+  const handleToday = () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    setDateRange([today, today]);
+    setActiveDateBtn('today');
+    fetchAttendance(1, entriesPerPage, today, today);
+  };
 
-const handleYesterday = () => {
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  yesterday.setHours(0, 0, 0, 0);
-  setDateRange([yesterday, yesterday]);
-  setActiveDateBtn('yesterday');
-  fetchAttendance(1, entriesPerPage, yesterday, yesterday);
-};
+  const handleYesterday = () => {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    yesterday.setHours(0, 0, 0, 0);
+    setDateRange([yesterday, yesterday]);
+    setActiveDateBtn('yesterday');
+    fetchAttendance(1, entriesPerPage, yesterday, yesterday);
+  };
 
-  // Memo: map rotaId -> raw rota object for instant department lookup
   const rotaRawMap = useMemo(() => {
     const map: Record<string, any> = {};
     rotaRawList.forEach((r) => {
@@ -216,7 +220,6 @@ const handleYesterday = () => {
     return map;
   }, [rotaRawList]);
 
-  // Fetch Meta Data
   useEffect(() => {
     if (!id) return;
     const fetchMetaData = async () => {
@@ -255,60 +258,58 @@ const handleYesterday = () => {
     fetchMetaData();
   }, [id]);
 
-  // Fetch Attendance Data
- const fetchAttendance = async (
-  page: number,
-  limit: number,
-  fromOverride?: Date,
-  toOverride?: Date
-) => {
-  if (!id) return;
+  const fetchAttendance = async (
+    page: number,
+    limit: number,
+    fromOverride?: Date,
+    toOverride?: Date
+  ) => {
+    if (!id) return;
 
-  const from = fromOverride ?? startDate;
-  const to = toOverride ?? endDate;
+    const from = fromOverride ?? startDate;
+    const to = toOverride ?? endDate;
 
-  setIsLoading(true);
-  try {
-    const params: any = {
-      companyId: id,
-      page,
-      limit,
-      fromDate: from
-        ? `${from.getFullYear()}-${String(from.getMonth() + 1).padStart(2, '0')}-${String(from.getDate()).padStart(2, '0')}`
-        : undefined,
-      toDate: to
-        ? `${to.getFullYear()}-${String(to.getMonth() + 1).padStart(2, '0')}-${String(to.getDate()).padStart(2, '0')}`
-        : undefined,
-      designationId: selectedDesignation?.value,
-      departmentId: selectedDepartment?.value,
-      userId: selectedUser?.value,
-      userType: 'employee'
-    };
+    setIsLoading(true);
+    try {
+      const params: any = {
+        companyId: id,
+        page,
+        limit,
+        fromDate: from
+          ? `${from.getFullYear()}-${String(from.getMonth() + 1).padStart(2, '0')}-${String(from.getDate()).padStart(2, '0')}`
+          : undefined,
+        toDate: to
+          ? `${to.getFullYear()}-${String(to.getMonth() + 1).padStart(2, '0')}-${String(to.getDate()).padStart(2, '0')}`
+          : undefined,
+        designationId: selectedDesignation?.value,
+        departmentId: selectedDepartment?.value,
+        userId: selectedUser?.value,
+        userType: 'employee'
+      };
 
-    if (selectedApproval !== null) {
-      params.isApproved = selectedApproval.value;
+      if (selectedApproval !== null) {
+        params.isApproved = selectedApproval.value;
+      }
+
+      const res = await axiosInstance.get(`/hr/attendance`, { params });
+      const apiResponse = res.data;
+
+      if (apiResponse.success && apiResponse.data) {
+        setAttendanceData(apiResponse.data.result || []);
+        setTotalPages(apiResponse.data.meta?.totalPage || 1);
+        setFetchedApproval(selectedApproval);
+      }
+    } catch (error) {
+      console.error('Error fetching attendance:', error);
+    } finally {
+      setIsLoading(false);
     }
-
-    const res = await axiosInstance.get(`/hr/attendance`, { params });
-    const apiResponse = res.data;
-
-    if (apiResponse.success && apiResponse.data) {
-      setAttendanceData(apiResponse.data.result || []);
-      setTotalPages(apiResponse.data.meta?.totalPage || 1);
-      setFetchedApproval(selectedApproval);
-    }
-  } catch (error) {
-    console.error('Error fetching attendance:', error);
-  } finally {
-    setIsLoading(false);
-  }
-};
+  };
 
   useEffect(() => {
     fetchAttendance(currentPage, entriesPerPage);
-  }, [id, currentPage, entriesPerPage]); // Re-fetch when approval filter changes
+  }, [id, currentPage, entriesPerPage]);
 
-  // Reset Filters
   const handleReset = () => {
     setSelectedUser(null);
     setSelectedDesignation(null);
@@ -320,14 +321,12 @@ const handleYesterday = () => {
     ]);
     setFetchedApproval(approvalOptions[0]);
     setActiveDateBtn(null);
-
   };
 
   const handleView = (recordId: string) => {
     navigate(`${recordId}`);
   };
 
-  // --- Fetch Rotas for a given employee and date range ---
   const fetchRotasForEmployee = async (
     employeeId: string,
     fromDate: string,
@@ -363,7 +362,6 @@ const handleYesterday = () => {
     }
   };
 
-  // --- Inline Edit Handlers ---
   const handleEditClick = (record: any) => {
     setEditingRecordId(record._id);
 
@@ -372,7 +370,7 @@ const handleYesterday = () => {
 
     const extractTime = (val: string) => {
       if (!val) return '';
-      if (val.includes('T')) return moment(val).format('HH:mm'); // Extract HH:mm from ISO
+      if (val.includes('T')) return moment(val).format('HH:mm');
       if (val.length >= 5) return val.substring(0, 5);
       return val;
     };
@@ -395,7 +393,6 @@ const handleYesterday = () => {
     setEditForm(form);
     setEditError(null);
 
-    // Fetch rotas using attendance's own clockInDate and clockOutDate
     const employeeId = record.userId?._id || record.userId;
     if (employeeId) {
       const from = clockInDate
@@ -502,7 +499,6 @@ const handleYesterday = () => {
     const record = attendanceData.find((r) => r._id === editingRecordId);
     const employeeId = record?.userId?._id || record?.userId;
 
-    // Convert UI states to ISO strings for the payload
     const payloadClockInDate = moment(editForm.startDate, 'YYYY-MM-DD')
       .startOf('day')
       .toISOString();
@@ -519,11 +515,13 @@ const handleYesterday = () => {
     ).toISOString();
 
     try {
+      // --- ADDED actionUserId here ---
       await axiosInstance.patch(`/hr/attendance/${editingRecordId}`, {
         clockInDate: payloadClockInDate,
         clockOutDate: payloadClockOutDate,
         clockIn: payloadClockIn,
         clockOut: payloadClockOut,
+        actionUserId: user?._id,
         ...(editForm.rotaId ? { rotaId: editForm.rotaId } : {}),
         ...(employeeId ? { employeeId } : {})
       });
@@ -564,6 +562,9 @@ const handleYesterday = () => {
 
       handleCancelEdit();
       toast({ title: 'Attendance Updated Successfully' });
+
+      // Optionally re-fetch to get the new history array
+      fetchAttendance(currentPage, entriesPerPage);
     } catch (error: any) {
       const msg =
         error?.response?.data?.message || 'Failed to update attendance record';
@@ -574,24 +575,26 @@ const handleYesterday = () => {
     }
   };
 
-  // --- Approve Handler ---
   const handleApprove = async (recordId: string) => {
     setApprovingRecordId(recordId);
     try {
+      // --- ADDED actionUserId here ---
       await axiosInstance.patch(`/hr/attendance/${recordId}`, {
-        isApproved: true
+        isApproved: true,
+        actionUserId: user?._id
       });
       toast({ title: 'Attendance Approved Successfully' });
 
-      // Optimistically remove from view if we are filtering by "Needs Approve"
       if (selectedApproval?.value === false) {
         setAttendanceData((prev) => prev.filter((r) => r._id !== recordId));
       } else {
-        // Otherwise, just update the property in local state
         setAttendanceData((prev) =>
           prev.map((r) => (r._id === recordId ? { ...r, isApproved: true } : r))
         );
       }
+
+      // Optionally re-fetch to get the new history array if needed
+      // fetchAttendance(currentPage, entriesPerPage);
     } catch (error: any) {
       const msg =
         error?.response?.data?.message || 'Failed to approve attendance';
@@ -614,9 +617,7 @@ const handleYesterday = () => {
     <div className="space-y-3">
       <Card className="w-full bg-white shadow-md">
         <CardContent className="space-y-3 p-2 pt-4">
-          {/* Filters Row */}
           <div className="grid grid-cols-1 items-end gap-3 lg:grid-cols-5">
-            {/* Employee Filter */}
             <div>
               <label className="mb-2 block text-xs font-semibold uppercase tracking-wider">
                 Employee
@@ -630,8 +631,6 @@ const handleYesterday = () => {
                 className="text-sm"
               />
             </div>
-
-            {/* Department Filter */}
             <div>
               <label className="mb-2 block text-xs font-semibold uppercase tracking-wider">
                 Department
@@ -645,8 +644,6 @@ const handleYesterday = () => {
                 className="text-sm"
               />
             </div>
-
-            {/* Approval Filter */}
             <div>
               <label className="mb-2 block text-xs font-semibold uppercase tracking-wider">
                 Status
@@ -660,35 +657,31 @@ const handleYesterday = () => {
                 className="text-xs"
               />
             </div>
-
-            {/* Date Range */}
             <div className="w-full">
-  <label className="mb-2 block text-xs font-semibold uppercase tracking-wider">
-    Date Range (DD-MM-YYYY)
-  </label>
-  <div className="relative w-full">
-    <DatePicker
-      selectsRange={true}
-      startDate={startDate}
-      endDate={isSameDay(startDate, endDate) ? null : endDate}
-      onChange={(update) => {
-        setDateRange(update);
-        setActiveDateBtn(null);
-      }}
-      isClearable={true}
-      dateFormat="dd-MM-yyyy"
-      className="flex h-10 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-theme"
-      placeholderText="Select range"
-      wrapperClassName="w-full"
-      showMonthDropdown
-      showYearDropdown
-      dropdownMode="select"
-      portalId='root'
-    />
-  </div>
-</div>
-
-            {/* Search & Reset Buttons */}
+              <label className="mb-2 block text-xs font-semibold uppercase tracking-wider">
+                Date Range (DD-MM-YYYY)
+              </label>
+              <div className="relative w-full">
+                <DatePicker
+                  selectsRange={true}
+                  startDate={startDate}
+                  endDate={isSameDay(startDate, endDate) ? null : endDate}
+                  onChange={(update) => {
+                    setDateRange(update);
+                    setActiveDateBtn(null);
+                  }}
+                  isClearable={true}
+                  dateFormat="dd-MM-yyyy"
+                  className="flex h-10 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-theme"
+                  placeholderText="Select range"
+                  wrapperClassName="w-full"
+                  showMonthDropdown
+                  showYearDropdown
+                  dropdownMode="select"
+                  portalId="root"
+                />
+              </div>
+            </div>
             <div className="flex gap-2">
               <Button
                 onClick={() => fetchAttendance(currentPage, entriesPerPage)}
@@ -702,7 +695,6 @@ const handleYesterday = () => {
                 )}
                 Search
               </Button>
-
               <Button
                 variant="outline"
                 onClick={handleReset}
@@ -712,52 +704,48 @@ const handleYesterday = () => {
                 Reset
               </Button>
             </div>
-
-            
           </div>
 
-          {/* Table Header Summary */}
-         <div className="flex flex-row items-center justify-between">
-  <div className='flex flex-row items-center gap-4'>
-    <div className="mt-2 text-lg font-semibold text-gray-600">
-  Attendance:{' '}
-  <span>{startDate ? formatDisplayDate(startDate) : '...'}</span>
-  {endDate && !isSameDay(startDate, endDate) && (
-    <span> - {formatDisplayDate(endDate)}</span>
-  )}
-</div>
-    {fetchedApproval && (
-      <div className="mt-2 flex items-center">
-        <span
-          className={`inline-flex items-center rounded-full border px-3 py-0.5 text-sm font-medium ${
-            fetchedApproval.label === 'Already Approved'
-              ? 'border-green-200 bg-green-100 text-green-700'
-              : 'border-orange-200 bg-yellow-100 text-orange-700'
-          }`}
-        >
-          {fetchedApproval.label}
-        </span>
-      </div>
-    )}
-  </div>
-
-  <div className='flex gap-4'>
-    <Button
-      size={'sm'}
-      variant={activeDateBtn === 'today' ? 'default' : 'outline'}
-      onClick={handleToday}
-    >
-      Today
-    </Button>
-    <Button
-      size={'sm'}
-      variant={activeDateBtn === 'yesterday' ? 'default' : 'outline'}
-      onClick={handleYesterday}
-    >
-      Yesterday
-    </Button>
-  </div>
-</div>
+          <div className="flex flex-row items-center justify-between">
+            <div className="flex flex-row items-center gap-4">
+              <div className="mt-2 text-lg font-semibold text-gray-600">
+                Attendance:{' '}
+                <span>{startDate ? formatDisplayDate(startDate) : '...'}</span>
+                {endDate && !isSameDay(startDate, endDate) && (
+                  <span> - {formatDisplayDate(endDate)}</span>
+                )}
+              </div>
+              {fetchedApproval && (
+                <div className="mt-2 flex items-center">
+                  <span
+                    className={`inline-flex items-center rounded-full border px-3 py-0.5 text-sm font-medium ${
+                      fetchedApproval.label === 'Already Approved'
+                        ? 'border-green-200 bg-green-100 text-green-700'
+                        : 'border-orange-200 bg-yellow-100 text-orange-700'
+                    }`}
+                  >
+                    {fetchedApproval.label}
+                  </span>
+                </div>
+              )}
+            </div>
+            <div className="flex gap-4">
+              <Button
+                size={'sm'}
+                variant={activeDateBtn === 'today' ? 'default' : 'outline'}
+                onClick={handleToday}
+              >
+                Today
+              </Button>
+              <Button
+                size={'sm'}
+                variant={activeDateBtn === 'yesterday' ? 'default' : 'outline'}
+                onClick={handleYesterday}
+              >
+                Yesterday
+              </Button>
+            </div>
+          </div>
 
           <div className="rounded-md">
             <TableSection
@@ -783,10 +771,109 @@ const handleYesterday = () => {
               onRotaChange={handleRotaChange}
               onTimeBlur={handleTimeBlur}
               onApprove={handleApprove}
+              onViewHistory={(record) => setHistoryRecord(record)} // Pass record to open Sidebar
             />
           </div>
         </CardContent>
       </Card>
+
+      {/* --- History Sidebar (Sheet) --- */}
+     <Sheet
+        open={!!historyRecord}
+        onOpenChange={(open) => !open && setHistoryRecord(null)}
+      >
+        <SheetContent className="w-full overflow-y-auto sm:max-w-md">
+          <SheetHeader className="mb-4">
+            <SheetTitle>Attendance History</SheetTitle>
+          </SheetHeader>
+
+          {historyRecord && (
+            <div className="space-y-6">
+              {/* Context / Details */}
+              <div className="rounded-lg border bg-theme/5 p-4 text-sm">
+                <div className="grid grid-cols-2 gap-2">
+                  <span className="font-medium ">Employee:</span>
+                  <span className="font-semibold text-gray-900">
+                    {historyRecord.userId?.firstName}{' '}
+                    {historyRecord.userId?.lastName}
+                  </span>
+
+                  <span className="font-medium ">Date:</span>
+                  <span className="text-gray-900">
+                    {moment(
+                      historyRecord.clockInDate || historyRecord.date
+                    ).format('DD MMM YYYY')}
+                  </span>
+
+                  <span className="font-medium ">Shift:</span>
+                  <span className="text-gray-900">
+                    {historyRecord.rotaId?.shiftName || '--'}
+                  </span>
+
+                  {/* Added Clock In */}
+                  <span className="font-medium ">Clock In:</span>
+                  <span className="text-gray-900">
+                    {historyRecord.clockIn
+                      ? historyRecord.clockIn.includes('T')
+                        ? moment(historyRecord.clockIn).format('DD MMM YYYY, HH:mm')
+                        : historyRecord.clockIn
+                      : '--'}
+                  </span>
+                  {/* Added Clock Out */}
+                 <span className="font-medium ">Clock Out:</span>
+                  <span className="text-gray-900">
+                    {historyRecord.clockOut
+                      ? historyRecord.clockOut.includes('T')
+                        ? moment(historyRecord.clockOut).format('DD MMM YYYY, HH:mm')
+                        : historyRecord.clockOut
+                      : '--'}
+                  </span>
+                </div>
+              </div>
+
+              {/* History Timeline */}
+              <div>
+                <h4 className="mb-4 border-b pb-2 font-semibold text-gray-900">
+                  Activity Logs
+                </h4>
+
+                {historyRecord.history && historyRecord.history.length > 0 ? (
+                  <div className="space-y-4">
+                    {[...historyRecord.history]
+                      // Sort Latest First
+                      .sort(
+                        (a, b) =>
+                          new Date(b.createdAt).getTime() -
+                          new Date(a.createdAt).getTime()
+                      )
+                      .map((item: any, index: number) => (
+                        <div key={index} className="flex gap-3">
+                          <div className="flex flex-col items-center">
+                            <div className="mt-1.5 h-2 w-2 rounded-full bg-theme" />
+                          </div>
+                          <div className="pb-2">
+                            <p className="text-sm font-medium text-gray-800">
+                              {item.message}{' '}
+                              <span className="  ml-1">
+                                {moment(item.createdAt).format(
+                                  'hh:mm A, DD MMM YYYY'
+                                )}
+                              </span>
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                ) : (
+                  <p className="py-4 text-center text-sm text-gray-500">
+                    No history available for this record.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 };
@@ -814,7 +901,8 @@ const TableSection = ({
   onFormChange,
   onRotaChange,
   onTimeBlur,
-  onApprove
+  onApprove,
+  onViewHistory
 }: {
   data: any[];
   loading: boolean;
@@ -838,6 +926,7 @@ const TableSection = ({
   onRotaChange: (opt: any) => void;
   onTimeBlur: (field: keyof EditFormState, value: string) => void;
   onApprove: (id: string) => void;
+  onViewHistory: (record: any) => void;
 }) => {
   if (loading) {
     return (
@@ -883,7 +972,7 @@ const TableSection = ({
         </TableHeader>
         <TableBody>
           {data.map((record: any) => {
-         const firstName = record.userId?.firstName || '';
+            const firstName = record.userId?.firstName || '';
             const lastName = record.userId?.lastName || '';
             const fullName = `${firstName} ${lastName}`.trim() || 'Unknown';
             const email = record.userId?.email || '--';
@@ -896,18 +985,16 @@ const TableSection = ({
             const isEditing = editingRecordId === record._id;
             const isApproving = approvingRecordId === record._id;
 
-            // Dates & times — prefer clockIn/Out fields; fall back to date
             const rStartDate = record.clockInDate || record.date || '';
             const rEndDate = record.clockOutDate || record.date || '';
 
-            // For display: use first attendanceLog if available
             const firstLog = record.attendanceLogs?.[0];
             const rStartTime = firstLog?.clockIn || record.clockIn || '--';
             const rEndTime = firstLog?.clockOut || record.clockOut || '--';
 
             const displayTime = (t: string) => {
               if (!t || t === '--') return '--';
-              if (t.includes('T')) return moment(t).format('HH:mm'); // Handle ISO parsing
+              if (t.includes('T')) return moment(t).format('HH:mm');
               if (t.length >= 5) return t.substring(0, 5);
               return t;
             };
@@ -932,12 +1019,9 @@ const TableSection = ({
               );
             }
 
-            // --- ADDED LOGIC HERE ---
-            // If the calculated duration is less than 1 minute, force display to '00:00'
             if (dCalc && dCalc.minutes < 1) {
               dCalc.display = '00:00';
             }
-            // ------------------------
 
             const isDurationValid = isEditing ? dCalc.minutes > 0 : true;
 
@@ -946,7 +1030,6 @@ const TableSection = ({
 
             return (
               <TableRow key={record._id}>
-                {/* Shift */}
                 <TableCell className="text-sm font-medium">
                   {isEditing ? (
                     <div className="min-w-[150px]">
@@ -980,14 +1063,12 @@ const TableSection = ({
                     </div>
                   ) : (
                     <div className="flex flex-col whitespace-nowrap">
-                      {/* Main Title: Show Shift Name, or fallback to Times if no name exists */}
                       <span className="text-sm font-bold text-gray-900">
                         {shiftName
                           ? shiftName
                           : `${rotaStartTime} - ${rotaEndTime}`}
                       </span>
 
-                      {/* Sub Title: Show Times under the Shift Name (only if Shift Name exists) */}
                       {shiftName && (
                         <span className="mt-0.5 text-xs font-semibold tracking-wide text-gray-800">
                           {rotaStartTime} - {rotaEndTime}
@@ -997,7 +1078,6 @@ const TableSection = ({
                   )}
                 </TableCell>
 
-                {/* Employee */}
                 <TableCell>
                   <div className="flex flex-col">
                     <span className="text-sm font-medium">{fullName}</span>
@@ -1005,10 +1085,8 @@ const TableSection = ({
                   </div>
                 </TableCell>
 
-                {/* Department */}
                 <TableCell className="text-sm">{departmentName}</TableCell>
 
-                {/* --- Start Date --- */}
                 <TableCell className="text-sm">
                   {isEditing ? (
                     <div className="relative max-w-[110px]">
@@ -1035,7 +1113,6 @@ const TableSection = ({
                   )}
                 </TableCell>
 
-                {/* --- Start Time --- */}
                 <TableCell className="font-mono text-sm">
                   {isEditing ? (
                     <Input
@@ -1053,7 +1130,6 @@ const TableSection = ({
                   )}
                 </TableCell>
 
-                {/* --- End Date --- */}
                 <TableCell className="text-sm">
                   {isEditing ? (
                     <div className="relative max-w-[110px]">
@@ -1085,7 +1161,6 @@ const TableSection = ({
                   )}
                 </TableCell>
 
-                {/* --- End Time --- */}
                 <TableCell className="font-mono text-sm">
                   {isEditing ? (
                     <Input
@@ -1101,7 +1176,6 @@ const TableSection = ({
                   )}
                 </TableCell>
 
-                {/* --- Duration --- */}
                 <TableCell className="text-sm">
                   <div
                     className={`flex items-center gap-1 font-mono text-sm ${
@@ -1114,7 +1188,6 @@ const TableSection = ({
                   </div>
                 </TableCell>
 
-                {/* --- Action --- */}
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-2">
                     {isEditing ? (
@@ -1142,6 +1215,18 @@ const TableSection = ({
                       </>
                     ) : (
                       <div className="flex items-center gap-2">
+                        {/* Show History Button if History exists */}
+                        {record.history && record.history.length > 0 && (
+                          <Button
+                            size="sm"
+                            
+                            onClick={() => onViewHistory(record)}
+                            title="View History"
+                          >
+                            <History className="h-4 w-4" />
+                          </Button>
+                        )}
+
                         {/* Show Reconcile Button */}
                         <Button
                           size="sm"

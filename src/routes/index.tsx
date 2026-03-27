@@ -99,6 +99,8 @@ import VisitorAttendancePage from '@/pages/company/Attendance/VisitorAttendanceL
 import ServiceUserAttendancePage from '@/pages/company/Attendance/ServiceUserAttendanceList';
 import SignatureDoc from '@/pages/company/SignatureDoc';
 import StaffAttendancePage from '@/pages/staff/attendance';
+import CompanyAdminPage from '@/pages/company/companyAdmin';
+import UserAccessControl from '@/pages/company/companyAdmin/accessControl';
 
 const SignInPage = lazy(() => import('@/pages/auth/signin'));
 
@@ -262,7 +264,9 @@ export default function AppRouter() {
         { path: 'leave-approval', element: <CompanyLeaveApprovalPage /> },
         { path: 'attendance-account', element: <AttendanceAccountPage /> },
         { path: 'service-user', element: <ServiceUserPage /> },
-        { path: 'signature-document', element: <SignatureDoc /> }
+        { path: 'signature-document', element: <SignatureDoc /> },
+        { path: 'company-admin', element: <CompanyAdminPage /> },
+        { path: 'company-admin/:caid/access-control', element: <UserAccessControl /> }
       ]
     }
   ];

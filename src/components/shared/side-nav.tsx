@@ -49,7 +49,8 @@ import {
   CalendarRange,
   AlertCircle,
   User,
-  Users2
+  Users2,
+  UserCog
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Link, useNavigate, useLocation, useParams } from 'react-router-dom';
@@ -58,8 +59,8 @@ import { useEffect, useState } from 'react';
 import { logout } from '@/redux/features/authSlice';
 import axiosInstance from '@/lib/axios';
 import { AppDispatch } from '@/redux/store';
-// IMPORT THE CONTEXT HOOK
 import { useScheduleStatus } from '@/context/scheduleStatusContext';
+import { useCompanyAccess } from '@/hooks/use-company-access'; // IMPORT THE NEW HOOK
 
 const navItems = [
   // --- Common ---
@@ -67,7 +68,7 @@ const navItems = [
     icon: LayoutDashboard,
     label: 'Dashboard',
     href: '',
-    roles: ['admin', 'company', 'employee']
+    roles: ['admin', 'company', 'companyAdmin', 'employee']
   },
   {
     icon: CalendarCheck2,
@@ -120,279 +121,310 @@ const navItems = [
     roles: ['admin']
   },
 
+  // --- Company / Company Admin Specific ---
   {
     icon: CalendarClock,
     label: 'Rota',
     href: 'rota',
-    roles: ['company']
+    roles: ['company', 'companyAdmin'],
+    accessKey: 'rota'
   },
-
   {
     icon: DoorOpen,
     label: 'Vacancy',
     href: 'vacancy',
-    roles: ['company']
+    roles: ['company', 'companyAdmin'],
+    accessKey: 'vacancy'
   },
   {
     icon: Users,
     label: 'Employees',
     href: 'employee',
-    roles: ['company']
+    roles: ['company', 'companyAdmin'],
+    accessKey: 'employee'
   },
-  // --- BADGE ITEMS START HERE ---
+  // --- BADGE ITEMS ---
   {
     icon: ShieldCheck,
     label: 'Right to Work',
     href: 'expiry/rtw',
-    roles: ['company'],
-    badgeKey: 'rtw'
+    roles: ['company', 'companyAdmin'],
+    badgeKey: 'rtw',
+    accessKey: 'employee'
   },
   {
     icon: FileBadge,
     label: 'Required Document',
     href: 'required-employee-documents',
-    roles: ['company'],
-    badgeKey: 'employeeDocument'
+    roles: ['company', 'companyAdmin'],
+    badgeKey: 'employeeDocument',
+    accessKey: 'employee'
   },
   {
     icon: ShieldCheck,
     label: 'DBS',
     href: 'expiry/dbs',
-    roles: ['company'],
-    badgeKey: 'dbs'
+    roles: ['company', 'companyAdmin'],
+    badgeKey: 'dbs',
+    accessKey: 'employee'
   },
   {
     icon: BarChart3,
     label: 'Appraisal',
     href: 'expiry/appraisal',
-    roles: ['company'],
-    badgeKey: 'appraisal'
+    roles: ['company', 'companyAdmin'],
+    badgeKey: 'appraisal',
+    accessKey: 'employee'
   },
   {
     icon: BookUser,
     label: 'Passport',
     href: 'expiry/passport',
-    roles: ['company'],
-    badgeKey: 'passport'
+    roles: ['company', 'companyAdmin'],
+    badgeKey: 'passport',
+    accessKey: 'employee'
   },
   {
     icon: BadgeCheck,
     label: 'Visa Status',
     href: 'expiry/visa',
-    roles: ['company'],
-    badgeKey: 'visa'
+    roles: ['company', 'companyAdmin'],
+    badgeKey: 'visa',
+    accessKey: 'employee'
   },
   {
     icon: FileCheck,
     label: 'Immigration Status',
     href: 'expiry/immigration',
-    roles: ['company'],
-    badgeKey: 'immigration'
+    roles: ['company', 'companyAdmin'],
+    badgeKey: 'immigration',
+    accessKey: 'employee'
   },
   {
     icon: FileCheck,
     label: 'Induction',
     href: 'expiry/induction',
-    roles: ['company'],
-    badgeKey: 'induction'
+    roles: ['company', 'companyAdmin'],
+    badgeKey: 'induction',
+    accessKey: 'employee'
   },
   {
     icon: FileCheck,
     label: 'Disciplinary',
     href: 'expiry/disciplinary',
-    roles: ['company'],
-    badgeKey: 'disciplinary'
+    roles: ['company', 'companyAdmin'],
+    badgeKey: 'disciplinary',
+    accessKey: 'employee'
   },
-
   {
     icon: GraduationCap,
     label: 'Training Status',
     href: 'expiry/training',
-    roles: ['company'],
-    badgeKey: 'training'
+    roles: ['company', 'companyAdmin'],
+    badgeKey: 'training',
+    accessKey: 'employee'
   },
   {
     icon: ClipboardCheck,
     label: 'Spot Check',
     href: 'expiry/spot-check',
-    roles: ['company'],
-    badgeKey: 'spot'
+    roles: ['company', 'companyAdmin'],
+    badgeKey: 'spot',
+    accessKey: 'employee'
   },
   {
     icon: UserCheck,
     label: 'Supervision',
     href: 'expiry/supervision',
-    roles: ['company'],
-    badgeKey: 'supervision'
+    roles: ['company', 'companyAdmin'],
+    badgeKey: 'supervision',
+    accessKey: 'employee'
   },
   {
     icon: FileCheck,
     label: 'Quality Assurance',
     href: 'expiry/qa',
-    roles: ['company'],
-    badgeKey: 'qa'
+    roles: ['company', 'companyAdmin'],
+    badgeKey: 'qa',
+    accessKey: 'employee'
   },
   // --- END UPDATED ITEMS ---
   {
     icon: Calendar,
     label: 'Leave Management',
     href: 'leave-approval',
-    roles: ['company']
+    roles: ['company', 'companyAdmin'],
+    accessKey: 'leave'
   },
   {
     icon: Users2,
     label: 'Service User',
     href: 'service-user',
-    roles: ['company']
+    roles: ['company', 'companyAdmin'],
+    accessKey: 'serviceUser'
   },
+ 
   // {
-  //   icon: FileBadge,
-  //   label: 'Signature Document',
-  //   href: 'signature-document',
-  //   roles: ['company']
+  //   icon: BarChart3,
+  //   label: 'Reports',
+  //   href: '#',
+  //   roles: ['company', 'companyAdmin']
   // },
-  {
-    icon: FileSpreadsheet,
-    label: 'Documents',
-    href: '#',
-    roles: ['company']
-  },
-
-  {
-    icon: BarChart3,
-    label: 'Reports',
-    href: '#',
-    roles: ['company']
-  },
-
-  {
-    icon: CreditCard,
-    label: 'Subscription',
-    href: '#',
-    roles: ['company']
-  },
+  // {
+  //   icon: CreditCard,
+  //   label: 'Subscription',
+  //   href: '#',
+  //   roles: ['company', 'companyAdmin']
+  // },
   {
     icon: CircleDollarSign,
     label: 'Payroll',
     href: 'payroll',
-    roles: ['company']
+    roles: ['company', 'companyAdmin'],
+    accessKey: 'payroll'
   },
   {
     icon: Bell,
     label: 'Notice',
     href: 'notice',
-    roles: ['company']
+    roles: ['company', 'companyAdmin'],
+    accessKey: 'notice'
   },
   {
-    icon: FileCheck2,
+    icon: BarChart3,
     label: 'Attendance',
-    roles: ['company'],
+    roles: ['company', 'companyAdmin'],
+    accessKey: 'attendance',
     subItems: [
       {
         icon: FileSpreadsheet,
         label: 'Visitor Attendance',
         href: 'visitor-attendance',
-        roles: ['company']
+        roles: ['company', 'companyAdmin'],
+        accessKey: 'attendance'
       },
       {
         icon: FileSpreadsheet,
         label: 'Service User Attendance',
         href: 'serviceuser-attendance',
-        roles: ['company']
+        roles: ['company', 'companyAdmin'],
+        accessKey: 'attendance'
       },
       {
-        icon: FileCheck2,
+        icon: BarChart3,
         label: 'Attendance List',
         href: 'attendance',
-        roles: ['company']
-      },
-      // {
-      //   icon: FileJsonIcon,
-      //   label: 'Upload Attendance',
-      //   href: 'csv-attendance',
-      //   roles: ['company']
-      // },
-      // {
-      //   icon: PenBox,
-      //   label: 'Manual Attendance',
-      //   href: 'attendance-entry',
-      //   roles: ['company']
-      // }
+        roles: ['company', 'companyAdmin'],
+        accessKey: 'attendance'
+      }
     ]
   },
   {
     icon: Settings,
     label: 'Settings',
-    roles: ['company'],
+    roles: ['company', 'companyAdmin'],
+    accessKey: 'setting',
     subItems: [
       {
         icon: ReceiptText,
         label: 'Company Details',
         href: 'company-details',
-        roles: ['company']
+        roles: ['company', 'companyAdmin'],
+        accessKey: 'setting'
       },
       {
         icon: Mails,
         label: 'Email Setup',
         href: 'email-setup',
-        roles: ['company']
+        roles: ['company', 'companyAdmin'],
+        accessKey: 'setting'
+      },
+      {
+        icon: UserCog,
+        label: 'Company Admin',
+        href: 'company-admin',
+        roles: ['company', 'companyAdmin'],
+        accessKey: 'setting'
       },
       {
         icon: User,
         label: 'Attendance Account',
         href: 'attendance-account',
-        roles: ['company']
+        roles: ['company', 'companyAdmin'],
+        accessKey: 'setting'
       },
       {
         icon: Calendar,
         label: 'Bank Holiday',
         href: 'bank-holiday',
-        roles: ['company']
+        roles: ['company', 'companyAdmin'],
+        accessKey: 'setting'
       },
       {
         icon: Clock4,
         label: 'Shifts',
         href: 'shift',
-        roles: ['company']
+        roles: ['company', 'companyAdmin'],
+        accessKey: 'setting'
       },
       {
         icon: Building2,
         label: 'Department',
         href: 'department',
-        roles: ['company']
+        roles: ['company', 'companyAdmin'],
+        accessKey: 'setting'
       },
       {
         icon: Briefcase,
         label: 'Designation',
         href: 'designation',
-        roles: ['company']
+        roles: ['company', 'companyAdmin'],
+        accessKey: 'setting'
       },
       {
         icon: GraduationCap,
         label: 'Training',
         href: 'training',
-        roles: ['company']
+        roles: ['company', 'companyAdmin'],
+        accessKey: 'setting'
       },
-
       {
         icon: UsersIcon,
         label: 'Schedule',
         href: 'schedule-check',
-        roles: ['company']
+        roles: ['company', 'companyAdmin'],
+        accessKey: 'setting'
       },
       {
         icon: MapPin,
         label: 'Branches / Locations',
         href: 'company-branch',
-        roles: ['company']
+        roles: ['company', 'companyAdmin'],
+        accessKey: 'setting'
       }
     ]
   }
 ];
 
+// Extracted Filter logic utilizing the hook
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const filterNavItemsByRole = (items: any[], role: string) => {
-  return items.filter((item) => item.roles?.includes(role));
+const filterNavItemsByRole = (items: any[], role: string, hasAccess: (key?: string) => boolean) => {
+  return items
+    .filter((item) => item.roles?.includes(role) && hasAccess(item.accessKey))
+    .map((item) => {
+      if (item.subItems) {
+        return {
+          ...item,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          subItems: item.subItems.filter((subItem: any) => 
+            subItem.roles?.includes(role) && hasAccess(subItem.accessKey)
+          )
+        };
+      }
+      return item;
+    })
+    // Hide parent items if all their subItems were restricted
+    .filter((item) => !item.subItems || item.subItems.length > 0);
 };
 
 const NavItem = ({
@@ -403,7 +435,7 @@ const NavItem = ({
   basePath,
   status,
   companyId,
-  effectiveRole ,
+  effectiveRole,
   onNavClick
 }: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -422,20 +454,17 @@ const NavItem = ({
   const location = useLocation();
   const isExpanded = expandedItems[item.label];
 
-  // Build target path based on the role
   let targetPath = '#';
 
-  // Check if href exists and is not '#'
   if (item.href !== undefined && item.href !== '#') {
-    if (effectiveRole === 'company' && companyId) {
-      // For company routes, insert companyId specifically
+    // UPDATED logic handles both company and companyAdmin seamlessly 
+    if ((effectiveRole === 'company' || effectiveRole === 'companyAdmin') && companyId) {
       if (item.href === '') {
         targetPath = `/company/${companyId}`;
       } else {
         targetPath = `/company/${companyId}/${item.href}`;
       }
     } else {
-      // For Admin and Employee, basePath handles the full prefix
       if (item.href === '') {
         targetPath = basePath;
       } else {
@@ -444,15 +473,7 @@ const NavItem = ({
     }
   }
 
-  const isActiveLeaf =
-    item.href !== undefined && item.href !== '#'
-      ? depth === 0
-        ? location.pathname === targetPath
-        : location.pathname === targetPath ||
-          location.pathname.startsWith(`${targetPath}/`)
-      : false;
-
-  // Logic to determine badge count
+  // Determine badge count
   const badgeCount = item.badgeKey && status ? status[item.badgeKey] : 0;
 
   if (item.subItems) {
@@ -517,7 +538,6 @@ const NavItem = ({
       onClick={onNavClick}
       className={cn(
         'group flex w-full items-center space-x-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 hover:bg-theme hover:text-white',
-
         depth > 0 && 'pl-3'
       )}
     >
@@ -538,6 +558,7 @@ export function SideNav() {
   const navigate = useNavigate();
   const location = useLocation();
   const dispatch = useDispatch<AppDispatch>();
+  
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const user = useSelector((state: any) => state.auth?.user) || null;
   const userRole = user?.role;
@@ -547,11 +568,11 @@ export function SideNav() {
   const [companyThemeColor, setCompanyThemeColor] = useState<string>('');
   const { id } = useParams();
 
-  // Detect if admin is viewing company layout
+  const { hasAccess } = useCompanyAccess(); // Fetch access utility for filtering
+
   const isAdminViewingCompany =
     userRole === 'admin' && location.pathname.startsWith('/company/');
 
-  // Get company ID from URL if admin is viewing company
   const getCompanyIdFromUrl = () => {
     if (isAdminViewingCompany) {
       const pathParts = location.pathname.split('/');
@@ -574,15 +595,14 @@ export function SideNav() {
         try {
           let fetchId = user?._id;
 
-          // If admin is viewing company layout, fetch that company's data
           if (isAdminViewingCompany) {
             const companyIdFromUrl = getCompanyIdFromUrl();
             if (companyIdFromUrl) {
               fetchId = companyIdFromUrl;
             }
           }
-          // NEW: If user is employee, fetch company details to get theme
-          else if (userRole === 'employee' && user?.company) {
+          // Now handles both employee and companyAdmin for parent company
+          else if ((userRole === 'employee' || userRole === 'companyAdmin') && user?.company) {
             fetchId = user.company;
           }
 
@@ -590,12 +610,9 @@ export function SideNav() {
           const themeColor = response.data.data.themeColor || '#38bdf8';
           setCompanyThemeColor(themeColor);
 
-          // Only set user data if it's the actual logged in user (or adjust logic if you want company profile loaded)
           if (userRole !== 'employee' || fetchId === user._id) {
             setUserData(response.data.data);
           } else {
-            // For employee we can still just fetch their own data or use Redux directly
-            // To keep avatar logic unbroken, let's load the employee's personal user object here:
             const selfResponse = await axiosInstance.get(`/users/${user._id}`);
             setUserData(selfResponse.data.data);
           }
@@ -623,23 +640,21 @@ export function SideNav() {
     }
   }, [user, isAdminViewingCompany, location.pathname, userRole]);
 
-  // Use the Context Hook
   const { status } = useScheduleStatus();
 
-  // Get company ID for building routes
+  // Route URL Construction Updates
   const companyId = isAdminViewingCompany
     ? getCompanyIdFromUrl()
     : userRole === 'company'
       ? user?._id
-      : userRole === 'employee'
+      : (userRole === 'employee' || userRole === 'companyAdmin')
         ? user?.company
         : null;
 
-  // Determine basePath based on roles
   const basePath =
     userRole === 'employee'
       ? `/company/${user?.company}/staff/${user?._id}`
-      : userRole === 'company' || isAdminViewingCompany
+      : (userRole === 'company' || userRole === 'companyAdmin' || isAdminViewingCompany)
         ? '/company'
         : '/admin';
 
@@ -661,9 +676,8 @@ export function SideNav() {
       for (const item of items) {
         if (item.subItems) {
           if (
-            item.subItems.some(
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              (subItem: any) =>
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            item.subItems.some((subItem: any) =>
                 location.pathname.includes(subItem.href) ||
                 (subItem.subItems &&
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -689,9 +703,10 @@ export function SideNav() {
     }));
   };
 
-  // Filter nav items - if admin is viewing company, show company items
   const effectiveRole = isAdminViewingCompany ? 'company' : userRole;
-  const filteredNavItems = filterNavItemsByRole(navItems, effectiveRole);
+  
+  // Use updated filter using the hasAccess validation 
+  const filteredNavItems = filterNavItemsByRole(navItems, effectiveRole, hasAccess);
 
   const sidebarContent = (
     <div className="flex h-full flex-col">
@@ -752,7 +767,7 @@ export function SideNav() {
             status={status}
             companyId={companyId}
             effectiveRole={effectiveRole}
-             onNavClick={() => setIsMobileMenuOpen(false)}
+            onNavClick={() => setIsMobileMenuOpen(false)}
           />
         ))}
       </nav>
@@ -772,7 +787,6 @@ export function SideNav() {
 
   return (
     <>
-      {/* Mobile Menu Button */}
       <button
         onClick={() => setIsMobileMenuOpen(true)}
         className="fixed left-4 top-4 z-50 rounded-lg bg-white p-2 shadow-md lg:hidden"
@@ -780,7 +794,6 @@ export function SideNav() {
         <Menu className="h-6 w-6 text-gray-600" />
       </button>
 
-      {/* Mobile Overlay */}
       {isMobileMenuOpen && (
         <div
           className="fixed inset-0 z-40 bg-black bg-opacity-50 lg:hidden"
@@ -788,7 +801,6 @@ export function SideNav() {
         />
       )}
 
-      {/* Sidebar */}
       <aside
         className={cn(
           'fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-sm transition-transform duration-300 lg:translate-x-0',
@@ -800,7 +812,6 @@ export function SideNav() {
         {sidebarContent}
       </aside>
 
-      {/* Desktop Sidebar */}
       <aside className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-50 lg:block lg:w-64 lg:bg-white lg:shadow-sm">
         {sidebarContent}
       </aside>

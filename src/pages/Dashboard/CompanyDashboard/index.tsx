@@ -17,11 +17,12 @@ import { useNavigate, useParams } from 'react-router-dom';
 import axiosInstance from '@/lib/axios';
 import { useSelector } from 'react-redux';
 import { useScheduleStatus } from '@/context/scheduleStatusContext';
+import { useCompanyAccess } from '@/hooks/use-company-access';
 
 const CompanyDashboardPage = () => {
   const [loadingEmployees, setLoadingEmployees] = useState(true);
   const [totalEmployees, setTotalEmployees] = useState(0);
-
+const { hasAccess } = useCompanyAccess();
   const navigate = useNavigate();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const user = useSelector((state: any) => state.auth.user);
@@ -64,7 +65,7 @@ const CompanyDashboardPage = () => {
       refetchStatus();
     }
   }, [id, refetchStatus]);
-
+const canViewEmployeeData = hasAccess('employee');
   // Helper to generate sub-text based on count
   const getSubText = (count: number) =>
     count > 0 ? `${count} Pending Action(s)` : 'All Valid';
@@ -213,7 +214,12 @@ const CompanyDashboardPage = () => {
       isWarning: status.employeeDocument > 0
     }
   ];
-
+if (!canViewEmployeeData) {
+    return (
+      <div >
+      </div>
+    );
+  }
   return (
     <div className="">
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4">

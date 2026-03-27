@@ -104,6 +104,15 @@ const calculateDuration = (
   return { display, minutes: totalMinutes };
 };
 
+const isSameDay = (a: Date | null, b: Date | null) => {
+  if (!a || !b) return false;
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+};
+
 const VisitorAttendancePage = () => {
   const user = useSelector((state: RootState) => state.auth?.user) || null;
   const navigate = useNavigate();
@@ -122,6 +131,9 @@ const VisitorAttendancePage = () => {
   const [entriesPerPage, setEntriesPerPage] = useState(100);
   const [isLoading, setIsLoading] = useState(false);
 
+  // New Date Buttons State
+  const [activeDateBtn, setActiveDateBtn] = useState<'today' | 'yesterday' | null>(null);
+
   // Reconcile/Edit States
   const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<EditFormState>({
@@ -134,8 +146,16 @@ const VisitorAttendancePage = () => {
   const [isUpdating, setIsUpdating] = useState(false);
 
   // Fetch Attendance Data
-  const fetchAttendance = async (page: number, limit: number) => {
+  const fetchAttendance = async (
+    page: number, 
+    limit: number,
+    fromOverride?: Date,
+    toOverride?: Date
+  ) => {
     if (!id) return;
+
+    const from = fromOverride ?? startDate;
+    const to = toOverride ?? endDate;
 
     setIsLoading(true);
     try {
@@ -144,11 +164,11 @@ const VisitorAttendancePage = () => {
         page,
         limit,
         userType: 'visitor', // Crucial: Only fetch visitors
-        fromDate: startDate
-          ? `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`
+        fromDate: from
+          ? `${from.getFullYear()}-${String(from.getMonth() + 1).padStart(2, '0')}-${String(from.getDate()).padStart(2, '0')}`
           : undefined,
-        toDate: endDate
-          ? `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`
+        toDate: to
+          ? `${to.getFullYear()}-${String(to.getMonth() + 1).padStart(2, '0')}-${String(to.getDate()).padStart(2, '0')}`
           : undefined
       };
 
@@ -170,13 +190,32 @@ const VisitorAttendancePage = () => {
     fetchAttendance(currentPage, entriesPerPage);
   }, [id, currentPage, entriesPerPage]);
 
+  const handleToday = () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    setDateRange([today, today]);
+    setActiveDateBtn('today');
+    fetchAttendance(1, entriesPerPage, today, today);
+  };
+
+  const handleYesterday = () => {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    yesterday.setHours(0, 0, 0, 0);
+    setDateRange([yesterday, yesterday]);
+    setActiveDateBtn('yesterday');
+    fetchAttendance(1, entriesPerPage, yesterday, yesterday);
+  };
+
   // Reset Filters
   const handleReset = () => {
     setDateRange([
       new Date(new Date().getFullYear(), new Date().getMonth(), 1),
       new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0)
     ]);
+    setActiveDateBtn(null);
   };
+
   const formatDisplayDate = (date: Date) =>
     date
       .toLocaleDateString('en-GB', {
@@ -185,6 +224,7 @@ const VisitorAttendancePage = () => {
         year: 'numeric'
       })
       .replace(',', '');
+
   const handleView = (recordId: string) => {
     navigate(`${recordId}`);
   };
@@ -319,8 +359,11 @@ const VisitorAttendancePage = () => {
                 <DatePicker
                   selectsRange={true}
                   startDate={startDate}
-                  endDate={endDate}
-                  onChange={(update) => setDateRange(update)}
+                  endDate={isSameDay(startDate, endDate) ? null : endDate}
+                  onChange={(update) => {
+                    setDateRange(update);
+                    setActiveDateBtn(null);
+                  }}
                   isClearable={true}
                   className="flex h-10 w-full rounded-md border-2 border-gray-600 px-3 py-2 pl-8 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholderText="Select range"
@@ -332,7 +375,7 @@ const VisitorAttendancePage = () => {
             </div>
 
             {/* Search & Reset Buttons */}
-            <div className=" flex gap-2">
+            <div className="flex flex-wrap gap-2 lg:col-span-3">
               <Button
                 onClick={() => fetchAttendance(currentPage, entriesPerPage)}
                 disabled={isLoading}
@@ -345,7 +388,7 @@ const VisitorAttendancePage = () => {
                 )}
                 Search
               </Button>
-
+             
               <Button
                 variant="outline"
                 onClick={handleReset}
@@ -358,10 +401,29 @@ const VisitorAttendancePage = () => {
           </div>
 
           {/* Table Header Summary */}
-          <div className="mt-2 text-lg font-semibold text-gray-600">
+          <div className="mt-2 text-lg font-semibold text-gray-600 flex flex-row items-center justify-between">
+            <div>
+
             Attendance:{' '}
             <span>{startDate ? formatDisplayDate(startDate) : '...'}</span>
-            {endDate && <span> - {formatDisplayDate(endDate)}</span>}
+            {endDate && !isSameDay(startDate, endDate) && <span> - {formatDisplayDate(endDate)}</span>}
+            </div>
+            <div className='flex flex-row items-center gap-2'>
+               <Button
+                variant={activeDateBtn === 'today' ? 'default' : 'outline'}
+                onClick={handleToday}
+                
+              >
+                Today
+              </Button>
+              <Button
+                variant={activeDateBtn === 'yesterday' ? 'default' : 'outline'}
+                onClick={handleYesterday}
+                
+              >
+                Yesterday
+              </Button>
+            </div>
           </div>
           <div className="rounded-md">
             <TableSection

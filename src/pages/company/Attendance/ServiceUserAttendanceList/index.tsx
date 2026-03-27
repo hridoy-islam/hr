@@ -97,6 +97,15 @@ const calculateDuration = (
   return { display, minutes: totalMinutes };
 };
 
+const isSameDay = (a: Date | null, b: Date | null) => {
+  if (!a || !b) return false;
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+};
+
 const ServiceUserAttendancePage = () => {
   const user = useSelector((state: RootState) => state.auth?.user) || null;
   const navigate = useNavigate();
@@ -104,10 +113,10 @@ const ServiceUserAttendancePage = () => {
   const { toast } = useToast();
 
   // State: Default range is Full Current Month
- const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([
-  new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-  new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0)
-]);
+  const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([
+    new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+    new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0)
+  ]);
   const [startDate, endDate] = dateRange;
   const [attendanceData, setAttendanceData] = useState<any[]>([]);
 
@@ -115,6 +124,9 @@ const ServiceUserAttendancePage = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [entriesPerPage, setEntriesPerPage] = useState(100);
   const [isLoading, setIsLoading] = useState(false);
+
+  // New Date Buttons State
+  const [activeDateBtn, setActiveDateBtn] = useState<'today' | 'yesterday' | null>(null);
 
   // Reconcile/Edit States
   const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
@@ -128,8 +140,16 @@ const ServiceUserAttendancePage = () => {
   const [isUpdating, setIsUpdating] = useState(false);
 
   // Fetch Attendance Data
-  const fetchAttendance = async (page: number, limit: number) => {
+  const fetchAttendance = async (
+    page: number, 
+    limit: number,
+    fromOverride?: Date,
+    toOverride?: Date
+  ) => {
     if (!id) return;
+
+    const from = fromOverride ?? startDate;
+    const to = toOverride ?? endDate;
 
     setIsLoading(true);
     try {
@@ -138,12 +158,12 @@ const ServiceUserAttendancePage = () => {
         page,
         limit,
         userType: 'service_user',
-       fromDate: startDate
-  ? `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`
-  : undefined,
-toDate: endDate
-  ? `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`
-  : undefined,
+        fromDate: from
+          ? `${from.getFullYear()}-${String(from.getMonth() + 1).padStart(2, '0')}-${String(from.getDate()).padStart(2, '0')}`
+          : undefined,
+        toDate: to
+          ? `${to.getFullYear()}-${String(to.getMonth() + 1).padStart(2, '0')}-${String(to.getDate()).padStart(2, '0')}`
+          : undefined,
       };
 
       const res = await axiosInstance.get(`/hr/attendance`, { params });
@@ -164,17 +184,35 @@ toDate: endDate
     fetchAttendance(currentPage, entriesPerPage);
   }, [id, currentPage, entriesPerPage]);
 
+  const handleToday = () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    setDateRange([today, today]);
+    setActiveDateBtn('today');
+    fetchAttendance(1, entriesPerPage, today, today);
+  };
+
+  const handleYesterday = () => {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    yesterday.setHours(0, 0, 0, 0);
+    setDateRange([yesterday, yesterday]);
+    setActiveDateBtn('yesterday');
+    fetchAttendance(1, entriesPerPage, yesterday, yesterday);
+  };
+
   // Reset Filters
   const handleReset = () => {
+    setDateRange([
+      new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+      new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0)
+    ]);
+    setActiveDateBtn(null);
+  };
 
-  setDateRange([
-    new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-    new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0)
-  ]);
-};
-const formatDisplayDate = (date: Date) =>
-  date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-    .replace(',', '');
+  const formatDisplayDate = (date: Date) =>
+    date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+      .replace(',', '');
 
   // --- Inline Edit Handlers ---
   const handleEditClick = (record: any) => {
@@ -234,7 +272,7 @@ const formatDisplayDate = (date: Date) =>
     setEditForm((prev) => ({ ...prev, [field]: cleanValue }));
   };
 
-const handleSaveEdit = async () => {
+  const handleSaveEdit = async () => {
     if (!editingRecordId) return;
     setIsUpdating(true);
     setEditError(null);
@@ -288,8 +326,8 @@ const handleSaveEdit = async () => {
       <Card className="w-full bg-white shadow-md">
         <CardContent className="space-y-3 pt-4">
           {/* Filters Row */}
-          <div className="flex flex-row items-center gap-4 justify-start">
-            <label className="block text-xl font-bold">
+          <div className="flex flex-wrap items-center gap-4 justify-start">
+            <label className="block text-xl font-bold w-full lg:w-auto">
               Service User Attendance
             </label>
 
@@ -299,8 +337,11 @@ const handleSaveEdit = async () => {
                 <DatePicker
                   selectsRange={true}
                   startDate={startDate}
-                  endDate={endDate}
-                  onChange={(update) => setDateRange(update)}
+                  endDate={isSameDay(startDate, endDate) ? null : endDate}
+                  onChange={(update) => {
+                    setDateRange(update);
+                    setActiveDateBtn(null);
+                  }}
                   isClearable={true}
                   className="flex h-10 w-full rounded-md border-2 border-gray-600 px-6 py-2 pl-8 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholderText="Select range"
@@ -311,7 +352,7 @@ const handleSaveEdit = async () => {
             </div>
 
             {/* Search & Reset Buttons */}
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button
                 onClick={() => fetchAttendance(currentPage, entriesPerPage)}
                 disabled={isLoading}
@@ -324,7 +365,7 @@ const handleSaveEdit = async () => {
                 )}
                 Search
               </Button>
-
+              
               <Button
                 variant="outline"
                 onClick={handleReset}
@@ -337,15 +378,33 @@ const handleSaveEdit = async () => {
           </div>
 
           {/* Table Header Summary */}
-          <div className="mt-2 text-lg font-semibold text-gray-600">
-  Attendance:{' '}
-  <span>
-    {startDate ? formatDisplayDate(startDate) : '...'}
-  </span>
-  {endDate && (
-    <span> - {formatDisplayDate(endDate)}</span>
-  )}
-</div>
+          <div className="mt-2 text-lg font-semibold text-gray-600 flex flex-row items-center justify-between">
+
+            <div>
+
+            Attendance:{' '}
+            <span>
+              {startDate ? formatDisplayDate(startDate) : '...'}
+            </span>
+            {endDate && !isSameDay(startDate, endDate) && (
+              <span> - {formatDisplayDate(endDate)}</span>
+            )}
+            </div>
+            <div className='flex flex-row items-center gap-2'>
+              <Button
+                variant={activeDateBtn === 'today' ? 'default' : 'outline'}
+                onClick={handleToday}
+              >
+                Today
+              </Button>
+              <Button
+                variant={activeDateBtn === 'yesterday' ? 'default' : 'outline'}
+                onClick={handleYesterday}
+              >
+                Yesterday
+              </Button>
+            </div>
+          </div>
 
           <div className="rounded-md">
             <TableSection
@@ -493,11 +552,9 @@ const TableSection = ({
               <TableRow key={record._id}>
                 {/* Service User Name */}
                 <TableCell>
-                  <span className="text-xs font-medium p-1.5 bg-theme text-white rounded-full mr-3 ">{room}</span>
+                  <span className="text-sm font-bold p-1.5  text-theme mr-3 ">{room}</span>
                   <span className="text-sm font-medium">{serviceUserName}</span>
                 </TableCell>
-
-                {/* Room */}
 
                 {/* --- Start Date --- */}
                 <TableCell className="text-sm">
@@ -654,7 +711,11 @@ const TableSection = ({
 
       {/* Pagination & Editing Error Display */}
       <div className="flex flex-col gap-2">
-        
+        {editError && (
+          <div className="rounded border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-500">
+            {editError}
+          </div>
+        )}
 
         {data.length > 60 && (
           <DynamicPagination
