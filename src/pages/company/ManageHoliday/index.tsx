@@ -233,7 +233,7 @@ const ManageHolidayPage = () => {
         <CardContent className="p-0">
           {isLoading ? (
             <div className="flex h-64 items-center justify-center">
-              <BlinkingDots size='large'/>
+              <BlinkingDots size='large' color="bg-theme"/>
             </div>
           ) : (
             <>
