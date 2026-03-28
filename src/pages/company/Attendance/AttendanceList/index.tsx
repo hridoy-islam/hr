@@ -790,7 +790,7 @@ const AttendancePage = () => {
           {historyRecord && (
             <div className="space-y-6">
               {/* Context / Details */}
-              <div className="rounded-lg border bg-theme/5 p-4 text-sm">
+              <div className="rounded-lg border border-gray-200 bg-theme/5 p-4 text-sm">
                 <div className="grid grid-cols-2 gap-2">
                   <span className="font-medium ">Employee:</span>
                   <span className="font-semibold text-gray-900">
@@ -833,7 +833,7 @@ const AttendancePage = () => {
 
               {/* History Timeline */}
               <div>
-                <h4 className="mb-4 border-b pb-2 font-semibold text-gray-900">
+                <h4 className="mb-4 border-b border-gray-200 pb-2 font-semibold text-gray-900">
                   Activity Logs
                 </h4>
 

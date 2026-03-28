@@ -11,7 +11,8 @@ import {
   Eye,
   Pencil,
   Check,
-  X as XIcon
+  X as XIcon,
+  History // <-- Added History Icon
 } from 'lucide-react';
 
 // Shadcn UI Imports
@@ -26,6 +27,12 @@ import {
   TableHeader,
   TableRow
 } from '@/components/ui/table';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle
+} from '@/components/ui/sheet'; // <-- Added Sheet Imports
 
 // Custom Imports
 import axiosInstance from '@/lib/axios';
@@ -118,6 +125,7 @@ const VisitorAttendancePage = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const { toast } = useToast();
+
   // State: Default range is Full Current Month
   const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([
     new Date(new Date().getFullYear(), new Date().getMonth(), 1),
@@ -145,9 +153,12 @@ const VisitorAttendancePage = () => {
   const [editError, setEditError] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
 
+  // State for controlling the History Sidebar
+  const [historyRecord, setHistoryRecord] = useState<any | null>(null);
+
   // Fetch Attendance Data
   const fetchAttendance = async (
-    page: number, 
+    page: number,
     limit: number,
     fromOverride?: Date,
     toOverride?: Date
@@ -225,10 +236,6 @@ const VisitorAttendancePage = () => {
       })
       .replace(',', '');
 
-  const handleView = (recordId: string) => {
-    navigate(`${recordId}`);
-  };
-
   // --- Inline Edit Handlers ---
   const handleEditClick = (record: any) => {
     setEditingRecordId(record._id);
@@ -293,7 +300,6 @@ const VisitorAttendancePage = () => {
     setEditError(null);
 
     try {
-      // 1. Convert your raw strings into exact Moment objects
       const clockInMoment = moment(
         `${editForm.startDate} ${editForm.startTime}`,
         'YYYY-MM-DD HH:mm'
@@ -303,7 +309,6 @@ const VisitorAttendancePage = () => {
         'YYYY-MM-DD HH:mm'
       );
 
-      // 2. Build the new payload with full ISO strings
       const isoPayload = {
         clockInDate: moment(editForm.startDate, 'YYYY-MM-DD')
           .startOf('day')
@@ -311,17 +316,16 @@ const VisitorAttendancePage = () => {
         clockOutDate: moment(editForm.endDate, 'YYYY-MM-DD')
           .startOf('day')
           .toISOString(),
+          actionUserId: user?._id,
         clockIn: clockInMoment.toISOString(),
         clockOut: clockOutMoment.toISOString()
       };
 
-      // 3. Send the ISO strings to the backend (this fixes your payload issue)
       await axiosInstance.patch(
         `/hr/attendance/${editingRecordId}`,
         isoPayload
       );
 
-      // 4. Update the local table UI
       setAttendanceData((prevData) =>
         prevData.map((record) =>
           record._id === editingRecordId ? { ...record, ...isoPayload } : record
@@ -330,6 +334,9 @@ const VisitorAttendancePage = () => {
 
       handleCancelEdit();
       toast({ title: 'Attendance Updated Successfully' });
+
+      // Re-fetch to get updated history array
+      fetchAttendance(currentPage, entriesPerPage);
     } catch (error: any) {
       setEditError(
         error?.response?.data?.message || 'Failed to update attendance record'
@@ -344,6 +351,7 @@ const VisitorAttendancePage = () => {
       setIsUpdating(false);
     }
   };
+
   return (
     <div className="space-y-3">
       <Card className="w-full bg-white shadow-md">
@@ -388,7 +396,7 @@ const VisitorAttendancePage = () => {
                 )}
                 Search
               </Button>
-             
+
               <Button
                 variant="outline"
                 onClick={handleReset}
@@ -401,30 +409,30 @@ const VisitorAttendancePage = () => {
           </div>
 
           {/* Table Header Summary */}
-          <div className="mt-2 text-lg font-semibold text-gray-600 flex flex-row items-center justify-between">
+          <div className="mt-2 flex flex-row items-center justify-between text-lg font-semibold text-gray-600">
             <div>
-
-            Attendance:{' '}
-            <span>{startDate ? formatDisplayDate(startDate) : '...'}</span>
-            {endDate && !isSameDay(startDate, endDate) && <span> - {formatDisplayDate(endDate)}</span>}
+              Attendance:{' '}
+              <span>{startDate ? formatDisplayDate(startDate) : '...'}</span>
+              {endDate && !isSameDay(startDate, endDate) && (
+                <span> - {formatDisplayDate(endDate)}</span>
+              )}
             </div>
-            <div className='flex flex-row items-center gap-2'>
-               <Button
+            <div className="flex flex-row items-center gap-2">
+              <Button
                 variant={activeDateBtn === 'today' ? 'default' : 'outline'}
                 onClick={handleToday}
-                
               >
                 Today
               </Button>
               <Button
                 variant={activeDateBtn === 'yesterday' ? 'default' : 'outline'}
                 onClick={handleYesterday}
-                
               >
                 Yesterday
               </Button>
             </div>
           </div>
+
           <div className="rounded-md">
             <TableSection
               data={attendanceData}
@@ -443,10 +451,109 @@ const VisitorAttendancePage = () => {
               onSaveEdit={handleSaveEdit}
               onFormChange={handleFormChange}
               onTimeBlur={handleTimeBlur}
+              onViewHistory={(record) => setHistoryRecord(record)} // Pass record to open Sidebar
             />
           </div>
         </CardContent>
       </Card>
+
+      {/* --- History Sidebar (Sheet) --- */}
+      <Sheet
+        open={!!historyRecord}
+        onOpenChange={(open) => !open && setHistoryRecord(null)}
+      >
+        <SheetContent className="w-full overflow-y-auto sm:max-w-md">
+          <SheetHeader className="mb-4">
+            <SheetTitle>Attendance History</SheetTitle>
+          </SheetHeader>
+
+          {historyRecord && (
+            <div className="space-y-6">
+              {/* Context / Details */}
+              <div className="rounded-lg border border-gray-200 bg-theme/5 p-4 text-sm">
+                <div className="grid grid-cols-2 gap-2">
+                  <span className="font-medium">Visitor:</span>
+                  <span className="font-semibold text-gray-900">
+                    {historyRecord.visitorName || '--'}
+                  </span>
+
+                  <span className="font-medium">Date:</span>
+                  <span className="text-gray-900">
+                    {moment(
+                      historyRecord.clockInDate || historyRecord.date
+                    ).format('DD MMM YYYY')}
+                  </span>
+
+                  <span className="font-medium">Reason:</span>
+                  <span className="text-gray-900">
+                    {historyRecord.visitReason || '--'}
+                  </span>
+
+                  {/* Clock In */}
+                  <span className="font-medium">Clock In:</span>
+                  <span className="text-gray-900">
+                    {historyRecord.clockIn
+                      ? historyRecord.clockIn.includes('T')
+                        ? moment(historyRecord.clockIn).format('DD MMM YYYY, HH:mm')
+                        : historyRecord.clockIn
+                      : '--'}
+                  </span>
+
+                  {/* Clock Out */}
+                  <span className="font-medium">Clock Out:</span>
+                  <span className="text-gray-900">
+                    {historyRecord.clockOut
+                      ? historyRecord.clockOut.includes('T')
+                        ? moment(historyRecord.clockOut).format('DD MMM YYYY, HH:mm')
+                        : historyRecord.clockOut
+                      : '--'}
+                  </span>
+                </div>
+              </div>
+
+              {/* History Timeline */}
+              <div>
+                <h4 className="mb-4 border-b border-gray-200 pb-2 font-semibold text-gray-900">
+                  Activity Logs
+                </h4>
+
+                {historyRecord.history && historyRecord.history.length > 0 ? (
+                  <div className="space-y-4">
+                    {[...historyRecord.history]
+                      // Sort Latest First
+                      .sort(
+                        (a, b) =>
+                          new Date(b.createdAt).getTime() -
+                          new Date(a.createdAt).getTime()
+                      )
+                      .map((item: any, index: number) => (
+                        <div key={index} className="flex gap-3">
+                          <div className="flex flex-col items-center">
+                            <div className="mt-1.5 h-2 w-2 rounded-full bg-theme" />
+                          </div>
+                          <div className="pb-2">
+                            <p className="text-sm font-medium text-gray-800">
+                              {item.message}{' '}
+                              <span className="ml-1">
+                                {moment(item.createdAt).format(
+                                  'hh:mm A, DD MMM YYYY'
+                                )}
+                              </span>
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                ) : (
+                  <p className="py-4 text-center text-sm text-gray-500">
+                    No history available for this record.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 };
@@ -468,7 +575,8 @@ const TableSection = ({
   onCancelEdit,
   onSaveEdit,
   onFormChange,
-  onTimeBlur
+  onTimeBlur,
+  onViewHistory
 }: {
   data: any[];
   loading: boolean;
@@ -486,6 +594,7 @@ const TableSection = ({
   onSaveEdit: () => void;
   onFormChange: (field: keyof EditFormState, value: string) => void;
   onTimeBlur: (field: keyof EditFormState, value: string) => void;
+  onViewHistory: (record: any) => void; // <-- Added
 }) => {
   if (loading) {
     return (
@@ -554,7 +663,6 @@ const TableSection = ({
               return d ? moment(d).format('DD-MM-YYYY') : '--';
             };
 
-            // Calculate Duration dynamically based on display values
             const dCalc = isEditing
               ? calculateDuration(
                   editForm.startDate,
@@ -564,15 +672,12 @@ const TableSection = ({
                 )
               : calculateDuration(startDate, rStartTime, endDate, rEndTime);
 
-            // --- ADDED LOGIC HERE ---
-            // If the calculated duration is less than 1 minute, force display to '00:00'
             if (dCalc && dCalc.minutes < 1) {
               dCalc.display = '00:00';
             }
-            // ------------------------
 
-            // Strict check: Minutes must be > 0
             const isDurationValid = dCalc.minutes > 0;
+
             return (
               <TableRow key={record._id}>
                 <TableCell>
@@ -719,7 +824,19 @@ const TableSection = ({
                         </Button>
                       </>
                     ) : (
-                      <>
+                      <div className="flex items-center gap-2">
+                        {/* Show History Button if History exists */}
+                        {record.history && record.history.length > 0 && (
+                          <Button
+                            size="sm"
+                            onClick={() => onViewHistory(record)}
+                            title="View History"
+                          >
+                            <History className="h-4 w-4" />
+                          </Button>
+                        )}
+
+                        {/* Reconcile Button */}
                         <Button
                           size="sm"
                           variant="outline"
@@ -728,7 +845,7 @@ const TableSection = ({
                         >
                           Reconcile
                         </Button>
-                      </>
+                      </div>
                     )}
                   </div>
                 </TableCell>

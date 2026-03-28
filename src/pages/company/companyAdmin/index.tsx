@@ -15,7 +15,7 @@ import { BlinkingDots } from '@/components/shared/blinking-dots';
 import { Input } from '@/components/ui/input';
 import { DynamicPagination } from '@/components/shared/DynamicPagination';
 import { CompanyAdminDialog } from './components/CompanyAdminDialog';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 
 export default function CompanyAdminPage() {
   const [attendees, setAttendees] = useState<any[]>([]);
@@ -23,7 +23,7 @@ export default function CompanyAdminPage() {
   const [editingUser, setEditingUser] = useState<any>();
   const [initialLoading, setInitialLoading] = useState(true);
   const { toast } = useToast();
-
+  const {id:companyId} = useParams()
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [entriesPerPage, setEntriesPerPage] = useState(30);
@@ -37,6 +37,7 @@ export default function CompanyAdminPage() {
           page,
           limit,
           role: 'companyAdmin',
+          company:companyId,
           ...(search ? { searchTerm: search } : {})
         }
       });

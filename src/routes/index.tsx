@@ -101,6 +101,7 @@ import SignatureDoc from '@/pages/company/SignatureDoc';
 import StaffAttendancePage from '@/pages/staff/attendance';
 import CompanyAdminPage from '@/pages/company/companyAdmin';
 import UserAccessControl from '@/pages/company/companyAdmin/accessControl';
+import ManageHolidayPage from '@/pages/company/ManageHoliday';
 
 const SignInPage = lazy(() => import('@/pages/auth/signin'));
 
@@ -266,7 +267,8 @@ export default function AppRouter() {
         { path: 'service-user', element: <ServiceUserPage /> },
         { path: 'signature-document', element: <SignatureDoc /> },
         { path: 'company-admin', element: <CompanyAdminPage /> },
-        { path: 'company-admin/:caid/access-control', element: <UserAccessControl /> }
+        { path: 'company-admin/:caid/access-control', element: <UserAccessControl /> },
+        { path: 'manage-holiday', element: <ManageHolidayPage /> }
       ]
     }
   ];

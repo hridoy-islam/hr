@@ -50,7 +50,9 @@ import {
   AlertCircle,
   User,
   Users2,
-  UserCog
+  UserCog,
+  CalendarCheck,
+  FileSymlink
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Link, useNavigate, useLocation, useParams } from 'react-router-dom';
@@ -316,6 +318,13 @@ const navItems = [
         href: 'attendance',
         roles: ['company', 'companyAdmin'],
         accessKey: 'attendance'
+      },
+      {
+        icon: FileSymlink,
+        label: 'Manual Attendance',
+        href: 'attendance-entry',
+        roles: ['company', 'companyAdmin'],
+        accessKey: 'attendance'
       }
     ]
   },
@@ -350,6 +359,13 @@ const navItems = [
         icon: User,
         label: 'Attendance Account',
         href: 'attendance-account',
+        roles: ['company', 'companyAdmin'],
+        accessKey: 'setting'
+      },
+      {
+        icon: CalendarCheck,
+        label: 'Manage Holiday',
+        href: 'manage-holiday',
         roles: ['company', 'companyAdmin'],
         accessKey: 'setting'
       },

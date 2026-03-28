@@ -18,6 +18,14 @@ import {
   TableHeader,
   TableRow
 } from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import { CalendarDays, Users, Edit2, Save, X } from 'lucide-react';
 import axiosInstance from '@/lib/axios';
 import { useToast } from '@/components/ui/use-toast';
@@ -41,16 +49,15 @@ const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
   const [error, setError] = useState<string | null>(null);
 
   const { toast } = useToast();
-  const { id, eid } = useParams(); // target user's ID
+  const { id, eid } = useParams();
 
   const [holidays, setHolidays] = useState<any[]>([]);
-
-  // To update the record, we need its DB _id
   const [holidayRecordId, setHolidayRecordId] = useState<string | null>(null);
 
-  // Exact sync with your new DB schema
   const [leaveAllowance, setLeaveAllowance] = useState({
     holidayAllowance: 0,
+    holidayEntitlement: 0,
+    carryForward: 0,
     holidayAccured: 0,
     usedHours: 0,
     bookedHours: 0,
@@ -61,12 +68,44 @@ const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
     unpaidLeaveRequest: 0
   });
 
-  // Edit Allowance States
-  const [isEditingAllowance, setIsEditingAllowance] = useState(false);
-  const [editAllowanceValue, setEditAllowanceValue] = useState<number | string>(
-    0
-  );
+  // ── Edit Dialog State ──
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editEntitlement, setEditEntitlement] = useState<number | string>(0);
+  const [editCarryForward, setEditCarryForward] = useState<number | string>(0);
+  const [carryForwardError, setCarryForwardError] = useState<string>('');
+  const [previousYearRemainingHours, setPreviousYearRemainingHours] = useState<number>(0);
   const [isUpdating, setIsUpdating] = useState(false);
+
+  // ── Fetch previous year's remaining hours for carry forward validation ──
+  const fetchPreviousYearRemainingHours = async () => {
+    try {
+      // Derive the previous holiday year string
+      // e.g. selectedYear = "2026-2027" → prevYear = "2025-2026"
+      const [startYear] = selectedYear.split('-').map(Number);
+      const prevYear = `${startYear - 1}-${startYear}`;
+
+      const response = await axiosInstance.get(
+        `/hr/holidays?userId=${eid}&year=${prevYear}&limit=all`
+      );
+
+      const responseData =
+        response.data?.data?.result || response.data?.data || response.data;
+
+      let prevRecord = null;
+      if (Array.isArray(responseData)) {
+        prevRecord = responseData.find((item: any) => item.year === prevYear);
+      } else if (responseData?.year === prevYear) {
+        prevRecord = responseData;
+      }
+
+      // If no record or negative remaining, treat as 0
+      const prevRemaining = prevRecord?.remainingHours ?? 0;
+      setPreviousYearRemainingHours(Math.max(0, prevRemaining));
+    } catch (err) {
+      console.error('Error fetching previous year holiday:', err);
+      setPreviousYearRemainingHours(0);
+    }
+  };
 
   // ── Data Fetching ──
   const fetchHolidayAllowance = async () => {
@@ -88,10 +127,11 @@ const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
       }
 
       if (holidayRecord) {
-        setHolidayRecordId(holidayRecord._id); // Save ID for PATCH request
-
+        setHolidayRecordId(holidayRecord._id);
         setLeaveAllowance({
           holidayAllowance: holidayRecord.holidayAllowance || 0,
+          holidayEntitlement: holidayRecord.holidayEntitlement || 0,
+          carryForward: holidayRecord.carryForward || 0,
           holidayAccured: holidayRecord.holidayAccured || 0,
           usedHours: holidayRecord.usedHours || 0,
           bookedHours: holidayRecord.bookedHours || 0,
@@ -101,11 +141,14 @@ const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
           unpaidBookedHours: holidayRecord.unpaidBookedHours || 0,
           unpaidLeaveRequest: holidayRecord.unpaidLeaveRequest || 0
         });
-        setEditAllowanceValue(holidayRecord.holidayAllowance || 0);
+        setEditEntitlement(holidayRecord.holidayEntitlement || 0);
+        setEditCarryForward(holidayRecord.carryForward || 0);
       } else {
         setHolidayRecordId(null);
         setLeaveAllowance({
           holidayAllowance: 0,
+          holidayEntitlement: 0,
+          carryForward: 0,
           holidayAccured: 0,
           usedHours: 0,
           bookedHours: 0,
@@ -115,23 +158,22 @@ const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
           unpaidBookedHours: 0,
           unpaidLeaveRequest: 0
         });
-        setEditAllowanceValue(0);
+        setEditEntitlement(0);
+        setEditCarryForward(0);
       }
     } catch (err: any) {
       console.error('Error fetching holiday allowance:', err);
     }
   };
 
-const fetchLeaveRequests = async () => {
+  const fetchLeaveRequests = async () => {
     try {
-      // Added holidayYear to the query parameters
       const response = await axiosInstance.get(
         `/hr/leave?userId=${eid}&holidayYear=${selectedYear}&limit=all`
       );
       let data =
         response.data.data?.result || response.data.data || response.data || [];
 
-      // Kept local filter as a safety fallback
       const filteredData = data.filter(
         (item: any) => item.holidayYear === selectedYear
       );
@@ -163,7 +205,35 @@ const fetchLeaveRequests = async () => {
     }
   }, [id, selectedYear]);
 
-  // ── Update Action ──
+  // ── Open dialog: reset fields from current data + fetch prev year ──
+  const handleOpenEditDialog = async () => {
+    setEditEntitlement(leaveAllowance.holidayEntitlement);
+    setEditCarryForward(leaveAllowance.carryForward);
+    setCarryForwardError('');
+    await fetchPreviousYearRemainingHours();
+    setIsEditDialogOpen(true);
+  };
+
+  // ── Carry forward change with live validation ──
+  const handleCarryForwardChange = (value: string) => {
+    setEditCarryForward(value);
+    const numValue = Number(value);
+    const maxAllowed = previousYearRemainingHours; // already clamped to >= 0
+
+    if (numValue < 0) {
+      setCarryForwardError('Carry forward cannot be negative.');
+    } 
+    // else if (numValue > maxAllowed) {
+    //   setCarryForwardError(
+    //     `Max carry forward is ${maxAllowed.toFixed(2)} h (previous year's remaining balance).`
+    //   );
+    // }
+     else {
+      setCarryForwardError('');
+    }
+  };
+
+  // ── Save dialog ──
   const handleUpdateAllowance = async () => {
     if (!holidayRecordId) {
       toast({
@@ -173,17 +243,28 @@ const fetchLeaveRequests = async () => {
       return;
     }
 
+    if (carryForwardError) return; // block if validation error
+
+    const carryForwardNum = Math.max(0, Number(editCarryForward));
+    const entitlementNum = Number(editEntitlement);
+
+    // Final guard (in case user bypassed UI)
+    // if (carryForwardNum > previousYearRemainingHours) {
+    //   setCarryForwardError(
+    //     `Max carry forward is ${previousYearRemainingHours.toFixed(2)} h.`
+    //   );
+    //   return;
+    // }
+
     setIsUpdating(true);
     try {
-      // Patch request to update the holiday allowance opening balance
       await axiosInstance.patch(`/hr/holidays/${holidayRecordId}`, {
-        holidayAllowance: Number(editAllowanceValue)
+        holidayEntitlement: entitlementNum,
+        carryForward: carryForwardNum,
       });
 
-      toast({ title: 'Allowance updated successfully!' });
-      setIsEditingAllowance(false);
-
-      // Refresh the data to get newly calculated remaining balances
+      toast({ title: 'Holiday allowance updated successfully!' });
+      setIsEditDialogOpen(false);
       await fetchHolidayAllowance();
     } catch (err: any) {
       toast({
@@ -199,14 +280,10 @@ const fetchLeaveRequests = async () => {
   // ── Helpers ──
   const mapStatus = (status: string): string => {
     switch (status?.toLowerCase()) {
-      case 'approved':
-        return 'Approved';
-      case 'pending':
-        return 'Pending';
-      case 'rejected':
-        return 'Rejected';
-      default:
-        return 'Pending';
+      case 'approved': return 'Approved';
+      case 'pending': return 'Pending';
+      case 'rejected': return 'Rejected';
+      default: return 'Pending';
     }
   };
 
@@ -220,31 +297,18 @@ const fetchLeaveRequests = async () => {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'Approved':
-        return (
-          <Badge variant="default" className="bg-green-100 text-green-800">
-            Approved
-          </Badge>
-        );
+        return <Badge className="bg-green-100 text-green-800">Approved</Badge>;
       case 'Pending':
-        return (
-          <Badge variant="default" className="bg-yellow-100 text-yellow-800">
-            Pending
-          </Badge>
-        );
+        return <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>;
       case 'Rejected':
-        return (
-          <Badge variant="destructive" className="bg-red-100 text-red-800">
-            Rejected
-          </Badge>
-        );
+        return <Badge className="bg-red-100 text-red-800">Rejected</Badge>;
       default:
         return <Badge variant="destructive">{status}</Badge>;
     }
   };
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-GB', {
+    return new Date(dateString).toLocaleDateString('en-GB', {
       weekday: 'short',
       day: '2-digit',
       month: 'short',
@@ -256,62 +320,33 @@ const fetchLeaveRequests = async () => {
     const currentYear = moment().year();
     const years: string[] = [];
     for (let i = backward; i > 0; i--) {
-      const start = currentYear - i;
-      years.push(`${start}-${start + 1}`);
+      years.push(`${currentYear - i}-${currentYear - i + 1}`);
     }
     years.push(`${currentYear}-${currentYear + 1}`);
     for (let i = 1; i <= forward; i++) {
-      const start = currentYear + i;
-      years.push(`${start}-${start + 1}`);
+      years.push(`${currentYear + i}-${currentYear + i + 1}`);
     }
     return years;
   };
 
   const holidayYears = useMemo(() => generateHolidayYears(20, 50), []);
 
-  // ── Memoized Allowance Stats ──
   const allowanceStatsList = useMemo(
     () => [
-      {
-        label: 'Holiday Accrued',
-        value: leaveAllowance.holidayAccured,
-        color: 'text-gray-800'
-      },
-      {
-        label: 'Taken',
-        value: leaveAllowance.usedHours,
-        color: 'text-green-600'
-      },
-      {
-        label: 'Booked',
-        value: leaveAllowance.bookedHours,
-        color: 'text-orange-600'
-      },
-      {
-        label: 'Requested',
-        value: leaveAllowance.requestedHours,
-        color: 'text-yellow-600'
-      },
-      {
-        label: 'Unpaid Leave Taken',
-        value: leaveAllowance.unpaidLeaveTaken,
-        color: 'text-cyan-600'
-      },
-      {
-        label: 'Unpaid Booked',
-        value: leaveAllowance.unpaidBookedHours,
-        color: 'text-blue-600'
-      },
-      {
-        label: 'Unpaid Requested',
-        value: leaveAllowance.unpaidLeaveRequest,
-        color: 'text-theme'
-      }
+      { label: 'Carry Forward From Last Year', value: leaveAllowance.carryForward, color: 'text-gray-800' },
+      { label: 'Present Year Holiday Entitlement', value: leaveAllowance.holidayEntitlement, color: 'text-gray-800' },
+      { label: 'Opening This Year', value: leaveAllowance.holidayAllowance, color: 'text-blue-800' },
+      { label: 'Holiday Accrued', value: leaveAllowance.holidayAccured, color: 'text-gray-800' },
+      { label: 'Taken', value: leaveAllowance.usedHours, color: 'text-green-600' },
+      { label: 'Booked', value: leaveAllowance.bookedHours, color: 'text-orange-600' },
+      { label: 'Requested', value: leaveAllowance.requestedHours, color: 'text-yellow-600' },
+      { label: 'Unpaid Leave Taken', value: leaveAllowance.unpaidLeaveTaken, color: 'text-cyan-600' },
+      { label: 'Unpaid Booked', value: leaveAllowance.unpaidBookedHours, color: 'text-blue-600' },
+      { label: 'Unpaid Requested', value: leaveAllowance.unpaidLeaveRequest, color: 'text-theme' }
     ],
     [leaveAllowance]
   );
 
-  // ── Render Guards ──
   if (loading) {
     return (
       <div className="flex justify-center py-12">
@@ -324,19 +359,13 @@ const fetchLeaveRequests = async () => {
     return (
       <div className="p-8 text-center">
         <div className="mb-4 text-red-600">Error: {error}</div>
-        <Button
-          onClick={() => {
-            fetchHolidayAllowance();
-            fetchLeaveRequests();
-          }}
-        >
+        <Button onClick={() => { fetchHolidayAllowance(); fetchLeaveRequests(); }}>
           Retry
         </Button>
       </div>
     );
   }
 
-  // ── JSX ──
   return (
     <div className="">
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -351,21 +380,14 @@ const fetchLeaveRequests = async () => {
             </CardHeader>
             <CardContent>
               <div className="mb-4 flex items-center justify-start gap-4">
-                <span className="font-semibold text-gray-700">
-                  Holiday Year:
-                </span>
-                <ShadcnSelect
-                  value={selectedYear}
-                  onValueChange={setSelectedYear}
-                >
+                <span className="font-semibold text-gray-700">Holiday Year:</span>
+                <ShadcnSelect value={selectedYear} onValueChange={setSelectedYear}>
                   <SelectTrigger className="w-48">
                     <SelectValue placeholder="Select year" />
                   </SelectTrigger>
                   <SelectContent>
                     {holidayYears.map((year) => (
-                      <SelectItem key={year} value={year}>
-                        {year}
-                      </SelectItem>
+                      <SelectItem key={year} value={year}>{year}</SelectItem>
                     ))}
                   </SelectContent>
                 </ShadcnSelect>
@@ -395,9 +417,7 @@ const fetchLeaveRequests = async () => {
                     <div className="text-2xl font-bold text-purple-600">
                       {leaveAllowance.remainingHours.toFixed(1)} h
                     </div>
-                    <div className="text-sm text-gray-600">
-                      Remaining Balance
-                    </div>
+                    <div className="text-sm text-gray-600">Remaining Balance</div>
                   </div>
                 </div>
 
@@ -415,15 +435,9 @@ const fetchLeaveRequests = async () => {
                     <TableBody>
                       {holidays.length > 0 ? (
                         holidays.map((holiday, index) => (
-                          <TableRow
-                            key={`${holiday.startDate}-${holiday.title}-${index}`}
-                          >
-                            <TableCell>
-                              {getStatusBadge(holiday.status)}
-                            </TableCell>
-                            <TableCell>
-                              {formatDate(holiday.startDate)}
-                            </TableCell>
+                          <TableRow key={`${holiday.startDate}-${holiday.title}-${index}`}>
+                            <TableCell>{getStatusBadge(holiday.status)}</TableCell>
+                            <TableCell>{formatDate(holiday.startDate)}</TableCell>
                             <TableCell>{formatDate(holiday.endDate)}</TableCell>
                             <TableCell className="w-[30%] whitespace-pre-wrap font-medium">
                               {holiday?.reason || '-'}
@@ -433,10 +447,7 @@ const fetchLeaveRequests = async () => {
                         ))
                       ) : (
                         <TableRow>
-                          <TableCell
-                            colSpan={5}
-                            className="text-center text-gray-500"
-                          >
+                          <TableCell colSpan={5} className="text-center text-gray-500">
                             No leave requests found for {selectedYear}.
                           </TableCell>
                         </TableRow>
@@ -449,7 +460,7 @@ const fetchLeaveRequests = async () => {
           </Card>
         </div>
 
-        {/* ── Right: Allowance & Edit Functionality ── */}
+        {/* ── Right: Allowance Card ── */}
         <div className="space-y-6">
           <Card className="shadow-sm">
             <CardHeader>
@@ -458,88 +469,36 @@ const fetchLeaveRequests = async () => {
                   <Users className="h-5 w-5 text-green-600" />
                   Leave Allowance
                 </div>
-                {!isEditingAllowance && (
-                  <Button
-                    size="sm"
-                    onClick={() => setIsEditingAllowance(true)}
-                  >
-                    Edit{' '}
-                  </Button>
-                )}
+                <Button size="sm" onClick={handleOpenEditDialog}>
+                  Edit
+                </Button>
               </CardTitle>
             </CardHeader>
 
             <CardContent>
               <div className="space-y-4">
-                {/* Editable Holiday Allowance Row */}
-                {isEditingAllowance ? (
-                  <div className="flex flex-col gap-2 border-b border-gray-300 py-2">
-                    <span className="font-medium text-gray-600">
-                      Opening This Year
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="number"
-                        step="1"
-                        className="h-8 w-48 text-left"
-                        value={editAllowanceValue}
-                        onChange={(e) => setEditAllowanceValue(e.target.value)}
-                        disabled={isUpdating}
-                      />
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8 text-green-600 hover:bg-green-50 hover:text-green-700"
-                        onClick={handleUpdateAllowance}
-                        disabled={isUpdating}
-                      >
-                        <Save className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8 text-red-600 hover:bg-red-50 hover:text-red-700"
-                        onClick={() => {
-                          setIsEditingAllowance(false);
-                          setEditAllowanceValue(
-                            leaveAllowance.holidayAllowance
-                          ); // reset
-                        }}
-                        disabled={isUpdating}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-between border-b border-gray-300 py-2">
-                    <span className="font-medium text-gray-600">
-                      Opening This Year
-                    </span>
-                    <span className="font-semibold text-gray-800">
-                      {leaveAllowance.holidayAllowance.toFixed(2)} h
-                    </span>
-                  </div>
-                )}
+                {/* Opening This Year (derived: entitlement + carryForward) */}
+                {/* <div className="flex items-center justify-between border-b border-gray-300 py-2">
+                  <span className="font-medium text-gray-600">Opening This Year</span>
+                  <span className="font-semibold text-gray-800">
+                    {leaveAllowance.holidayAllowance.toFixed(2)} h
+                  </span>
+                </div> */}
 
-                {/* Rest of the UI map */}
                 {allowanceStatsList.map(({ label, value, color }) => (
                   <div
                     key={label}
                     className="flex items-center justify-between border-b border-gray-300 py-2"
                   >
-                    <span className="text-gray-600">{label}</span>
+                    <span className="text-gray-600 max-w-[60%]">{label}</span>
                     <span className={`font-semibold ${color}`}>
                       {value.toFixed(2)} h
                     </span>
                   </div>
                 ))}
 
-                {/* Remaining Balance Total */}
                 <div className="mt-2 flex items-center justify-between rounded-lg bg-blue-50 px-3 py-2">
-                  <span className="font-semibold text-black">
-                    Balance Remaining
-                  </span>
+                  <span className="font-semibold text-black">Balance Remaining</span>
                   <span className="text-lg font-bold text-theme">
                     {leaveAllowance.remainingHours.toFixed(2)} h
                   </span>
@@ -549,6 +508,81 @@ const fetchLeaveRequests = async () => {
           </Card>
         </div>
       </div>
+
+      {/* ── Edit Dialog ── */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Holiday Allowance  {selectedYear}</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-5 py-2">
+             <div className="space-y-1.5">
+              <Label htmlFor="carryForward">
+                Carry Forward from Last Year (hours)
+              </Label>
+              <Input
+                id="carryForward"
+                type="number"
+                min={0}
+                step={0.01}
+                value={editCarryForward}
+                onChange={(e) => handleCarryForwardChange(e.target.value)}
+                disabled={isUpdating}
+              />
+              {/* Hint: always show max allowed */}
+              {/* <p className="text-xs text-gray-500">
+                Max allowed:{' '}
+                <span className="font-medium">
+                  {previousYearRemainingHours.toFixed(2)} h
+                </span>{' '}
+                
+              </p> */}
+              {/* Live validation error */}
+              {carryForwardError && (
+                <p className="text-xs font-medium text-red-600">
+                  {carryForwardError}
+                </p>
+              )}
+            </div>
+            {/* Holiday Entitlement */}
+            <div className="space-y-1.5">
+              <Label htmlFor="entitlement">Present Year Holiday Entitlement (hours)</Label>
+              <Input
+                id="entitlement"
+                type="number"
+                min={0}
+                step={1}
+                value={editEntitlement}
+                onChange={(e) => setEditEntitlement(e.target.value)}
+                disabled={isUpdating}
+              />
+            </div>
+
+            {/* Carry Forward */}
+           
+
+            {/* Preview: derived allowance */}
+            
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setIsEditDialogOpen(false)}
+              disabled={isUpdating}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleUpdateAllowance}
+              disabled={isUpdating || !!carryForwardError}
+            >
+              {isUpdating ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -14,13 +14,13 @@ import { BlinkingDots } from "@/components/shared/blinking-dots";
 const MODULES = [
   "rota",
   "vacancy",
-  "employee",
   "leave",
   "serviceUser",
   "notice",
   "payroll",
   "attendance",
   "setting",
+  "employee",
 ] as const;
 
 type ModuleType = typeof MODULES[number];
@@ -148,12 +148,21 @@ export default function UserAccessControl() {
                     />
                   )}
                 />
+                <div className="flex flex-col items-start ">
+
                 <Label
                   htmlFor={`checkbox-${module}`}
                   className="cursor-pointer text-lg font-medium capitalize text-gray-700"
-                >
+                  >
                   {module.replace(/([A-Z])/g, " $1").trim()} {/* Converts "serviceUser" to "service User" */}
                 </Label>
+
+                {module === "employee" && (
+                  <span className="mt-1 text-sm text-gray-800">
+                      Includes access to: RTW, Required Docs, Appraisals, Passports, Visas, Immigration, Inductions, Disciplinary Actions, Training, Spot Checks, Supervision, and Quality Assurance.
+                    </span>
+                  )}
+                  </div>
               </div>
             ))}
           </div>

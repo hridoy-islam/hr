@@ -38,6 +38,7 @@ import CopyRotaDialog from './components/CopyRotaDialog';
 import BulkAssignDialog from './components/BulkAssignDialog';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
+import { useSelector } from 'react-redux';
 
 // Types
 type Department = {
@@ -195,6 +196,7 @@ const PublishRotaModal: React.FC<PublishRotaModalProps> = ({
   const { toast } = useToast();
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
   const [isPublishing, setIsPublishing] = useState(false);
+  const user = useSelector((state: any) => state.auth?.user) || null;
 
   const pendingByDate = useMemo(() => {
     const map: Record<string, number> = {};
@@ -240,7 +242,7 @@ const PublishRotaModal: React.FC<PublishRotaModalProps> = ({
       );
       await Promise.all(
         rotasToPublish.map((r) =>
-          axiosInstance.patch(`/rota/${r._id}`, { status: 'publish' })
+          axiosInstance.patch(`/rota/${r._id}`, { status: 'publish', actionUserId: user?._id })
         )
       );
       onPublishSuccess(rotasToPublish.map((r) => r._id));

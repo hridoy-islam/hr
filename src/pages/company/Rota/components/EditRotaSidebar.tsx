@@ -34,6 +34,7 @@ import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { CirclePicker } from 'react-color';
+import { useSelector } from 'react-redux';
 
 // --- Zod schema (common + slots) ---
 const slotSchema = z.object({
@@ -106,6 +107,7 @@ export default function EditRotaSidebar({
   publishedDates
 }: any) {
   const { toast } = useToast();
+  const user = useSelector((state: any) => state.auth?.user) || null;
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -126,6 +128,29 @@ export default function EditRotaSidebar({
   const watchLeaveType = form.watch('leaveType');
   const isStandard = !watchLeaveType;
 
+  // Collect all history entries across all rota slots, sorted latest first
+  const allHistory = (() => {
+    const rotaArray = Array.isArray(rota) ? rota : rota ? [rota] : [];
+    const entries: any[] = [];
+    rotaArray.forEach((r: any) => {
+      if (r.history && r.history.length > 0) {
+        r.history.forEach((h: any) => {
+          entries.push({
+            ...h,
+            // attach the slot's startDate for context if needed
+            slotDate: r.startDate
+          });
+        });
+      }
+    });
+    return entries.sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+  })();
+
+  const hasHistory = allHistory.length > 0;
+
   useEffect(() => {
     if (isOpen && rota) {
       const rotaArray = Array.isArray(rota) ? rota : [rota];
@@ -145,27 +170,14 @@ export default function EditRotaSidebar({
     }
   }, [isOpen, rota, form]);
 
-  // useEffect(() => {
-  //   if (watchLeaveType) {
-  //     const currentSlots = form.getValues('slots') || [];
-  //     currentSlots.forEach((_, idx) => {
-  //       form.setValue(`slots.${idx}.startTime`, '');
-  //       form.setValue(`slots.${idx}.endTime`, '');
-  //     });
-  //     form.setValue('shiftName', watchLeaveType);
-  //     form.setValue('color', '');
-  //   }
-  // }, [watchLeaveType, form]);
-
   useEffect(() => {
     if (watchLeaveType) {
       form.setValue('shiftName', watchLeaveType);
       form.setValue('color', '');
-      // Do NOT clear startTime/endTime here — clearing happens only on submit
     }
   }, [watchLeaveType, form]);
 
- const onSubmit = async (values: FormValues) => {
+  const onSubmit = async (values: FormValues) => {
     try {
       const baseRota = Array.isArray(rota) ? rota[0] : rota;
 
@@ -184,14 +196,13 @@ export default function EditRotaSidebar({
             .format('YYYY-MM-DD');
         }
 
-        // --- NEW: Check if the date is already published ---
         const isPublished = publishedDates?.has(startDateStr);
 
         const payload: any = {
           startDate: startDateStr,
           endDate: endDateStr,
           note: values.note || '',
-          ...(isPublished ? { status: 'publish' } : {}) // <--- ADDED
+          ...(isPublished ? { status: 'publish' } : {})
         };
 
         if (!isStandard) {
@@ -209,7 +220,11 @@ export default function EditRotaSidebar({
         }
 
         if (slot._id) {
-          return axiosInstance.patch(`/rota/${slot._id}`, payload);
+          const patchPayload = {
+            ...payload,
+            actionUserId: user?._id
+          };
+          return axiosInstance.patch(`/rota/${slot._id}`, patchPayload);
         } else {
           payload.employeeId = employee?._id;
           payload.companyId = baseRota?.companyId;
@@ -335,15 +350,24 @@ export default function EditRotaSidebar({
               </div>
             </div>
 
+            {/* --- Tabs: conditionally show History tab --- */}
             <Tabs
               defaultValue="details"
               className="flex flex-1 flex-col overflow-hidden"
             >
-              <TabsList className="mx-5 grid w-[calc(100%-40px)] grid-cols-2 bg-gray-100">
+              <TabsList
+                className={`mx-5 grid w-[calc(100%-40px)] bg-gray-100 ${
+                  hasHistory ? 'grid-cols-3' : 'grid-cols-2'
+                }`}
+              >
                 <TabsTrigger value="details">Shift Details</TabsTrigger>
+                {hasHistory && (
+                  <TabsTrigger value="history">History</TabsTrigger>
+                )}
                 <TabsTrigger value="note">Notes</TabsTrigger>
               </TabsList>
 
+              {/* ---- Shift Details Tab ---- */}
               <TabsContent
                 value="details"
                 className="flex-1 space-y-6 overflow-y-auto p-5"
@@ -601,7 +625,6 @@ export default function EditRotaSidebar({
                   })}
                 </div>
 
-                {/* Color picker: only show when no leave type selected */}
                 {isStandard && (
                   <FormField
                     control={form.control}
@@ -628,7 +651,6 @@ export default function EditRotaSidebar({
                   />
                 )}
 
-                {/* ✅ Leave Type section — always visible */}
                 <div className="space-y-3 border-t border-gray-100 pt-4">
                   <label className="text-xs font-bold uppercase text-gray-900">
                     Leave Type
@@ -660,6 +682,40 @@ export default function EditRotaSidebar({
                 </div>
               </TabsContent>
 
+              
+              {/* ---- History Tab (only rendered when history exists) ---- */}
+              {hasHistory && (
+                <TabsContent
+                  value="history"
+                  className="flex-1 overflow-y-auto p-5"
+                >
+                  <div className="space-y-4">
+                    <h4 className="border-b border-gray-200 pb-2 font-semibold text-gray-900">
+                      Activity Logs
+                    </h4>
+                    <div className="space-y-4">
+                      {allHistory.map((item: any, index: number) => (
+                        <div key={index} className="flex gap-3">
+                          <div className="flex flex-col items-center">
+                            <div className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-theme" />
+                          </div>
+                          <div className="pb-2">
+                            <p className="text-sm font-medium text-gray-800">
+                              {item.message}{' '}{moment(item.createdAt).format(
+                                'hh:mm A, DD MMM YYYY'
+                              )}
+                            </p>
+                           
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </TabsContent>
+              )}
+
+
+              {/* ---- Notes Tab ---- */}
               <TabsContent value="note" className="flex-1 overflow-y-auto p-5">
                 <FormField
                   control={form.control}
@@ -680,6 +736,7 @@ export default function EditRotaSidebar({
                   )}
                 />
               </TabsContent>
+
             </Tabs>
 
             <div className="flex items-center justify-between border-t border-gray-100 bg-gray-50 p-5">
