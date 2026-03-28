@@ -154,21 +154,40 @@ export default function AttendanceScanner() {
   };
 
   // --- Focus Management for QR ---
+  // useEffect(() => {
+  //   const keepFocused = () => {
+  //     if (
+  //       scanMode === 'qr' &&
+  //       inputRef.current &&
+  //       document.activeElement !== inputRef.current &&
+  //       !logoutTarget &&
+  //       !isMenuOpen
+  //     ) {
+  //       inputRef.current.focus();
+  //     }
+  //   };
+  //   const interval = setInterval(keepFocused, 500);
+  //   return () => clearInterval(interval);
+  // }, [scanMode, logoutTarget, isMenuOpen]);
+
+
   useEffect(() => {
-    const keepFocused = () => {
-      if (
-        scanMode === 'qr' &&
-        inputRef.current &&
-        document.activeElement !== inputRef.current &&
-        !logoutTarget &&
-        !isMenuOpen
-      ) {
-        inputRef.current.focus();
-      }
-    };
-    const interval = setInterval(keepFocused, 500);
-    return () => clearInterval(interval);
-  }, [scanMode, logoutTarget, isMenuOpen]);
+  const keepFocused = () => {
+    if (
+      scanMode === 'qr' &&
+      !matchedUser &&          
+      inputRef.current &&
+      document.activeElement !== inputRef.current &&
+      !logoutTarget &&
+      !isMenuOpen
+    ) {
+      inputRef.current.focus();
+    }
+  };
+  const interval = setInterval(keepFocused, 500);
+  return () => clearInterval(interval);
+}, [scanMode, matchedUser, logoutTarget, isMenuOpen]); // <-- add matchedUser to deps
+
 
   // --- Core Clock Event logic ---
   const processClockEvent = async (payload: any) => {
@@ -273,16 +292,58 @@ export default function AttendanceScanner() {
     }
   };
 
-  const handleQRSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (isProcessing.current || status !== 'idle') return;
-    const scannedId = inputValue.trim();
-    if (!scannedId) return;
+  // const handleQRSubmit = async (e: React.FormEvent) => {
+  //   e.preventDefault();
+  //   if (isProcessing.current || status !== 'idle') return;
+  //   const scannedId = inputValue.trim();
+  //   if (!scannedId) return;
 
-    isProcessing.current = true;
-    setInputValue('');
-    await processClockEvent({ userId: scannedId, userType: 'employee' });
-  };
+  //   isProcessing.current = true;
+  //   setInputValue('');
+  //   await processClockEvent({ userId: scannedId, userType: 'employee' });
+  // };
+
+  const handleQRSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  if (isProcessing.current || status !== 'idle') return;
+  const scannedId = inputValue.trim();
+  if (!scannedId) return;
+
+  try {
+    setStatus('loading');
+    const response = await axiosInstance.get(
+      `/users/${scannedId}?company=${companyId}`
+    );
+    const user = response.data?.data || response.data;
+    if (user && user._id) {
+      setMatchedUser(user);
+      setInputValue('');
+      setStatus('idle');
+    } else {
+      throw new Error('User not found');
+    }
+  } catch (error) {
+    // fallback: try finding by _id in already fetched employees
+    const found = allEmployees.find((e) => e._id === scannedId);
+    if (found) {
+      setMatchedUser(found);
+      setInputValue('');
+      setStatus('idle');
+    } else {
+      setStatus('error');
+      setFeedbackMessage({ title: '', description: 'Employee not found.' });
+      errorSound.currentTime = 0;
+      errorSound.play().catch(console.log);
+      setInputValue('');
+      setTimeout(() => {
+        setStatus('idle');
+        setFeedbackMessage({ title: '', description: '' });
+        isProcessing.current = false;
+      }, 4000);
+    }
+  }
+};
+
 
   const submitDobSearch = async (date: Date | null) => {
     if (!date) return;
@@ -954,36 +1015,89 @@ export default function AttendanceScanner() {
                       )}
 
                       {/* --- QR MODE --- */}
-                      {scanMode === 'qr' && (
-                        <>
-                          <div className="relative flex h-48 w-48 items-center justify-center">
-                            <div className="absolute inset-0 animate-[ping_3s_ease-in-out_infinite] rounded-full bg-theme/10" />
-                            <div className="absolute inset-0 animate-[spin_10s_linear_infinite] rounded-full border-2 border-dashed border-theme/30" />
-                            <div className="relative flex h-32 w-32 items-center justify-center rounded-3xl bg-theme shadow-xl shadow-theme/30">
-                              <ScanLine className="h-16 w-16 animate-pulse text-white" />
-                            </div>
-                          </div>
-                          <div className="space-y-2">
-                            <p className="text-3xl font-bold tracking-tight text-black">
-                              Scan your QR code to Clock In/Out
-                            </p>
-                          </div>
-                          <form
-                            onSubmit={handleQRSubmit}
-                            className="flex w-full flex-col items-center pt-4"
-                          >
-                            <input
-                              ref={inputRef}
-                              type="text"
-                              disabled={status !== 'idle'}
-                              value={inputValue}
-                              onChange={(e) => setInputValue(e.target.value)}
-                              className="h-20 w-full rounded-2xl border-4 border-theme bg-slate-50 px-8 py-4 text-center font-mono text-3xl font-bold tracking-[0.1em] text-slate-800 shadow-md transition-all placeholder:text-slate-300 focus:border-theme focus:outline-none focus:ring-0"
-                              placeholder=""
-                            />
-                          </form>
-                        </>
-                      )}
+                     {scanMode === 'qr' && (
+  <>
+    {!matchedUser ? (
+      <>
+        <div className="relative flex h-48 w-48 items-center justify-center">
+          <div className="absolute inset-0 animate-[ping_3s_ease-in-out_infinite] rounded-full bg-theme/10" />
+          <div className="absolute inset-0 animate-[spin_10s_linear_infinite] rounded-full border-2 border-dashed border-theme/30" />
+          <div className="relative flex h-32 w-32 items-center justify-center rounded-3xl bg-theme shadow-xl shadow-theme/30">
+            <ScanLine className="h-16 w-16 animate-pulse text-white" />
+          </div>
+        </div>
+        <div className="space-y-2">
+          <p className="text-3xl font-bold tracking-tight text-black">
+            Scan your QR code to Clock In/Out
+          </p>
+        </div>
+        <form
+          onSubmit={handleQRSubmit}
+          className="flex w-full flex-col items-center pt-4"
+        >
+          <input
+            ref={inputRef}
+            type="text"
+            disabled={status !== 'idle'}
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            className="h-20 w-full rounded-2xl border-4 border-theme bg-slate-50 px-8 py-4 text-center font-mono text-3xl font-bold tracking-[0.1em] text-slate-800 shadow-md transition-all placeholder:text-slate-300 focus:border-theme focus:outline-none focus:ring-0"
+            placeholder=""
+          />
+        </form>
+      </>
+    ) : (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-8 shadow-sm"
+      >
+        <h3 className="mb-8 text-3xl font-bold text-slate-800">
+          Are you{' '}
+          {matchedUser.name ||
+            `${matchedUser.firstName} ${matchedUser.lastName}`}
+          ?
+        </h3>
+        <div className="flex w-full gap-6">
+          <Button
+            className="h-16 flex-1 rounded-xl bg-green-600 text-xl font-bold text-white shadow-md hover:bg-green-700"
+            onClick={() =>
+              processClockEvent({
+                userId: matchedUser._id,
+                userType: 'employee',
+                actionType: 'clock_in'
+              })
+            }
+          >
+            Clock In
+          </Button>
+          <Button
+            className="h-16 flex-1 rounded-xl bg-red-600 text-xl font-bold text-white shadow-md hover:bg-red-700"
+            onClick={() =>
+              processClockEvent({
+                userId: matchedUser._id,
+                userType: 'employee',
+                actionType: 'clock_out'
+              })
+            }
+          >
+            Clock Out
+          </Button>
+        </div>
+        <Button
+          variant="outline"
+          className="mt-6 h-14 w-full text-lg font-semibold"
+          onClick={() => {
+            setMatchedUser(null);
+            setInputValue('');
+          }}
+        >
+          No, try again
+        </Button>
+      </motion.div>
+    )}
+  </>
+)}
                     </motion.div>
                   )}
 
