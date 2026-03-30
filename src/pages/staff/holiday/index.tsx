@@ -279,6 +279,7 @@ const HolidayPage: React.FC = () => {
         endDate: item.endDate,
         title: item.title,
         reason: item.reason,
+        holidayType: item.holidayType,
         hours: formatHours(item.totalHours || 0),
         holidayYear: item.holidayYear
       }));
@@ -442,6 +443,12 @@ const HolidayPage: React.FC = () => {
         label: 'Requested',
         value: leaveAllowance.requestedHours,
         color: 'text-yellow-600'
+      },
+      {
+        label: 'Balance Remaining',
+        value: leaveAllowance.remainingHours,
+        color: 'text-red-600',
+        isBold: true
       },
       {
         label: 'Unpaid Leave Taken',
@@ -831,7 +838,8 @@ const HolidayPage: React.FC = () => {
                           <TableHead>Status</TableHead>
                           <TableHead>Start Date</TableHead>
                           <TableHead>End Date</TableHead>
-                          <TableHead className="w-[10vw]">Reason</TableHead>
+                          <TableHead className="w-[30%]">Reason</TableHead>
+                          <TableHead>Holiday Type</TableHead>
                           <TableHead>Hours</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -852,6 +860,10 @@ const HolidayPage: React.FC = () => {
                               </TableCell>
                               <TableCell className="w-[30%] whitespace-pre-wrap font-medium">
                                 {holiday?.reason || '-'}
+                              </TableCell>
+                              <TableCell>
+                                {holiday.holidayType.charAt(0).toUpperCase() +
+                                  holiday.holidayType.slice(1) || '-'}
                               </TableCell>
                               <TableCell>{holiday.hours}</TableCell>
                             </TableRow>
@@ -896,21 +908,25 @@ const HolidayPage: React.FC = () => {
                       key={label}
                       className="flex items-center justify-between border-b border-gray-300 py-2"
                     >
-                      <span className="text-gray-600 max-w-[60%]">{label}</span>
+                      <span
+                        className={`max-w-[60%] text-gray-600 ${label === 'Balance Remaining' ? 'font-bold text-gray-900' : ''}`}
+                      >
+                        {label}
+                      </span>{' '}
                       <span className={`font-semibold ${color}`}>
                         {value.toFixed(1)} h
                       </span>
                     </div>
                   ))}
 
-                  <div className="flex items-center justify-between rounded-lg bg-blue-50 px-3 py-2">
+                  {/* <div className="flex items-center justify-between rounded-lg bg-blue-50 px-3 py-2">
                     <span className="font-semibold text-black">
                       Balance Remaining
                     </span>
                     <span className="text-lg font-bold text-theme">
                       {leaveAllowance.remainingHours.toFixed(1)} h
                     </span>
-                  </div>
+                  </div> */}
                 </div>
               </CardContent>
             </Card>

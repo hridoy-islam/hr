@@ -73,7 +73,8 @@ const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
   const [editEntitlement, setEditEntitlement] = useState<number | string>(0);
   const [editCarryForward, setEditCarryForward] = useState<number | string>(0);
   const [carryForwardError, setCarryForwardError] = useState<string>('');
-  const [previousYearRemainingHours, setPreviousYearRemainingHours] = useState<number>(0);
+  const [previousYearRemainingHours, setPreviousYearRemainingHours] =
+    useState<number>(0);
   const [isUpdating, setIsUpdating] = useState(false);
 
   // ── Fetch previous year's remaining hours for carry forward validation ──
@@ -185,6 +186,8 @@ const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
         endDate: item.endDate,
         title: item.title,
         reason: item.reason,
+        holidayType: item.holidayType,
+
         hours: formatHours(item.totalHours || 0),
         holidayYear: item.holidayYear
       }));
@@ -222,13 +225,13 @@ const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
 
     if (numValue < 0) {
       setCarryForwardError('Carry forward cannot be negative.');
-    } 
+    }
     // else if (numValue > maxAllowed) {
     //   setCarryForwardError(
     //     `Max carry forward is ${maxAllowed.toFixed(2)} h (previous year's remaining balance).`
     //   );
     // }
-     else {
+    else {
       setCarryForwardError('');
     }
   };
@@ -260,7 +263,7 @@ const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
     try {
       await axiosInstance.patch(`/hr/holidays/${holidayRecordId}`, {
         holidayEntitlement: entitlementNum,
-        carryForward: carryForwardNum,
+        carryForward: carryForwardNum
       });
 
       toast({ title: 'Holiday allowance updated successfully!' });
@@ -280,10 +283,14 @@ const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
   // ── Helpers ──
   const mapStatus = (status: string): string => {
     switch (status?.toLowerCase()) {
-      case 'approved': return 'Approved';
-      case 'pending': return 'Pending';
-      case 'rejected': return 'Rejected';
-      default: return 'Pending';
+      case 'approved':
+        return 'Approved';
+      case 'pending':
+        return 'Pending';
+      case 'rejected':
+        return 'Rejected';
+      default:
+        return 'Pending';
     }
   };
 
@@ -333,16 +340,62 @@ const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
 
   const allowanceStatsList = useMemo(
     () => [
-      { label: 'Carry Forward From Last Year', value: leaveAllowance.carryForward, color: 'text-gray-800' },
-      { label: 'Present Year Holiday Entitlement', value: leaveAllowance.holidayEntitlement, color: 'text-gray-800' },
-      { label: 'Opening This Year', value: leaveAllowance.holidayAllowance, color: 'text-blue-800' },
-      { label: 'Holiday Accrued', value: leaveAllowance.holidayAccured, color: 'text-gray-800' },
-      { label: 'Taken', value: leaveAllowance.usedHours, color: 'text-green-600' },
-      { label: 'Booked', value: leaveAllowance.bookedHours, color: 'text-orange-600' },
-      { label: 'Requested', value: leaveAllowance.requestedHours, color: 'text-yellow-600' },
-      { label: 'Unpaid Leave Taken', value: leaveAllowance.unpaidLeaveTaken, color: 'text-cyan-600' },
-      { label: 'Unpaid Booked', value: leaveAllowance.unpaidBookedHours, color: 'text-blue-600' },
-      { label: 'Unpaid Requested', value: leaveAllowance.unpaidLeaveRequest, color: 'text-theme' }
+      {
+        label: 'Carry Forward From Last Year',
+        value: leaveAllowance.carryForward,
+        color: 'text-gray-800'
+      },
+      {
+        label: 'Present Year Holiday Entitlement',
+        value: leaveAllowance.holidayEntitlement,
+        color: 'text-gray-800'
+      },
+      {
+        label: 'Opening This Year',
+        value: leaveAllowance.holidayAllowance,
+        color: 'text-blue-800'
+      },
+      {
+        label: 'Holiday Accrued',
+        value: leaveAllowance.holidayAccured,
+        color: 'text-gray-800'
+      },
+      {
+        label: 'Taken',
+        value: leaveAllowance.usedHours,
+        color: 'text-green-600'
+      },
+      {
+        label: 'Booked',
+        value: leaveAllowance.bookedHours,
+        color: 'text-orange-600'
+      },
+      {
+        label: 'Requested',
+        value: leaveAllowance.requestedHours,
+        color: 'text-yellow-600'
+      },
+      {
+        label: 'Balance Remaining',
+        value: leaveAllowance.remainingHours,
+        color: 'text-red-600',
+        isBold: true
+      },
+      {
+        label: 'Unpaid Leave Taken',
+        value: leaveAllowance.unpaidLeaveTaken,
+        color: 'text-cyan-600'
+      },
+      {
+        label: 'Unpaid Booked',
+        value: leaveAllowance.unpaidBookedHours,
+        color: 'text-blue-600'
+      },
+      {
+        label: 'Unpaid Requested',
+        value: leaveAllowance.unpaidLeaveRequest,
+        color: 'text-theme'
+      }
     ],
     [leaveAllowance]
   );
@@ -359,7 +412,12 @@ const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
     return (
       <div className="p-8 text-center">
         <div className="mb-4 text-red-600">Error: {error}</div>
-        <Button onClick={() => { fetchHolidayAllowance(); fetchLeaveRequests(); }}>
+        <Button
+          onClick={() => {
+            fetchHolidayAllowance();
+            fetchLeaveRequests();
+          }}
+        >
           Retry
         </Button>
       </div>
@@ -380,14 +438,21 @@ const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
             </CardHeader>
             <CardContent>
               <div className="mb-4 flex items-center justify-start gap-4">
-                <span className="font-semibold text-gray-700">Holiday Year:</span>
-                <ShadcnSelect value={selectedYear} onValueChange={setSelectedYear}>
+                <span className="font-semibold text-gray-700">
+                  Holiday Year:
+                </span>
+                <ShadcnSelect
+                  value={selectedYear}
+                  onValueChange={setSelectedYear}
+                >
                   <SelectTrigger className="w-48">
                     <SelectValue placeholder="Select year" />
                   </SelectTrigger>
                   <SelectContent>
                     {holidayYears.map((year) => (
-                      <SelectItem key={year} value={year}>{year}</SelectItem>
+                      <SelectItem key={year} value={year}>
+                        {year}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </ShadcnSelect>
@@ -417,7 +482,9 @@ const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
                     <div className="text-2xl font-bold text-purple-600">
                       {leaveAllowance.remainingHours.toFixed(1)} h
                     </div>
-                    <div className="text-sm text-gray-600">Remaining Balance</div>
+                    <div className="text-sm text-gray-600">
+                      Remaining Balance
+                    </div>
                   </div>
                 </div>
 
@@ -428,26 +495,41 @@ const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
                         <TableHead>Status</TableHead>
                         <TableHead>Start Date</TableHead>
                         <TableHead>End Date</TableHead>
-                        <TableHead className="w-[10vw]">Reason</TableHead>
+                        <TableHead className="w-[30%]">Reason</TableHead>
+                        <TableHead>Holiday Type</TableHead>
+
                         <TableHead>Hours</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {holidays.length > 0 ? (
                         holidays.map((holiday, index) => (
-                          <TableRow key={`${holiday.startDate}-${holiday.title}-${index}`}>
-                            <TableCell>{getStatusBadge(holiday.status)}</TableCell>
-                            <TableCell>{formatDate(holiday.startDate)}</TableCell>
+                          <TableRow
+                            key={`${holiday.startDate}-${holiday.title}-${index}`}
+                          >
+                            <TableCell>
+                              {getStatusBadge(holiday.status)}
+                            </TableCell>
+                            <TableCell>
+                              {formatDate(holiday.startDate)}
+                            </TableCell>
                             <TableCell>{formatDate(holiday.endDate)}</TableCell>
                             <TableCell className="w-[30%] whitespace-pre-wrap font-medium">
                               {holiday?.reason || '-'}
+                            </TableCell>
+                            <TableCell>
+                              {holiday.holidayType.charAt(0).toUpperCase() +
+                                holiday.holidayType.slice(1) || '-'}
                             </TableCell>
                             <TableCell>{holiday.hours}</TableCell>
                           </TableRow>
                         ))
                       ) : (
                         <TableRow>
-                          <TableCell colSpan={5} className="text-center text-gray-500">
+                          <TableCell
+                            colSpan={5}
+                            className="text-center text-gray-500"
+                          >
                             No leave requests found for {selectedYear}.
                           </TableCell>
                         </TableRow>
@@ -490,19 +572,21 @@ const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
                     key={label}
                     className="flex items-center justify-between border-b border-gray-300 py-2"
                   >
-                    <span className="text-gray-600 max-w-[60%]">{label}</span>
+                    <span className="max-w-[60%] text-gray-600">{label}</span>
                     <span className={`font-semibold ${color}`}>
                       {value.toFixed(2)} h
                     </span>
                   </div>
                 ))}
 
-                <div className="mt-2 flex items-center justify-between rounded-lg bg-blue-50 px-3 py-2">
-                  <span className="font-semibold text-black">Balance Remaining</span>
+                {/* <div className="mt-2 flex items-center justify-between rounded-lg bg-blue-50 px-3 py-2">
+                  <span className="font-semibold text-black">
+                    Balance Remaining
+                  </span>
                   <span className="text-lg font-bold text-theme">
                     {leaveAllowance.remainingHours.toFixed(2)} h
                   </span>
-                </div>
+                </div> */}
               </div>
             </CardContent>
           </Card>
@@ -513,11 +597,11 @@ const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Edit Holiday Allowance  {selectedYear}</DialogTitle>
+            <DialogTitle>Edit Holiday Allowance {selectedYear}</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-5 py-2">
-             <div className="space-y-1.5">
+            <div className="space-y-1.5">
               <Label htmlFor="carryForward">
                 Carry Forward from Last Year (hours)
               </Label>
@@ -547,7 +631,9 @@ const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
             </div>
             {/* Holiday Entitlement */}
             <div className="space-y-1.5">
-              <Label htmlFor="entitlement">Present Year Holiday Entitlement (hours)</Label>
+              <Label htmlFor="entitlement">
+                Present Year Holiday Entitlement (hours)
+              </Label>
               <Input
                 id="entitlement"
                 type="number"
@@ -560,10 +646,8 @@ const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
             </div>
 
             {/* Carry Forward */}
-           
 
             {/* Preview: derived allowance */}
-            
           </div>
 
           <DialogFooter className="gap-2">
