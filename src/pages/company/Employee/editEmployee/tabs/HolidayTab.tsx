@@ -572,8 +572,11 @@ const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
                     key={label}
                     className="flex items-center justify-between border-b border-gray-300 py-2"
                   >
-                    <span className="max-w-[60%] text-gray-600">{label}</span>
-                    <span className={`font-semibold ${color}`}>
+ <span
+                        className={`max-w-[60%] text-gray-600 ${label === 'Balance Remaining' ? 'font-bold text-gray-900' : ''}`}
+                      >
+                        {label}
+                      </span>{' '}                    <span className={`font-semibold ${color}`}>
                       {value.toFixed(2)} h
                     </span>
                   </div>
