@@ -39,6 +39,13 @@ import BulkAssignDialog from './components/BulkAssignDialog';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { useSelector } from 'react-redux';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+
 
 // Types
 type Department = {
@@ -242,7 +249,10 @@ const PublishRotaModal: React.FC<PublishRotaModalProps> = ({
       );
       await Promise.all(
         rotasToPublish.map((r) =>
-          axiosInstance.patch(`/rota/${r._id}`, { status: 'publish', actionUserId: user?._id })
+          axiosInstance.patch(`/rota/${r._id}`, {
+            status: 'publish',
+            actionUserId: user?._id
+          })
         )
       );
       onPublishSuccess(rotasToPublish.map((r) => r._id));
@@ -419,6 +429,9 @@ interface DraggableRowProps {
     departmentId: string
   ) => void;
   pendingDates: Set<string>;
+ handleCopy: (rotas: any[]) => void;
+  handlePaste: (user: any, day: moment.Moment, deptId: string) => void;
+  copiedRotas: any[];
 }
 
 const DraggableRow: React.FC<DraggableRowProps> = ({
@@ -430,20 +443,22 @@ const DraggableRow: React.FC<DraggableRowProps> = ({
   rotaMap,
   leaveTypeColors,
   handleCellClick,
-  pendingDates
+  pendingDates,
+  handleCopy,
+  handlePaste,
+  copiedRotas,
 }) => {
   const ref = useRef<HTMLTableRowElement>(null);
+
+  // Drag and Drop Logic
   const [{ isDragging }, drag, dragPreview] = useDrag({
-    type: DRAG_TYPE,
+    type: 'ROTA_ROW', // Use your DRAG_TYPE constant
     item: { deptRowIndex, departmentId },
     collect: (monitor) => ({ isDragging: monitor.isDragging() })
   });
-  const [{ isOver }, drop] = useDrop<
-    { deptRowIndex: number; departmentId: string },
-    void,
-    { isOver: boolean }
-  >({
-    accept: DRAG_TYPE,
+
+  const [{ isOver }, drop] = useDrop<{ deptRowIndex: number; departmentId: string }, void, { isOver: boolean }>({
+    accept: 'ROTA_ROW',
     collect: (monitor) => ({ isOver: monitor.isOver() }),
     hover(item, monitor) {
       if (!ref.current || item.departmentId !== departmentId) return;
@@ -451,8 +466,7 @@ const DraggableRow: React.FC<DraggableRowProps> = ({
       const hoverIndex = deptRowIndex;
       if (dragIndex === hoverIndex) return;
       const hoverBoundingRect = ref.current.getBoundingClientRect();
-      const hoverMiddleY =
-        (hoverBoundingRect.bottom - hoverBoundingRect.top) / 2;
+      const hoverMiddleY = (hoverBoundingRect.bottom - hoverBoundingRect.top) / 2;
       const clientOffset = monitor.getClientOffset();
       if (!clientOffset) return;
       const hoverClientY = clientOffset.y - hoverBoundingRect.top;
@@ -462,6 +476,7 @@ const DraggableRow: React.FC<DraggableRowProps> = ({
       item.deptRowIndex = hoverIndex;
     }
   });
+
   drop(dragPreview(ref));
 
   return (
@@ -469,6 +484,7 @@ const DraggableRow: React.FC<DraggableRowProps> = ({
       ref={ref}
       className={`transition-colors hover:bg-slate-50/60 ${isDragging ? 'bg-blue-50 opacity-40' : ''} ${isOver ? 'bg-slate-100' : ''}`}
     >
+      {/* User Info Column */}
       <td className="sticky left-0 z-20 border-b border-r border-gray-200 bg-white p-3 shadow-[2px_0_0_0_rgba(0,0,0,0.05)]">
         <div className="flex items-center gap-2">
           <div
@@ -485,23 +501,27 @@ const DraggableRow: React.FC<DraggableRowProps> = ({
               className="object-cover"
             />
             <AvatarFallback className="bg-gray-100 text-[11px] font-black text-black">
-              {getInitials(user.firstName, user.lastName, user.name)}
+              {/* Replace with your actual helper */}
+              {user.firstName?.charAt(0)}{user.lastName?.charAt(0)}
             </AvatarFallback>
           </Avatar>
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-black">
-              {user.firstName
-                ? `${user.firstName} ${user.lastName}`
-                : user.name}
+              {user.firstName ? `${user.firstName} ${user.lastName}` : user.name}
             </p>
             <p className="text-[10px] font-medium text-gray-500">
-              {getDesignationTitle(user.designationId)}
+              {/* Replace with your actual helper */}
+              {user.designationId?.title || 'Staff'}
             </p>
           </div>
         </div>
       </td>
+
+      {/* Rota Cells */}
       {daysArray.map((day, idx) => {
         const dateKey = day.format('YYYY-MM-DD');
+        
+        // Filter rotas specifically for this user and this department row
         const rotaList = (rotaMap[user._id]?.[dateKey] || []).filter(
           (r: any) =>
             (typeof r.departmentId === 'object'
@@ -512,54 +532,88 @@ const DraggableRow: React.FC<DraggableRowProps> = ({
         const hasPendingCol = pendingDates.has(dateKey);
 
         return (
-          <td
-            key={idx}
-            onClick={() => handleCellClick(user, day, departmentId)}
-            className={`group min-w-[65px] cursor-pointer border-b border-r border-gray-200 p-1 text-center hover:bg-amber-100/60 ${hasPendingCol ? 'bg-amber-50' : 'hover:bg-slate-100/80'}`}
-          >
-            {rotaList.length > 0 ? (
-              <div className="flex flex-col gap-0.5">
-                {(() => {
-                  const firstRota = rotaList[0];
-                  const extraSlots = rotaList.slice(1).map((r: any) => ({
-                    startTime: r.startTime,
-                    endTime: r.endTime
-                  }));
-                  let shiftColors: any = 'theme';
-                  if (
-                    firstRota.leaveType &&
-                    leaveTypeColors[firstRota.leaveType]
-                  )
-                    shiftColors = leaveTypeColors[firstRota.leaveType];
-                  else if (firstRota.color)
-                    shiftColors =
-                      typeof firstRota.color === 'string'
-                        ? {
-                            bg: firstRota.color,
-                            border: firstRota.color,
-                            text: '#FFFFFF'
-                          }
-                        : firstRota.color;
-                  return (
-                    <ShiftBlock
-                      key={firstRota._id}
-                      leaveType={firstRota.leaveType}
-                      shiftName={firstRota.shiftName}
-                      startTime={firstRota.startTime}
-                      endTime={firstRota.endTime}
-                      colors={shiftColors}
-                      extraSlots={extraSlots}
-                      isPending={firstRota.status === 'pending'}
-                    />
-                  );
-                })()}
-              </div>
-            ) : (
-              <div className="mx-auto flex h-9 w-full min-w-[50px] items-center justify-center rounded-lg border border-dashed border-transparent text-gray-300 opacity-0 transition-all group-hover:border-gray-300 group-hover:bg-gray-50 group-hover:opacity-100">
-                <Plus className="h-4 w-4" />
-              </div>
-            )}
-          </td>
+          <ContextMenu key={idx}>
+            <ContextMenuTrigger asChild>
+              <td
+                onClick={() => handleCellClick(user, day, departmentId)}
+                className={`group min-w-[65px] cursor-pointer border-b border-r border-gray-200 p-1 text-center hover:bg-amber-100/60 ${hasPendingCol ? 'bg-amber-50' : 'hover:bg-slate-100/80'}`}
+              >
+                {rotaList.length > 0 ? (
+                  <div className="flex flex-col gap-0.5">
+                    {(() => {
+                      const firstRota = rotaList[0];
+                      const extraSlots = rotaList.slice(1).map((r: any) => ({
+                        startTime: r.startTime,
+                        endTime: r.endTime
+                      }));
+                      
+                      let shiftColors: any = 'theme';
+                      if (firstRota.leaveType && leaveTypeColors[firstRota.leaveType])
+                        shiftColors = leaveTypeColors[firstRota.leaveType];
+                      else if (firstRota.color)
+                        shiftColors = typeof firstRota.color === 'string'
+                          ? { bg: firstRota.color, border: firstRota.color, text: '#FFFFFF' }
+                          : firstRota.color;
+
+                      return (
+                        <ShiftBlock
+                          key={firstRota._id}
+                          leaveType={firstRota.leaveType}
+                          shiftName={firstRota.shiftName}
+                          startTime={firstRota.startTime}
+                          endTime={firstRota.endTime}
+                          colors={shiftColors}
+                          extraSlots={extraSlots}
+                          isPending={firstRota.status === 'pending'}
+                        />
+                      );
+                    })()}
+                  </div>
+                ) : (
+                  <div className="mx-auto flex h-9 w-full min-w-[50px] items-center justify-center rounded-lg border border-dashed border-transparent text-gray-300 opacity-0 transition-all group-hover:border-gray-300 group-hover:bg-gray-50 group-hover:opacity-100">
+                    <Plus className="h-4 w-4" />
+                  </div>
+                )}
+              </td>
+            </ContextMenuTrigger>
+
+            <ContextMenuContent className="w-56">
+              {/* Option to Copy if shifts exist in this cell */}
+              {rotaList.length > 0 && (
+                <ContextMenuItem 
+                  className="cursor-pointer" 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleCopy(rotaList);
+                  }}
+                >
+                  <Copy className="mr-2 h-4 w-4 " />
+                  <span>Copy {rotaList.length > 1 ? 'Rotas' : 'Rota'}</span>
+                </ContextMenuItem>
+              )}
+              
+              {/* Option to Paste if shifts are in the clipboard */}
+             {copiedRotas && copiedRotas.length > 0 && rotaList.length === 0 && (
+  <ContextMenuItem 
+    className="cursor-pointer" 
+    onClick={(e) => {
+      e.stopPropagation();
+      handlePaste(user, day, departmentId);
+    }}
+  >
+    <CheckCircle2 className="mr-2 h-4 w-4 " />
+    <span>Paste {copiedRotas.length > 1 ? 'Rotas' : 'Rota'}</span>
+  </ContextMenuItem>
+)}
+
+              {/* fallback if no actions available */}
+              {rotaList.length === 0 && (!copiedRotas || copiedRotas.length === 0) && (
+                <ContextMenuItem disabled className="text-xs text-gray-400">
+                  No actions available
+                </ContextMenuItem>
+              )}
+            </ContextMenuContent>
+          </ContextMenu>
         );
       })}
     </tr>
@@ -590,19 +644,15 @@ interface DraggableChildGroupProps {
     departmentId: string
   ) => void;
   pendingDates: Set<string>;
+  handleCopy: (rotas: any[]) => void;
+  handlePaste: (user: any, day: moment.Moment, deptId: string) => void;
+  copiedRotas: any[]
 }
 
 const DraggableChildGroup: React.FC<DraggableChildGroupProps> = ({
-  childGroup,
-  childIndex,
-  parentId,
-  moveChildGroup,
-  daysArray,
-  rotaMap,
-  leaveTypeColors,
-  moveRow,
-  handleCellClick,
-  pendingDates
+ childGroup, childIndex, parentId, moveChildGroup,
+  daysArray, rotaMap, leaveTypeColors, moveRow, handleCellClick, pendingDates,
+  handleCopy, handlePaste, copiedRotas
 }) => {
   const ref = useRef<HTMLTableRowElement>(null);
 
@@ -673,6 +723,9 @@ const DraggableChildGroup: React.FC<DraggableChildGroupProps> = ({
           leaveTypeColors={leaveTypeColors}
           handleCellClick={handleCellClick}
           pendingDates={pendingDates}
+           handleCopy={handleCopy}
+        handlePaste={handlePaste}
+        copiedRotas={copiedRotas}
         />
       ))}
     </>
@@ -703,19 +756,15 @@ interface DraggableHierarchyBlockProps {
     departmentId: string
   ) => void;
   pendingDates: Set<string>;
+  handleCopy: (rotas: any[]) => void;
+  handlePaste: (user: any, day: moment.Moment, deptId: string) => void;
+  copiedRotas: any[];
 }
 
 const DraggableHierarchyBlock: React.FC<DraggableHierarchyBlockProps> = ({
-  hierarchy,
-  deptIndex,
-  moveDepartment,
-  moveChildGroup,
-  daysArray,
-  rotaMap,
-  leaveTypeColors,
-  moveRow,
-  handleCellClick,
-  pendingDates
+ hierarchy, deptIndex, moveDepartment, moveChildGroup,
+  daysArray, rotaMap, leaveTypeColors, moveRow, handleCellClick, pendingDates,
+  handleCopy, handlePaste, copiedRotas
 }) => {
   const ref = useRef<HTMLTableSectionElement>(null);
 
@@ -798,6 +847,9 @@ const DraggableHierarchyBlock: React.FC<DraggableHierarchyBlockProps> = ({
           leaveTypeColors={leaveTypeColors}
           handleCellClick={handleCellClick}
           pendingDates={pendingDates}
+          handleCopy={handleCopy}
+        handlePaste={handlePaste}
+        copiedRotas={copiedRotas}
         />
       ))}
 
@@ -814,6 +866,9 @@ const DraggableHierarchyBlock: React.FC<DraggableHierarchyBlockProps> = ({
           moveRow={moveRow}
           handleCellClick={handleCellClick}
           pendingDates={pendingDates}
+          handleCopy={handleCopy}
+          handlePaste={handlePaste}
+          copiedRotas={copiedRotas}
         />
       ))}
     </tbody>
@@ -846,7 +901,7 @@ export default function CompanyRota() {
   const [isCopyRotaOpen, setIsCopyRotaOpen] = useState(false);
   const [companyColor, setCompanyColor] = useState(null);
   const [isPublishOpen, setIsPublishOpen] = useState(false);
-
+const [copiedRotas, setCopiedRotas] = useState<any[]>([]);
   const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([
     null,
     null
@@ -859,6 +914,56 @@ export default function CompanyRota() {
   ]);
   const [appliedStart, appliedEnd] = appliedRange;
   const isCustomRange = !!(appliedStart && appliedEnd);
+
+  const tableWrapperRef = useRef<HTMLDivElement>(null);
+  const topScrollWrapperRef = useRef<HTMLDivElement>(null);
+  const topScrollInnerRef = useRef<HTMLDivElement>(null);
+
+
+  const handleCopy = (rotas: any[]) => {
+  // Strip IDs and metadata so we create fresh records on paste
+  const stripped = rotas.map(({ _id, createdAt, updatedAt, history, ...rest }) => rest);
+  setCopiedRotas(stripped);
+  toast({ title: `Rota(s) copied to clipboard` });
+};
+
+const handlePaste = async (targetUser: User, targetDate: moment.Moment, targetDeptId: string) => {
+  if (copiedRotas.length === 0) return;
+
+  const dateKey = targetDate.format('YYYY-MM-DD');
+  
+  // Check if this specific date column already has any published shifts
+  const isColumnPublished = rotas.some(r => 
+    moment(r.startDate).format('YYYY-MM-DD') === dateKey && r.status === 'publish'
+  );
+
+  try {
+    const promises = copiedRotas.map(rota => {
+      const payload = {
+        ...rota,
+        companyId: companyId,
+        employeeId: targetUser._id,
+        departmentId: targetDeptId,
+        startDate: dateKey,
+        endDate: dateKey,
+        // Requirement: If column is published, paste as published
+        status: isColumnPublished ? 'publish' : 'pending'
+      };
+      return axiosInstance.post('/rota', payload);
+    });
+
+    const results = await Promise.all(promises);
+    const newRotas = results.map(res => res.data?.data);
+    
+    handleAddRotaSuccess(newRotas);
+    toast({ 
+      title: `Rota Pasted`, 
+      // description: `Status: ${isColumnPublished ? 'Published' : 'Pending'}` 
+    });
+  } catch (error) {
+    toast({ title: "Failed to paste shifts", variant: "destructive" });
+  }
+};
 
   const fetchUsersAndRotas = useCallback(
     async (isInitial = false) => {
@@ -1256,17 +1361,62 @@ export default function CompanyRota() {
     );
   };
 
+  // 1. Sync the scrollbar widths
+  // 1. Sync the scrollbar widths
+  useEffect(() => {
+    const syncScrollWidth = () => {
+      if (tableWrapperRef.current && topScrollInnerRef.current) {
+        // Use scrollWidth of the table container to match the exact internal width
+        const tableScrollWidth = tableWrapperRef.current.scrollWidth;
+        topScrollInnerRef.current.style.width = `${tableScrollWidth}px`;
+      }
+    };
+
+    // Run immediately
+    syncScrollWidth();
+
+    // Use ResizeObserver for more robust tracking of content changes
+    const resizeObserver = new ResizeObserver(() => syncScrollWidth());
+    if (tableWrapperRef.current) {
+      resizeObserver.observe(tableWrapperRef.current);
+    }
+
+    // Fallback timeout for initial render/data loads
+    const timer = setTimeout(syncScrollWidth, 200);
+
+    window.addEventListener('resize', syncScrollWidth);
+    return () => {
+      window.removeEventListener('resize', syncScrollWidth);
+      resizeObserver.disconnect();
+      clearTimeout(timer);
+    };
+  }, [daysArray, orderedGroups, isLoading, rotas]); // Added rotas as dependency
+
+  // 2. Handlers to keep scroll positions perfectly matched
+  const handleTopScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    if (tableWrapperRef.current) {
+      tableWrapperRef.current.scrollLeft = e.currentTarget.scrollLeft;
+    }
+  };
+
+  const handleTableScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    if (topScrollWrapperRef.current) {
+      topScrollWrapperRef.current.scrollLeft = e.currentTarget.scrollLeft;
+    }
+  };
+
   return (
     <DndProvider backend={HTML5Backend}>
-      <div className="flex h-full w-full max-w-[100vw] flex-col overflow-hidden rounded-md bg-white p-4 text-black shadow-sm">
+      <div className="flex h-full w-full max-w-[100vw] flex-col overflow-hidden rounded-md bg-white p-2 text-black shadow-sm">
         <style>{`
-          .custom-scrollbar::-webkit-scrollbar { height: 14px; width: 14px; }
-          .custom-scrollbar::-webkit-scrollbar-track { background: #F8FAFC; border-radius: 8px; border: 1px solid #E2E8F0; }
-          .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #CBD5E1; border-radius: 8px; border: 3px solid #F8FAFC; }
-          .custom-scrollbar::-webkit-scrollbar-thumb:hover { background-color: #94A3B8; }
-          .custom-scrollbar::-webkit-scrollbar-corner { background: #F8FAFC; }
-          .scrollbar-top-wrapper { transform: rotateX(180deg); }
-          .scrollbar-top-wrapper > table { transform: rotateX(180deg); }
+          .custom-scrollbar::-webkit-scrollbar { height: 14px; width: 14px; background: transparent; }
+  .custom-scrollbar::-webkit-scrollbar-track { background: transparent; border-radius: 8px; border: 1px solid #E2E8F0; }
+  .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #CBD5E1; border-radius: 8px; border: 3px solid #F8FAFC; }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover { background-color: #94A3B8; }
+  .custom-scrollbar::-webkit-scrollbar-corner { background:transparent; }
+
+  .hide-x-scrollbar::-webkit-scrollbar:horizontal { height: 0px; display: none; }
+  .hide-x-scrollbar { overflow-x: auto; }
         `}</style>
 
         {/* Header */}
@@ -1487,61 +1637,93 @@ export default function CompanyRota() {
             </div>
           </div>
         ) : (
-          <div className="custom-scrollbar scrollbar-top-wrapper relative min-h-0 w-full flex-1 overflow-auto bg-white">
-            <table className="w-full border-collapse text-left">
-              <thead className="sticky bottom-0 top-0 z-40 bg-gray-50">
-                <tr>
-                  <th className="sticky bottom-0 left-0 top-0 z-50 min-w-[160px] border-b border-r border-gray-200 bg-[#F8FAFC] p-4 shadow-[1px_0_0_0_rgba(0,0,0,0.1)] sm:min-w-[240px]">
-                    <span className="text-xs font-bold uppercase text-black">
-                      Staff Member
-                    </span>
-                  </th>
-                  {daysArray.map((day) => {
-                    const isToday = day.isSame(moment(), 'day');
-                    const isWeekend = day.day() === 0 || day.day() === 6;
-                    const isPendingCol = pendingDates.has(
-                      day.format('YYYY-MM-DD')
-                    );
-                    return (
-                      <th
-                        key={day.format('D')}
-                        className={`min-w-[52px] border-b border-r border-gray-200 py-2 text-center ${isToday ? 'bg-theme/50 text-white' : isPendingCol ? 'bg-amber-100' : isWeekend ? 'bg-theme/5' : ''}`}
-                      >
-                        <div className="flex flex-col items-center gap-0.5">
-                          <div className="text-xs font-bold uppercase text-black">
-                            {day.format('ddd')}
-                          </div>
-                          <div
-                            className={`text-sm font-black ${isToday ? 'mx-auto flex h-6 w-6 items-center justify-center rounded-full bg-theme text-white' : 'text-black'}`}
-                          >
-                            {day.format('D')}
-                          </div>
-                          {isPendingCol && !isToday && (
-                            <Clock className="h-2.5 w-2.5 text-amber-500" />
-                          )}
-                        </div>
-                      </th>
-                    );
-                  })}
-                </tr>
-              </thead>
+          <div className="relative flex min-h-0 w-full flex-1 flex-col">
+            {/* Top scrollbar mirror */}
+            <div
+              ref={topScrollWrapperRef}
+              className="custom-scrollbar invisible-hover-scrollbar w-full overflow-x-auto overflow-y-hidden border-b border-gray-100"
+              style={{ height: '12px' }}
+              onScroll={handleTopScroll}
+            >
+              <div
+                ref={topScrollInnerRef}
+                style={{ height: '1px', display: 'block' }}
+              />{' '}
+            </div>
 
-              {orderedGroups.map((hierarchy, deptIndex) => (
-                <DraggableHierarchyBlock
-                  key={hierarchy.parentGroup.department._id}
-                  hierarchy={hierarchy}
-                  deptIndex={deptIndex}
-                  moveDepartment={moveDepartment}
-                  moveChildGroup={moveChildGroup}
-                  daysArray={daysArray}
-                  rotaMap={rotaMap}
-                  leaveTypeColors={leaveTypeColors}
-                  moveRow={moveRow}
-                  handleCellClick={handleCellClick}
-                  pendingDates={pendingDates}
-                />
-              ))}
-            </table>
+            {/* Actual table */}
+            <div
+              ref={tableWrapperRef}
+              className="custom-scrollbar hide-x-scrollbar w-full flex-1 overflow-auto bg-white pr-2"
+              style={{ maxHeight: 'calc(100vh - 110px)' }}
+              onScroll={handleTableScroll}
+            >
+              <table className="w-full border-collapse text-left">
+                <thead className="sticky top-0 z-40 bg-gray-50">
+                  <tr>
+                    <th className="sticky left-0 z-50 min-w-[160px] border-b border-r border-gray-200 bg-[#F8FAFC] p-4 shadow-[1px_0_0_0_rgba(0,0,0,0.1)] sm:min-w-[240px]">
+                      <span className="text-xs font-bold uppercase text-black">
+                        Staff Member
+                      </span>
+                    </th>
+                    {daysArray.map((day) => {
+                      const isToday = day.isSame(moment(), 'day');
+                      const isWeekend = day.day() === 0 || day.day() === 6;
+                      const isPendingCol = pendingDates.has(
+                        day.format('YYYY-MM-DD')
+                      );
+                      return (
+                        <th
+                          key={day.format('D')}
+                          className={`min-w-[52px] border-b border-r border-gray-200 py-2 text-center ${
+                            isToday
+                              ? 'bg-theme/50 text-white'
+                              : isPendingCol
+                                ? 'bg-amber-100'
+                                : isWeekend
+                                  ? 'bg-theme/5'
+                                  : 'bg-gray-50'
+                          }`}
+                        >
+                          <div className="flex flex-col items-center gap-0.5">
+                            <div className="text-xs font-bold uppercase text-black">
+                              {day.format('ddd')}
+                            </div>
+                            <div
+                              className={`text-sm font-black ${isToday ? 'mx-auto flex h-6 w-6 items-center justify-center rounded-full bg-theme text-white' : 'text-black'}`}
+                            >
+                              {day.format('D')}
+                            </div>
+                            {isPendingCol && !isToday && (
+                              <Clock className="h-2.5 w-2.5 text-amber-500" />
+                            )}
+                          </div>
+                        </th>
+                      );
+                    })}
+                  </tr>
+                </thead>
+
+                {orderedGroups.map((hierarchy, deptIndex) => (
+                  <DraggableHierarchyBlock
+                    key={hierarchy.parentGroup.department._id}
+                    hierarchy={hierarchy}
+                    deptIndex={deptIndex}
+                    moveDepartment={moveDepartment}
+                    moveChildGroup={moveChildGroup}
+                    daysArray={daysArray}
+                    rotaMap={rotaMap}
+                    leaveTypeColors={leaveTypeColors}
+                    moveRow={moveRow}
+                    handleCellClick={handleCellClick}
+                    pendingDates={pendingDates}
+                     handleCopy={handleCopy}
+                    handlePaste={handlePaste}
+                    copiedRotas={copiedRotas}
+                  />
+                ))}
+              </table>
+            </div>
           </div>
         )}
 

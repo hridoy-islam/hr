@@ -80,11 +80,14 @@ export default function AttendanceScanner() {
   const { toast } = useToast();
   const { id: companyId } = useParams();
 
+  // Sounds
   const clockInSound = useMemo(() => new Audio('/clockin.mp3'), []);
   const clockOutSound = useMemo(() => new Audio('/clockout.mp3'), []);
   const loggedInSound = useMemo(() => new Audio('/loggedin.mp3'), []);
   const loggedOutSound = useMemo(() => new Audio('/loggedout.mp3'), []);
   const errorSound = useMemo(() => new Audio('/error.mp3'), []);
+  const breakStartSound = useMemo(() => new Audio('/breakstart.mp3'), []);
+  const breakEndSound = useMemo(() => new Audio('/breakend.mp3'), []);
 
   // Split service users into active/inactive
   const activeServiceUsersList = activeServiceUsers.filter(
@@ -153,41 +156,22 @@ export default function AttendanceScanner() {
     navigate('/');
   };
 
-  // --- Focus Management for QR ---
-  // useEffect(() => {
-  //   const keepFocused = () => {
-  //     if (
-  //       scanMode === 'qr' &&
-  //       inputRef.current &&
-  //       document.activeElement !== inputRef.current &&
-  //       !logoutTarget &&
-  //       !isMenuOpen
-  //     ) {
-  //       inputRef.current.focus();
-  //     }
-  //   };
-  //   const interval = setInterval(keepFocused, 500);
-  //   return () => clearInterval(interval);
-  // }, [scanMode, logoutTarget, isMenuOpen]);
-
-
   useEffect(() => {
-  const keepFocused = () => {
-    if (
-      scanMode === 'qr' &&
-      !matchedUser &&          
-      inputRef.current &&
-      document.activeElement !== inputRef.current &&
-      !logoutTarget &&
-      !isMenuOpen
-    ) {
-      inputRef.current.focus();
-    }
-  };
-  const interval = setInterval(keepFocused, 500);
-  return () => clearInterval(interval);
-}, [scanMode, matchedUser, logoutTarget, isMenuOpen]); // <-- add matchedUser to deps
-
+    const keepFocused = () => {
+      if (
+        scanMode === 'qr' &&
+        !matchedUser &&          
+        inputRef.current &&
+        document.activeElement !== inputRef.current &&
+        !logoutTarget &&
+        !isMenuOpen
+      ) {
+        inputRef.current.focus();
+      }
+    };
+    const interval = setInterval(keepFocused, 500);
+    return () => clearInterval(interval);
+  }, [scanMode, matchedUser, logoutTarget, isMenuOpen]);
 
   // --- Core Clock Event logic ---
   const processClockEvent = async (payload: any) => {
@@ -224,6 +208,9 @@ export default function AttendanceScanner() {
         const isVisitorOrServiceUser =
           payload.userType === 'visitor' || payload.userType === 'service_user';
 
+        let soundToPlay;
+
+        // Determine Message and Audio based on Action Type
         if (action === 'clock_in') {
           setFeedbackMessage({
             title: `Thank You, ${name}`,
@@ -233,15 +220,12 @@ export default function AttendanceScanner() {
                 : 'You are Logged In'
               : 'You are Clocked In'
           });
-          const soundToPlay =
-            payload.userType === 'service_user'
-              ? loggedOutSound
-              : isVisitorOrServiceUser
-              ? loggedInSound
-              : clockInSound;
-          soundToPlay.currentTime = 0;
-          soundToPlay.play().catch(console.log);
-        } else {
+          soundToPlay = payload.userType === 'service_user'
+            ? loggedOutSound
+            : isVisitorOrServiceUser
+            ? loggedInSound
+            : clockInSound;
+        } else if (action === 'clock_out') {
           setFeedbackMessage({
             title: `Thank You, ${name}`,
             description: isVisitorOrServiceUser
@@ -250,12 +234,27 @@ export default function AttendanceScanner() {
                 : 'You are Logged Out'
               : 'You are Clocked Out'
           });
-          const soundToPlay =
-            payload.userType === 'service_user'
-              ? loggedInSound
-              : isVisitorOrServiceUser
-              ? loggedOutSound
-              : clockOutSound;
+          soundToPlay = payload.userType === 'service_user'
+            ? loggedInSound
+            : isVisitorOrServiceUser
+            ? loggedOutSound
+            : clockOutSound;
+        } else if (action === 'break_start') {
+          setFeedbackMessage({
+            title: `Break Started, ${name}`,
+            description: ''
+          });
+          soundToPlay = breakStartSound;
+        } else if (action === 'break_end') {
+          setFeedbackMessage({
+            title: `Welcome back, ${name}`,
+            description: 'Break Ended Successfully'
+          });
+          soundToPlay = breakEndSound;
+        }
+
+        // Play the selected sound
+        if (soundToPlay) {
           soundToPlay.currentTime = 0;
           soundToPlay.play().catch(console.log);
         }
@@ -292,81 +291,86 @@ export default function AttendanceScanner() {
     }
   };
 
-  // const handleQRSubmit = async (e: React.FormEvent) => {
-  //   e.preventDefault();
-  //   if (isProcessing.current || status !== 'idle') return;
-  //   const scannedId = inputValue.trim();
-  //   if (!scannedId) return;
-
-  //   isProcessing.current = true;
-  //   setInputValue('');
-  //   await processClockEvent({ userId: scannedId, userType: 'employee' });
-  // };
-
   const handleQRSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  if (isProcessing.current || status !== 'idle') return;
-  const scannedId = inputValue.trim();
-  if (!scannedId) return;
+    e.preventDefault();
+    if (isProcessing.current || status !== 'idle') return;
+    const scannedId = inputValue.trim();
+    if (!scannedId) return;
 
-  try {
-    setStatus('loading');
-    const response = await axiosInstance.get(
-      `/users/${scannedId}?company=${companyId}`
-    );
-    const user = response.data?.data || response.data;
-    if (user && user._id) {
-      setMatchedUser(user);
-      setInputValue('');
-      setStatus('idle');
-    } else {
-      throw new Error('User not found');
-    }
-  } catch (error) {
-    // fallback: try finding by _id in already fetched employees
-    const found = allEmployees.find((e) => e._id === scannedId);
-    if (found) {
-      setMatchedUser(found);
-      setInputValue('');
-      setStatus('idle');
-    } else {
-      setStatus('error');
-      setFeedbackMessage({ title: '', description: 'Employee not found.' });
-      errorSound.currentTime = 0;
-      errorSound.play().catch(console.log);
-      setInputValue('');
-      setTimeout(() => {
-        setStatus('idle');
-        setFeedbackMessage({ title: '', description: '' });
-        isProcessing.current = false;
-      }, 4000);
-    }
-  }
-};
-
-
-  const submitDobSearch = async (date: Date | null) => {
-    if (!date) return;
     try {
       setStatus('loading');
-      const formattedDobLocal = moment(date).format('YYYY-MM-DD');
+      const response = await axiosInstance.get(
+        `/users/${scannedId}?company=${companyId}`
+      );
+      const user = response.data?.data || response.data;
+      if (user && user._id) {
+        setMatchedUser(user);
+        setInputValue('');
+        setStatus('idle');
+      } else {
+        throw new Error('User not found');
+      }
+    } catch (error) {
+      // fallback: try finding by _id in already fetched employees
+      const found = allEmployees.find((e) => e._id === scannedId);
+      if (found) {
+        setMatchedUser(found);
+        setInputValue('');
+        setStatus('idle');
+      } else {
+        setStatus('error');
+        setFeedbackMessage({ title: '', description: 'Employee not found.' });
+        errorSound.currentTime = 0;
+        errorSound.play().catch(console.log);
+        setInputValue('');
+        setTimeout(() => {
+          setStatus('idle');
+          setFeedbackMessage({ title: '', description: '' });
+          isProcessing.current = false;
+        }, 4000);
+      }
+    }
+  };
+
+ 
+const submitDobSearch = async () => {
+    try {
+      setStatus('loading');
+
+      const parts = inputValue.split('-');
+      if (parts.length !== 3 || parts[2].length !== 4) {
+        toast({ title: 'Invalid Date', description: 'Please enter a valid DOB.', variant: 'destructive' });
+        setStatus('idle');
+        return;
+      }
+      
+      const [dd, mm, yyyy] = parts;
+      const formattedDob = `${yyyy}-${mm}-${dd}`;
+      
+      console.log('inputValue:', inputValue);
+      console.log('formattedDob we are searching for:', formattedDob);
+      
       const response = await axiosInstance.get(
         `/users?company=${companyId}&limit=all&role=employee`
       );
-      const usersList =
-        response.data?.data?.result || response.data?.data || [];
+      const usersList = response.data?.data?.result || response.data?.data || [];
 
       const foundUser = usersList.find((u: any) => {
         if (!u.dateOfBirth) return false;
-        const userDobRaw =
-          typeof u.dateOfBirth === 'string' ? u.dateOfBirth.split('T')[0] : '';
-        const userDobLocal = moment(u.dateOfBirth).format('YYYY-MM-DD');
-        const userDobUTC = moment.utc(u.dateOfBirth).format('YYYY-MM-DD');
-        return (
-          userDobRaw === formattedDobLocal ||
-          userDobLocal === formattedDobLocal ||
-          userDobUTC === formattedDobLocal
-        );
+        
+        const dbDateStr = u.dateOfBirth as string;
+        
+        // 1. Raw DB String Match (Ignores timezone shifting completely)
+        const rawUtcDate = dbDateStr.split('T')[0];
+        
+        // 2. Local Timezone Match (In case 18:00:00Z falls onto the correct day locally)
+        const localDateObj = new Date(dbDateStr);
+        const localY = localDateObj.getFullYear();
+        const localM = String(localDateObj.getMonth() + 1).padStart(2, '0');
+        const localD = String(localDateObj.getDate()).padStart(2, '0');
+        const localFormattedDate = `${localY}-${localM}-${localD}`;
+
+        return rawUtcDate === formattedDob || localFormattedDate === formattedDob;
       });
 
       if (foundUser) {
@@ -389,7 +393,7 @@ export default function AttendanceScanner() {
       setStatus('idle');
     }
   };
-
+  
   const handleVisitorSubmit = (actionType: 'clock_in' | 'clock_out') => {
     if (!visitorName.trim()) {
       toast({
@@ -455,7 +459,6 @@ export default function AttendanceScanner() {
   );
   const isVisitorClockedIn = !!matchedActiveVisitor;
 
-  // We check inactive list (logged in status) to determine if they need to Log Out
   const isServiceUserLoggedIn =
     selectedServiceUser &&
     inactiveServiceUsersList.some((su) => su._id === selectedServiceUser.value);
@@ -673,7 +676,7 @@ export default function AttendanceScanner() {
 
       {/* MAIN CONTENT AREA */}
       <div className="flex h-full flex-1 flex-col gap-4 lg:flex-row lg:items-stretch">
-        {/* SCANNER CONTROLS - always left large panel */}
+        {/* SCANNER CONTROLS */}
         <div className="flex flex-1 flex-col gap-4">
           <div className="relative flex min-h-[500px] flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
             <div className="pointer-events-none absolute left-[-10%] top-[-10%] h-[40%] w-[40%] rounded-full bg-theme/5 blur-[100px]" />
@@ -709,144 +712,117 @@ export default function AttendanceScanner() {
 
                           {!matchedUser ? (
                             <div className="relative z-50 flex w-full flex-col gap-3 sm:flex-row">
-                              <div className="flex-1 [&_.react-datepicker-wrapper]:w-full">
-                                <DatePicker
-                                  selected={selectedDob}
-                                  onChange={(date: Date | null) => {
-                                    setSelectedDob(date);
-                                    if (date) {
-                                      setInputValue(
-                                        moment(date).format('DD-MM-YYYY')
-                                      );
-                                    } else {
-                                      setInputValue('');
-                                    }
-                                  }}
-                                  onChangeRaw={(e: any) => {
-                                    if (
-                                      !e ||
-                                      !e.target ||
-                                      typeof e.target.value !== 'string'
-                                    ) {
-                                      return;
-                                    }
+  <div className="flex-1 [&_.react-datepicker-wrapper]:w-full">
+    <DatePicker
+      selected={selectedDob}
+      onChange={(date: Date | null) => {
+        if (date) {
+          // When clicked from calendar, extract Local day safely
+          const dd = String(date.getDate()).padStart(2, '0');
+          const mm = String(date.getMonth() + 1).padStart(2, '0');
+          const yyyy = date.getFullYear();
+          setInputValue(`${dd}-${mm}-${yyyy}`);
+          setSelectedDob(date);
+        } else {
+          setInputValue('');
+          setSelectedDob(null);
+        }
+      }}
+      onChangeRaw={(e: any) => {
+        if (!e || !e.target || typeof e.target.value !== 'string') {
+          return;
+        }
 
-                                    let val = e.target.value;
-                                    const inputType = e.nativeEvent?.inputType;
-                                    const isDeleting =
-                                      inputType === 'deleteContentBackward' ||
-                                      inputType === 'deleteContentForward';
+        let val = e.target.value;
+        const inputType = e.nativeEvent?.inputType;
+        const isDeleting =
+          inputType === 'deleteContentBackward' ||
+          inputType === 'deleteContentForward';
 
-                                    val = val.replace(/[^0-9-]/g, '');
-                                    val = val.replace(/--+/g, '-');
+        val = val.replace(/[^0-9-]/g, '');
+        val = val.replace(/--+/g, '-');
 
-                                    let parts = val.split('-');
+        let parts = val.split('-');
 
-                                    if (parts[0] && parts[0].length > 2) {
-                                      parts[1] =
-                                        parts[0].slice(2) + (parts[1] || '');
-                                      parts[0] = parts[0].slice(0, 2);
-                                    }
-                                    if (parts[1] && parts[1].length > 2) {
-                                      parts[2] =
-                                        parts[1].slice(2) + (parts[2] || '');
-                                      parts[1] = parts[1].slice(0, 2);
-                                    }
-                                    if (parts[2] && parts[2].length > 4) {
-                                      parts[2] = parts[2].slice(0, 4);
-                                    }
+        if (parts[0] && parts[0].length > 2) {
+          parts[1] = parts[0].slice(2) + (parts[1] || '');
+          parts[0] = parts[0].slice(0, 2);
+        }
+        if (parts[1] && parts[1].length > 2) {
+          parts[2] = parts[1].slice(2) + (parts[2] || '');
+          parts[1] = parts[1].slice(0, 2);
+        }
+        if (parts[2] && parts[2].length > 4) {
+          parts[2] = parts[2].slice(0, 4);
+        }
 
-                                    val = parts.join('-');
+        val = parts.join('-');
 
-                                    if (!isDeleting) {
-                                      if (
-                                        val.length === 2 &&
-                                        !val.includes('-')
-                                      ) {
-                                        val += '-';
-                                      } else if (
-                                        val.length === 5 &&
-                                        val.split('-').length === 2
-                                      ) {
-                                        val += '-';
-                                      }
-                                    }
+        if (!isDeleting) {
+          if (val.length === 2 && !val.includes('-')) {
+            val += '-';
+          } else if (val.length === 5 && val.split('-').length === 2) {
+            val += '-';
+          }
+        }
 
-                                    if (val.length > 10) val = val.slice(0, 10);
+        if (val.length > 10) val = val.slice(0, 10);
 
-                                    e.target.value = val;
-                                    setInputValue(val);
+        // Update the string state first
+        e.target.value = val;
+        setInputValue(val);
 
-                                    if (val.length === 10) {
-                                      const [dd, mm, yyyy] = val.split('-');
-                                      if (
-                                        dd?.length === 2 &&
-                                        mm?.length === 2 &&
-                                        yyyy?.length === 4
-                                      ) {
-                                        const date = new Date(
-                                          `${yyyy}-${mm}-${dd}`
-                                        );
-                                        if (!isNaN(date.getTime())) {
-                                          setSelectedDob(date);
-                                        }
-                                      }
-                                    } else if (selectedDob !== null) {
-                                      setSelectedDob(null);
-                                    }
-                                  }}
-                                  dateFormat="dd-MM-yyyy"
-                                  showYearDropdown
-                                  showMonthDropdown
-                                  dropdownMode="select"
-                                  maxDate={new Date()}
-                                  wrapperClassName="w-full"
-                                  customInput={
-                                    <input
-                                      type="text"
-                                      value={inputValue}
-                                      onChange={(e) =>
-                                        setInputValue(e.target.value)
-                                      }
-                                      onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                          e.preventDefault();
-                                          if (inputValue.length === 10) {
-                                            const [dd, mm, yyyy] =
-                                              inputValue.split('-');
-                                            const date = new Date(
-                                              `${yyyy}-${mm}-${dd}`
-                                            );
-                                            if (!isNaN(date.getTime()))
-                                              submitDobSearch(date);
-                                          }
-                                        }
-                                      }}
-                                      maxLength={10}
-                                      placeholder="DD-MM-YYYY"
-                                      className="h-16 w-full rounded-2xl border-2 border-slate-200 px-6 py-4 text-center text-2xl font-semibold shadow-sm focus:border-theme focus:outline-none focus:ring-0"
-                                    />
-                                  }
-                                />
-                              </div>
-                              <Button
-                                disabled={inputValue.length !== 10}
-                                className="h-16 rounded-2xl bg-theme px-10 text-xl font-bold text-white shadow-sm transition-colors hover:bg-theme/90 sm:w-auto"
-                                onClick={() => {
-                                  if (inputValue.length === 10) {
-                                    const [dd, mm, yyyy] =
-                                      inputValue.split('-');
-                                    const date = new Date(
-                                      `${yyyy}-${mm}-${dd}`
-                                    );
-                                    if (!isNaN(date.getTime()))
-                                      submitDobSearch(date);
-                                  }
-                                }}
-                              >
-                                Next
-                              </Button>
-                            </div>
+        if (val.length === 10) {
+          const [dd, mm, yyyy] = val.split('-');
+          if (dd?.length === 2 && mm?.length === 2 && yyyy?.length === 4) {
+            // FIX: Set hours to 12:00 (Noon) to prevent timezone offsets from shifting it to the previous day
+            const date = new Date(Number(yyyy), Number(mm) - 1, Number(dd), 12, 0, 0);
+            if (!isNaN(date.getTime())) {
+              setSelectedDob(date);
+            }
+          }
+        } else if (selectedDob !== null) {
+          setSelectedDob(null);
+        }
+      }}
+      dateFormat="dd-MM-yyyy"
+      showYearDropdown
+      showMonthDropdown
+      dropdownMode="select"
+      maxDate={new Date()}
+      wrapperClassName="w-full"
+      customInput={
+        <input
+          type="text"
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              if (inputValue.length === 10) {
+                submitDobSearch();
+              }
+            }
+          }}
+          maxLength={10}
+          placeholder="DD-MM-YYYY"
+          className="h-16 w-full rounded-2xl border-2 border-slate-200 px-6 py-4 text-center text-2xl font-semibold shadow-sm focus:border-theme focus:outline-none focus:ring-0"
+        />
+      }
+    />
+  </div>
+  <Button
+    disabled={inputValue.length !== 10}
+    className="h-16 rounded-2xl bg-theme px-10 text-xl font-bold text-white shadow-sm transition-colors hover:bg-theme/90 sm:w-auto"
+    onClick={() => {
+      if (inputValue.length === 10) {
+        submitDobSearch();
+      }
+    }}
+  >
+    Next
+  </Button>
+</div>
                           ) : (
                             <motion.div
                               initial={{ opacity: 0, scale: 0.9 }}
@@ -885,6 +861,35 @@ export default function AttendanceScanner() {
                                   Clock Out
                                 </Button>
                               </div>
+                              
+                              {/* BREAK BUTTONS FOR DOB MODE */}
+                              <div className="mt-4 flex w-full gap-6">
+                                <Button
+                                  className="h-16 flex-1 rounded-xl bg-blue-500 text-xl font-bold text-white shadow-md hover:bg-blue-600"
+                                  onClick={() =>
+                                    processClockEvent({
+                                      userId: matchedUser._id,
+                                      userType: 'employee',
+                                      actionType: 'break_start'
+                                    })
+                                  }
+                                >
+                                  Break Start
+                                </Button>
+                                <Button
+                                  className="h-16 flex-1 rounded-xl bg-orange-500 text-xl font-bold text-white shadow-md hover:bg-orange-600"
+                                  onClick={() =>
+                                    processClockEvent({
+                                      userId: matchedUser._id,
+                                      userType: 'employee',
+                                      actionType: 'break_end'
+                                    })
+                                  }
+                                >
+                                  Break End
+                                </Button>
+                              </div>
+
                               <Button
                                 variant="outline"
                                 className="mt-6 h-14 w-full text-lg font-semibold"
@@ -994,7 +999,7 @@ export default function AttendanceScanner() {
                                   <Button
                                     className="h-20 w-full rounded-2xl bg-red-600 text-2xl font-bold text-white shadow-lg transition-transform hover:scale-[1.02] hover:bg-red-700"
                                     onClick={() =>
-                                      handleServiceUserSubmit('clock_in') // 'clock_in' on Backend maps to Log Out
+                                      handleServiceUserSubmit('clock_in')
                                     }
                                   >
                                     Log Out
@@ -1003,7 +1008,7 @@ export default function AttendanceScanner() {
                                   <Button
                                     className="h-20 w-full rounded-2xl bg-green-600 text-2xl font-bold text-white shadow-lg transition-transform hover:scale-[1.02] hover:bg-green-700"
                                     onClick={() =>
-                                      handleServiceUserSubmit('clock_out') // 'clock_out' on Backend maps to Log In
+                                      handleServiceUserSubmit('clock_out')
                                     }
                                   >
                                     Log In
@@ -1016,88 +1021,117 @@ export default function AttendanceScanner() {
 
                       {/* --- QR MODE --- */}
                      {scanMode === 'qr' && (
-  <>
-    {!matchedUser ? (
-      <>
-        <div className="relative flex h-48 w-48 items-center justify-center">
-          <div className="absolute inset-0 animate-[ping_3s_ease-in-out_infinite] rounded-full bg-theme/10" />
-          <div className="absolute inset-0 animate-[spin_10s_linear_infinite] rounded-full border-2 border-dashed border-theme/30" />
-          <div className="relative flex h-32 w-32 items-center justify-center rounded-3xl bg-theme shadow-xl shadow-theme/30">
-            <ScanLine className="h-16 w-16 animate-pulse text-white" />
-          </div>
-        </div>
-        <div className="space-y-2">
-          <p className="text-3xl font-bold tracking-tight text-black">
-            Scan your QR code to Clock In/Out
-          </p>
-        </div>
-        <form
-          onSubmit={handleQRSubmit}
-          className="flex w-full flex-col items-center pt-4"
-        >
-          <input
-            ref={inputRef}
-            type="text"
-            disabled={status !== 'idle'}
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            className="h-20 w-full rounded-2xl border-4 border-theme bg-slate-50 px-8 py-4 text-center font-mono text-3xl font-bold tracking-[0.1em] text-slate-800 shadow-md transition-all placeholder:text-slate-300 focus:border-theme focus:outline-none focus:ring-0"
-            placeholder=""
-          />
-        </form>
-      </>
-    ) : (
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-8 shadow-sm"
-      >
-        <h3 className="mb-8 text-3xl font-bold text-slate-800">
-          Are you{' '}
-          {matchedUser.name ||
-            `${matchedUser.firstName} ${matchedUser.lastName}`}
-          ?
-        </h3>
-        <div className="flex w-full gap-6">
-          <Button
-            className="h-16 flex-1 rounded-xl bg-green-600 text-xl font-bold text-white shadow-md hover:bg-green-700"
-            onClick={() =>
-              processClockEvent({
-                userId: matchedUser._id,
-                userType: 'employee',
-                actionType: 'clock_in'
-              })
-            }
-          >
-            Clock In
-          </Button>
-          <Button
-            className="h-16 flex-1 rounded-xl bg-red-600 text-xl font-bold text-white shadow-md hover:bg-red-700"
-            onClick={() =>
-              processClockEvent({
-                userId: matchedUser._id,
-                userType: 'employee',
-                actionType: 'clock_out'
-              })
-            }
-          >
-            Clock Out
-          </Button>
-        </div>
-        <Button
-          variant="outline"
-          className="mt-6 h-14 w-full text-lg font-semibold"
-          onClick={() => {
-            setMatchedUser(null);
-            setInputValue('');
-          }}
-        >
-          No, try again
-        </Button>
-      </motion.div>
-    )}
-  </>
-)}
+                        <>
+                          {!matchedUser ? (
+                            <>
+                              <div className="relative flex h-48 w-48 items-center justify-center">
+                                <div className="absolute inset-0 animate-[ping_3s_ease-in-out_infinite] rounded-full bg-theme/10" />
+                                <div className="absolute inset-0 animate-[spin_10s_linear_infinite] rounded-full border-2 border-dashed border-theme/30" />
+                                <div className="relative flex h-32 w-32 items-center justify-center rounded-3xl bg-theme shadow-xl shadow-theme/30">
+                                  <ScanLine className="h-16 w-16 animate-pulse text-white" />
+                                </div>
+                              </div>
+                              <div className="space-y-2">
+                                <p className="text-3xl font-bold tracking-tight text-black">
+                                  Scan your QR code to Clock In/Out
+                                </p>
+                              </div>
+                              <form
+                                onSubmit={handleQRSubmit}
+                                className="flex w-full flex-col items-center pt-4"
+                              >
+                                <input
+                                  ref={inputRef}
+                                  type="text"
+                                  disabled={status !== 'idle'}
+                                  value={inputValue}
+                                  onChange={(e) => setInputValue(e.target.value)}
+                                  className="h-20 w-full rounded-2xl border-4 border-theme bg-slate-50 px-8 py-4 text-center font-mono text-3xl font-bold tracking-[0.1em] text-slate-800 shadow-md transition-all placeholder:text-slate-300 focus:border-theme focus:outline-none focus:ring-0"
+                                  placeholder=""
+                                />
+                              </form>
+                            </>
+                          ) : (
+                            <motion.div
+                              initial={{ opacity: 0, scale: 0.9 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-8 shadow-sm"
+                            >
+                              <h3 className="mb-8 text-3xl font-bold text-slate-800">
+                                Are you{' '}
+                                {matchedUser.name ||
+                                  `${matchedUser.firstName} ${matchedUser.lastName}`}
+                                ?
+                              </h3>
+                              <div className="flex w-full gap-6">
+                                <Button
+                                  className="h-16 flex-1 rounded-xl bg-green-600 text-xl font-bold text-white shadow-md hover:bg-green-700"
+                                  onClick={() =>
+                                    processClockEvent({
+                                      userId: matchedUser._id,
+                                      userType: 'employee',
+                                      actionType: 'clock_in'
+                                    })
+                                  }
+                                >
+                                  Clock In
+                                </Button>
+                                <Button
+                                  className="h-16 flex-1 rounded-xl bg-red-600 text-xl font-bold text-white shadow-md hover:bg-red-700"
+                                  onClick={() =>
+                                    processClockEvent({
+                                      userId: matchedUser._id,
+                                      userType: 'employee',
+                                      actionType: 'clock_out'
+                                    })
+                                  }
+                                >
+                                  Clock Out
+                                </Button>
+                              </div>
+
+                              {/* BREAK BUTTONS FOR QR MODE */}
+                              <div className="mt-4 flex w-full gap-6">
+                                <Button
+                                  className="h-16 flex-1 rounded-xl bg-blue-500 text-xl font-bold text-white shadow-md hover:bg-blue-600"
+                                  onClick={() =>
+                                    processClockEvent({
+                                      userId: matchedUser._id,
+                                      userType: 'employee',
+                                      actionType: 'break_start'
+                                    })
+                                  }
+                                >
+                                  Break Start
+                                </Button>
+                                <Button
+                                  className="h-16 flex-1 rounded-xl bg-orange-500 text-xl font-bold text-white shadow-md hover:bg-orange-600"
+                                  onClick={() =>
+                                    processClockEvent({
+                                      userId: matchedUser._id,
+                                      userType: 'employee',
+                                      actionType: 'break_end'
+                                    })
+                                  }
+                                >
+                                  Break End
+                                </Button>
+                              </div>
+
+                              <Button
+                                variant="outline"
+                                className="mt-6 h-14 w-full text-lg font-semibold"
+                                onClick={() => {
+                                  setMatchedUser(null);
+                                  setInputValue('');
+                                }}
+                              >
+                                No, try again
+                              </Button>
+                            </motion.div>
+                          )}
+                        </>
+                      )}
                     </motion.div>
                   )}
 

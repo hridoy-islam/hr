@@ -98,3 +98,10 @@
 .react-datepicker-popper {
   z-index: 9999 !important;
 }
+
+
+.scrollbar-top-wrapper { 
+  transform: rotateX(180deg);
+  display: block; /* Ensure it's not flex which can break sticky */
+}
+

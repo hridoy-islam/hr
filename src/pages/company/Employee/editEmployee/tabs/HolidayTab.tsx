@@ -353,7 +353,7 @@ const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
       {
         label: 'Opening This Year',
         value: leaveAllowance.holidayAllowance,
-        color: 'text-blue-800'
+        color: 'text-red-800'
       },
       {
         label: 'Holiday Accrued',
@@ -493,10 +493,10 @@ const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Status</TableHead>
+                        <TableHead>Holiday Type</TableHead>
                         <TableHead>Start Date</TableHead>
                         <TableHead>End Date</TableHead>
                         <TableHead className="w-[30%]">Reason</TableHead>
-                        <TableHead>Holiday Type</TableHead>
 
                         <TableHead>Hours</TableHead>
                       </TableRow>
@@ -511,15 +511,15 @@ const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
                               {getStatusBadge(holiday.status)}
                             </TableCell>
                             <TableCell>
+                              {holiday.holidayType.charAt(0).toUpperCase() +
+                                holiday.holidayType.slice(1) || '-'}
+                            </TableCell>
+                            <TableCell>
                               {formatDate(holiday.startDate)}
                             </TableCell>
                             <TableCell>{formatDate(holiday.endDate)}</TableCell>
                             <TableCell className="w-[30%] whitespace-pre-wrap font-medium">
                               {holiday?.reason || '-'}
-                            </TableCell>
-                            <TableCell>
-                              {holiday.holidayType.charAt(0).toUpperCase() +
-                                holiday.holidayType.slice(1) || '-'}
                             </TableCell>
                             <TableCell>{holiday.hours}</TableCell>
                           </TableRow>

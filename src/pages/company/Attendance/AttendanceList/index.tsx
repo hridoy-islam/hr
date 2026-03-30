@@ -13,7 +13,11 @@ import {
   Eye,
   Check,
   X as XIcon,
-  History // <-- Added History Icon
+  History,
+  Coffee,
+  Plus,
+  Trash2,
+  Edit
 } from 'lucide-react';
 
 // Shadcn UI Imports
@@ -34,7 +38,17 @@ import {
   SheetDescription,
   SheetHeader,
   SheetTitle
-} from '@/components/ui/sheet'; // <-- Added Sheet Imports
+} from '@/components/ui/sheet';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from '@/components/ui/alert-dialog';
 
 // Custom Imports
 import axiosInstance from '@/lib/axios';
@@ -192,8 +206,25 @@ const AttendancePage = () => {
     'today' | 'yesterday' | null
   >(null);
 
-  // State for controlling the History Sidebar
+  // State for controlling Sidebars
   const [historyRecord, setHistoryRecord] = useState<any | null>(null);
+  const [breakLogsRecord, setBreakLogsRecord] = useState<any | null>(null);
+
+  // --- Break Logs State ---
+  const [editingBreakLogIndex, setEditingBreakLogIndex] = useState<number | null>(
+    null
+  );
+  const [deletingBreakLogIndex, setDeletingBreakLogIndex] = useState<number | null>(
+    null
+  );
+  const [isAddingBreak, setIsAddingBreak] = useState(false);
+  const [isBreakUpdating, setIsBreakUpdating] = useState(false);
+  const [breakEditForm, setBreakEditForm] = useState({
+    breakStartDate: '',
+    breakStart: '',
+    breakEndDate: '',
+    breakEnd: ''
+  });
 
   const handleToday = () => {
     const today = new Date();
@@ -515,7 +546,6 @@ const AttendancePage = () => {
     ).toISOString();
 
     try {
-      // --- ADDED actionUserId here ---
       await axiosInstance.patch(`/hr/attendance/${editingRecordId}`, {
         clockInDate: payloadClockInDate,
         clockOutDate: payloadClockOutDate,
@@ -563,7 +593,6 @@ const AttendancePage = () => {
       handleCancelEdit();
       toast({ title: 'Attendance Updated Successfully' });
 
-      // Optionally re-fetch to get the new history array
       fetchAttendance(currentPage, entriesPerPage);
     } catch (error: any) {
       const msg =
@@ -578,7 +607,6 @@ const AttendancePage = () => {
   const handleApprove = async (recordId: string) => {
     setApprovingRecordId(recordId);
     try {
-      // --- ADDED actionUserId here ---
       await axiosInstance.patch(`/hr/attendance/${recordId}`, {
         isApproved: true,
         actionUserId: user?._id
@@ -592,9 +620,6 @@ const AttendancePage = () => {
           prev.map((r) => (r._id === recordId ? { ...r, isApproved: true } : r))
         );
       }
-
-      // Optionally re-fetch to get the new history array if needed
-      // fetchAttendance(currentPage, entriesPerPage);
     } catch (error: any) {
       const msg =
         error?.response?.data?.message || 'Failed to approve attendance';
@@ -603,6 +628,246 @@ const AttendancePage = () => {
       setApprovingRecordId(null);
     }
   };
+
+  // --- Break Handlers ---
+  const handleBreakFormChange = (field: string, value: string) => {
+    let processedValue = value;
+    if (field === 'breakStart' || field === 'breakEnd') {
+      processedValue = processedValue.replace(/[^0-9:]/g, '').slice(0, 5);
+      if (
+        processedValue.length === 2 &&
+        breakEditForm[field as keyof typeof breakEditForm].length === 1 &&
+        !processedValue.includes(':')
+      ) {
+        processedValue += ':';
+      }
+    }
+
+    // Prevent breakEndDate from being before breakStartDate
+    if (field === 'breakEndDate' && breakEditForm.breakStartDate) {
+      if (moment(value).isBefore(moment(breakEditForm.breakStartDate))) {
+        toast({ title: 'End date cannot be before start date', variant: 'destructive' });
+        return;
+      }
+    }
+
+    // Prevent breakStartDate from being after breakEndDate
+    if (field === 'breakStartDate' && breakEditForm.breakEndDate) {
+      if (moment(value).isAfter(moment(breakEditForm.breakEndDate))) {
+        setBreakEditForm((prev) => ({ ...prev, [field]: processedValue, breakEndDate: processedValue }));
+        return;
+      }
+    }
+
+    setBreakEditForm((prev) => ({ ...prev, [field]: processedValue }));
+  };
+
+  const handleBreakTimeBlur = (field: string, value: string) => {
+    let cleanValue = value.trim();
+    if (cleanValue) {
+      const m = moment(cleanValue, ['HH:mm', 'H:mm', 'HHmm', 'Hmm', 'H']);
+      if (m.isValid()) cleanValue = m.format('HH:mm');
+    }
+    setBreakEditForm((prev) => ({ ...prev, [field]: cleanValue }));
+  };
+
+  const saveBreakLogs = async (
+    attendanceId: string,
+    updatedBreakLogs: any[]
+  ) => {
+    setIsBreakUpdating(true);
+    try {
+      const res = await axiosInstance.patch(`/hr/attendance/${attendanceId}`, {
+        breakLogs: updatedBreakLogs,
+        actionUserId: user?._id
+      });
+      toast({ title: 'Break logs updated successfully' });
+
+      // Only update the break logs internally to retain existing mapped data
+      const responseLogs = res.data?.data?.breakLogs || updatedBreakLogs;
+
+      setBreakLogsRecord((prev: any) =>
+        prev ? { ...prev, breakLogs: responseLogs } : prev
+      );
+
+      // Keep Table in sync
+      setAttendanceData((prevData) =>
+        prevData.map((r) =>
+          r._id === attendanceId ? { ...r, breakLogs: responseLogs } : r
+        )
+      );
+
+    } catch (error: any) {
+      toast({
+        title: error?.response?.data?.message || 'Failed to update break logs',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsBreakUpdating(false);
+      setEditingBreakLogIndex(null);
+      setIsAddingBreak(false);
+      setDeletingBreakLogIndex(null);
+    }
+  };
+
+  const handleSaveBreak = () => {
+    if (!breakLogsRecord) return;
+    const payloadStartDate = moment(breakEditForm.breakStartDate, 'YYYY-MM-DD').startOf('day');
+    const payloadEndDate = moment(breakEditForm.breakEndDate, 'YYYY-MM-DD').startOf('day');
+    const payloadStart = moment(`${breakEditForm.breakStartDate} ${breakEditForm.breakStart}`, 'YYYY-MM-DD HH:mm');
+    const payloadEnd = breakEditForm.breakEnd ? moment(`${breakEditForm.breakEndDate} ${breakEditForm.breakEnd}`, 'YYYY-MM-DD HH:mm') : null;
+
+    if (payloadEndDate.isBefore(payloadStartDate)) {
+      toast({ title: 'End date cannot be before start date', variant: 'destructive' });
+      return;
+    }
+
+    if (payloadEnd && payloadEnd.isSameOrBefore(payloadStart)) {
+      toast({ title: 'End time must be after start time', variant: 'destructive' });
+      return;
+    }
+
+    let duration = 0;
+    if (payloadEnd) {
+      duration = payloadEnd.diff(payloadStart, 'minutes');
+    }
+
+    const updatedLogs = [...(breakLogsRecord.breakLogs || [])];
+
+    if (isAddingBreak) {
+      updatedLogs.push({
+        breakStart: payloadStart.toISOString(),
+        breakStartDate: payloadStartDate.toISOString(),
+        breakEnd: payloadEnd ? payloadEnd.toISOString() : null,
+        breakEndDate: payloadEndDate.toISOString(),
+        duration: Math.max(0, duration)
+      });
+    } else if (editingBreakLogIndex !== null && editingBreakLogIndex > -1) {
+      updatedLogs[editingBreakLogIndex] = {
+        ...updatedLogs[editingBreakLogIndex],
+        breakStart: payloadStart.toISOString(),
+        breakStartDate: payloadStartDate.toISOString(),
+        breakEnd: payloadEnd ? payloadEnd.toISOString() : null,
+        breakEndDate: payloadEndDate.toISOString(),
+        duration: Math.max(0, duration)
+      };
+    }
+
+    saveBreakLogs(breakLogsRecord._id, updatedLogs);
+  };
+
+  const confirmDeleteBreak = () => {
+    if (!breakLogsRecord || deletingBreakLogIndex === null) return;
+    const updatedLogs = breakLogsRecord.breakLogs.filter(
+      (_: any, idx: number) => idx !== deletingBreakLogIndex
+    );
+    saveBreakLogs(breakLogsRecord._id, updatedLogs);
+  };
+
+  const renderBreakForm = () => (
+    <div className="flex flex-col gap-3 rounded-md border border-theme bg-blue-50/20 p-3 shadow-sm">
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="mb-1 block text-xs font-medium text-gray-600">
+            Start Date
+          </label>
+          <div className="relative">
+            <DatePicker
+              selected={
+                breakEditForm.breakStartDate
+                  ? moment(breakEditForm.breakStartDate).toDate()
+                  : null
+              }
+              onChange={(date) =>
+                handleBreakFormChange(
+                  'breakStartDate',
+                  date ? moment(date).format('YYYY-MM-DD') : ''
+                )
+              }
+              dateFormat="dd-MM-yyyy"
+              className="flex h-8 w-full rounded-md border border-gray-300 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-theme"
+              portalId="root"
+            />
+          </div>
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-gray-600">
+            Start Time
+          </label>
+          <Input
+            value={breakEditForm.breakStart}
+            onChange={(e) =>
+              handleBreakFormChange('breakStart', e.target.value)
+            }
+            onBlur={(e) => handleBreakTimeBlur('breakStart', e.target.value)}
+            placeholder="HH:mm"
+            className="h-8 font-mono text-xs"
+            maxLength={5}
+          />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="mb-1 block text-xs font-medium text-gray-600">
+            End Date
+          </label>
+          <div className="relative">
+            <DatePicker
+              selected={
+                breakEditForm.breakEndDate
+                  ? moment(breakEditForm.breakEndDate).toDate()
+                  : null
+              }
+              onChange={(date) =>
+                handleBreakFormChange(
+                  'breakEndDate',
+                  date ? moment(date).format('YYYY-MM-DD') : ''
+                )
+              }
+              dateFormat="dd-MM-yyyy"
+              className="flex h-8 w-full rounded-md border border-gray-300 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-theme"
+              portalId="root"
+            />
+          </div>
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-gray-600">
+            End Time
+          </label>
+          <Input
+            value={breakEditForm.breakEnd}
+            onChange={(e) => handleBreakFormChange('breakEnd', e.target.value)}
+            onBlur={(e) => handleBreakTimeBlur('breakEnd', e.target.value)}
+            placeholder="HH:mm"
+            className="h-8 font-mono text-xs"
+            maxLength={5}
+          />
+        </div>
+      </div>
+      <div className="mt-1 flex justify-end gap-2">
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 px-2 text-xs"
+          onClick={() => {
+            setIsAddingBreak(false);
+            setEditingBreakLogIndex(null);
+          }}
+        >
+          Cancel
+        </Button>
+        <Button
+          size="sm"
+          className="h-7 px-2 text-xs"
+          onClick={handleSaveBreak}
+          disabled={isBreakUpdating}
+        >
+          {isBreakUpdating && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+          Save
+        </Button>
+      </div>
+    </div>
+  );
 
   const formatDisplayDate = (date: Date) =>
     date
@@ -614,9 +879,10 @@ const AttendancePage = () => {
       .replace(',', '');
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 relative">
       <Card className="w-full bg-white shadow-md">
         <CardContent className="space-y-3 p-2 pt-4">
+          {/* Filters Top Bar */}
           <div className="grid grid-cols-1 items-end gap-3 lg:grid-cols-5">
             <div>
               <label className="mb-2 block text-xs font-semibold uppercase tracking-wider">
@@ -771,14 +1037,39 @@ const AttendancePage = () => {
               onRotaChange={handleRotaChange}
               onTimeBlur={handleTimeBlur}
               onApprove={handleApprove}
-              onViewHistory={(record) => setHistoryRecord(record)} // Pass record to open Sidebar
+              onViewHistory={(record) => setHistoryRecord(record)}
+              onViewBreakLogs={(record) => setBreakLogsRecord(record)}
             />
           </div>
         </CardContent>
       </Card>
 
+      {/* Delete Confirmation Alert Dialog */}
+      <AlertDialog
+        open={deletingBreakLogIndex !== null}
+        onOpenChange={(open) => !open && setDeletingBreakLogIndex(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Break Log?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this break log? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteBreak}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* --- History Sidebar (Sheet) --- */}
-     <Sheet
+      <Sheet
         open={!!historyRecord}
         onOpenChange={(open) => !open && setHistoryRecord(null)}
       >
@@ -810,7 +1101,6 @@ const AttendancePage = () => {
                     {historyRecord.rotaId?.shiftName || '--'}
                   </span>
 
-                  {/* Added Clock In */}
                   <span className="font-medium ">Clock In:</span>
                   <span className="text-gray-900">
                     {historyRecord.clockIn
@@ -819,8 +1109,7 @@ const AttendancePage = () => {
                         : historyRecord.clockIn
                       : '--'}
                   </span>
-                  {/* Added Clock Out */}
-                 <span className="font-medium ">Clock Out:</span>
+                  <span className="font-medium ">Clock Out:</span>
                   <span className="text-gray-900">
                     {historyRecord.clockOut
                       ? historyRecord.clockOut.includes('T')
@@ -840,7 +1129,6 @@ const AttendancePage = () => {
                 {historyRecord.history && historyRecord.history.length > 0 ? (
                   <div className="space-y-4">
                     {[...historyRecord.history]
-                      // Sort Latest First
                       .sort(
                         (a, b) =>
                           new Date(b.createdAt).getTime() -
@@ -874,6 +1162,214 @@ const AttendancePage = () => {
           )}
         </SheetContent>
       </Sheet>
+
+      {/* --- Break Logs Custom Div Overlay --- */}
+      {breakLogsRecord && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 -top-8 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="relative flex w-full max-w-xl max-h-[90vh] flex-col overflow-y-auto rounded-lg bg-white p-6 shadow-2xl animate-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="mb-4 flex items-center justify-between border-b pb-3">
+              <h2 className="text-xl font-bold text-gray-800">Break Logs</h2>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-full"
+                onClick={() => {
+                  setBreakLogsRecord(null);
+                  setIsAddingBreak(false);
+                  setEditingBreakLogIndex(null);
+                  setDeletingBreakLogIndex(null);
+                }}
+              >
+                <XIcon className="h-5 w-5 text-gray-500" />
+              </Button>
+            </div>
+
+            {/* Context / Details */}
+            <div className="space-y-6">
+              <div className="rounded-lg border border-gray-200 bg-theme/5 p-4 text-sm">
+                <div className="grid grid-cols-2 gap-2">
+                  <span className="font-medium ">Employee:</span>
+                  <span className="font-semibold text-gray-900">
+                    {breakLogsRecord.userId?.firstName}{' '}
+                    {breakLogsRecord.userId?.lastName}
+                  </span>
+
+                  <span className="font-medium ">Date:</span>
+                  <span className="text-gray-900">
+                    {moment(
+                      breakLogsRecord.clockInDate || breakLogsRecord.date
+                    ).format('DD MMM YYYY')}
+                  </span>
+
+                  <span className="font-medium ">Shift:</span>
+                  <span className="text-gray-900">
+                    {breakLogsRecord.rotaId?.shiftName || '--'}
+                  </span>
+
+                  <span className="font-medium ">Clock In:</span>
+                  <span className="text-gray-900">
+                    {breakLogsRecord.clockIn
+                      ? breakLogsRecord.clockIn.includes('T')
+                        ? moment(breakLogsRecord.clockIn).format(
+                            'DD MMM YYYY, HH:mm'
+                          )
+                        : breakLogsRecord.clockIn
+                      : '--'}
+                  </span>
+                  <span className="font-medium ">Clock Out:</span>
+                  <span className="text-gray-900">
+                    {breakLogsRecord.clockOut
+                      ? breakLogsRecord.clockOut.includes('T')
+                        ? moment(breakLogsRecord.clockOut).format(
+                            'DD MMM YYYY, HH:mm'
+                          )
+                        : breakLogsRecord.clockOut
+                      : '--'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Break Logs Details */}
+              <div>
+                <div className="mb-4 flex items-center justify-between border-b border-gray-200 pb-2">
+                  <h4 className="font-semibold text-gray-900">Break Details</h4>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8"
+                    onClick={() => {
+                      setIsAddingBreak(true);
+                      setEditingBreakLogIndex(null);
+                      setBreakEditForm({
+                        breakStartDate: breakLogsRecord.clockInDate
+                          ? moment(breakLogsRecord.clockInDate).format(
+                              'YYYY-MM-DD'
+                            )
+                          : moment().format('YYYY-MM-DD'),
+                        breakEndDate: breakLogsRecord.clockOutDate
+                          ? moment(breakLogsRecord.clockOutDate).format(
+                              'YYYY-MM-DD'
+                            )
+                          : moment().format('YYYY-MM-DD'),
+                        breakStart: '',
+                        breakEnd: ''
+                      });
+                    }}
+                  >
+                    <Plus className="mr-1 h-3.5 w-3.5" /> Add Break
+                  </Button>
+                </div>
+
+                <div className="space-y-3">
+                  {isAddingBreak && renderBreakForm()}
+
+                  {(breakLogsRecord.breakLogs || []).map(
+                    (item: any, index: number) => {
+                      const isEditing = editingBreakLogIndex === index;
+
+                      if (isEditing) {
+                        return (
+                          <div key={item._id || index}>
+                            {renderBreakForm()}
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div
+                          key={item._id || index}
+                          className="flex flex-col gap-1 rounded-md border border-gray-200 bg-white p-3 shadow-sm"
+                        >
+                          <div className="mb-1 flex items-center justify-between text-sm">
+                            <span className="font-semibold text-gray-700">
+                              Break {index + 1}
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-800">
+                                {item.duration || 0} min
+                              </span>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-6 w-6"
+                                onClick={() => {
+                                  setIsAddingBreak(false);
+                                  setEditingBreakLogIndex(index);
+                                  setBreakEditForm({
+                                    breakStartDate: item.breakStartDate
+                                      ? moment(item.breakStartDate).format(
+                                          'YYYY-MM-DD'
+                                        )
+                                      : moment(item.breakStart).format(
+                                          'YYYY-MM-DD'
+                                        ),
+                                    breakEndDate: item.breakEndDate
+                                      ? moment(item.breakEndDate).format(
+                                          'YYYY-MM-DD'
+                                        )
+                                      : item.breakEnd
+                                        ? moment(item.breakEnd).format(
+                                            'YYYY-MM-DD'
+                                          )
+                                        : moment(item.breakStart).format(
+                                            'YYYY-MM-DD'
+                                          ),
+                                    breakStart: item.breakStart
+                                      ? moment(item.breakStart).format('HH:mm')
+                                      : '',
+                                    breakEnd: item.breakEnd
+                                      ? moment(item.breakEnd).format('HH:mm')
+                                      : ''
+                                  });
+                                }}
+                              >
+                                <Edit className="h-3.5 w-3.5 " />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="destructive"
+                                className="h-6 w-6"
+                                onClick={() => setDeletingBreakLogIndex(index)}
+                              >
+                                <Trash2 className="h-3.5 w-3.5 " />
+                              </Button>
+                            </div>
+                          </div>
+                          <div className="flex justify-start gap-4 text-xs text-gray-800">
+                            <span className="font-bold">Start Time:</span>
+                            <span className='font-semibold'>
+                              {moment(item.breakStart).format(
+                                'DD MMM YYYY, hh:mm'
+                              )}
+                            </span>
+                          </div>
+                          <div className="flex justify-start gap-4 text-xs text-gray-800">
+                            <span className="font-bold">End Time:</span>
+                            <span className='font-semibold'>
+                              {item.breakEnd
+                                ? moment(item.breakEnd).format(
+                                    'DD MMM YYYY, hh:mm'
+                                  )
+                                : 'Ongoing'}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    }
+                  )}
+
+                  {!breakLogsRecord.breakLogs?.length && !isAddingBreak && (
+                    <p className="py-4 text-center text-sm text-gray-500">
+                      No break logs available.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -902,7 +1398,8 @@ const TableSection = ({
   onRotaChange,
   onTimeBlur,
   onApprove,
-  onViewHistory
+  onViewHistory,
+  onViewBreakLogs
 }: {
   data: any[];
   loading: boolean;
@@ -927,6 +1424,7 @@ const TableSection = ({
   onTimeBlur: (field: keyof EditFormState, value: string) => void;
   onApprove: (id: string) => void;
   onViewHistory: (record: any) => void;
+  onViewBreakLogs: (record: any) => void;
 }) => {
   if (loading) {
     return (
@@ -966,7 +1464,7 @@ const TableSection = ({
             <TableHead className="w-[9%]">Start Time</TableHead>
             <TableHead className="w-[9%]">End Date</TableHead>
             <TableHead className="w-[9%]">End Time</TableHead>
-            <TableHead className="w-[9%]">Duration</TableHead>
+            <TableHead className="w-[12%]">Duration</TableHead>
             <TableHead className="text-right">Action</TableHead>
           </TableRow>
         </TableHeader>
@@ -1002,6 +1500,7 @@ const TableSection = ({
             const displayDate = (d: string) =>
               d ? moment(d).format('DD-MM-YYYY') : '--';
 
+            // Calculate Base Duration
             let dCalc;
             if (isEditing) {
               dCalc = calculateDuration(
@@ -1018,6 +1517,9 @@ const TableSection = ({
                 rEndTime
               );
             }
+
+            // Provide Break details reference
+            const breakLogs = record.breakLogs || [];
 
             if (dCalc && dCalc.minutes < 1) {
               dCalc.display = '00:00';
@@ -1177,14 +1679,29 @@ const TableSection = ({
                 </TableCell>
 
                 <TableCell className="text-sm">
-                  <div
-                    className={`flex items-center gap-1 font-mono text-sm ${
-                      !isDurationValid && isEditing
-                        ? 'font-bold text-red-500'
-                        : 'text-black'
-                    }`}
-                  >
-                    {dCalc.display}
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`font-mono text-sm ${
+                        !isDurationValid && isEditing
+                          ? 'font-bold text-red-500'
+                          : 'text-black'
+                      }`}
+                    >
+                      {dCalc.display}
+                    </span>
+                    {!isEditing && breakLogs?.length > 0 && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-6 border-amber-200 bg-amber-50 px-1.5 py-0 text-[10px] text-amber-700 hover:bg-amber-100 hover:text-amber-600"
+                        onClick={() => onViewBreakLogs(record)}
+                        title="View Break Logs"
+                      >
+                        <Coffee className="mr-1 h-3 w-3" />
+                        Breaks{' '}
+                       
+                      </Button>
+                    )}
                   </div>
                 </TableCell>
 
@@ -1219,7 +1736,7 @@ const TableSection = ({
                         {record.history && record.history.length > 0 && (
                           <Button
                             size="sm"
-                            
+                            variant="outline"
                             onClick={() => onViewHistory(record)}
                             title="View History"
                           >

@@ -836,10 +836,10 @@ const HolidayPage: React.FC = () => {
                       <TableHeader>
                         <TableRow>
                           <TableHead>Status</TableHead>
+                          <TableHead>Holiday Type</TableHead>
                           <TableHead>Start Date</TableHead>
                           <TableHead>End Date</TableHead>
                           <TableHead className="w-[30%]">Reason</TableHead>
-                          <TableHead>Holiday Type</TableHead>
                           <TableHead>Hours</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -853,6 +853,10 @@ const HolidayPage: React.FC = () => {
                                 {getStatusBadge(holiday.status)}
                               </TableCell>
                               <TableCell>
+                                {holiday.holidayType.charAt(0).toUpperCase() +
+                                  holiday.holidayType.slice(1) || '-'}
+                              </TableCell>
+                              <TableCell>
                                 {formatDate(holiday.startDate)}
                               </TableCell>
                               <TableCell>
@@ -860,10 +864,6 @@ const HolidayPage: React.FC = () => {
                               </TableCell>
                               <TableCell className="w-[30%] whitespace-pre-wrap font-medium">
                                 {holiday?.reason || '-'}
-                              </TableCell>
-                              <TableCell>
-                                {holiday.holidayType.charAt(0).toUpperCase() +
-                                  holiday.holidayType.slice(1) || '-'}
                               </TableCell>
                               <TableCell>{holiday.hours}</TableCell>
                             </TableRow>

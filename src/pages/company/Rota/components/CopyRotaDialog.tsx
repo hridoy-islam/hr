@@ -18,7 +18,7 @@ const RangeInput = React.forwardRef<HTMLInputElement, any>(
         readOnly
         value={displayValue}
         placeholder={placeholder}
-        className="flex h-10 w-full cursor-pointer rounded-md border border-gray-200 bg-white px-3 py-2 pl-9 text-[13px] font-medium text-gray-800 transition-shadow"
+        className="flex h-10 w-full cursor-pointer rounded-md border border-gray-200 bg-white px-3 py-2 pl-9 text-[13px] font-medium text-gray-800 transition-shadow focus:outline-none focus:ring-2 focus:ring-theme/20"
       />
       <CalendarIcon
         className={`pointer-events-none absolute left-3 top-2.5 h-4 w-4 ${
@@ -57,15 +57,18 @@ export default function CopyRotaDialog({
 
     setIsSubmitting(true);
 
+    // Using 'isoWeek' ensures the range starts on Monday regardless of locale
+    const startToken = copyType === 'week' ? 'isoWeek' : copyType;
+
     try {
       const response = await axiosInstance.post(`/rota/copy`, {
         companyId,
         type: copyType,
         sourceStart: moment(sourceDate)
-          .startOf(copyType) // Moment neatly accepts 'day', 'week', or 'month'
+          .startOf(startToken) 
           .format('YYYY-MM-DD'),
         targetStart: moment(targetDate)
-          .startOf(copyType)
+          .startOf(startToken)
           .format('YYYY-MM-DD')
       });
 
@@ -82,7 +85,6 @@ export default function CopyRotaDialog({
 
       onSuccess();
       onClose();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -97,14 +99,14 @@ export default function CopyRotaDialog({
   const getRangeText = (date: Date | null) => {
     if (!date) return '';
 
-    // If day, just show the exact day.
     if (copyType === 'day') {
       return moment(date).format('DD-MM-YYYY');
     }
 
-    // If week or month, show the range
-    const start = moment(date).startOf(copyType).format('DD-MM-YYYY');
-    const end = moment(date).endOf(copyType).format('DD-MM-YYYY');
+    // Explicitly use isoWeek for Monday-Sunday range display
+    const startToken = copyType === 'week' ? 'isoWeek' : copyType;
+    const start = moment(date).startOf(startToken).format('DD-MM-YYYY');
+    const end = moment(date).endOf(startToken).format('DD-MM-YYYY');
 
     return `${start}  to  ${end}`;
   };
@@ -136,32 +138,17 @@ export default function CopyRotaDialog({
         <div className="space-y-7 p-6">
           {/* Mode Toggle */}
           <div className="flex rounded-lg bg-gray-100 p-1">
-            <button
-              onClick={() => resetDatesOnTypeChange('day')}
-              className={`flex-1 rounded-md py-2 text-sm font-semibold transition-colors ${
-                copyType === 'day' ? 'bg-theme text-white' : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              Copy by Day
-            </button>
-
-            <button
-              onClick={() => resetDatesOnTypeChange('week')}
-              className={`flex-1 rounded-md py-2 text-sm font-semibold transition-colors ${
-                copyType === 'week' ? 'bg-theme text-white' : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              Copy by Week
-            </button>
-
-            <button
-              onClick={() => resetDatesOnTypeChange('month')}
-              className={`flex-1 rounded-md py-2 text-sm font-semibold transition-colors ${
-                copyType === 'month' ? 'bg-theme text-white' : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              Copy by Month
-            </button>
+            {(['day', 'week', 'month'] as const).map((type) => (
+              <button
+                key={type}
+                onClick={() => resetDatesOnTypeChange(type)}
+                className={`flex-1 rounded-md py-2 text-sm font-semibold transition-colors capitalize ${
+                  copyType === type ? 'bg-theme text-white' : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Copy by {type}
+              </button>
+            ))}
           </div>
 
           {/* Date Pickers */}
@@ -175,6 +162,7 @@ export default function CopyRotaDialog({
                 onChange={setSourceDate}
                 showWeekPicker={copyType === 'week'}
                 showMonthYearPicker={copyType === 'month'}
+                calendarStartDay={1} // Forces Sunday to the end, Monday to the start
                 wrapperClassName="w-full"
                 customInput={
                   <RangeInput
@@ -196,6 +184,7 @@ export default function CopyRotaDialog({
                 onChange={setTargetDate}
                 showWeekPicker={copyType === 'week'}
                 showMonthYearPicker={copyType === 'month'}
+                calendarStartDay={1} // Forces Sunday to the end, Monday to the start
                 wrapperClassName="w-full"
                 customInput={
                   <RangeInput
