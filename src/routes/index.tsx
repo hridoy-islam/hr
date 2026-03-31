@@ -102,10 +102,29 @@ import StaffAttendancePage from '@/pages/staff/attendance';
 import CompanyAdminPage from '@/pages/company/companyAdmin';
 import UserAccessControl from '@/pages/company/companyAdmin/accessControl';
 import ManageHolidayPage from '@/pages/company/ManageHoliday';
+import { useSelector } from 'react-redux';
 
 const SignInPage = lazy(() => import('@/pages/auth/signin'));
 
 // ----------------------------------------------------------------------
+
+const RoleGuard = ({
+  allowedRoles,
+  children
+}: {
+  allowedRoles: string[];
+  children: React.ReactNode;
+}) => {
+  // Replace 'any' with 'RootState' if you have your store typed
+  const user = useSelector((state: any) => state.auth?.user) || null;
+  const role = user?.role;
+
+  if (!role || !allowedRoles.includes(role)) {
+    return <Navigate to="/404" replace />;
+  }
+
+  return <>{children}</>;
+};
 
 export default function AppRouter() {
   const adminRoutes = [
@@ -113,10 +132,12 @@ export default function AppRouter() {
       path: '/admin',
       element: (
         <ProtectedRoute>
-            <ScheduleStatusProvider>
+          <RoleGuard allowedRoles={['admin']}>
 
-          <HrLayout />
-            </ScheduleStatusProvider>
+          <ScheduleStatusProvider>
+            <HrLayout />
+          </ScheduleStatusProvider>
+          </RoleGuard>
         </ProtectedRoute>
       ),
       children: [
@@ -142,9 +163,12 @@ export default function AppRouter() {
       path: '/company/:id',
       element: (
         <ProtectedRoute>
+          <RoleGuard allowedRoles={['admin', 'company', 'companyAdmin']}>
+
           <ScheduleStatusProvider>
             <HrLayout />
           </ScheduleStatusProvider>
+          </RoleGuard>
         </ProtectedRoute>
       ),
       children: [
@@ -210,7 +234,10 @@ export default function AppRouter() {
         { path: 'attendance/:aid', element: <AttendanceDetails /> },
         { path: 'attendance-list', element: <AttendanceList /> },
         { path: 'visitor-attendance', element: <VisitorAttendancePage /> },
-        { path: 'serviceuser-attendance', element: <ServiceUserAttendancePage /> },
+        {
+          path: 'serviceuser-attendance',
+          element: <ServiceUserAttendancePage />
+        },
         { path: 'csv-attendance', element: <BulkAttendancePage /> },
         { path: 'attendance-entry', element: <EntryAttendance /> },
 
@@ -267,7 +294,10 @@ export default function AppRouter() {
         { path: 'service-user', element: <ServiceUserPage /> },
         { path: 'signature-document', element: <SignatureDoc /> },
         { path: 'company-admin', element: <CompanyAdminPage /> },
-        { path: 'company-admin/:caid/access-control', element: <UserAccessControl /> },
+        {
+          path: 'company-admin/:caid/access-control',
+          element: <UserAccessControl />
+        },
         { path: 'manage-holiday', element: <ManageHolidayPage /> }
       ]
     }
@@ -277,9 +307,12 @@ export default function AppRouter() {
       path: '/company/:id/staff/:eid',
       element: (
         <ProtectedRoute>
+          <RoleGuard allowedRoles={['admin', 'employee']}>
+
           <ScheduleStatusProvider>
             <HrLayout />
           </ScheduleStatusProvider>
+          </RoleGuard>
         </ProtectedRoute>
       ),
       children: [
@@ -300,14 +333,17 @@ export default function AppRouter() {
       ]
     }
   ];
-    const rotaRoutes = [
+  const rotaRoutes = [
     {
       path: '/company/:id/rota',
       element: (
         <ProtectedRoute>
+          <RoleGuard allowedRoles={['admin', 'company', 'companyAdmin']}>
+
           <ScheduleStatusProvider>
             <RotaLayout />
           </ScheduleStatusProvider>
+          </RoleGuard>
         </ProtectedRoute>
       ),
       children: [
@@ -320,35 +356,35 @@ export default function AppRouter() {
           )
         },
         { path: 'report', element: <CompanyRotaReport /> }
-
-   
       ]
     }
-    ];
-  
-  
-   const attendanceroutes = [
-     {
-       path: '/company/:id/employee-attendance',
-       element: (
-         <ProtectedRoute>
-           <ScheduleStatusProvider>
-             <AttendanceLayout />
-           </ScheduleStatusProvider>
-         </ProtectedRoute>
-       ),
-       children: [
-         {
-           index: true,
-           element: (
-             <Suspense>
-               <AttendanceScanner />
-             </Suspense>
-           )
-         },
-       ]
-     }
-   ];
+  ];
+
+  const attendanceroutes = [
+    {
+      path: '/company/:id/employee-attendance',
+      element: (
+        <ProtectedRoute>
+          <RoleGuard allowedRoles={[ 'attendance']}>
+
+          <ScheduleStatusProvider>
+            <AttendanceLayout />
+          </ScheduleStatusProvider>
+          </RoleGuard>
+        </ProtectedRoute>
+      ),
+      children: [
+        {
+          index: true,
+          element: (
+            <Suspense>
+              <AttendanceScanner />
+            </Suspense>
+          )
+        }
+      ]
+    }
+  ];
 
   const publicRoutes = [
     {
