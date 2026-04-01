@@ -43,9 +43,8 @@ import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu";
-
+  ContextMenuTrigger
+} from '@/components/ui/context-menu';
 
 // Types
 type Department = {
@@ -274,6 +273,9 @@ const PublishRotaModal: React.FC<PublishRotaModalProps> = ({
 
   if (!isOpen) return null;
 
+
+  
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
       <div className="relative w-full max-w-7xl rounded-2xl bg-white p-6 shadow-2xl">
@@ -429,7 +431,7 @@ interface DraggableRowProps {
     departmentId: string
   ) => void;
   pendingDates: Set<string>;
- handleCopy: (rotas: any[]) => void;
+  handleCopy: (rotas: any[]) => void;
   handlePaste: (user: any, day: moment.Moment, deptId: string) => void;
   copiedRotas: any[];
 }
@@ -446,7 +448,7 @@ const DraggableRow: React.FC<DraggableRowProps> = ({
   pendingDates,
   handleCopy,
   handlePaste,
-  copiedRotas,
+  copiedRotas
 }) => {
   const ref = useRef<HTMLTableRowElement>(null);
 
@@ -457,7 +459,11 @@ const DraggableRow: React.FC<DraggableRowProps> = ({
     collect: (monitor) => ({ isDragging: monitor.isDragging() })
   });
 
-  const [{ isOver }, drop] = useDrop<{ deptRowIndex: number; departmentId: string }, void, { isOver: boolean }>({
+  const [{ isOver }, drop] = useDrop<
+    { deptRowIndex: number; departmentId: string },
+    void,
+    { isOver: boolean }
+  >({
     accept: 'ROTA_ROW',
     collect: (monitor) => ({ isOver: monitor.isOver() }),
     hover(item, monitor) {
@@ -466,7 +472,8 @@ const DraggableRow: React.FC<DraggableRowProps> = ({
       const hoverIndex = deptRowIndex;
       if (dragIndex === hoverIndex) return;
       const hoverBoundingRect = ref.current.getBoundingClientRect();
-      const hoverMiddleY = (hoverBoundingRect.bottom - hoverBoundingRect.top) / 2;
+      const hoverMiddleY =
+        (hoverBoundingRect.bottom - hoverBoundingRect.top) / 2;
       const clientOffset = monitor.getClientOffset();
       if (!clientOffset) return;
       const hoverClientY = clientOffset.y - hoverBoundingRect.top;
@@ -502,12 +509,15 @@ const DraggableRow: React.FC<DraggableRowProps> = ({
             />
             <AvatarFallback className="bg-gray-100 text-[11px] font-black text-black">
               {/* Replace with your actual helper */}
-              {user.firstName?.charAt(0)}{user.lastName?.charAt(0)}
+              {user.firstName?.charAt(0)}
+              {user.lastName?.charAt(0)}
             </AvatarFallback>
           </Avatar>
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-black">
-              {user.firstName ? `${user.firstName} ${user.lastName}` : user.name}
+              {user.firstName
+                ? `${user.firstName} ${user.lastName}`
+                : user.name}
             </p>
             <p className="text-[10px] font-medium text-gray-500">
               {/* Replace with your actual helper */}
@@ -520,7 +530,7 @@ const DraggableRow: React.FC<DraggableRowProps> = ({
       {/* Rota Cells */}
       {daysArray.map((day, idx) => {
         const dateKey = day.format('YYYY-MM-DD');
-        
+
         // Filter rotas specifically for this user and this department row
         const rotaList = (rotaMap[user._id]?.[dateKey] || []).filter(
           (r: any) =>
@@ -546,14 +556,22 @@ const DraggableRow: React.FC<DraggableRowProps> = ({
                         startTime: r.startTime,
                         endTime: r.endTime
                       }));
-                      
+
                       let shiftColors: any = 'theme';
-                      if (firstRota.leaveType && leaveTypeColors[firstRota.leaveType])
+                      if (
+                        firstRota.leaveType &&
+                        leaveTypeColors[firstRota.leaveType]
+                      )
                         shiftColors = leaveTypeColors[firstRota.leaveType];
                       else if (firstRota.color)
-                        shiftColors = typeof firstRota.color === 'string'
-                          ? { bg: firstRota.color, border: firstRota.color, text: '#FFFFFF' }
-                          : firstRota.color;
+                        shiftColors =
+                          typeof firstRota.color === 'string'
+                            ? {
+                                bg: firstRota.color,
+                                border: firstRota.color,
+                                text: '#FFFFFF'
+                              }
+                            : firstRota.color;
 
                       return (
                         <ShiftBlock
@@ -580,8 +598,8 @@ const DraggableRow: React.FC<DraggableRowProps> = ({
             <ContextMenuContent className="w-56">
               {/* Option to Copy if shifts exist in this cell */}
               {rotaList.length > 0 && (
-                <ContextMenuItem 
-                  className="cursor-pointer" 
+                <ContextMenuItem
+                  className="cursor-pointer"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleCopy(rotaList);
@@ -591,27 +609,32 @@ const DraggableRow: React.FC<DraggableRowProps> = ({
                   <span>Copy {rotaList.length > 1 ? 'Rotas' : 'Rota'}</span>
                 </ContextMenuItem>
               )}
-              
+
               {/* Option to Paste if shifts are in the clipboard */}
-             {copiedRotas && copiedRotas.length > 0 && rotaList.length === 0 && (
-  <ContextMenuItem 
-    className="cursor-pointer" 
-    onClick={(e) => {
-      e.stopPropagation();
-      handlePaste(user, day, departmentId);
-    }}
-  >
-    <CheckCircle2 className="mr-2 h-4 w-4 " />
-    <span>Paste {copiedRotas.length > 1 ? 'Rotas' : 'Rota'}</span>
-  </ContextMenuItem>
-)}
+              {copiedRotas &&
+                copiedRotas.length > 0 &&
+                rotaList.length === 0 && (
+                  <ContextMenuItem
+                    className="cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handlePaste(user, day, departmentId);
+                    }}
+                  >
+                    <CheckCircle2 className="mr-2 h-4 w-4 " />
+                    <span>
+                      Paste {copiedRotas.length > 1 ? 'Rotas' : 'Rota'}
+                    </span>
+                  </ContextMenuItem>
+                )}
 
               {/* fallback if no actions available */}
-              {rotaList.length === 0 && (!copiedRotas || copiedRotas.length === 0) && (
-                <ContextMenuItem disabled className="text-xs text-gray-400">
-                  No actions available
-                </ContextMenuItem>
-              )}
+              {rotaList.length === 0 &&
+                (!copiedRotas || copiedRotas.length === 0) && (
+                  <ContextMenuItem disabled className="text-xs text-gray-400">
+                    No actions available
+                  </ContextMenuItem>
+                )}
             </ContextMenuContent>
           </ContextMenu>
         );
@@ -646,13 +669,23 @@ interface DraggableChildGroupProps {
   pendingDates: Set<string>;
   handleCopy: (rotas: any[]) => void;
   handlePaste: (user: any, day: moment.Moment, deptId: string) => void;
-  copiedRotas: any[]
+  copiedRotas: any[];
 }
 
 const DraggableChildGroup: React.FC<DraggableChildGroupProps> = ({
- childGroup, childIndex, parentId, moveChildGroup,
-  daysArray, rotaMap, leaveTypeColors, moveRow, handleCellClick, pendingDates,
-  handleCopy, handlePaste, copiedRotas
+  childGroup,
+  childIndex,
+  parentId,
+  moveChildGroup,
+  daysArray,
+  rotaMap,
+  leaveTypeColors,
+  moveRow,
+  handleCellClick,
+  pendingDates,
+  handleCopy,
+  handlePaste,
+  copiedRotas
 }) => {
   const ref = useRef<HTMLTableRowElement>(null);
 
@@ -723,9 +756,9 @@ const DraggableChildGroup: React.FC<DraggableChildGroupProps> = ({
           leaveTypeColors={leaveTypeColors}
           handleCellClick={handleCellClick}
           pendingDates={pendingDates}
-           handleCopy={handleCopy}
-        handlePaste={handlePaste}
-        copiedRotas={copiedRotas}
+          handleCopy={handleCopy}
+          handlePaste={handlePaste}
+          copiedRotas={copiedRotas}
         />
       ))}
     </>
@@ -762,9 +795,19 @@ interface DraggableHierarchyBlockProps {
 }
 
 const DraggableHierarchyBlock: React.FC<DraggableHierarchyBlockProps> = ({
- hierarchy, deptIndex, moveDepartment, moveChildGroup,
-  daysArray, rotaMap, leaveTypeColors, moveRow, handleCellClick, pendingDates,
-  handleCopy, handlePaste, copiedRotas
+  hierarchy,
+  deptIndex,
+  moveDepartment,
+  moveChildGroup,
+  daysArray,
+  rotaMap,
+  leaveTypeColors,
+  moveRow,
+  handleCellClick,
+  pendingDates,
+  handleCopy,
+  handlePaste,
+  copiedRotas
 }) => {
   const ref = useRef<HTMLTableSectionElement>(null);
 
@@ -848,8 +891,8 @@ const DraggableHierarchyBlock: React.FC<DraggableHierarchyBlockProps> = ({
           handleCellClick={handleCellClick}
           pendingDates={pendingDates}
           handleCopy={handleCopy}
-        handlePaste={handlePaste}
-        copiedRotas={copiedRotas}
+          handlePaste={handlePaste}
+          copiedRotas={copiedRotas}
         />
       ))}
 
@@ -901,7 +944,7 @@ export default function CompanyRota() {
   const [isCopyRotaOpen, setIsCopyRotaOpen] = useState(false);
   const [companyColor, setCompanyColor] = useState(null);
   const [isPublishOpen, setIsPublishOpen] = useState(false);
-const [copiedRotas, setCopiedRotas] = useState<any[]>([]);
+  const [copiedRotas, setCopiedRotas] = useState<any[]>([]);
   const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([
     null,
     null
@@ -919,51 +962,58 @@ const [copiedRotas, setCopiedRotas] = useState<any[]>([]);
   const topScrollWrapperRef = useRef<HTMLDivElement>(null);
   const topScrollInnerRef = useRef<HTMLDivElement>(null);
 
-
   const handleCopy = (rotas: any[]) => {
-  // Strip IDs and metadata so we create fresh records on paste
-  const stripped = rotas.map(({ _id, createdAt, updatedAt, history, ...rest }) => rest);
-  setCopiedRotas(stripped);
-  toast({ title: `Rota(s) copied to clipboard` });
-};
+    // Strip IDs and metadata so we create fresh records on paste
+    const stripped = rotas.map(
+      ({ _id, createdAt, updatedAt, history, ...rest }) => rest
+    );
+    setCopiedRotas(stripped);
+    toast({ title: `Rota(s) copied to clipboard` });
+  };
 
-const handlePaste = async (targetUser: User, targetDate: moment.Moment, targetDeptId: string) => {
-  if (copiedRotas.length === 0) return;
+  const handlePaste = async (
+    targetUser: User,
+    targetDate: moment.Moment,
+    targetDeptId: string
+  ) => {
+    if (copiedRotas.length === 0) return;
 
-  const dateKey = targetDate.format('YYYY-MM-DD');
-  
-  // Check if this specific date column already has any published shifts
-  const isColumnPublished = rotas.some(r => 
-    moment(r.startDate).format('YYYY-MM-DD') === dateKey && r.status === 'publish'
-  );
+    const dateKey = targetDate.format('YYYY-MM-DD');
 
-  try {
-    const promises = copiedRotas.map(rota => {
-      const payload = {
-        ...rota,
-        companyId: companyId,
-        employeeId: targetUser._id,
-        departmentId: targetDeptId,
-        startDate: dateKey,
-        endDate: dateKey,
-        // Requirement: If column is published, paste as published
-        status: isColumnPublished ? 'publish' : 'pending'
-      };
-      return axiosInstance.post('/rota', payload);
-    });
+    // Check if this specific date column already has any published shifts
+    const isColumnPublished = rotas.some(
+      (r) =>
+        moment(r.startDate).format('YYYY-MM-DD') === dateKey &&
+        r.status === 'publish'
+    );
 
-    const results = await Promise.all(promises);
-    const newRotas = results.map(res => res.data?.data);
-    
-    handleAddRotaSuccess(newRotas);
-    toast({ 
-      title: `Rota Pasted`, 
-      // description: `Status: ${isColumnPublished ? 'Published' : 'Pending'}` 
-    });
-  } catch (error) {
-    toast({ title: "Failed to paste shifts", variant: "destructive" });
-  }
-};
+    try {
+      const promises = copiedRotas.map((rota) => {
+        const payload = {
+          ...rota,
+          companyId: companyId,
+          employeeId: targetUser._id,
+          departmentId: targetDeptId,
+          startDate: dateKey,
+          endDate: dateKey,
+          // Requirement: If column is published, paste as published
+          status: isColumnPublished ? 'publish' : 'pending'
+        };
+        return axiosInstance.post('/rota', payload);
+      });
+
+      const results = await Promise.all(promises);
+      const newRotas = results.map((res) => res.data?.data);
+
+      handleAddRotaSuccess(newRotas);
+      toast({
+        title: `Rota Pasted`
+        // description: `Status: ${isColumnPublished ? 'Published' : 'Pending'}`
+      });
+    } catch (error) {
+      toast({ title: 'Failed to paste shifts', variant: 'destructive' });
+    }
+  };
 
   const fetchUsersAndRotas = useCallback(
     async (isInitial = false) => {
@@ -1268,6 +1318,14 @@ const handlePaste = async (targetUser: User, targetDate: moment.Moment, targetDe
     [toast]
   );
 
+  // Check if a single day is currently selected
+  const isSingleDay = moment(appliedStart).isSame(appliedEnd, 'day');
+  
+  // Determine which button should be active
+  const isPreviousActive = isSingleDay && moment(appliedStart).isSame(moment().subtract(1, 'day'), 'day');
+  const isTodayActive = isSingleDay && moment(appliedStart).isSame(moment(), 'day');
+  const isTomorrowActive = isSingleDay && moment(appliedStart).isSame(moment().add(1, 'day'), 'day');
+
   const daysArray = useMemo(() => {
     if (isCustomRange && appliedStart && appliedEnd) {
       const days = [];
@@ -1296,6 +1354,23 @@ const handlePaste = async (targetUser: User, targetDate: moment.Moment, targetDe
   const handleRangeChange = (update: [Date | null, Date | null]) => {
     setDateRange(update);
   };
+
+  const setSingleDateView = (dateMom: moment.Moment) => {
+    const d = dateMom.toDate();
+    setDateRange([d, d]);
+    setAppliedRange([d, d]);
+    setIsCustomMode(false);
+
+    // Ensure we fetch data for the correct month if they navigate outside the current month
+    if (!dateMom.isSame(currentDate, 'month')) {
+      setCurrentDate(dateMom.clone().startOf('month'));
+    }
+  };
+
+  const handlePreviousDay = () =>
+    setSingleDateView(moment().subtract(1, 'day'));
+  const handleToday = () => setSingleDateView(moment());
+  const handleTomorrow = () => setSingleDateView(moment().add(1, 'day'));
 
   const handleApply = () => {
     if (rangeStart && rangeEnd) {
@@ -1420,171 +1495,204 @@ const handlePaste = async (targetUser: User, targetDate: moment.Moment, targetDe
         `}</style>
 
         {/* Header */}
-        <div className="flex flex-none items-center justify-between pb-4">
-          <div className="flex items-center gap-3">
-            <h1 className="text-lg font-bold">Staff Rota</h1>
-          </div>
-          <div className="flex items-center gap-2">
-            {isCustomRange && !isCustomMode ? (
-              <div className="flex items-center gap-1 rounded-full border border-theme/30 bg-theme/5 p-1">
-                <button
-                  onClick={() => setIsCustomMode(true)}
-                  className="flex items-center gap-2 px-3 py-1 text-xs font-semibold text-theme transition-all hover:text-blue-900"
-                >
-                  <CalendarRange className="h-3.5 w-3.5 flex-shrink-0" />
-                  {moment(appliedStart).format('DD MMM YYYY')}
-                  {' → '}
-                  {moment(appliedEnd).format('DD MMM YYYY')}
-                </button>
-                <button
-                  onClick={clearRange}
-                  title="Back to month view"
-                  className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-100 text-theme transition-all hover:bg-red-100 hover:text-red-500"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </div>
-            ) : isCustomMode ? (
-              <div className="rota-range-picker flex items-center gap-2 rounded-full border border-blue-300 bg-white p-1 shadow-sm">
-                <CalendarRange className="ml-2 h-3.5 w-3.5 flex-shrink-0 text-theme" />
-                <DatePicker
-                  selectsRange
-                  startDate={rangeStart}
-                  endDate={rangeEnd}
-                  onChange={handleRangeChange}
-                  dateFormat="dd MMM yyyy"
-                  placeholderText="Select date range..."
-                  isClearable={false}
-                  className="w-52 border-none bg-transparent text-xs font-semibold text-gray-700 outline-none placeholder:text-gray-400"
-                />
-                <button
-                  onClick={handleApply}
-                  disabled={!rangeStart || !rangeEnd}
-                  className="flex h-7 items-center gap-1 rounded-full bg-theme px-3 text-[11px] font-bold text-white transition-all hover:bg-theme/90 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  Apply
-                </button>
-                <button
-                  onClick={() => {
-                    setIsCustomMode(false);
-                    if (!isCustomRange) setDateRange([null, null]);
-                  }}
-                  className="mr-1 flex h-7 w-7 items-center justify-center rounded-full text-gray-400 transition-all hover:bg-gray-100 hover:text-gray-600"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50/50 p-1">
-                <Button
-                  variant="ghost"
-                  onClick={prevMonth}
-                  size="icon"
-                  className="h-8 w-8 rounded-full hover:bg-theme hover:text-white"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <div className="relative">
-                  <button
-                    ref={pickerAnchorRef}
-                    onClick={() => setPickerOpen((o) => !o)}
-                    className="flex w-36 items-center justify-center gap-2 border-none text-sm font-bold uppercase text-black"
-                  >
-                    <CalendarDays className="h-4 w-4" />
-                    {currentDate.format('MMM YYYY')}
-                  </button>
-                  {pickerOpen && (
-                    <div className="absolute left-1/2 z-50 -translate-x-1/2 rounded-lg border-none">
-                      <DatePicker
-                        selected={currentDate.toDate()}
-                        onChange={handlePickerChange}
-                        dateFormat="MM/yyyy"
-                        showMonthYearPicker
-                        inline
-                        onClickOutside={() => setPickerOpen(false)}
-                      />
-                    </div>
-                  )}
-                </div>
-                <Button
-                  variant="ghost"
-                  onClick={nextMonth}
-                  size="icon"
-                  className="h-8 w-8 rounded-full hover:bg-theme hover:text-white"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-                <button
-                  onClick={() => setIsCustomMode(true)}
-                  className="ml-1 flex h-8 items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 text-[11px] font-semibold text-gray-500 shadow-sm transition-all hover:border-theme hover:bg-theme/5 hover:text-theme"
-                >
-                  <CalendarRange className="h-3 w-3" />
-                  Custom
-                </button>
-              </div>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              onClick={() => navigate(-1)}
-              variant="outline"
-              className="h-9 gap-2"
-            >
-              <MoveLeft className="h-4 w-4" /> Back
-            </Button>
-            {/* Pending helper text + publish button */}
-
-            <div className="flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5">
-              <span className="text-xs font-semibold text-amber-700">
-                Pending Rota
-              </span>
-              <Clock className="h-3.5 w-3.5 flex-shrink-0 text-amber-500" />
+        <div className="flex flex-col gap-3 pb-4">
+          {/* --- FIRST LINE: Title, Date Picker, Action Buttons --- */}
+          <div className="flex flex-none items-center justify-between">
+            <div className="flex items-center gap-3">
+              <h1 className="text-lg font-bold">Staff Rota</h1>
             </div>
 
-            {/* {pendingRotasCount > 0 && (
-              <div className="flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5">
-                <Clock className="h-3.5 w-3.5 flex-shrink-0 text-amber-500" />
-                <span className="text-xs font-semibold text-amber-700">
-                  {pendingRotasCount} rota{pendingRotasCount !== 1 ? 's' : ''} pending
-                </span>
-              </div>
-            )} */}
-            <Button
-              onClick={() => setIsPublishOpen(true)}
-              variant="outline"
-              className="h-9 gap-2 border-none bg-blue-600 text-white hover:bg-blue-700"
-            >
-              <Send className="h-4 w-4" /> Publish Rota
-            </Button>
+            {/* Center Date Picker Navigation */}
+            <div className="flex items-center gap-2">
+              {isCustomRange && !isCustomMode ? (
+                <div className="flex items-center gap-1 rounded-full border border-theme/30 bg-theme/5 p-1">
+                  <button
+                    onClick={() => setIsCustomMode(true)}
+                    className="flex items-center gap-2 px-3 py-1 text-xs font-semibold text-theme transition-all hover:text-blue-900"
+                  >
+                    <CalendarRange className="h-3.5 w-3.5 flex-shrink-0" />
+                    {moment(appliedStart).isSame(moment(appliedEnd), 'day')
+                      ? moment(appliedStart).format('DD MMM YYYY')
+                      : `${moment(appliedStart).format('DD MMM YYYY')} → ${moment(appliedEnd).format('DD MMM YYYY')}`}
+                  </button>
+                  <button
+                    onClick={clearRange}
+                    title="Back to month view"
+                    className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-100 text-theme transition-all hover:bg-red-100 hover:text-red-500"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ) : isCustomMode ? (
+                <div className="rota-range-picker flex items-center gap-2 rounded-full border border-blue-300 bg-white p-1 shadow-sm">
+                  <CalendarRange className="ml-2 h-3.5 w-3.5 flex-shrink-0 text-theme" />
+                  <DatePicker
+                    selectsRange
+                    startDate={rangeStart}
+                    endDate={rangeEnd}
+                    onChange={handleRangeChange}
+                    dateFormat="dd MMM yyyy"
+                    placeholderText="Select date range..."
+                    isClearable={false}
+                    className="w-52 border-none bg-transparent text-xs font-semibold text-gray-700 outline-none placeholder:text-gray-400"
+                  />
+                  <button
+                    onClick={handleApply}
+                    disabled={!rangeStart || !rangeEnd}
+                    className="flex h-7 items-center gap-1 rounded-full bg-theme px-3 text-[11px] font-bold text-white transition-all hover:bg-theme/90 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Apply
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsCustomMode(false);
+                      if (!isCustomRange) setDateRange([null, null]);
+                    }}
+                    className="mr-1 flex h-7 w-7 items-center justify-center rounded-full text-gray-400 transition-all hover:bg-gray-100 hover:text-gray-600"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50/50 p-1">
+                  <Button
+                    variant="ghost"
+                    onClick={prevMonth}
+                    size="icon"
+                    className="h-8 w-8 rounded-full hover:bg-theme hover:text-white"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <div className="relative">
+                    <button
+                      ref={pickerAnchorRef}
+                      onClick={() => setPickerOpen((o) => !o)}
+                      className="flex w-36 items-center justify-center gap-2 border-none text-sm font-bold uppercase text-black"
+                    >
+                      <CalendarDays className="h-4 w-4" />
+                      {currentDate.format('MMM YYYY')}
+                    </button>
+                    {pickerOpen && (
+                      <div className="absolute left-1/2 z-50 -translate-x-1/2 rounded-lg border-none">
+                        <DatePicker
+                          selected={currentDate.toDate()}
+                          onChange={handlePickerChange}
+                          dateFormat="MM/yyyy"
+                          showMonthYearPicker
+                          inline
+                          onClickOutside={() => setPickerOpen(false)}
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    onClick={nextMonth}
+                    size="icon"
+                    className="h-8 w-8 rounded-full hover:bg-theme hover:text-white"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  <button
+                    onClick={() => setIsCustomMode(true)}
+                    className="ml-1 flex h-8 items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 text-[11px] font-semibold text-gray-500 shadow-sm transition-all hover:border-theme hover:bg-theme/5 hover:text-theme"
+                  >
+                    <CalendarRange className="h-3 w-3" />
+                    Custom
+                  </button>
+                </div>
+              )}
+            </div>
 
-            <Button
-              onClick={() => setIsCopyRotaOpen(true)}
-              variant="outline"
-              className="h-9 gap-2 border-none bg-emerald-800 text-white hover:bg-emerald-700"
-            >
-              <Copy className="h-4 w-4" /> Copy Rota
-            </Button>
-            <Button
-              onClick={() => navigate('report')}
-              variant="outline"
-              className="h-9 gap-2 border-none bg-purple-800 text-white hover:bg-purple-700"
-            >
-              <File className="h-4 w-4" /> Report
-            </Button>
-            <Button
-              onClick={() => setIsBulkAssignOpen(true)}
-              variant="outline"
-              className="h-9 gap-2 border-none bg-orange-800 text-white hover:bg-orange-700"
-            >
-              <Users className="h-4 w-4" /> Bulk Assign
-            </Button>
-            <Button
-              onClick={() => setIsAddRotaOpen(true)}
-              className="h-9 gap-2"
-            >
-              <Plus className="h-4 w-4" /> Add Rota
-            </Button>
+            {/* Right Action Buttons */}
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={() => navigate(-1)}
+                variant="outline"
+                className="h-9 gap-2"
+              >
+                <MoveLeft className="h-4 w-4" /> Back
+              </Button>
+
+              <div className="flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5">
+                <span className="text-xs font-semibold text-amber-700">
+                  Pending Rota
+                </span>
+                <Clock className="h-3.5 w-3.5 flex-shrink-0 text-amber-500" />
+              </div>
+
+              <Button
+                onClick={() => setIsPublishOpen(true)}
+                variant="outline"
+                className="h-9 gap-2 border-none bg-blue-600 text-white hover:bg-blue-700"
+              >
+                <Send className="h-4 w-4" /> Publish Rota
+              </Button>
+              <Button
+                onClick={() => setIsCopyRotaOpen(true)}
+                variant="outline"
+                className="h-9 gap-2 border-none bg-emerald-800 text-white hover:bg-emerald-700"
+              >
+                <Copy className="h-4 w-4" /> Copy Rota
+              </Button>
+              <Button
+                onClick={() => navigate('report')}
+                variant="outline"
+                className="h-9 gap-2 border-none bg-purple-800 text-white hover:bg-purple-700"
+              >
+                <File className="h-4 w-4" /> Report
+              </Button>
+              <Button
+                onClick={() => setIsBulkAssignOpen(true)}
+                variant="outline"
+                className="h-9 gap-2 border-none bg-orange-800 text-white hover:bg-orange-700"
+              >
+                <Users className="h-4 w-4" /> Bulk Assign
+              </Button>
+              <Button
+                onClick={() => setIsAddRotaOpen(true)}
+                className="h-9 gap-2"
+              >
+                <Plus className="h-4 w-4" /> Add Rota
+              </Button>
+            </div>
           </div>
+
+          {/* --- SECOND LINE: Quick Select Buttons (Centered) --- */}
+         <div className="flex justify-end">
+  <div className="flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50/50 p-1">
+    <button
+      onClick={handlePreviousDay}
+      className={`rounded-full px-3 py-1 text-xs font-semibold transition-all ${
+        isPreviousActive
+          ? 'bg-theme text-white'
+          : 'text-gray-600 hover:bg-theme/10 hover:text-theme'
+      }`}
+    >
+      Previous
+    </button>
+    <button
+      onClick={handleToday}
+      className={`rounded-full px-3 py-1 text-xs font-semibold transition-all ${
+        isTodayActive
+          ? 'bg-theme text-white'
+          : 'text-gray-600 hover:bg-theme/10 hover:text-theme'
+      }`}
+    >
+      Today
+    </button>
+    <button
+      onClick={handleTomorrow}
+      className={`rounded-full px-3 py-1 text-xs font-semibold transition-all ${
+        isTomorrowActive
+          ? 'bg-theme text-white'
+          : 'text-gray-600 hover:bg-theme/10 hover:text-theme'
+      }`}
+    >
+      Tomorrow
+    </button>
+  </div>
+</div>
         </div>
 
         {/* Skipped Records Banner */}
@@ -1717,7 +1825,7 @@ const handlePaste = async (targetUser: User, targetDate: moment.Moment, targetDe
                     moveRow={moveRow}
                     handleCellClick={handleCellClick}
                     pendingDates={pendingDates}
-                     handleCopy={handleCopy}
+                    handleCopy={handleCopy}
                     handlePaste={handlePaste}
                     copiedRotas={copiedRotas}
                   />
