@@ -1530,7 +1530,7 @@ const TableSection = ({
             const selectedRotaOption =
               rotaOptions.find((o) => o.value === editForm.rotaId) || null;
 
-            // --- Calculate Shift Duration ---
+           // --- Calculate Shift Duration ---
             let shiftDurationDisplay = '';
             if (rotaStartTime && rotaEndTime) {
               const rStart = moment(rotaStartTime, 'HH:mm');
@@ -1542,7 +1542,11 @@ const TableSection = ({
               if (diffMins > 0) {
                 const hrs = Math.floor(diffMins / 60);
                 const mins = diffMins % 60;
-                shiftDurationDisplay = `(${hrs.toString().padStart(2, '0')}h ${mins.toString().padStart(2, '0')}m)`;
+                
+                // Only show minutes if they are greater than 0
+                shiftDurationDisplay = mins === 0 
+                  ? `(${hrs.toString().padStart(2, '0')}h)` 
+                  : `(${hrs.toString().padStart(2, '0')}h ${mins.toString().padStart(2, '0')}m)`;
               }
             }
 
