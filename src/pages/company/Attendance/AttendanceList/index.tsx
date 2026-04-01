@@ -1530,6 +1530,22 @@ const TableSection = ({
             const selectedRotaOption =
               rotaOptions.find((o) => o.value === editForm.rotaId) || null;
 
+            // --- Calculate Shift Duration ---
+            let shiftDurationDisplay = '';
+            if (rotaStartTime && rotaEndTime) {
+              const rStart = moment(rotaStartTime, 'HH:mm');
+              const rEnd = moment(rotaEndTime, 'HH:mm');
+              // handle overnight shifts where end time is smaller than start time
+              if (rEnd.isBefore(rStart)) rEnd.add(1, 'day');
+              
+              const diffMins = rEnd.diff(rStart, 'minutes');
+              if (diffMins > 0) {
+                const hrs = Math.floor(diffMins / 60);
+                const mins = diffMins % 60;
+                shiftDurationDisplay = `(${hrs.toString().padStart(2, '0')}h ${mins.toString().padStart(2, '0')}m)`;
+              }
+            }
+
             return (
               <TableRow key={record._id}>
                 <TableCell className="text-sm font-medium">
@@ -1568,12 +1584,14 @@ const TableSection = ({
                       <span className="text-sm font-bold text-gray-900">
                         {shiftName
                           ? shiftName
-                          : `${rotaStartTime} - ${rotaEndTime}`}
+                          : rotaStartTime && rotaEndTime
+                            ? `${rotaStartTime} - ${rotaEndTime} ${shiftDurationDisplay}`
+                            : '--'}
                       </span>
 
-                      {shiftName && (
+                      {shiftName && rotaStartTime && rotaEndTime && (
                         <span className="mt-0.5 text-xs font-semibold tracking-wide text-gray-800">
-                          {rotaStartTime} - {rotaEndTime}
+                          {rotaStartTime} - {rotaEndTime} <span className="text-gray-500 font-medium">{shiftDurationDisplay}</span>
                         </span>
                       )}
                     </div>
