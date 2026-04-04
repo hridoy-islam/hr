@@ -52,7 +52,8 @@ import {
   Users2,
   UserCog,
   CalendarCheck,
-  FileSymlink
+  FileSymlink,
+  PenLine
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Link, useNavigate, useLocation, useParams } from 'react-router-dom';
@@ -273,9 +274,9 @@ const navItems = [
   //   roles: ['company', 'companyAdmin']
   // },
   // {
-  //   icon: CreditCard,
-  //   label: 'Subscription',
-  //   href: '#',
+  //   icon: PenLine,
+  //   label: 'Document Signature',
+  //   href: 'signature-document',
   //   roles: ['company', 'companyAdmin']
   // },
   {
@@ -348,6 +349,13 @@ const navItems = [
         roles: ['company', 'companyAdmin'],
         accessKey: 'setting'
       },
+      // {
+      //   icon: FileCheck,
+      //   label: 'Docusign Details',
+      //   href: 'docusign-details',
+      //   roles: ['company', 'companyAdmin'],
+      //   accessKey: 'setting'
+      // },
       {
         icon: UserCog,
         label: 'Company Admin',

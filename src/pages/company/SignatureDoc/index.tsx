@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Pen, Trash2, Plus, FileText, Check } from 'lucide-react';
+import { Trash2, Plus, FileText, Check, ExternalLink } from 'lucide-react'; // <-- Imported ExternalLink
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -31,26 +31,36 @@ export default function SignatureDoc() {
   const { toast } = useToast();
   const [documents, setDocuments] = useState<any[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
-  const [dialogOpen, setDialogOpen] = useState(false);
+  
+  // Dialog states 
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
-  const [entriesPerPage, setEntriesPerPage] = useState(100);
+  const [entriesPerPage, setEntriesPerPage] = useState(50);
   const [totalPages, setTotalPages] = useState(1);
 
   const fetchDocuments = async () => {
     try {
-      // Added status: 'pending' to only fetch pending documents
-      const response = await axiosInstance.get(`/signature-documents`, {
-        params: { page: currentPage, limit: entriesPerPage, status: 'pending' }
+      const res = await axiosInstance.get('/signature-documents', {
+        params: {
+          page: currentPage,
+          limit: entriesPerPage,
+          status:'pending'
+        }
       });
-      setDocuments(response.data.data.result || []);
-      setTotalPages(response.data.totalPages || 1);
+      if (res.data?.success) {
+        setDocuments(res.data.data.result || []);
+        if (res.data.data.meta) {
+          setTotalPages(res.data.data.meta.totalPage);
+        }
+      }
     } catch (error) {
+      console.error('Error fetching signature documents:', error);
       toast({
         title: 'Error',
-        description: 'Failed to fetch signature documents',
+        description: 'Failed to load documents.',
         variant: 'destructive'
       });
     } finally {
@@ -60,18 +70,21 @@ export default function SignatureDoc() {
 
   useEffect(() => {
     fetchDocuments();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage, entriesPerPage]);
 
   const handleDelete = async () => {
     if (!deleteId) return;
     try {
-      await axiosInstance.delete(`/signature-documents/${deleteId}`);
-      toast({ title: 'Success', description: 'Document deleted successfully' });
-      fetchDocuments();
-    } catch (error) {
+      const res = await axiosInstance.delete(`/signature-documents/${deleteId}`);
+      if (res.data?.success) {
+        toast({ title: 'Success', description: 'Document deleted successfully.' });
+        fetchDocuments();
+      }
+    } catch (error: any) {
       toast({
         title: 'Error',
-        description: 'Failed to delete document',
+        description: error.response?.data?.message || 'Failed to delete document',
         variant: 'destructive'
       });
     } finally {
@@ -79,133 +92,86 @@ export default function SignatureDoc() {
     }
   };
 
-  const handleApprove = async (id: string) => {
-    try {
-      // Assuming your endpoint accepts a PATCH to update the status
-      await axiosInstance.patch(`/signature-documents/${id}`, { status: 'completed' });
-      toast({ title: 'Success', description: 'Document approved successfully!' });
-      fetchDocuments();
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to approve document',
-        variant: 'destructive'
-      });
-    }
-  };
-
   if (initialLoading) {
     return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <BlinkingDots />
+      <div className="flex h-64 items-center justify-center">
+        <BlinkingDots size="large" color="text-theme" />
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-6 bg-white rounded-md shadow-md p-4">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-6 bg-white p-4 rounded-md shadow-sm">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            Pending Signature Documents
-          </h1>
+          <h2 className="text-2xl font-semibold tracking-tight text-gray-800">Signature Documents</h2>
         </div>
-        <Button
-          onClick={() => setDialogOpen(true)}
-          className="bg-theme text-white hover:bg-theme/90"
-        >
-          <Plus className="mr-2 h-4 w-4" /> Send Document to Staff
-        </Button>
+        
+        {/* 🚀 NEW: Buttons Container */}
+        <div className="flex items-center gap-3">
+          <Button onClick={() => setCreateDialogOpen(true)} className="bg-theme hover:bg-theme/90 text-white">
+            <Plus className="mr-2 h-4 w-4" /> Create Document
+          </Button>
+        </div>
       </div>
 
-      <div className="">
+      <div className="  ">
         <Table>
           <TableHeader>
-            <TableRow>
-              <TableHead>Employee</TableHead>
-              <TableHead>Sent</TableHead>
-              <TableHead>Submitted</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Document</TableHead>
-              <TableHead>Signed Document</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+            <TableRow className="">
+              <TableHead className="font-semibold">Document</TableHead>
+              <TableHead className="font-semibold">Employee</TableHead>
+              <TableHead className="font-semibold">Status</TableHead>
+              <TableHead className="font-semibold">Created At</TableHead>
+              <TableHead className="text-right font-semibold">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {documents.length === 0 ? (
               <TableRow>
-                <TableCell
-                  colSpan={7}
-                  className="h-24 text-center text-gray-500"
-                >
-                  No pending documents found.
+                <TableCell colSpan={5} className="h-32 text-center text-gray-500">
+                  No documents found. Click "Create Document" to add one.
                 </TableCell>
               </TableRow>
             ) : (
               documents.map((doc) => (
-                <TableRow key={doc._id}>
-                  <TableCell className="font-medium">
-                    {doc.employeeId?.firstName} {doc.employeeId?.lastName}
-                  </TableCell>
-
-                  <TableCell className="">
-                    {moment(doc.createdAt).format('DD MMM, YYYY')}
-                  </TableCell>
-                  <TableCell className="">
-                    {doc?.submittedAt
-                      ? moment(doc.submittedAt).format('DD MMM, YYYY')
-                      : '--'}
+                <TableRow key={doc._id} className="">
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+                        <FileText className="h-5 w-5" />
+                      </div>
+                      <div className="max-w-[200px] truncate font-medium text-gray-900" title={doc.content}>
+                        {doc.content}
+                      </div>
+                    </div>
                   </TableCell>
                   <TableCell>
-                    <Badge
-                      variant={
-                        doc.status === 'completed' ? 'default' : 'secondary'
-                      }
-                    >
-                      {doc.status}
-                    </Badge>
+                    <div className="text-sm font-medium text-gray-900">
+                      {doc.employeeId?.name || `${doc.employeeId?.firstName} ${doc.employeeId?.lastName}`}
+                    </div>
+                    <div className="text-xs text-gray-500">{doc.employeeId?.email}</div>
                   </TableCell>
                   <TableCell>
-                    <a
-                      href={doc.document}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex items-center text-theme hover:underline"
-                    >
-                      <FileText className="mr-1 h-4 w-4" /> View Doc
-                    </a>
-                  </TableCell>
-                  <TableCell>
-                    {doc?.submittedDoc ? (
-                      <a
-                        href={doc.submittedDoc}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex items-center text-theme hover:underline"
-                      >
-                        <FileText className="mr-1 h-4 w-4" /> View Doc
-                      </a>
+                    {doc.status === 'submitted' ? (
+                      <Badge className="bg-green-100 text-green-700 hover:bg-green-100/80">
+                        <Check className="mr-1 h-3 w-3" /> Signed
+                      </Badge>
                     ) : (
-                      <span className="text-gray-400 text-sm">Not submitted</span>
+                      <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50">
+                        Pending
+                      </Badge>
                     )}
                   </TableCell>
+                  <TableCell className="text-gray-500 text-sm">
+                    {moment(doc.createdAt).format('MMM DD, YYYY')}
+                  </TableCell>
                   <TableCell className="text-right">
-                    <div className="flex justify-end gap-2 items-center">
-                      {/* Approve Button - Only shows if pending AND a document is submitted */}
-                      {doc.status === 'pending' && doc.submittedDoc && (
-                        <Button
-                          size="sm"
-                          onClick={() => handleApprove(doc._id)}
-                          className="bg-green-600 hover:bg-green-700 text-white h-8"
-                        >
-                          <Check className="mr-1 h-3.5 w-3.5" /> Approve
-                        </Button>
-                      )}
-                      
+                    <div className="flex justify-end gap-2">
+                      {/* Delete Button */}
                       <Button
                         variant="destructive"
                         size="icon"
-                        className="h-8 w-8"
                         onClick={() => setDeleteId(doc._id)}
                       >
                         <Trash2 className="h-4 w-4" />
@@ -219,7 +185,7 @@ export default function SignatureDoc() {
         </Table>
       </div>
 
-      {documents.length > 60 && (
+      {documents.length > 30 && (
         <DynamicPagination
           pageSize={entriesPerPage}
           setPageSize={setEntriesPerPage}
@@ -229,13 +195,13 @@ export default function SignatureDoc() {
         />
       )}
 
-      {/* The Dialog */}
-      {dialogOpen && (
+      {/* Create Dialog */}
+      {createDialogOpen && (
         <SendDocumentDialog
-          onClose={() => setDialogOpen(false)}
+          onClose={() => setCreateDialogOpen(false)}
           onSuccess={() => {
-            setDialogOpen(false);
-            fetchDocuments(); // Refresh table after sending
+            setCreateDialogOpen(false);
+            fetchDocuments();
           }}
         />
       )}
@@ -257,7 +223,7 @@ export default function SignatureDoc() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
-              className="bg-red-600 hover:bg-red-700 text-white"
+              className="bg-red-600 text-white hover:bg-red-700"
             >
               Delete
             </AlertDialogAction>

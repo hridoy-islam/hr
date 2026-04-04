@@ -30,6 +30,7 @@ import InductionTab from './tabs/InductionTab';
 import DisciplinaryTab from './tabs/DisciplinaryTab';
 import QACheckTab from './tabs/QATab';
 import SupervisionTab from './tabs/SuperVisionCheckTab';
+import SignatureDocumentTab from './tabs/SignatureDocumentTab';
 const EditEmployee = () => {
   const navigate = useNavigate();
   const {
@@ -332,6 +333,15 @@ const EditEmployee = () => {
         />
       )
     },
+    // {
+    //   id: 'signature',
+    //   label: 'Signature Documents',
+    //   component: (
+    //     <SignatureDocumentTab
+        
+    //     />
+    //   )
+    // },
     {
       id: 'beneficiary',
       label: 'Next Of Kin',

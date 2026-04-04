@@ -65,13 +65,15 @@ const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
     remainingHours: 0,
     unpaidLeaveTaken: 0,
     unpaidBookedHours: 0,
-    unpaidLeaveRequest: 0
+    unpaidLeaveRequest: 0,
+    hoursPerDay: 8 // 🚀 Added default hoursPerDay
   });
 
   // ── Edit Dialog State ──
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editEntitlement, setEditEntitlement] = useState<number | string>(0);
   const [editCarryForward, setEditCarryForward] = useState<number | string>(0);
+  const [editHoursPerDay, setEditHoursPerDay] = useState<number | string>(8); // 🚀 Added state for hoursPerDay
   const [carryForwardError, setCarryForwardError] = useState<string>('');
   const [previousYearRemainingHours, setPreviousYearRemainingHours] =
     useState<number>(0);
@@ -80,8 +82,6 @@ const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
   // ── Fetch previous year's remaining hours for carry forward validation ──
   const fetchPreviousYearRemainingHours = async () => {
     try {
-      // Derive the previous holiday year string
-      // e.g. selectedYear = "2026-2027" → prevYear = "2025-2026"
       const [startYear] = selectedYear.split('-').map(Number);
       const prevYear = `${startYear - 1}-${startYear}`;
 
@@ -99,7 +99,6 @@ const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
         prevRecord = responseData;
       }
 
-      // If no record or negative remaining, treat as 0
       const prevRemaining = prevRecord?.remainingHours ?? 0;
       setPreviousYearRemainingHours(Math.max(0, prevRemaining));
     } catch (err) {
@@ -140,10 +139,12 @@ const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
           remainingHours: holidayRecord.remainingHours || 0,
           unpaidLeaveTaken: holidayRecord.unpaidLeaveTaken || 0,
           unpaidBookedHours: holidayRecord.unpaidBookedHours || 0,
-          unpaidLeaveRequest: holidayRecord.unpaidLeaveRequest || 0
+          unpaidLeaveRequest: holidayRecord.unpaidLeaveRequest || 0,
+          hoursPerDay: holidayRecord.hoursPerDay || 8 // 🚀 Added to state
         });
         setEditEntitlement(holidayRecord.holidayEntitlement || 0);
         setEditCarryForward(holidayRecord.carryForward || 0);
+        setEditHoursPerDay(holidayRecord.hoursPerDay || 8); // 🚀 Added to edit state
       } else {
         setHolidayRecordId(null);
         setLeaveAllowance({
@@ -157,10 +158,12 @@ const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
           remainingHours: 0,
           unpaidLeaveTaken: 0,
           unpaidBookedHours: 0,
-          unpaidLeaveRequest: 0
+          unpaidLeaveRequest: 0,
+          hoursPerDay: 8
         });
         setEditEntitlement(0);
         setEditCarryForward(0);
+        setEditHoursPerDay(8);
       }
     } catch (err: any) {
       console.error('Error fetching holiday allowance:', err);
@@ -187,7 +190,6 @@ const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
         title: item.title,
         reason: item.reason,
         holidayType: item.holidayType,
-
         hours: formatHours(item.totalHours || 0),
         holidayYear: item.holidayYear
       }));
@@ -212,6 +214,7 @@ const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
   const handleOpenEditDialog = async () => {
     setEditEntitlement(leaveAllowance.holidayEntitlement);
     setEditCarryForward(leaveAllowance.carryForward);
+    setEditHoursPerDay(leaveAllowance.hoursPerDay); // 🚀 Initialize hoursPerDay field
     setCarryForwardError('');
     await fetchPreviousYearRemainingHours();
     setIsEditDialogOpen(true);
@@ -221,17 +224,10 @@ const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
   const handleCarryForwardChange = (value: string) => {
     setEditCarryForward(value);
     const numValue = Number(value);
-    const maxAllowed = previousYearRemainingHours; // already clamped to >= 0
 
     if (numValue < 0) {
       setCarryForwardError('Carry forward cannot be negative.');
-    }
-    // else if (numValue > maxAllowed) {
-    //   setCarryForwardError(
-    //     `Max carry forward is ${maxAllowed.toFixed(2)} h (previous year's remaining balance).`
-    //   );
-    // }
-    else {
+    } else {
       setCarryForwardError('');
     }
   };
@@ -246,24 +242,18 @@ const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
       return;
     }
 
-    if (carryForwardError) return; // block if validation error
+    if (carryForwardError) return;
 
     const carryForwardNum = Math.max(0, Number(editCarryForward));
     const entitlementNum = Number(editEntitlement);
-
-    // Final guard (in case user bypassed UI)
-    // if (carryForwardNum > previousYearRemainingHours) {
-    //   setCarryForwardError(
-    //     `Max carry forward is ${previousYearRemainingHours.toFixed(2)} h.`
-    //   );
-    //   return;
-    // }
+    const hoursPerDayNum = Number(editHoursPerDay); // 🚀 Parse hoursPerDay
 
     setIsUpdating(true);
     try {
       await axiosInstance.patch(`/hr/holidays/${holidayRecordId}`, {
         holidayEntitlement: entitlementNum,
-        carryForward: carryForwardNum
+        carryForward: carryForwardNum,
+        hoursPerDay: hoursPerDayNum // 🚀 Pass to backend
       });
 
       toast({ title: 'Holiday allowance updated successfully!' });
@@ -497,7 +487,6 @@ const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
                         <TableHead>Start Date</TableHead>
                         <TableHead>End Date</TableHead>
                         <TableHead className="w-[30%]">Reason</TableHead>
-
                         <TableHead>Hours</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -527,7 +516,7 @@ const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
                       ) : (
                         <TableRow>
                           <TableCell
-                            colSpan={5}
+                            colSpan={6}
                             className="text-center text-gray-500"
                           >
                             No leave requests found for {selectedYear}.
@@ -559,37 +548,22 @@ const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
 
             <CardContent>
               <div className="space-y-4">
-                {/* Opening This Year (derived: entitlement + carryForward) */}
-                {/* <div className="flex items-center justify-between border-b border-gray-300 py-2">
-                  <span className="font-medium text-gray-600">Opening This Year</span>
-                  <span className="font-semibold text-gray-800">
-                    {leaveAllowance.holidayAllowance.toFixed(2)} h
-                  </span>
-                </div> */}
-
                 {allowanceStatsList.map(({ label, value, color }) => (
                   <div
                     key={label}
                     className="flex items-center justify-between border-b border-gray-300 py-2"
                   >
- <span
-                        className={`max-w-[60%] text-gray-600 ${label === 'Balance Remaining' ? 'font-bold text-gray-900' : ''}`}
-                      >
-                        {label}
-                      </span>{' '}                    <span className={`font-semibold ${color}`}>
+                    <span
+                      className={`max-w-[60%] text-gray-600 ${label === 'Balance Remaining' ? 'font-bold text-gray-900' : ''}`}
+                    >
+                      {label}
+                    </span>
+                    <span className={`font-semibold ${color}`}>
                       {value.toFixed(2)} h
                     </span>
                   </div>
                 ))}
-
-                {/* <div className="mt-2 flex items-center justify-between rounded-lg bg-blue-50 px-3 py-2">
-                  <span className="font-semibold text-black">
-                    Balance Remaining
-                  </span>
-                  <span className="text-lg font-bold text-theme">
-                    {leaveAllowance.remainingHours.toFixed(2)} h
-                  </span>
-                </div> */}
+               
               </div>
             </CardContent>
           </Card>
@@ -617,22 +591,13 @@ const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
                 onChange={(e) => handleCarryForwardChange(e.target.value)}
                 disabled={isUpdating}
               />
-              {/* Hint: always show max allowed */}
-              {/* <p className="text-xs text-gray-500">
-                Max allowed:{' '}
-                <span className="font-medium">
-                  {previousYearRemainingHours.toFixed(2)} h
-                </span>{' '}
-                
-              </p> */}
-              {/* Live validation error */}
               {carryForwardError && (
                 <p className="text-xs font-medium text-red-600">
                   {carryForwardError}
                 </p>
               )}
             </div>
-            {/* Holiday Entitlement */}
+
             <div className="space-y-1.5">
               <Label htmlFor="entitlement">
                 Present Year Holiday Entitlement (hours)
@@ -648,9 +613,24 @@ const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
               />
             </div>
 
-            {/* Carry Forward */}
-
-            {/* Preview: derived allowance */}
+            {/* 🚀 ADDED: Hours Per Day Edit Field */}
+            <div className="space-y-1.5">
+              <Label htmlFor="hoursPerDay">
+                Hours Per Day
+              </Label>
+              <Input
+                id="hoursPerDay"
+                type="number"
+                min={1}
+                step={0.5}
+                value={editHoursPerDay}
+                onChange={(e) => setEditHoursPerDay(e.target.value)}
+                disabled={isUpdating}
+              />
+              <p className="text-xs text-gray-500">
+                This is used to calculate the standard daily deduction for leave requests.
+              </p>
+            </div>
           </div>
 
           <DialogFooter className="gap-2">

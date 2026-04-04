@@ -40,8 +40,8 @@ export default function Designation() {
   const [totalPages, setTotalPages] = useState(1);
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [searchTerm, setSearchTerm] = useState('');
-const user = useSelector((state: any) => state.auth.user);
-  const{id} = useParams()
+  const user = useSelector((state: any) => state.auth.user);
+  const { id } = useParams();
   const fetchData = async (page: number, limit: number, search = '') => {
     try {
       setInitialLoading(true);
@@ -49,7 +49,7 @@ const user = useSelector((state: any) => state.auth.user);
         params: {
           page,
           limit,
-           companyId:id,
+          companyId: id,
           ...(search ? { searchTerm: search } : {})
         }
       });

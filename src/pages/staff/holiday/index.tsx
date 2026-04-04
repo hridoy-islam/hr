@@ -111,8 +111,6 @@ const leaveTypeOptions = [
   { value: 'family', label: 'Family Leave' }
 ];
 
-const HOURS_PER_DAY = 8;
-
 // ─── Component ────────────────────────────────────────────────────────────────
 
 const HolidayPage: React.FC = () => {
@@ -142,7 +140,7 @@ const HolidayPage: React.FC = () => {
   const { id: companyId, eid } = useParams();
   const [holidays, setHolidays] = useState<any[]>([]);
 
-  // Aligning state exactly with your new DB schema
+  // 🚀 Aligning state exactly with DB schema and adding hoursPerDay
   const [leaveAllowance, setLeaveAllowance] = useState({
     holidayAllowance: 0,
     holidayEntitlement: 0,
@@ -154,10 +152,11 @@ const HolidayPage: React.FC = () => {
     remainingHours: 0,
     unpaidLeaveTaken: 0,
     unpaidBookedHours: 0,
-    unpaidLeaveRequest: 0
+    unpaidLeaveRequest: 0,
+    hoursPerDay: 8 // default fallback
   });
 
-  // ── Auto-calculate days & hours ONLY when dates change ──
+  // ── 🚀 Auto-calculate days & hours ONLY when dates change using dynamic hoursPerDay ──
   useEffect(() => {
     if (startDate && endDate) {
       const days =
@@ -167,7 +166,7 @@ const HolidayPage: React.FC = () => {
 
       if (days >= 0) {
         setCalculatedDays(days);
-        setCalculatedHours(days * HOURS_PER_DAY);
+        setCalculatedHours(days * leaveAllowance.hoursPerDay);
       } else {
         setCalculatedDays(0);
         setCalculatedHours(0);
@@ -176,7 +175,7 @@ const HolidayPage: React.FC = () => {
       setCalculatedDays('');
       setCalculatedHours('');
     }
-  }, [startDate, endDate]);
+  }, [startDate, endDate, leaveAllowance.hoursPerDay]);
 
   // ── Handlers ──
   const handleDaysChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -184,7 +183,8 @@ const HolidayPage: React.FC = () => {
     setCalculatedDays(raw);
     const val = parseFloat(raw);
     if (!isNaN(val) && val >= 0) {
-      setCalculatedHours(parseFloat((val * HOURS_PER_DAY).toFixed(2)));
+      // 🚀 Calculate based on dynamic hoursPerDay
+      setCalculatedHours(parseFloat((val * leaveAllowance.hoursPerDay).toFixed(2)));
     } else {
       setCalculatedHours('');
     }
@@ -237,7 +237,8 @@ const HolidayPage: React.FC = () => {
           remainingHours: holidayRecord.remainingHours || 0,
           unpaidLeaveTaken: holidayRecord.unpaidLeaveTaken || 0,
           unpaidBookedHours: holidayRecord.unpaidBookedHours || 0,
-          unpaidLeaveRequest: holidayRecord.unpaidLeaveRequest || 0
+          unpaidLeaveRequest: holidayRecord.unpaidLeaveRequest || 0,
+          hoursPerDay: holidayRecord.hoursPerDay || 8 // 🚀 Fetching hoursPerDay from DB
         });
       } else {
         // Reset if no record found for the year
@@ -252,7 +253,8 @@ const HolidayPage: React.FC = () => {
           remainingHours: 0,
           unpaidLeaveTaken: 0,
           unpaidBookedHours: 0,
-          unpaidLeaveRequest: 0
+          unpaidLeaveRequest: 0,
+          hoursPerDay: 8
         });
       }
     } catch (err: any) {
@@ -285,8 +287,6 @@ const HolidayPage: React.FC = () => {
       }));
 
       setHolidays(mappedHolidays);
-
-      // Removed manual frontend math here! We let the DB handle calculations.
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to load leave requests');
       console.error('Error fetching leave requests:', err);
@@ -501,7 +501,7 @@ const HolidayPage: React.FC = () => {
     setIsSubmitting(true);
 
     try {
-      const leaveDays = generateLeaveDaysArray(startDate!, endDate!);
+      const leaveDays = generateLeaveDaysArray(startDate!, endDate!, selectedType);
 
       await axiosInstance.post(`/hr/leave`, {
         holidayYear: selectedYear,
@@ -597,7 +597,6 @@ const HolidayPage: React.FC = () => {
                       </SheetHeader>
 
                       <div className="space-y-5">
-                        {/* Drawer content remains the same... */}
                         {/* Holiday Year */}
                         <div>
                           <Label htmlFor="holiday-year">Holiday Year</Label>
@@ -871,7 +870,7 @@ const HolidayPage: React.FC = () => {
                         ) : (
                           <TableRow>
                             <TableCell
-                              colSpan={5}
+                              colSpan={6}
                               className="text-center text-gray-500"
                             >
                               No leave requests found for {selectedYear}.
@@ -886,7 +885,7 @@ const HolidayPage: React.FC = () => {
             </Card>
           </div>
 
-          {/* ── Right: Allowance + Drawer ── */}
+          {/* ── Right: Allowance ── */}
           <div className="space-y-6">
             <Card className="shadow-sm">
               <CardHeader>
@@ -895,14 +894,11 @@ const HolidayPage: React.FC = () => {
                     <Users className="h-5 w-5 text-green-600" />
                     My Leave Allowance
                   </div>
-
-                  {/* ── Sheet / Drawer ── */}
                 </CardTitle>
               </CardHeader>
 
               <CardContent>
                 <div className="space-y-4">
-                  {/* Using our optimized, memoized UI map */}
                   {allowanceStatsList.map(({ label, value, color }) => (
                     <div
                       key={label}
@@ -919,14 +915,13 @@ const HolidayPage: React.FC = () => {
                     </div>
                   ))}
 
-                  {/* <div className="flex items-center justify-between rounded-lg bg-blue-50 px-3 py-2">
-                    <span className="font-semibold text-black">
-                      Balance Remaining
+                  {/* 🚀 New Stat showing Hours Per Day */}
+                  <div className="flex items-center justify-between border-b border-gray-300 py-2 bg-gray-50 px-2 rounded-md mt-4">
+                    <span className="font-medium text-gray-700">Hours Per Day (Standard)</span>
+                    <span className="font-bold text-gray-900">
+                      {leaveAllowance.hoursPerDay} h
                     </span>
-                    <span className="text-lg font-bold text-theme">
-                      {leaveAllowance.remainingHours.toFixed(1)} h
-                    </span>
-                  </div> */}
+                  </div>
                 </div>
               </CardContent>
             </Card>

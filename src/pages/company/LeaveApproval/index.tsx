@@ -11,7 +11,7 @@ import {
   TableRow
 } from '@/components/ui/table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Users, Info, User, Search, RotateCcw } from 'lucide-react';
+import { Users, Info, User, Search, RotateCcw, Clock } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -50,12 +50,20 @@ import { z } from 'zod';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Textarea } from '@/components/ui/textarea';
+import { useSelector } from 'react-redux';
 
 // --- INTERFACES ---
 interface LeaveDay {
   leaveDate: string;
   leaveType: string;
   _id: string;
+}
+
+// 🚀 ADDED: History Interface
+interface LeaveHistory {
+  message: string;
+  timestamp: string;
+  userId: string | any;
 }
 
 interface LeaveRequest {
@@ -79,6 +87,7 @@ interface LeaveRequest {
   createdAt: string;
   updatedAt: string;
   leaveDays?: LeaveDay[];
+  history?: LeaveHistory[]; // 🚀 ADDED: History array
 }
 
 interface EmployeeOption {
@@ -252,6 +261,7 @@ const CompanyLeaveApprovalPage: React.FC = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [entriesPerPage, setEntriesPerPage] = useState(100);
   const navigate = useNavigate();
+  const user = useSelector((state: any) => state.auth?.user) || null;
 
   // --- FORM SETUP ---
   const form = useForm<LeaveProcessFormValues>({
@@ -269,11 +279,11 @@ const CompanyLeaveApprovalPage: React.FC = () => {
   const watchDayStatuses = form.watch('dayStatuses');
   const isInitialLoad = useRef(true);
 
-  // --- FETCH EMPLOYEES & DEPARTMENTS FOR FILTER DROPDOWNS ---
+  // --- FETCH EMPLOYEES FOR FILTER DROPDOWNS ---
   useEffect(() => {
     const fetchFilterOptions = async () => {
       try {
-        const [empRes, deptRes] = await Promise.all([
+        const [empRes] = await Promise.all([
           axiosInstance.get(
             `/users?company=${companyId}&limit=all&role=employee`
           )
@@ -360,7 +370,6 @@ const CompanyLeaveApprovalPage: React.FC = () => {
           : undefined
       };
 
-      // Using the object-based params style
       const res = await axiosInstance.get(`/hr/leave`, { params });
 
       const apiResponse = res.data;
@@ -376,7 +385,6 @@ const CompanyLeaveApprovalPage: React.FC = () => {
     }
   };
 
-  // Initial load + page/limit changes
   useEffect(() => {
     fetchLeaveRequests();
   }, [currentPage, entriesPerPage, companyId]);
@@ -392,7 +400,6 @@ const CompanyLeaveApprovalPage: React.FC = () => {
     setSelectedEmployee(null);
     setSelectedDepartment(null);
     setSelectedStatus(defaultStatus);
-    // Reset to null
     setDateRange([null, null]);
     setCurrentPage(1);
 
@@ -405,25 +412,38 @@ const CompanyLeaveApprovalPage: React.FC = () => {
     });
   };
 
+  // 🚀 UPDATED: Action submit now handles a generic 'update' action
   const handleActionSubmit = async (
-    status: 'approved' | 'rejected',
+    action: 'approved' | 'rejected' | 'update',
     formData?: LeaveProcessFormValues
   ) => {
     if (!selectedLeave) return;
 
     try {
-      const payload: any = { status };
+      const payload: any = {};
 
-      if (status === 'approved' && formData) {
+      // Only attach status if we are actually approving or rejecting
+      if (action !== 'update') {
+        payload.status = action;
+      }
+
+      // If we are approving OR just updating details, grab the form data
+      if ((action === 'approved' || action === 'update') && formData) {
         payload.totalDays = formData.totalDays;
         payload.totalHours = formData.totalHours;
         payload.endDate = formData.endDate;
+        payload.reason = formData.reason;
         payload.dayBreakdown = formData.dayStatuses;
       }
-
+      payload.actionUserId = user?._id;
       await axiosInstance.patch(`/hr/leave/${selectedLeave._id}`, payload);
-      setLeaves((prev) => prev.filter((req) => req._id !== selectedLeave._id));
-      toast({ title: `Leave request ${status} successfully` });
+
+      // Re-fetch to get the newly appended history logs and updated data
+      fetchLeaveRequests();
+
+      toast({
+        title: `Leave request ${action === 'update' ? 'updated' : action} successfully`
+      });
       setIsSheetOpen(false);
       setShowRejectConfirmModal(false);
     } catch (err: any) {
@@ -638,7 +658,6 @@ const CompanyLeaveApprovalPage: React.FC = () => {
           <CardContent>
             {/* ── FILTER BAR ── */}
             <div className="grid grid-cols-1 gap-4 pb-4 sm:grid-cols-2 lg:grid-cols-4">
-              {/* Employee */}
               <div className="space-y-1">
                 <label className="text-xs font-semibold uppercase tracking-wide ">
                   Employee
@@ -653,7 +672,6 @@ const CompanyLeaveApprovalPage: React.FC = () => {
                 />
               </div>
 
-              {/* Status */}
               <div className="space-y-1">
                 <label className="text-xs font-semibold uppercase tracking-wide ">
                   Status
@@ -668,7 +686,6 @@ const CompanyLeaveApprovalPage: React.FC = () => {
                 />
               </div>
 
-              {/* Date Range */}
               <div className="w-full space-y-1">
                 <label className="text-xs font-semibold uppercase tracking-wide ">
                   Date Range (DD-MM-YYYY)
@@ -860,7 +877,7 @@ const CompanyLeaveApprovalPage: React.FC = () => {
                             {...field}
                             id="reason"
                             placeholder="Employee's reason for leave..."
-                            className="min-h-[200px] border-theme/20 bg-theme/5 focus-visible:ring-theme/20"
+                            className="min-h-[120px] border-theme/20 bg-theme/5 focus-visible:ring-theme/20"
                           />
                         )}
                       />
@@ -920,8 +937,10 @@ const CompanyLeaveApprovalPage: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Action Footer */}
-                    <div className="mt-6 flex justify-between gap-3 pt-6">
+                  
+
+                    {/* 🚀 UPDATED: Action Footer */}
+                    <div className=" flex justify-between gap-3 border-t border-gray-100 pt-6">
                       {selectedLeave.status === 'pending' ? (
                         <>
                           <Button
@@ -951,16 +970,54 @@ const CompanyLeaveApprovalPage: React.FC = () => {
                           </div>
                         </>
                       ) : (
-                        <div className="flex w-full justify-end">
+                        // If status is ALREADY approved or rejected, hide Approve/Reject, show Update
+                        <div className="flex w-full justify-end gap-3">
                           <Button
                             variant="outline"
                             onClick={() => setIsSheetOpen(false)}
                           >
                             Close
                           </Button>
+                          <Button
+                            onClick={form.handleSubmit((data) =>
+                              handleActionSubmit('update', data)
+                            )}
+                          >
+                            Update Details
+                          </Button>
                         </div>
                       )}
                     </div>
+
+
+                      {/* 🚀 ADDED: History Timeline Section */}
+                    {selectedLeave.history &&
+                      selectedLeave.history.length > 0 && (
+                        <div className="mb-6 mt-8 space-y-4 rounded-lg  ">
+                          <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider ">
+                            <Clock className="h-4 w-4" /> Activity History
+                          </h3>
+                          <div className="space-y-3">
+                            {/* 🚀 ADDED [...array].reverse() right here */}
+                            {[...selectedLeave.history]
+                              .reverse()
+                              .map((log, idx) => (
+                                <div
+                                  key={idx}
+                                  className="flex flex-col border-l-2 border-theme/30 pl-3 text-sm"
+                                >
+                                  <span className="font-medium text-gray-800">
+                                    {log.message}{' '}
+                                    {moment(log?.createdAt).format(
+                                      'DD MMM YYYY, hh:mm '
+                                    )}
+                                  </span>
+                                  <span className="mt-0.5 text-xs text-gray-400"></span>
+                                </div>
+                              ))}
+                          </div>
+                        </div>
+                      )}
                   </div>
                 )}
               </SheetContent>

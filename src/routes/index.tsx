@@ -103,6 +103,7 @@ import CompanyAdminPage from '@/pages/company/companyAdmin';
 import UserAccessControl from '@/pages/company/companyAdmin/accessControl';
 import ManageHolidayPage from '@/pages/company/ManageHoliday';
 import { useSelector } from 'react-redux';
+import CompanyDocusignDetailsPage from '@/pages/company/companyDocusignDetails';
 
 const SignInPage = lazy(() => import('@/pages/auth/signin'));
 
@@ -298,7 +299,8 @@ export default function AppRouter() {
           path: 'company-admin/:caid/access-control',
           element: <UserAccessControl />
         },
-        { path: 'manage-holiday', element: <ManageHolidayPage /> }
+        { path: 'manage-holiday', element: <ManageHolidayPage /> },
+        { path: 'docusign-details', element: <CompanyDocusignDetailsPage /> }
       ]
     }
   ];
