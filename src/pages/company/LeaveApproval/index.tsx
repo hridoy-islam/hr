@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -11,7 +11,16 @@ import {
   TableRow
 } from '@/components/ui/table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Users, Info, User, Search, RotateCcw, Clock } from 'lucide-react';
+import {
+  Users,
+  Info,
+  User,
+  Search,
+  RotateCcw,
+  Clock,
+  Calendar,
+  CheckCircle
+} from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -30,12 +39,20 @@ import {
   Sheet,
   SheetContent,
   SheetHeader,
-  SheetTitle
+  SheetTitle,
+  SheetTrigger
 } from '@/components/ui/sheet';
+import {
+  Select as ShadcnSelect,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
-import Select from 'react-select';
+import ReactSelect from 'react-select';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 
@@ -56,14 +73,14 @@ import { useSelector } from 'react-redux';
 interface LeaveDay {
   leaveDate: string;
   leaveType: string;
-  _id: string;
+  _id?: string;
 }
 
-// 🚀 ADDED: History Interface
 interface LeaveHistory {
   message: string;
   timestamp: string;
   userId: string | any;
+  createdAt?: string;
 }
 
 interface LeaveRequest {
@@ -87,7 +104,7 @@ interface LeaveRequest {
   createdAt: string;
   updatedAt: string;
   leaveDays?: LeaveDay[];
-  history?: LeaveHistory[]; // 🚀 ADDED: History array
+  history?: LeaveHistory[];
 }
 
 interface EmployeeOption {
@@ -100,7 +117,17 @@ interface DepartmentOption {
   label: string;
 }
 
-// --- ZOD SCHEMA ---
+interface HolidayFormErrors {
+  holidayYear?: string;
+  reason?: string;
+  holidayType?: string;
+  dateRange?: string;
+  totalDays?: string;
+  totalHours?: string;
+  employee?: string;
+}
+
+// --- ZOD SCHEMAS ---
 const leaveProcessSchema = z.object({
   totalDays: z.number().min(1, 'Number of days cannot be less than 1'),
   totalHours: z.number().min(0, 'Hours cannot be negative'),
@@ -111,19 +138,34 @@ const leaveProcessSchema = z.object({
 
 type LeaveProcessFormValues = z.infer<typeof leaveProcessSchema>;
 
-// --- STATUS OPTIONS ---
+const holidayRequestSchema = z.object({
+  holidayYear: z.string().min(1, 'Holiday year is required'),
+  reason: z.string().optional(),
+  holidayType: z.string().min(1, 'Type is required'),
+  startDate: z.date({ required_error: 'Start date is required' }),
+  endDate: z.date({ required_error: 'End date is required' }),
+  totalDays: z.number().min(1, 'Days must be at least 1'),
+  totalHours: z.number().min(1, 'Hours must be at least 1') // Relaxed to 1 so hours can be changed freely
+});
+
+// --- CONSTANTS ---
 const STATUS_OPTIONS = [
   { value: 'pending', label: 'Pending' },
   { value: 'approved', label: 'Approved' },
   { value: 'rejected', label: 'Rejected' }
 ];
 
-// --- REACT SELECT CUSTOM STYLES ---
+const leaveTypeOptions = [
+  { value: 'holiday', label: 'Holiday' },
+  { value: 'absence', label: 'Absence' },
+  { value: 'sick', label: 'Sick Leave' },
+  { value: 'family', label: 'Family Leave' }
+];
+
 const selectStyles = {
   control: (base: any, state: any) => ({
     ...base,
     minHeight: '40px',
-
     borderRadius: '6px',
     fontSize: '14px'
   }),
@@ -137,102 +179,58 @@ const selectStyles = {
   menu: (base: any) => ({ ...base, zIndex: 9999 })
 };
 
-// --- DAY STATUS DROPDOWN ---
-const DayStatusButton = ({
-  day,
-  status,
-  onChange
-}: {
-  day: { date: string; label: string };
-  status: 'paid' | 'unpaid' | 'dayoff';
-  onChange: (date: string, value: 'paid' | 'unpaid' | 'dayoff') => void;
-}) => {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const getBtnColor = () => {
-    if (status === 'paid')
-      return 'bg-green-500 hover:bg-green-600 text-white border-green-600';
-    if (status === 'unpaid')
-      return 'bg-red-500 hover:bg-red-600 text-white border-red-600';
-    return 'bg-blue-500 hover:bg-blue-600 text-white border-blue-600';
-  };
-
-  const options: {
-    label: string;
-    value: 'paid' | 'unpaid' | 'dayoff';
-    color: string;
-  }[] = [
-    { label: 'Paid', value: 'paid', color: 'text-green-600 hover:bg-green-50' },
-    { label: 'Unpaid', value: 'unpaid', color: 'text-red-600 hover:bg-red-50' },
-    {
-      label: 'Day Off',
-      value: 'dayoff',
-      color: 'text-blue-600 hover:bg-blue-50'
-    }
-  ];
-
-  return (
-    <div className="relative" ref={ref}>
-      <button
-        type="button"
-        className={`w-full rounded-md border-2 px-1 py-2 text-sm font-semibold transition-colors ${getBtnColor()}`}
-        onClick={() => setOpen((prev) => !prev)}
-      >
-        <div className="text-xs opacity-80">
-          {day.label},{day.date}
-        </div>
-        <div className="mt-0.5 text-[11px] capitalize">
-          {status === 'dayoff' ? 'Day Off' : status}
-        </div>
-      </button>
-      {open && (
-        <div className="absolute bottom-full left-1/2 z-50 mb-1 w-28 -translate-x-1/2 rounded-md border border-gray-200 bg-white shadow-lg">
-          {options.map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              className={`flex w-full items-center gap-2 px-3 py-2 text-sm font-medium ${opt.color} ${status === opt.value ? 'font-bold' : ''}`}
-              onClick={() => {
-                onChange(day.date, opt.value);
-                setOpen(false);
-              }}
-            >
-              <span
-                className={`h-2.5 w-2.5 rounded-full ${
-                  opt.value === 'paid'
-                    ? 'bg-green-500'
-                    : opt.value === 'unpaid'
-                      ? 'bg-red-500'
-                      : 'bg-blue-500'
-                }`}
-              />
-              {opt.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
+// --- HELPER FUNCTIONS ---
+const generateHolidayYears = (backward = 20, forward = 50) => {
+  const currentYear = moment().year();
+  const years: string[] = [];
+  for (let i = backward; i > 0; i--) {
+    const start = currentYear - i;
+    years.push(`${start}-${start + 1}`);
+  }
+  years.push(`${currentYear}-${currentYear + 1}`);
+  for (let i = 1; i <= forward; i++) {
+    const start = currentYear + i;
+    years.push(`${start}-${start + 1}`);
+  }
+  return years;
 };
 
+const getCurrentHolidayYear = () => {
+  const year = moment().year();
+  return `${year}-${year + 1}`;
+};
+
+// Update this function in your React code
+const generateLeaveDaysArray = (
+  start: Date,
+  end: Date,
+  holidayType: string
+) => {
+  const days = [];
+  let current = moment(start);
+  const endMoment = moment(end);
+
+  // LOGIC: If holiday type is 'holiday', set leaveType to 'paid', otherwise 'unpaid'
+  const dayStatus = holidayType === 'holiday' ? 'paid' : 'unpaid';
+
+  while (current.isSameOrBefore(endMoment)) {
+    days.push({
+      leaveDate: current.format('YYYY-MM-DD'),
+      leaveType: dayStatus // This now safely maps to your Mongoose enum
+    });
+    current.add(1, 'days');
+  }
+  return days;
+};
+
+// --- COMPONENTS ---
 const CompanyLeaveApprovalPage: React.FC = () => {
   const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [showRejectConfirmModal, setShowRejectConfirmModal] = useState(false);
 
-  // Sheet State
+  // Approval Sheet State
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [selectedLeave, setSelectedLeave] = useState<LeaveRequest | null>(null);
   const [currentDaysList, setCurrentDaysList] = useState<
@@ -254,6 +252,25 @@ const CompanyLeaveApprovalPage: React.FC = () => {
     null
   ]);
   const [startDate, endDate] = dateRange;
+
+  // --- CREATE LEAVE REQUEST STATE ---
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [selectedYear, setSelectedYear] = useState<string>(
+    getCurrentHolidayYear()
+  );
+  const [createReason, setCreateReason] = useState('');
+  const [selectedType, setSelectedType] = useState('');
+  const [createStartDate, setCreateStartDate] = useState<Date | undefined>();
+  const [createEndDate, setCreateEndDate] = useState<Date | undefined>();
+  const [calculatedDays, setCalculatedDays] = useState<string>('');
+  const [calculatedHours, setCalculatedHours] = useState<string>('');
+  const [createSelectedEmployee, setCreateSelectedEmployee] =
+    useState<EmployeeOption | null>(null);
+  const [createTitle, setCreateTitle] = useState('');
+  const [formErrors, setFormErrors] = useState<HolidayFormErrors>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const holidayYears = useMemo(() => generateHolidayYears(20, 50), []);
 
   const { id: companyId } = useParams();
   const { toast } = useToast();
@@ -279,7 +296,7 @@ const CompanyLeaveApprovalPage: React.FC = () => {
   const watchDayStatuses = form.watch('dayStatuses');
   const isInitialLoad = useRef(true);
 
-  // --- FETCH EMPLOYEES FOR FILTER DROPDOWNS ---
+  // --- FETCH EMPLOYEES FOR FILTER & CREATE DROPDOWNS ---
   useEffect(() => {
     const fetchFilterOptions = async () => {
       try {
@@ -412,7 +429,135 @@ const CompanyLeaveApprovalPage: React.FC = () => {
     });
   };
 
-  // 🚀 UPDATED: Action submit now handles a generic 'update' action
+  // --- CREATE LEAVE HANDLERS ---
+  const clearError = (field: string) => {
+    setFormErrors((prev: any) => {
+      const newErrs = { ...prev };
+      delete newErrs[field];
+      return newErrs;
+    });
+  };
+
+  const handleDaysChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setCalculatedDays(value);
+
+    const parsedDays = parseFloat(value);
+    if (!isNaN(parsedDays) && parsedDays >= 1) {
+      setCalculatedHours(String(parsedDays * 8)); // Days still updates hours by default
+
+      if (createStartDate) {
+        const newEndDate = moment(createStartDate)
+          .add(parsedDays - 1, 'days')
+          .toDate();
+        setCreateEndDate(newEndDate);
+      }
+    } else if (!isNaN(parsedDays) && parsedDays < 1) {
+      // Force minimum 1 day if user types a lower number
+      setCalculatedDays('1');
+      setCalculatedHours('8');
+      if (createStartDate) {
+        setCreateEndDate(createStartDate);
+      }
+    } else {
+      setCalculatedHours('');
+    }
+    clearError('totalDays');
+  };
+
+  const handleHoursChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    // Just update the hours state. Do not touch calculatedDays or createEndDate.
+    setCalculatedHours(value);
+    clearError('totalHours');
+  };
+
+  const handleSubmitRequest = async () => {
+    if (!createSelectedEmployee) {
+      setFormErrors((prev) => ({
+        ...prev,
+        employee: 'Please select an employee'
+      }));
+      return;
+    }
+
+    const formData = {
+      holidayYear: selectedYear,
+      reason: createReason,
+      holidayType: selectedType,
+      startDate: createStartDate as Date,
+      endDate: createEndDate as Date,
+      totalDays: parseFloat(String(calculatedDays)),
+      totalHours: parseFloat(String(calculatedHours))
+    };
+
+    const result = holidayRequestSchema.safeParse(formData);
+
+    if (!result.success) {
+      const errors: HolidayFormErrors = {};
+      result.error.errors.forEach((err) => {
+        const field = err.path[0] as string;
+        if (field === 'startDate' || field === 'endDate') {
+          if (!errors.dateRange) errors.dateRange = err.message;
+        } else if (field && !errors[field as keyof HolidayFormErrors]) {
+          (errors as any)[field] = err.message;
+        }
+      });
+      setFormErrors(errors);
+      return;
+    }
+
+    setFormErrors({});
+    setIsSubmitting(true);
+
+    try {
+      const leaveDays = generateLeaveDaysArray(
+        createStartDate!,
+        createEndDate!,
+        selectedType
+      );
+      await axiosInstance.post(`/hr/leave`, {
+        holidayYear: selectedYear,
+        userId: createSelectedEmployee.value,
+        startDate: createStartDate,
+        endDate: createEndDate,
+        reason: createReason,
+        companyId,
+        holidayType: selectedType,
+        totalDays: result.data.totalDays,
+        totalHours: result.data.totalHours,
+        leaveDays,
+        status: 'pending',
+        title: createTitle || `${selectedType} Request`
+      });
+
+      toast({ title: 'Leave request submitted successfully!' });
+
+      setCreateStartDate(undefined);
+      setCreateEndDate(undefined);
+      setCreateTitle('');
+      setCreateReason('');
+      setSelectedType('');
+      setCalculatedDays('');
+      setCalculatedHours('');
+      setCreateSelectedEmployee(null);
+      setSelectedYear(getCurrentHolidayYear()); // Reset to the current year after submittal
+      setFormErrors({});
+      setIsDrawerOpen(false);
+
+      await fetchLeaveRequests();
+    } catch (err: any) {
+      toast({
+        title: err.response?.data?.message || 'Submission failed',
+        className: 'bg-destructive text-white border-none'
+      });
+      console.error('Error submitting leave:', err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // --- APPROVE/UPDATE/REJECT ACTIONS ---
   const handleActionSubmit = async (
     action: 'approved' | 'rejected' | 'update',
     formData?: LeaveProcessFormValues
@@ -422,12 +567,10 @@ const CompanyLeaveApprovalPage: React.FC = () => {
     try {
       const payload: any = {};
 
-      // Only attach status if we are actually approving or rejecting
       if (action !== 'update') {
         payload.status = action;
       }
 
-      // If we are approving OR just updating details, grab the form data
       if ((action === 'approved' || action === 'update') && formData) {
         payload.totalDays = formData.totalDays;
         payload.totalHours = formData.totalHours;
@@ -438,7 +581,6 @@ const CompanyLeaveApprovalPage: React.FC = () => {
       payload.actionUserId = user?._id;
       await axiosInstance.patch(`/hr/leave/${selectedLeave._id}`, payload);
 
-      // Re-fetch to get the newly appended history logs and updated data
       fetchLeaveRequests();
 
       toast({
@@ -491,26 +633,6 @@ const CompanyLeaveApprovalPage: React.FC = () => {
     });
   };
 
-  const setAllDaysStatus = (status: 'paid' | 'unpaid') => {
-    const newStatuses: Record<string, 'paid' | 'unpaid' | 'dayoff'> = {};
-    currentDaysList.forEach((d) => {
-      newStatuses[d.date] = status;
-    });
-    form.setValue('dayStatuses', newStatuses, { shouldDirty: true });
-  };
-
-  const handleDayStatusChange = (
-    date: string,
-    value: 'paid' | 'unpaid' | 'dayoff'
-  ) => {
-    const current = form.getValues('dayStatuses') || {};
-    form.setValue(
-      'dayStatuses',
-      { ...current, [date]: value },
-      { shouldDirty: true }
-    );
-  };
-
   const getStatusBadgeClass = (status: string) => {
     if (status === 'approved')
       return 'bg-green-500 text-white hover:bg-green-500';
@@ -518,7 +640,6 @@ const CompanyLeaveApprovalPage: React.FC = () => {
     return 'bg-yellow-500 text-white hover:bg-yellow-500';
   };
 
-  // Enhanced LeaveTooltipContent
   const LeaveTooltipContent = ({ request }: { request: LeaveRequest }) => {
     const [allowance, setAllowance] = useState<any>(null);
     const [loading, setLoading] = useState<boolean>(true);
@@ -650,9 +771,239 @@ const CompanyLeaveApprovalPage: React.FC = () => {
       <div className="min-h-screen bg-gray-50">
         <Card className="shadow-sm">
           <CardHeader className="pb-4">
-            <CardTitle className="flex items-center gap-2 text-2xl">
-              <Users className="h-5 w-5 text-theme" />
-              Leave Requests
+            <CardTitle className="flex items-center justify-between gap-2 text-2xl">
+              <div className="flex flex-row items-center gap-2">
+                <Users className="h-5 w-5 text-theme" />
+                Leave Requests
+              </div>
+              <div>
+                {/* ── CREATE LEAVE SHEET ── */}
+                <Sheet open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
+                  <SheetTrigger asChild>
+                    <Button size={'sm'} className="font-bold">
+                      Create Leave Request
+                    </Button>
+                  </SheetTrigger>
+
+                  <SheetContent className="overflow-y-auto sm:max-w-[450px]">
+                    <SheetHeader className="mb-6">
+                      <SheetTitle className="flex items-center gap-2">
+                        <CheckCircle className="h-5 w-5 text-theme" />
+                        Submit Leave Request
+                      </SheetTitle>
+                    </SheetHeader>
+
+                    <div className="space-y-5">
+                      {/* Employee Selection */}
+                      <div>
+                        <Label className="mb-1 block">Employee</Label>
+                        <ReactSelect
+                          options={employeeOptions}
+                          value={createSelectedEmployee}
+                          onChange={(opt) => {
+                            setCreateSelectedEmployee(opt);
+                            clearError('employee');
+                          }}
+                          placeholder="Select Employee..."
+                          isClearable
+                          styles={selectStyles}
+                        />
+                        {formErrors.employee && (
+                          <p className="mt-1 text-xs text-red-500">
+                            {formErrors.employee}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Holiday Year */}
+                      <div>
+                        <Label htmlFor="holiday-year">Holiday Year</Label>
+                        <ShadcnSelect
+                          value={selectedYear}
+                          onValueChange={(val) => {
+                            setSelectedYear(val);
+                            clearError('holidayYear');
+                          }}
+                        >
+                          <SelectTrigger
+                            id="holiday-year"
+                            className={
+                              formErrors.holidayYear ? 'border-red-500' : ''
+                            }
+                          >
+                            <SelectValue placeholder="Select year" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {holidayYears.map((year) => (
+                              <SelectItem key={year} value={year}>
+                                {year}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </ShadcnSelect>
+                        {formErrors.holidayYear && (
+                          <p className="mt-1 text-xs text-red-500">
+                            {formErrors.holidayYear}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Reason */}
+                      <div>
+                        <Label htmlFor="create-reason">Reason</Label>
+                        <Textarea
+                          id="create-reason"
+                          placeholder="Enter reason for leave"
+                          value={createReason}
+                          onChange={(e) => {
+                            setCreateReason(e.target.value);
+                            clearError('reason');
+                          }}
+                          className={`border-gray-300 ${formErrors.reason ? 'border-red-500' : ''}`}
+                        />
+                        {formErrors.reason && (
+                          <p className="mt-1 text-xs text-red-500">
+                            {formErrors.reason}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Holiday Type */}
+                      <div>
+                        <Label htmlFor="type" className="mb-1 block">
+                          Holiday Type
+                        </Label>
+                        <ReactSelect
+                          inputId="type"
+                          options={leaveTypeOptions}
+                          value={
+                            leaveTypeOptions.find(
+                              (opt) => opt.value === selectedType
+                            ) || null
+                          }
+                          onChange={(option) => {
+                            setSelectedType(option?.value || '');
+                            clearError('holidayType');
+                          }}
+                          placeholder="Select type"
+                          className="react-select-container"
+                          classNamePrefix="react-select"
+                          styles={{
+                            control: (base) => ({
+                              ...base,
+                              borderColor: formErrors.holidayType
+                                ? '#ef4444'
+                                : base.borderColor,
+                              '&:hover': {
+                                borderColor: formErrors.holidayType
+                                  ? '#ef4444'
+                                  : base.borderColor
+                              }
+                            })
+                          }}
+                        />
+                        {formErrors.holidayType && (
+                          <p className="mt-1 text-xs text-red-500">
+                            {formErrors.holidayType}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Date Range Picker */}
+                      <div className="flex flex-col gap-1">
+                        <Label>Leave Period (DD-MM-YYYY)</Label>
+                        <DatePicker
+                          selectsRange
+                          startDate={createStartDate}
+                          endDate={createEndDate}
+                          onChange={(dates) => {
+                            const [start, end] = dates;
+                            setCreateStartDate(start ?? undefined);
+                            setCreateEndDate(end ?? undefined);
+                            clearError('dateRange');
+
+                            // Auto calculate total days and hours
+                            if (start && end) {
+                              const daysDiff =
+                                moment(end).diff(moment(start), 'days') + 1;
+                              const validDays = Math.max(1, daysDiff);
+                              setCalculatedDays(String(validDays));
+                              setCalculatedHours(String(validDays * 8));
+                            } else if (start && !end) {
+                              setCalculatedDays('1');
+                              setCalculatedHours('8');
+                            } else {
+                              setCalculatedDays('');
+                              setCalculatedHours('');
+                            }
+                          }}
+                          isClearable
+                          placeholderText="Select start and end date"
+                          className={`w-full rounded border px-3 py-2 ${formErrors.dateRange ? 'border-red-500' : 'border-gray-300'}`}
+                          dateFormat="dd-MM-yyyy"
+                          minDate={new Date()}
+                        />
+                        {formErrors.dateRange && (
+                          <p className="mt-1 text-xs text-red-500">
+                            {formErrors.dateRange}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Total Days */}
+                      <div className="space-y-1">
+                        <Label htmlFor="duration-days">
+                          Holiday Duration (Days)
+                        </Label>
+                        <Input
+                          id="duration-days"
+                          type="number"
+                          min="1"
+                          step="1"
+                          value={calculatedDays}
+                          onChange={handleDaysChange}
+                          placeholder="e.g. 2"
+                          className={`bg-white ${formErrors.totalDays ? 'border-red-500' : ''}`}
+                        />
+                        {formErrors.totalDays && (
+                          <p className="text-xs text-red-500">
+                            {formErrors.totalDays}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Total Hours */}
+                      <div className="space-y-1">
+                        <Label htmlFor="duration-hours">Duration (Hours)</Label>
+                        <Input
+                          id="duration-hours"
+                          type="number"
+                          min="1"
+                          step="0.5"
+                          value={calculatedHours}
+                          onChange={handleHoursChange}
+                          placeholder="e.g. 16"
+                          className={`bg-white ${formErrors.totalHours ? 'border-red-500' : ''}`}
+                        />
+                        {formErrors.totalHours && (
+                          <p className="text-xs text-red-500">
+                            {formErrors.totalHours}
+                          </p>
+                        )}
+                      </div>
+
+                      <Button
+                        onClick={handleSubmitRequest}
+                        className="mt-4 w-full bg-theme text-white hover:bg-theme/90"
+                        disabled={isSubmitting}
+                      >
+                        <Calendar className="mr-2 h-4 w-4" />
+                        {isSubmitting ? 'Submitting...' : 'Submit Request'}
+                      </Button>
+                    </div>
+                  </SheetContent>
+                </Sheet>
+              </div>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -662,7 +1013,7 @@ const CompanyLeaveApprovalPage: React.FC = () => {
                 <label className="text-xs font-semibold uppercase tracking-wide ">
                   Employee
                 </label>
-                <Select
+                <ReactSelect
                   options={employeeOptions}
                   value={selectedEmployee}
                   onChange={(opt) => setSelectedEmployee(opt)}
@@ -676,7 +1027,7 @@ const CompanyLeaveApprovalPage: React.FC = () => {
                 <label className="text-xs font-semibold uppercase tracking-wide ">
                   Status
                 </label>
-                <Select
+                <ReactSelect
                   options={STATUS_OPTIONS}
                   value={selectedStatus}
                   onChange={(opt) => setSelectedStatus(opt)}
@@ -937,9 +1288,7 @@ const CompanyLeaveApprovalPage: React.FC = () => {
                       </div>
                     </div>
 
-                  
-
-                    {/* 🚀 UPDATED: Action Footer */}
+                    {/* Action Footer */}
                     <div className=" flex justify-between gap-3 border-t border-gray-100 pt-6">
                       {selectedLeave.status === 'pending' ? (
                         <>
@@ -970,7 +1319,6 @@ const CompanyLeaveApprovalPage: React.FC = () => {
                           </div>
                         </>
                       ) : (
-                        // If status is ALREADY approved or rejected, hide Approve/Reject, show Update
                         <div className="flex w-full justify-end gap-3">
                           <Button
                             variant="outline"
@@ -989,8 +1337,7 @@ const CompanyLeaveApprovalPage: React.FC = () => {
                       )}
                     </div>
 
-
-                      {/* 🚀 ADDED: History Timeline Section */}
+                    {/* History Timeline Section */}
                     {selectedLeave.history &&
                       selectedLeave.history.length > 0 && (
                         <div className="mb-6 mt-8 space-y-4 rounded-lg  ">
@@ -998,7 +1345,6 @@ const CompanyLeaveApprovalPage: React.FC = () => {
                             <Clock className="h-4 w-4" /> Activity History
                           </h3>
                           <div className="space-y-3">
-                            {/* 🚀 ADDED [...array].reverse() right here */}
                             {[...selectedLeave.history]
                               .reverse()
                               .map((log, idx) => (
