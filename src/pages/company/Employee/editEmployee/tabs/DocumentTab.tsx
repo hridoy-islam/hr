@@ -636,8 +636,8 @@ export default function EmployeeDocumentTab() {
                         <div className="text-sm text-gray-600">
                           <span className="font-semibold text-theme">
                             Click to upload
-                          </span>{' '}
-                          or drag and drop
+                          </span>
+                          
                         </div>
                         <p className="text-xs text-gray-400">
                           PDF, DOCX, JPG (Max 5MB)
