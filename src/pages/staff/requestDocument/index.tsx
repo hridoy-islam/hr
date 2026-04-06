@@ -43,7 +43,7 @@ interface SignatureDoc {
   updatedAt: string;
 }
 
-function SignatureDocumentTab() {
+function StaffRequestDocumentPage() {
   const { id, eid } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
@@ -156,7 +156,7 @@ function SignatureDocumentTab() {
     try {
       const response = await axiosInstance.post(
         `/signature-documents/initiate-signing/${signatureDocId}`,
-        { signerId: eid,layout:'adminLayout' } 
+        { signerId: eid, layout:'staffLayout' } 
       );
       const signingUrl = response.data?.data?.signingUrl || response.data?.signingUrl;
       if (signingUrl) {
@@ -347,4 +347,4 @@ function SignatureDocumentTab() {
   );
 }
 
-export default SignatureDocumentTab;
+export default StaffRequestDocumentPage;

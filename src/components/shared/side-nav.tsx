@@ -91,6 +91,12 @@ const navItems = [
     href: 'notice',
     roles: ['employee']
   },
+  // {
+  //   icon: FileBadge,
+  //   label: 'Request Document',
+  //   href: 'document-request',
+  //   roles: ['employee']
+  // },
   {
     icon: FileSpreadsheet,
     label: 'Attendance',

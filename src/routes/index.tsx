@@ -104,6 +104,7 @@ import UserAccessControl from '@/pages/company/companyAdmin/accessControl';
 import ManageHolidayPage from '@/pages/company/ManageHoliday';
 import { useSelector } from 'react-redux';
 import CompanyDocusignDetailsPage from '@/pages/company/companyDocusignDetails';
+import StaffRequestDocumentPage from '@/pages/staff/requestDocument';
 
 const SignInPage = lazy(() => import('@/pages/auth/signin'));
 
@@ -331,7 +332,8 @@ export default function AppRouter() {
         { path: 'notice', element: <StaffNoticeBoard /> },
         { path: 'holiday', element: <HolidayPage /> },
         { path: 'profile', element: <StaffProfile /> },
-        { path: 'attendance', element: <StaffAttendancePage /> }
+        { path: 'attendance', element: <StaffAttendancePage /> },
+        { path: 'document-request', element: <StaffRequestDocumentPage /> }
       ]
     }
   ];

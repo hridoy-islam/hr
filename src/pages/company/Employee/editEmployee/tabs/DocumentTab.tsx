@@ -12,7 +12,10 @@ import {
   AlertCircle,
   Pencil,
   Eye,
-  FileWarning
+  Camera,
+  X,
+  RefreshCw,
+  Check
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -104,11 +107,15 @@ interface SelectOption {
 export default function EmployeeDocumentTab() {
   const { eid } = useParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Camera Refs
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   // --- State ---
   const [documents, setDocuments] = useState<TEmployeeDocument[]>([]);
   const [complianceStatus, setComplianceStatus] = useState<TComplianceStatus | null>(null);
-  const [userData, setUserData] = useState<any>(null); // ✅ Added user state
+  const [userData, setUserData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   // Dialog State
@@ -126,12 +133,19 @@ export default function EmployeeDocumentTab() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Camera State
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  
+  // Image Preview State (Captured but not yet accepted)
+  const [capturedImageFile, setCapturedImageFile] = useState<File | null>(null);
+  const [capturedImagePreview, setCapturedImagePreview] = useState<string | null>(null);
+
   // --- Data Fetching ---
   const fetchData = async () => {
     if (!eid) return;
     try {
       setIsLoading(true);
-      // ✅ Fetch docs, status, AND user data simultaneously
       const [docsRes, statusRes, userRes] = await Promise.all([
         axiosInstance.get(`/employee-documents?limit=all`, {
           params: { employeeId: eid }
@@ -142,7 +156,7 @@ export default function EmployeeDocumentTab() {
 
       setDocuments(docsRes.data?.data?.result || []);
       setComplianceStatus(statusRes.data?.data || null);
-      setUserData(userRes.data?.data || null); // ✅ Store user data
+      setUserData(userRes.data?.data || null);
     } catch (error) {
       console.error('Failed to fetch data', error);
     } finally {
@@ -154,14 +168,24 @@ export default function EmployeeDocumentTab() {
     fetchData();
   }, [eid]);
 
+  // Clean up camera on unmount or dialog close
+  useEffect(() => {
+    if (!isDialogOpen) {
+      stopCamera();
+      clearCaptureState();
+    }
+    return () => {
+      stopCamera();
+      if (capturedImagePreview) URL.revokeObjectURL(capturedImagePreview);
+    };
+  }, [isDialogOpen]);
+
   // --- Computed Options for React Select ---
   const selectOptions = useMemo(() => {
     const uploadedTitles = documents.map((d) => d.documentTitle.trim());
 
-    // Count specifically for "Reference" (Employment Reference)
     const referenceCount = uploadedTitles.filter((t) => t === 'Reference').length;
 
-    // ✅ Dynamic list logic based on user profile
     let dynamicRequiredList = [...REQUIRED_DOCUMENTS_LIST];
     
     if (userData?.noRtwCheck) {
@@ -181,18 +205,15 @@ export default function EmployeeDocumentTab() {
     const filterUploaded = (list: string[]) => {
       return list
         .filter((title) => {
-          // Special Case: "Reference" allows up to MIN_REFERENCE_COUNT (2)
           if (title === 'Reference') {
             return referenceCount < MIN_REFERENCE_COUNT;
           }
-
-          // Standard Case: "DBS Reference" and others hide if uploaded once
           return !uploadedTitles.includes(title);
         })
         .map((title) => ({ label: title, value: title }));
     };
 
-    const requiredOpts = filterUploaded(dynamicRequiredList); // ✅ Apply dynamic list
+    const requiredOpts = filterUploaded(dynamicRequiredList);
     const optionalOpts = filterUploaded(OPTIONAL_DOCUMENTS_LIST);
 
     return [
@@ -209,7 +230,76 @@ export default function EmployeeDocumentTab() {
         options: [{ label: '+ Other (Type Manually)', value: 'Other' }]
       }
     ];
-  }, [documents, userData]); // ✅ Added userData to dependencies
+  }, [documents, userData]);
+
+  // --- Helpers ---
+  const clearCaptureState = () => {
+    setCapturedImageFile(null);
+    if (capturedImagePreview) URL.revokeObjectURL(capturedImagePreview);
+    setCapturedImagePreview(null);
+  };
+
+  // --- Camera Handlers ---
+  const startCamera = async () => {
+    clearCaptureState();
+    setUploadError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: 'environment' } // Prefers back camera on mobile
+      });
+      setCameraStream(stream);
+      setIsCameraOpen(true);
+      // Using a timeout to ensure the video element has rendered before setting srcObject
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+      }, 100);
+    } catch (err) {
+      console.error("Camera access denied:", err);
+      setUploadError("Camera access denied. Please check your browser permissions.");
+    }
+  };
+
+  const stopCamera = () => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach((track) => track.stop());
+      setCameraStream(null);
+    }
+    setIsCameraOpen(false);
+  };
+
+  const capturePhoto = () => {
+    if (videoRef.current && canvasRef.current) {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const context = canvas.getContext('2d');
+      context?.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      canvas.toBlob((blob) => {
+        if (blob) {
+          const file = new File([blob], `capture-${Date.now()}.jpg`, { type: 'image/jpeg' });
+          setCapturedImageFile(file);
+          setCapturedImagePreview(URL.createObjectURL(blob));
+          stopCamera(); // Turn off camera while user reviews the photo
+        }
+      }, 'image/jpeg', 0.9);
+    }
+  };
+
+  const retakePhoto = () => {
+    clearCaptureState();
+    startCamera();
+  };
+
+  const acceptPhoto = () => {
+    if (capturedImageFile) {
+      uploadFileFromSource(capturedImageFile);
+      clearCaptureState(); // Cleanup preview state once upload starts
+    }
+  };
 
   // --- Handlers ---
   const handleOpenCreate = () => {
@@ -219,17 +309,14 @@ export default function EmployeeDocumentTab() {
     setUploadedDocUrl(null);
     setFileToUpload(null);
     setUploadError(null);
+    stopCamera();
+    clearCaptureState();
     setIsDialogOpen(true);
   };
 
   const handleOpenEdit = (doc: TEmployeeDocument) => {
     setEditingDoc(doc);
-
-    // Check if doc title is in our known lists
-    const isStandard = [
-      ...REQUIRED_DOCUMENTS_LIST,
-      ...OPTIONAL_DOCUMENTS_LIST
-    ].includes(doc.documentTitle);
+    const isStandard = [...REQUIRED_DOCUMENTS_LIST, ...OPTIONAL_DOCUMENTS_LIST].includes(doc.documentTitle);
 
     if (isStandard) {
       setSelectedOption({ label: doc.documentTitle, value: doc.documentTitle });
@@ -242,12 +329,13 @@ export default function EmployeeDocumentTab() {
     setUploadedDocUrl(doc.documentUrl);
     setFileToUpload(null);
     setUploadError(null);
+    stopCamera();
+    clearCaptureState();
     setIsDialogOpen(true);
   };
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !eid) return;
+  const uploadFileFromSource = async (file: File) => {
+    if (!eid) return;
 
     if (file.size > 5 * 1024 * 1024) {
       setUploadError('File size exceeds 5MB limit.');
@@ -279,6 +367,13 @@ export default function EmployeeDocumentTab() {
     }
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      uploadFileFromSource(file);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -301,10 +396,7 @@ export default function EmployeeDocumentTab() {
       };
 
       if (editingDoc) {
-        await axiosInstance.patch(
-          `/employee-documents/${editingDoc._id}`,
-          payload
-        );
+        await axiosInstance.patch(`/employee-documents/${editingDoc._id}`, payload);
       } else {
         await axiosInstance.post('/employee-documents', payload);
       }
@@ -330,15 +422,12 @@ export default function EmployeeDocumentTab() {
     }
   };
 
-  // React Select Styles
   const customSelectStyles = {
     control: (base: any) => ({
       ...base,
       borderColor: '#e5e7eb',
       boxShadow: 'none',
-      '&:hover': {
-        borderColor: '#a1a1aa'
-      },
+      '&:hover': { borderColor: '#a1a1aa' },
       padding: '2px',
       fontSize: '0.875rem',
       borderRadius: '0.375rem'
@@ -346,11 +435,7 @@ export default function EmployeeDocumentTab() {
     option: (base: any, state: any) => ({
       ...base,
       fontSize: '0.875rem',
-      backgroundColor: state.isSelected
-        ? '#0f172a'
-        : state.isFocused
-          ? '#f3f4f6'
-          : 'white',
+      backgroundColor: state.isSelected ? '#0f172a' : state.isFocused ? '#f3f4f6' : 'white',
       color: state.isSelected ? 'white' : '#1f2937'
     }),
     groupHeading: (base: any) => ({
@@ -371,7 +456,6 @@ export default function EmployeeDocumentTab() {
           <h3 className="text-2xl font-bold tracking-tight text-gray-900">
             Documents
           </h3>
-         
         </div>
 
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -384,7 +468,7 @@ export default function EmployeeDocumentTab() {
             </Button>
           </DialogTrigger>
 
-          <DialogContent className="max-h-[90vh] overflow-visible sm:max-w-xl">
+          <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
             <DialogHeader>
               <DialogTitle>
                 {editingDoc ? 'Edit Document' : 'Upload New Document'}
@@ -395,7 +479,6 @@ export default function EmployeeDocumentTab() {
             </DialogHeader>
 
             <form onSubmit={handleSubmit} className="space-y-5 py-4">
-              {/* React Select */}
               <div className="space-y-2">
                 <Label>
                   Document Title <span className="text-red-500">*</span>
@@ -406,10 +489,7 @@ export default function EmployeeDocumentTab() {
                   onChange={setSelectedOption}
                   placeholder="Search or Select Document..."
                   styles={customSelectStyles}
-                  
                 />
-
-                {/* Custom Input for 'Other' */}
                 {selectedOption?.value === 'Other' && (
                   <div className="mt-2 duration-200 animate-in fade-in zoom-in-95">
                     <Input
@@ -423,74 +503,150 @@ export default function EmployeeDocumentTab() {
                 )}
               </div>
 
-              {/* File Upload Area */}
               <div className="space-y-2">
-                <Label>
-                  File Attachment <span className="text-red-500">*</span>
-                </Label>
+                <div className="flex items-center justify-between">
+                  <Label>
+                    File Attachment <span className="text-red-500">*</span>
+                  </Label>
+                  {!isCameraOpen && !capturedImagePreview && !uploadedDocUrl && !isUploading && (
+                     <Button 
+                       type="button" 
+                       variant="outline" 
+                       size="sm" 
+                       onClick={startCamera}
+                       className="text-xs font-medium"
+                     >
+                       <Camera className="mr-2 h-3.5 w-3.5" /> Take Photo
+                     </Button>
+                  )}
+                </div>
+
                 <input
                   ref={fileInputRef}
                   type="file"
                   onChange={handleFileSelect}
                   className="hidden"
-                  disabled={isUploading}
+                  disabled={isUploading || isCameraOpen || !!capturedImagePreview}
                 />
-                <div
-                  onClick={() => !isUploading && fileInputRef.current?.click()}
-                  className={`relative flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 text-center transition-colors
-                    ${
-                      isUploading
-                        ? 'cursor-wait border-blue-300 bg-blue-50'
-                        : uploadedDocUrl
-                          ? 'border-emerald-300 bg-emerald-50'
-                          : 'border-gray-200 bg-gray-50 hover:border-gray-400 hover:bg-gray-100'
-                    }`}
-                >
-                  {isUploading ? (
-                    <div className="flex flex-col items-center gap-2">
-                      <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-                      <p className="text-sm font-medium text-blue-700">
-                        Uploading...
-                      </p>
-                    </div>
-                  ) : uploadedDocUrl ? (
-                    <div className="flex flex-col items-center gap-2">
-                      <CheckCircle className="h-8 w-8 text-emerald-500" />
-                      <p className="text-sm font-medium text-emerald-700">
-                        File Ready
-                      </p>
-                      <p className="max-w-[200px] truncate text-xs text-emerald-600">
-                        {fileToUpload?.name || 'Existing File'}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setUploadedDocUrl(null);
-                          setFileToUpload(null);
-                        }}
-                        className="mt-1 text-xs font-semibold text-emerald-800 hover:underline"
+
+                {/* --- CAMERA / PREVIEW / DRAG & DROP AREA --- */}
+                {isCameraOpen ? (
+                  // State 1: Camera is ON
+                  <div className="relative flex flex-col items-center justify-center overflow-hidden rounded-lg bg-black text-center shadow-inner">
+                    <video 
+                      ref={videoRef} 
+                      autoPlay 
+                      playsInline 
+                      className="w-full h-auto max-h-[350px] object-cover" 
+                    />
+                    <canvas ref={canvasRef} className="hidden" />
+                    <div className="absolute bottom-4 flex gap-3">
+                      <Button 
+                        type="button" 
+                        variant="destructive" 
+                        size="sm"
+                        onClick={stopCamera}
                       >
-                        Remove & Replace
-                      </button>
+                        <X className="mr-1 h-4 w-4" /> Cancel
+                      </Button>
+                      <Button 
+                        type="button" 
+                        className="bg-white text-black hover:bg-gray-200 font-semibold"
+                        size="sm"
+                        onClick={capturePhoto}
+                      >
+                        <Camera className="mr-2 h-4 w-4" /> Capture
+                      </Button>
                     </div>
-                  ) : (
-                    <div className="flex flex-col items-center gap-2">
-                      <div className="rounded-full bg-white p-2 shadow-sm">
-                        <Upload className="h-5 w-5 text-gray-400" />
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        <span className="font-semibold text-theme">
-                          Click to upload
-                        </span>{' '}
-                        or drag and drop
-                      </div>
-                      <p className="text-xs text-gray-400">
-                        PDF, DOCX, JPG (Max 5MB)
-                      </p>
+                  </div>
+                ) : capturedImagePreview ? (
+                  // State 2: Photo captured, awaiting approval
+                  <div className="relative flex flex-col items-center justify-center overflow-hidden rounded-lg bg-gray-900 p-2 text-center shadow-inner">
+                    <img 
+                      src={capturedImagePreview} 
+                      alt="Captured Preview" 
+                      className="w-full h-auto max-h-[350px] rounded-md object-contain" 
+                    />
+                    <div className="absolute bottom-4 flex gap-3">
+                      <Button 
+                        type="button" 
+                        variant="secondary" 
+                        size="sm"
+                        onClick={retakePhoto}
+                        className="bg-white/90 text-gray-900 hover:bg-white backdrop-blur-sm"
+                      >
+                        <RefreshCw className="mr-2 h-4 w-4" /> Retake
+                      </Button>
+                      <Button 
+                        type="button" 
+                        className="bg-theme text-white hover:bg-theme/90 shadow-md"
+                        size="sm"
+                        onClick={acceptPhoto}
+                      >
+                        <Check className="mr-2 h-4 w-4" /> Accept & Upload
+                      </Button>
                     </div>
-                  )}
-                </div>
+                  </div>
+                ) : (
+                  // State 3: Default Upload View
+                  <div
+                    onClick={() => !isUploading && fileInputRef.current?.click()}
+                    className={`relative flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 text-center transition-colors
+                      ${
+                        isUploading
+                          ? 'cursor-wait border-blue-300 bg-blue-50'
+                          : uploadedDocUrl
+                            ? 'border-emerald-300 bg-emerald-50'
+                            : 'border-gray-200 bg-gray-50 hover:border-gray-400 hover:bg-gray-100'
+                      }`}
+                  >
+                    {isUploading ? (
+                      <div className="flex flex-col items-center gap-2">
+                        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                        <p className="text-sm font-medium text-blue-700">
+                          Uploading...
+                        </p>
+                      </div>
+                    ) : uploadedDocUrl ? (
+                      <div className="flex flex-col items-center gap-2">
+                        <CheckCircle className="h-8 w-8 text-emerald-500" />
+                        <p className="text-sm font-medium text-emerald-700">
+                          File Ready
+                        </p>
+                        <p className="max-w-[200px] truncate text-xs text-emerald-600">
+                          {fileToUpload?.name || 'Captured Image / Existing File'}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setUploadedDocUrl(null);
+                            setFileToUpload(null);
+                          }}
+                          className="mt-1 text-xs font-semibold text-emerald-800 hover:underline"
+                        >
+                          Remove & Replace
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="rounded-full bg-white p-2 shadow-sm">
+                          <Upload className="h-5 w-5 text-gray-400" />
+                        </div>
+                        <div className="text-sm text-gray-600">
+                          <span className="font-semibold text-theme">
+                            Click to upload
+                          </span>{' '}
+                          or drag and drop
+                        </div>
+                        <p className="text-xs text-gray-400">
+                          PDF, DOCX, JPG (Max 5MB)
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {uploadError && (
                   <p className="flex items-center gap-2 text-sm text-red-600">
                     <AlertCircle className="h-4 w-4" /> {uploadError}
@@ -498,7 +654,7 @@ export default function EmployeeDocumentTab() {
                 )}
               </div>
 
-              <DialogFooter>
+              <DialogFooter className='flex gap-2'>
                 <Button
                   type="button"
                   className="border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
@@ -527,7 +683,6 @@ export default function EmployeeDocumentTab() {
       {/* 2. Status Section */}
       {!isLoading && complianceStatus && (
         <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-          
           <div className="p-4">
             {complianceStatus.missingDocuments.length > 0 ? (
               <div className="flex flex-col gap-3">
@@ -576,10 +731,10 @@ export default function EmployeeDocumentTab() {
       )}
 
       {/* 3. Documents Table */}
-      <div className="overflow-hidden ">
+      <div className="overflow-hidden">
         {isLoading ? (
           <div className="flex h-40 items-center justify-center">
-           <BlinkingDots  size="large" color="bg-theme" />
+           <BlinkingDots size="large" color="bg-theme" />
           </div>
         ) : documents.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -600,9 +755,6 @@ export default function EmployeeDocumentTab() {
                 <TableHead className="w-[40%] font-semibold text-gray-900">
                   Document Title
                 </TableHead>
-                {/* <TableHead className="w-[20%] font-semibold text-gray-900">
-                  Type
-                </TableHead> */}
                 <TableHead className="w-[20%] font-semibold text-gray-900">
                   Uploaded At
                 </TableHead>
@@ -613,9 +765,6 @@ export default function EmployeeDocumentTab() {
             </TableHeader>
             <TableBody>
               {documents.map((doc) => {
-                const isRequired = REQUIRED_DOCUMENTS_LIST.includes(
-                  doc.documentTitle
-                );
                 return (
                   <TableRow key={doc._id} className="hover:bg-gray-50">
                     <TableCell>
@@ -628,20 +777,6 @@ export default function EmployeeDocumentTab() {
                         </span>
                       </div>
                     </TableCell>
-                    {/* <TableCell>
-                      {isRequired ? (
-                        <Badge className="bg-gray-900 text-white hover:bg-gray-800">
-                          Required
-                        </Badge>
-                      ) : (
-                        <Badge
-                          variant="outline"
-                          className="border-gray-300 text-gray-500"
-                        >
-                          Optional
-                        </Badge>
-                      )}
-                    </TableCell> */}
                     <TableCell className="text-sm text-gray-500">
                       {doc.createdAt
                         ? moment(doc.createdAt).format('DD MMM, YYYY')
