@@ -50,7 +50,9 @@ const formSchema = z
     shiftName: z.string().max(20, 'Max 20 characters').optional(),
     color: z.string().optional(),
     note: z.string().optional(),
-    slots: z.array(slotSchema)
+    slots: z.array(slotSchema),
+    byNotice: z.boolean().default(false),
+    byEmail: z.boolean().default(false), 
   })
   .superRefine((data, ctx) => {
     const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
@@ -116,7 +118,10 @@ export default function EditRotaSidebar({
       shiftName: '',
       color: '#2196f3',
       note: '',
-      slots: []
+      slots: [],
+      byNotice: false,
+      byEmail: false
+
     }
   });
 
@@ -129,20 +134,30 @@ export default function EditRotaSidebar({
   const isStandard = !watchLeaveType;
 
   // Collect all history entries across all rota slots, sorted latest first
+// Collect all history entries across all rota slots, sorted latest first
   const allHistory = (() => {
     const rotaArray = Array.isArray(rota) ? rota : rota ? [rota] : [];
     const entries: any[] = [];
+    const seen = new Set<string>(); // Keep track of unique history items
+
     rotaArray.forEach((r: any) => {
       if (r.history && r.history.length > 0) {
         r.history.forEach((h: any) => {
-          entries.push({
-            ...h,
-            // attach the slot's startDate for context if needed
-            slotDate: r.startDate
-          });
+          // Create a unique key using the message and timestamp
+          const uniqueKey = `${h.message}`;
+          
+          if (!seen.has(uniqueKey)) {
+            seen.add(uniqueKey);
+            entries.push({
+              ...h,
+              // attach the slot's startDate for context if needed
+              slotDate: r.startDate
+            });
+          }
         });
       }
     });
+    
     return entries.sort(
       (a, b) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -159,6 +174,8 @@ export default function EditRotaSidebar({
         leaveType: first.leaveType || '',
         shiftName: first.shiftName || '',
         color: first.color || '#2196f3',
+        byNotice: first.byNotice || false, 
+        byEmail: first.byEmail || false,   
         note: first.note || '',
         slots: rotaArray.map((r: any) => ({
           _id: r._id,
@@ -202,6 +219,8 @@ export default function EditRotaSidebar({
           startDate: startDateStr,
           endDate: endDateStr,
           note: values.note || '',
+          byNotice: values.byNotice, 
+          byEmail: values.byEmail,
           ...(isPublished ? { status: 'publish' } : {})
         };
 
@@ -678,6 +697,48 @@ export default function EditRotaSidebar({
                         )}
                       />
                     ))}
+                  </div>
+                </div>
+
+                <div className="space-y-3 border-t border-gray-100 pt-4">
+                  <label className="text-xs font-bold uppercase text-gray-900">
+                     Send Notification
+                  </label>
+                  <div className="flex gap-6 rounded-md border border-gray-100 bg-gray-50/50 p-4">
+                    <FormField
+                      control={form.control}
+                      name="byEmail"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center space-x-2 space-y-0">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                          <FormLabel className="cursor-pointer text-sm font-medium leading-none">
+                            By Email
+                          </FormLabel>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="byNotice"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center space-x-2 space-y-0">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                          <FormLabel className="cursor-pointer text-sm font-medium leading-none">
+                            By Notice
+                          </FormLabel>
+                        </FormItem>
+                      )}
+                    />
                   </div>
                 </div>
               </TabsContent>

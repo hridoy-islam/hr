@@ -150,7 +150,31 @@ const StaffDashboardPage = () => {
     fetchDashboardData();
   }, [eid]);
 
-  const groupedShifts = useMemo(() => groupShiftsByMonth(shifts), [shifts]);
+const groupedShifts = useMemo(() => {
+    const seen = new Set<string>();
+    
+    const uniqueShifts = shifts.filter((shift) => {
+      let key = '';
+
+      if (shift.leaveType) {
+        // 1. IF IT'S A LEAVE: Deduplicate by Date and Leave Type
+        // This fixes the multiple identical "DO" (Day Off) issue
+        key = `leave_${shift.startDate}_${shift.leaveType}`;
+      } else {
+        // 2. IF IT'S A REGULAR SHIFT: Include times so we don't delete valid multiple shifts in one day
+        key = `work_${shift.startDate}_${shift.startTime}_${shift.endTime}_${shift.shiftName}`;
+      }
+      
+      if (seen.has(key)) {
+        return false; // Skip duplicate
+      }
+      
+      seen.add(key);
+      return true; // Keep unique
+    });
+
+    return groupShiftsByMonth(uniqueShifts);
+  }, [shifts]);
 
   // --- Download QR Code Logic ---
   const downloadQRCode = () => {
@@ -458,7 +482,7 @@ const StaffDashboardPage = () => {
                     </Badge>
                   </div>
 
-                  <p className="mb-3 line-clamp-3 text-sm leading-relaxed text-slate-700">
+                  <p className="mb-3 line-clamp-3 text-xs leading-relaxed text-slate-800 font-medium">
                     {notice.noticeDescription}
                   </p>
 
