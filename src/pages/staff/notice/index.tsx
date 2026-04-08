@@ -65,7 +65,7 @@ export default function StaffNoticeBoard() {
 
   useEffect(() => {
     fetchNotices();
-  }, [entriesPerPage,currentPage]);
+  }, [entriesPerPage, currentPage]);
 
   const getNoticeTypeStyle = (type: string) => {
     const normalizedType = type.toLowerCase();
@@ -166,7 +166,7 @@ export default function StaffNoticeBoard() {
                     </p>
 
                     {/* Posted by */}
-                    {notice.noticeBy && (
+                    {/* {notice.noticeBy && (
                       <div className="flex items-center gap-1.5 text-xs">
                         <UserIcon className="h-3.5 w-3.5 text-slate-400" />
                         <span className="font-semibold text-theme">
@@ -176,7 +176,14 @@ export default function StaffNoticeBoard() {
                             : notice.noticeBy?.name}
                         </span>
                       </div>
-                    )}
+                  {/* )} */}
+                    <div className="flex items-center gap-1.5 text-xs text-slate-800">
+                      <Calendar className="h-3.5 w-3.5" />
+                      <span>
+                        {moment(notice.noticeDate).format('DD MMM YYYY')} at{' '}
+                        {moment(notice.noticeDate).format('h:mm A')}
+                      </span>
+                    </div>
                   </div>
                 </Card>
               ))}

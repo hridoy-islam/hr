@@ -494,7 +494,7 @@ const groupedShifts = useMemo(() => {
                       </span>
                     </div>
 
-                    {notice.noticeBy && (
+                    {/* {notice.noticeBy && (
                       <div className="flex items-center gap-1.5 text-[11px]">
                         <UserIcon className="h-3 w-3 text-slate-500" />
                         <span className="font-medium text-slate-500">
@@ -504,7 +504,7 @@ const groupedShifts = useMemo(() => {
                             : notice.noticeBy?.name}
                         </span>
                       </div>
-                    )}
+                    )} */}
                   </div>
                 </Card>
               ))
