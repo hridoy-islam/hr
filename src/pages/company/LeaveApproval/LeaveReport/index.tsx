@@ -73,6 +73,8 @@ interface ReportResult {
   dateRangeSummary: DateRangeSummary;
 }
 
+
+
 // --- PDF Styles ---
 const pdfStyles = StyleSheet.create({
   page: { padding: 30, fontSize: 10, fontFamily: 'Helvetica' },
@@ -134,8 +136,17 @@ const ReportPDF = ({
       <Text style={pdfStyles.header}>{companyName}</Text>
       <Text style={pdfStyles.subHeader}>
         Holiday Year: {holidayYear} | Period:{' '}
-        {moment(startDate).format('DD MMM YYYY')} -{' '}
-        {moment(endDate).format('DD MMM YYYY')}
+     {new Date(startDate).toLocaleDateString('en-GB', {
+  day: '2-digit',
+  month: 'short',
+  year: 'numeric',
+})} -{' '}
+{new Date(endDate).toLocaleDateString('en-GB', {
+  day: '2-digit',
+  month: 'short',
+  year: 'numeric',
+ 
+})}
       </Text>
 
       <View style={pdfStyles.table}>
@@ -225,6 +236,12 @@ const generateHolidayYears = (backward = 20, forward = 50) => {
   }
   return years;
 };
+ const formatLocalDate = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
 
 // --- New Helper to extract April 1 to March 31 from a year string ---
 const getDatesFromHolidayYear = (yearStr: string): [Date, Date] => {
@@ -256,12 +273,7 @@ const LeaveReportPage: React.FC = () => {
     []
   );
 
-  const formatLocalDate = (date: Date) => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
+  
 
   const [defaultStartDate, defaultEndDate] = getDatesFromHolidayYear(currentYearStr);
 
