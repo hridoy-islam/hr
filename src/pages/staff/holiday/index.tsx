@@ -708,7 +708,7 @@ const HolidayPage: React.FC = () => {
                             placeholderText="Select start and end date"
                             className={`w-full rounded border px-3 py-2 ${formErrors.dateRange ? 'border-red-500' : 'border-gray-300'}`}
                             dateFormat="dd-MM-yyyy"
-                            minDate={new Date()}
+                           
                           />
                           {formErrors.dateRange && (
                             <p className="mt-1 text-xs text-red-500">

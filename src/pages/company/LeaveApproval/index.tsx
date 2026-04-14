@@ -662,15 +662,17 @@ const CompanyLeaveApprovalPage: React.FC = () => {
 
           if (record) {
             setAllowance({
+              carryForward: record.carryForward || 0,
+              holidayEntitlement: record.holidayEntitlement || 0,
               holidayAllowance: record.holidayAllowance || 0,
               holidayAccured: record.holidayAccured || 0,
               usedHours: record.usedHours || 0,
               bookedHours: record.bookedHours || 0,
               requestedHours: record.requestedHours || 0,
+              remainingHours: record.remainingHours || 0,
               unpaidLeaveTaken: record.unpaidLeaveTaken || 0,
               unpaidBookedHours: record.unpaidBookedHours || 0,
-              unpaidLeaveRequest: record.unpaidLeaveRequest || 0,
-              remainingHours: record.remainingHours || 0
+              unpaidLeaveRequest: record.unpaidLeaveRequest || 0
             });
           }
         } catch (err) {
@@ -685,81 +687,113 @@ const CompanyLeaveApprovalPage: React.FC = () => {
     const allowanceStatsList = allowance
       ? [
           {
+            label: 'Carry Forward From Last Year',
+            value: allowance.carryForward,
+            color: 'text-gray-900',
+            labelClass: 'text-gray-500'
+          },
+          {
+            label: 'Present Year Holiday Entitlement',
+            value: allowance.holidayEntitlement,
+            color: 'text-gray-900',
+            labelClass: 'text-gray-500'
+          },
+          {
             label: 'Opening This Year',
             value: allowance.holidayAllowance,
-            color: 'text-gray-800'
+            color: 'text-red-700',
+            labelClass: 'text-gray-500'
           },
           {
             label: 'Holiday Accrued',
             value: allowance.holidayAccured,
-            color: 'text-gray-800'
+            color: 'text-gray-900',
+            labelClass: 'text-gray-500'
           },
           {
             label: 'Taken',
             value: allowance.usedHours,
-            color: 'text-green-600'
+            color: 'text-green-600',
+            labelClass: 'text-gray-500'
           },
           {
             label: 'Booked',
             value: allowance.bookedHours,
-            color: 'text-orange-600'
+            color: 'text-orange-600',
+            labelClass: 'text-gray-500'
           },
           {
             label: 'Requested',
             value: allowance.requestedHours,
-            color: 'text-yellow-600'
+            color: 'text-yellow-500',
+            labelClass: 'text-gray-500'
+          },
+          {
+            label: 'Balance Remaining',
+            value: allowance.remainingHours,
+            color: 'text-red-700',
+            labelClass: 'font-bold text-gray-900'
           },
           {
             label: 'Unpaid Leave Taken',
             value: allowance.unpaidLeaveTaken,
-            color: 'text-cyan-600'
+            color: 'text-cyan-500',
+            labelClass: 'text-gray-500'
           },
           {
             label: 'Unpaid Booked',
             value: allowance.unpaidBookedHours,
-            color: 'text-blue-600'
+            color: 'text-blue-600',
+            labelClass: 'text-gray-500'
           },
           {
             label: 'Unpaid Requested',
             value: allowance.unpaidLeaveRequest,
-            color: 'text-theme'
+            color: 'text-blue-600',
+            labelClass: 'text-gray-500'
           }
         ]
       : [];
 
     return (
-      <div className="max-w-xs space-y-3 rounded-lg bg-white p-3 shadow-lg">
-        <div className="flex items-center space-x-2">
-          <User className="h-4 w-4 " />
-          <span className="font-semibold">
+      <div className="w-auto space-y-3 rounded-lg bg-white p-1 shadow-lg">
+        {/* Optional Header mapping to User Details. It was not in the immediate crop but helps context. */}
+        <div className="flex hidden items-center space-x-2 border-b border-gray-100 px-2 pb-2 pt-1">
+          <User className="h-4 w-4" />
+          <span className="font-semibold text-gray-800">
             {request.userId?.firstName} {request.userId?.lastName}
           </span>
         </div>
-        <div className="space-y-2 rounded-md bg-blue-50 p-3 text-sm">
-          <h4 className="font-semibold text-blue-900">
-            Leave Allowance ({currentYear})
-          </h4>
+
+        <div className="px-3 pb-2 text-[13px]">
           {loading ? (
-            <div className="flex justify-center py-2">
-              <BlinkingDots size="small" color="bg-blue-600" />
+            <div className="flex justify-center py-4">
+              <BlinkingDots size="small" color="bg-theme" />
             </div>
           ) : allowance ? (
-            <div className="space-y-1">
-              {allowanceStatsList.map(({ label, value, color }) => (
-                <div key={label} className="flex justify-between">
-                  <span className="text-gray-600">{label}:</span>
-                  <span className={`font-medium ${color}`}>
-                    {value.toFixed(1)} h
-                  </span>
-                </div>
-              ))}
-              <div className="flex justify-between border-t border-gray-300 pt-1 font-bold text-theme">
-                <span>Balance Remaining:</span>
-                <span>{allowance.remainingHours.toFixed(1)} h</span>
-              </div>
+            <div className="flex flex-col">
+              {allowanceStatsList.map(
+                ({ label, value, color, labelClass }, index) => (
+                  <div
+                    key={label}
+                    className={`flex items-center justify-between py-[10px] ${
+                      index !== allowanceStatsList.length - 1
+                        ? 'border-b border-gray-200'
+                        : ''
+                    }`}
+                  >
+                    <span className={labelClass}>{label}</span>
+                    <span className={`font-semibold ${color}`}>
+                      {value.toFixed(2)} h
+                    </span>
+                  </div>
+                )
+              )}
             </div>
           ) : (
-            <div className="text-center ">No data</div>
+            <div className="py-4 text-center text-gray-500">
+              No data available
+            </div>
           )}
         </div>
       </div>
@@ -777,232 +811,235 @@ const CompanyLeaveApprovalPage: React.FC = () => {
                 Leave Requests
               </div>
               <div>
-                {/* ── CREATE LEAVE SHEET ── */}
-                <Sheet open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
-                  <SheetTrigger asChild>
-                    <Button size={'sm'} className="font-bold">
-                      Create Leave Request
-                    </Button>
-                  </SheetTrigger>
+                <div className="flex gap-2">
+                  {/* ── CREATE LEAVE SHEET ── */}
+                  <Sheet open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
+                    <SheetTrigger asChild>
+                      <Button className="">Create Leave Request</Button>
+                    </SheetTrigger>
 
-                  <SheetContent className="overflow-y-auto sm:max-w-[450px]">
-                    <SheetHeader className="mb-6">
-                      <SheetTitle className="flex items-center gap-2">
-                        <CheckCircle className="h-5 w-5 text-theme" />
-                        Submit Leave Request
-                      </SheetTitle>
-                    </SheetHeader>
+                    <SheetContent className="overflow-y-auto sm:max-w-[450px]">
+                      <SheetHeader className="mb-6">
+                        <SheetTitle className="flex items-center gap-2">
+                          <CheckCircle className="h-5 w-5 text-theme" />
+                          Submit Leave Request
+                        </SheetTitle>
+                      </SheetHeader>
 
-                    <div className="space-y-5">
-                      {/* Employee Selection */}
-                      <div>
-                        <Label className="mb-1 block">Employee</Label>
-                        <ReactSelect
-                          options={employeeOptions}
-                          value={createSelectedEmployee}
-                          onChange={(opt) => {
-                            setCreateSelectedEmployee(opt);
-                            clearError('employee');
-                          }}
-                          placeholder="Select Employee..."
-                          isClearable
-                          styles={selectStyles}
-                        />
-                        {formErrors.employee && (
-                          <p className="mt-1 text-xs text-red-500">
-                            {formErrors.employee}
-                          </p>
-                        )}
-                      </div>
+                      <div className="space-y-5">
+                        {/* Employee Selection */}
+                        <div>
+                          <Label className="mb-1 block">Employee</Label>
+                          <ReactSelect
+                            options={employeeOptions}
+                            value={createSelectedEmployee}
+                            onChange={(opt) => {
+                              setCreateSelectedEmployee(opt);
+                              clearError('employee');
+                            }}
+                            placeholder="Select Employee..."
+                            isClearable
+                            styles={selectStyles}
+                          />
+                          {formErrors.employee && (
+                            <p className="mt-1 text-xs text-red-500">
+                              {formErrors.employee}
+                            </p>
+                          )}
+                        </div>
 
-                      {/* Holiday Year */}
-                      <div>
-                        <Label htmlFor="holiday-year">Holiday Year</Label>
-                        <ShadcnSelect
-                          value={selectedYear}
-                          onValueChange={(val) => {
-                            setSelectedYear(val);
-                            clearError('holidayYear');
-                          }}
-                        >
-                          <SelectTrigger
-                            id="holiday-year"
-                            className={
-                              formErrors.holidayYear ? 'border-red-500' : ''
-                            }
+                        {/* Holiday Year */}
+                        <div>
+                          <Label htmlFor="holiday-year">Holiday Year</Label>
+                          <ShadcnSelect
+                            value={selectedYear}
+                            onValueChange={(val) => {
+                              setSelectedYear(val);
+                              clearError('holidayYear');
+                            }}
                           >
-                            <SelectValue placeholder="Select year" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {holidayYears.map((year) => (
-                              <SelectItem key={year} value={year}>
-                                {year}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </ShadcnSelect>
-                        {formErrors.holidayYear && (
-                          <p className="mt-1 text-xs text-red-500">
-                            {formErrors.holidayYear}
-                          </p>
-                        )}
-                      </div>
+                            <SelectTrigger
+                              id="holiday-year"
+                              className={
+                                formErrors.holidayYear ? 'border-red-500' : ''
+                              }
+                            >
+                              <SelectValue placeholder="Select year" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {holidayYears.map((year) => (
+                                <SelectItem key={year} value={year}>
+                                  {year}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </ShadcnSelect>
+                          {formErrors.holidayYear && (
+                            <p className="mt-1 text-xs text-red-500">
+                              {formErrors.holidayYear}
+                            </p>
+                          )}
+                        </div>
 
-                      {/* Reason */}
-                      <div>
-                        <Label htmlFor="create-reason">Reason</Label>
-                        <Textarea
-                          id="create-reason"
-                          placeholder="Enter reason for leave"
-                          value={createReason}
-                          onChange={(e) => {
-                            setCreateReason(e.target.value);
-                            clearError('reason');
-                          }}
-                          className={`border-gray-300 ${formErrors.reason ? 'border-red-500' : ''}`}
-                        />
-                        {formErrors.reason && (
-                          <p className="mt-1 text-xs text-red-500">
-                            {formErrors.reason}
-                          </p>
-                        )}
-                      </div>
+                        {/* Reason */}
+                        <div>
+                          <Label htmlFor="create-reason">Reason</Label>
+                          <Textarea
+                            id="create-reason"
+                            placeholder="Enter reason for leave"
+                            value={createReason}
+                            onChange={(e) => {
+                              setCreateReason(e.target.value);
+                              clearError('reason');
+                            }}
+                            className={`border-gray-300 ${formErrors.reason ? 'border-red-500' : ''}`}
+                          />
+                          {formErrors.reason && (
+                            <p className="mt-1 text-xs text-red-500">
+                              {formErrors.reason}
+                            </p>
+                          )}
+                        </div>
 
-                      {/* Holiday Type */}
-                      <div>
-                        <Label htmlFor="type" className="mb-1 block">
-                          Holiday Type
-                        </Label>
-                        <ReactSelect
-                          inputId="type"
-                          options={leaveTypeOptions}
-                          value={
-                            leaveTypeOptions.find(
-                              (opt) => opt.value === selectedType
-                            ) || null
-                          }
-                          onChange={(option) => {
-                            setSelectedType(option?.value || '');
-                            clearError('holidayType');
-                          }}
-                          placeholder="Select type"
-                          className="react-select-container"
-                          classNamePrefix="react-select"
-                          styles={{
-                            control: (base) => ({
-                              ...base,
-                              borderColor: formErrors.holidayType
-                                ? '#ef4444'
-                                : base.borderColor,
-                              '&:hover': {
+                        {/* Holiday Type */}
+                        <div>
+                          <Label htmlFor="type" className="mb-1 block">
+                            Holiday Type
+                          </Label>
+                          <ReactSelect
+                            inputId="type"
+                            options={leaveTypeOptions}
+                            value={
+                              leaveTypeOptions.find(
+                                (opt) => opt.value === selectedType
+                              ) || null
+                            }
+                            onChange={(option) => {
+                              setSelectedType(option?.value || '');
+                              clearError('holidayType');
+                            }}
+                            placeholder="Select type"
+                            className="react-select-container"
+                            classNamePrefix="react-select"
+                            styles={{
+                              control: (base) => ({
+                                ...base,
                                 borderColor: formErrors.holidayType
                                   ? '#ef4444'
-                                  : base.borderColor
+                                  : base.borderColor,
+                                '&:hover': {
+                                  borderColor: formErrors.holidayType
+                                    ? '#ef4444'
+                                    : base.borderColor
+                                }
+                              })
+                            }}
+                          />
+                          {formErrors.holidayType && (
+                            <p className="mt-1 text-xs text-red-500">
+                              {formErrors.holidayType}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Date Range Picker */}
+                        <div className="flex flex-col gap-1">
+                          <Label>Leave Period (DD-MM-YYYY)</Label>
+                          <DatePicker
+                            selectsRange
+                            startDate={createStartDate}
+                            endDate={createEndDate}
+                            onChange={(dates) => {
+                              const [start, end] = dates;
+                              setCreateStartDate(start ?? undefined);
+                              setCreateEndDate(end ?? undefined);
+                              clearError('dateRange');
+
+                              // Auto calculate total days and hours
+                              if (start && end) {
+                                const daysDiff =
+                                  moment(end).diff(moment(start), 'days') + 1;
+                                const validDays = Math.max(1, daysDiff);
+                                setCalculatedDays(String(validDays));
+                                setCalculatedHours(String(validDays * 8));
+                              } else if (start && !end) {
+                                setCalculatedDays('1');
+                                setCalculatedHours('8');
+                              } else {
+                                setCalculatedDays('');
+                                setCalculatedHours('');
                               }
-                            })
-                          }}
-                        />
-                        {formErrors.holidayType && (
-                          <p className="mt-1 text-xs text-red-500">
-                            {formErrors.holidayType}
-                          </p>
-                        )}
+                            }}
+                            isClearable
+                            placeholderText="Select start and end date"
+                            className={`w-full rounded border px-3 py-2 ${formErrors.dateRange ? 'border-red-500' : 'border-gray-300'}`}
+                            dateFormat="dd-MM-yyyy"
+                          />
+                          {formErrors.dateRange && (
+                            <p className="mt-1 text-xs text-red-500">
+                              {formErrors.dateRange}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Total Days */}
+                        <div className="space-y-1">
+                          <Label htmlFor="duration-days">
+                            Holiday Duration (Days)
+                          </Label>
+                          <Input
+                            id="duration-days"
+                            type="number"
+                            min="1"
+                            step="1"
+                            value={calculatedDays}
+                            onChange={handleDaysChange}
+                            placeholder="e.g. 2"
+                            className={`bg-white ${formErrors.totalDays ? 'border-red-500' : ''}`}
+                          />
+                          {formErrors.totalDays && (
+                            <p className="text-xs text-red-500">
+                              {formErrors.totalDays}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Total Hours */}
+                        <div className="space-y-1">
+                          <Label htmlFor="duration-hours">
+                            Duration (Hours)
+                          </Label>
+                          <Input
+                            id="duration-hours"
+                            type="number"
+                            min="1"
+                            step="0.5"
+                            value={calculatedHours}
+                            onChange={handleHoursChange}
+                            placeholder="e.g. 16"
+                            className={`bg-white ${formErrors.totalHours ? 'border-red-500' : ''}`}
+                          />
+                          {formErrors.totalHours && (
+                            <p className="text-xs text-red-500">
+                              {formErrors.totalHours}
+                            </p>
+                          )}
+                        </div>
+
+                        <Button
+                          onClick={handleSubmitRequest}
+                          className="mt-4 w-full bg-theme text-white hover:bg-theme/90"
+                          disabled={isSubmitting}
+                        >
+                          <Calendar className="mr-2 h-4 w-4" />
+                          {isSubmitting ? 'Submitting...' : 'Submit Request'}
+                        </Button>
                       </div>
+                    </SheetContent>
+                  </Sheet>
 
-                      {/* Date Range Picker */}
-                      <div className="flex flex-col gap-1">
-                        <Label>Leave Period (DD-MM-YYYY)</Label>
-                        <DatePicker
-                          selectsRange
-                          startDate={createStartDate}
-                          endDate={createEndDate}
-                          onChange={(dates) => {
-                            const [start, end] = dates;
-                            setCreateStartDate(start ?? undefined);
-                            setCreateEndDate(end ?? undefined);
-                            clearError('dateRange');
-
-                            // Auto calculate total days and hours
-                            if (start && end) {
-                              const daysDiff =
-                                moment(end).diff(moment(start), 'days') + 1;
-                              const validDays = Math.max(1, daysDiff);
-                              setCalculatedDays(String(validDays));
-                              setCalculatedHours(String(validDays * 8));
-                            } else if (start && !end) {
-                              setCalculatedDays('1');
-                              setCalculatedHours('8');
-                            } else {
-                              setCalculatedDays('');
-                              setCalculatedHours('');
-                            }
-                          }}
-                          isClearable
-                          placeholderText="Select start and end date"
-                          className={`w-full rounded border px-3 py-2 ${formErrors.dateRange ? 'border-red-500' : 'border-gray-300'}`}
-                          dateFormat="dd-MM-yyyy"
-                          minDate={new Date()}
-                        />
-                        {formErrors.dateRange && (
-                          <p className="mt-1 text-xs text-red-500">
-                            {formErrors.dateRange}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Total Days */}
-                      <div className="space-y-1">
-                        <Label htmlFor="duration-days">
-                          Holiday Duration (Days)
-                        </Label>
-                        <Input
-                          id="duration-days"
-                          type="number"
-                          min="1"
-                          step="1"
-                          value={calculatedDays}
-                          onChange={handleDaysChange}
-                          placeholder="e.g. 2"
-                          className={`bg-white ${formErrors.totalDays ? 'border-red-500' : ''}`}
-                        />
-                        {formErrors.totalDays && (
-                          <p className="text-xs text-red-500">
-                            {formErrors.totalDays}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Total Hours */}
-                      <div className="space-y-1">
-                        <Label htmlFor="duration-hours">Duration (Hours)</Label>
-                        <Input
-                          id="duration-hours"
-                          type="number"
-                          min="1"
-                          step="0.5"
-                          value={calculatedHours}
-                          onChange={handleHoursChange}
-                          placeholder="e.g. 16"
-                          className={`bg-white ${formErrors.totalHours ? 'border-red-500' : ''}`}
-                        />
-                        {formErrors.totalHours && (
-                          <p className="text-xs text-red-500">
-                            {formErrors.totalHours}
-                          </p>
-                        )}
-                      </div>
-
-                      <Button
-                        onClick={handleSubmitRequest}
-                        className="mt-4 w-full bg-theme text-white hover:bg-theme/90"
-                        disabled={isSubmitting}
-                      >
-                        <Calendar className="mr-2 h-4 w-4" />
-                        {isSubmitting ? 'Submitting...' : 'Submit Request'}
-                      </Button>
-                    </div>
-                  </SheetContent>
-                </Sheet>
+                  <Button variant={'outline'} onClick={()=> navigate('leave-report')}>Report</Button>
+                </div>
               </div>
             </CardTitle>
           </CardHeader>

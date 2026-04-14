@@ -105,6 +105,8 @@ import ManageHolidayPage from '@/pages/company/ManageHoliday';
 import { useSelector } from 'react-redux';
 import CompanyDocusignDetailsPage from '@/pages/company/companyDocusignDetails';
 import StaffRequestDocumentPage from '@/pages/staff/requestDocument';
+import SignatureDocumentDetail from '@/pages/company/SignatureDoc/DetailDocument';
+import LeaveReportPage from '@/pages/company/LeaveApproval/LeaveReport';
 
 const SignInPage = lazy(() => import('@/pages/auth/signin'));
 
@@ -292,9 +294,11 @@ export default function AppRouter() {
         { path: 'bank-holiday', element: <BankHolidayPage /> },
         { path: 'schedule-check', element: <CompanyScheduleCheckPage /> },
         { path: 'leave-approval', element: <CompanyLeaveApprovalPage /> },
+        { path: 'leave-approval/leave-report', element: <LeaveReportPage /> },
         { path: 'attendance-account', element: <AttendanceAccountPage /> },
         { path: 'service-user', element: <ServiceUserPage /> },
         { path: 'signature-document', element: <SignatureDoc /> },
+        { path: 'signature-document/details', element: <SignatureDocumentDetail /> },
         { path: 'company-admin', element: <CompanyAdminPage /> },
         {
           path: 'company-admin/:caid/access-control',

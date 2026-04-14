@@ -34,7 +34,7 @@ interface SignatureDoc {
   employeeId: any; 
   companyId: string;
   approverIds?: any[]; 
-  signedByApprovers?: any[]; // 🚀 NEW: Added to track who has signed
+  signedBy?: any[]; 
   envelopeId?: string | null;
   signedDocument?: string;
   status: 'pending' | 'submitted' | 'forwarded' | 'completed' | 'rejected';
@@ -61,30 +61,18 @@ function SignatureDocumentTab() {
   const fetchDocuments = async (page: number, limit: number) => {
     if (!eid) return;
     try {
-      const [resEmployee, resApprover] = await Promise.all([
-        axiosInstance.get(`/signature-documents`, {
-          params: { employeeId: eid, companyId: id, page, limit }
-        }),
-        axiosInstance.get(`/signature-documents`, {
-          params: { approverIds: eid, companyId: id, page, limit }
-        })
-      ]);
+      const res = await axiosInstance.get(`/signature-documents`, {
+        params: { employeeId: eid, approverIds: eid, companyId: id, page, limit }
+      });
 
-      const empDocs = resEmployee.data?.data?.result || resEmployee.data || [];
-      const appDocs = resApprover.data?.data?.result || resApprover.data || [];
+      const docs = res.data?.data?.result || res.data || [];
 
-      const allDocsMap = new Map();
-      [...empDocs, ...appDocs].forEach((doc) => allDocsMap.set(doc._id, doc));
-      
-      const combinedDocs = Array.from(allDocsMap.values());
-      
-      combinedDocs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      docs.sort((a: SignatureDoc, b: SignatureDoc) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
 
-      setDocuments(combinedDocs);
-
-      const empPages = resEmployee?.data?.data?.meta?.totalPage || 1;
-      const appPages = resApprover?.data?.data?.meta?.totalPage || 1;
-      setTotalPages(Math.max(empPages, appPages));
+      setDocuments(docs);
+      setTotalPages(res?.data?.data?.meta?.totalPage || 1);
     } catch (err) {
       console.error('Error fetching signature documents:', err);
       if (!isProcessingSignature) {
@@ -132,10 +120,11 @@ function SignatureDocumentTab() {
   useEffect(() => {
     if (!isProcessingSignature || documents.length === 0) return;
     const justSignedDoc = documents.find((doc) => {
-      if (doc.status !== 'submitted') return false;
+      if (doc.status !== 'submitted' && doc.status !== 'completed') return false;
       const updatedTime = moment(doc.submittedAt || doc.updatedAt);
       return moment().diff(updatedTime, 'seconds') < 120;
     });
+    
     if (justSignedDoc) {
       setIsProcessingSignature(false);
       toast({
@@ -156,7 +145,7 @@ function SignatureDocumentTab() {
     try {
       const response = await axiosInstance.post(
         `/signature-documents/initiate-signing/${signatureDocId}`,
-        { signerId: eid,layout:'adminLayout' } 
+        { signerId: eid, layout: 'adminLayout' } 
       );
       const signingUrl = response.data?.data?.signingUrl || response.data?.signingUrl;
       if (signingUrl) {
@@ -209,6 +198,7 @@ function SignatureDocumentTab() {
           <TableHeader>
             <TableRow>
               <TableHead>Document Details</TableHead>
+              <TableHead>Recipient</TableHead>
               <TableHead>Date Requested</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
@@ -217,7 +207,7 @@ function SignatureDocumentTab() {
           <TableBody>
             {documents.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="py-12 text-center text-gray-500">
+                <TableCell colSpan={4} className="py-12 text-center text-gray-500">
                   <div className="flex flex-col items-center justify-center gap-2">
                     <FileText className="h-8 w-8 text-gray-300" />
                     <p>No signature documents found.</p>
@@ -226,15 +216,58 @@ function SignatureDocumentTab() {
               </TableRow>
             ) : (
               documents.map((doc) => {
-                const isEmployee = typeof doc.employeeId === 'string' 
-                  ? doc.employeeId === eid 
-                  : doc.employeeId?._id === eid;
+                // 1. Identify the Employee ID
+                const empIdStr = typeof doc.employeeId === 'string' 
+                  ? doc.employeeId 
+                  : doc.employeeId?._id;
+                
+                const isEmployee = empIdStr === eid;
 
-                // 🚀 NEW: Safely check if the current user's eid is in the signedByApprovers array
-                const hasAlreadySigned = doc.signedByApprovers?.some((approver: any) => {
-                  const idToCheck = typeof approver === 'string' ? approver : approver?._id;
-                  return idToCheck === eid;
-                }) || false;
+                // 2. Identify who has already signed
+                const signedUserIds = doc.signedBy?.map((s: any) => 
+                  typeof s.userId === 'string' ? s.userId : s.userId?._id
+                ) || [];
+
+                const hasAlreadySigned = signedUserIds.includes(eid);
+                const employeeHasSigned = signedUserIds.includes(empIdStr);
+
+                // 3. Identify if current user is an approver
+                const approverMatch = doc.approverIds?.find((app: any) => {
+                  const appIdStr = typeof app.userId === 'string' ? app.userId : app.userId?._id;
+                  return appIdStr === eid;
+                });
+
+                // 4. LOGIC: Is it my turn to sign?
+                let isMyTurn = false;
+
+                if (!hasAlreadySigned && doc.status !== 'completed') {
+                  if (isEmployee) {
+                    // Employee goes first
+                    isMyTurn = true;
+                  } else if (approverMatch) {
+                    // Approver logic
+                    if (employeeHasSigned) {
+                      // Check if any approvers with a lower index HAVEN'T signed yet
+                      const waitingOnPrevious = doc.approverIds?.some((app: any) => {
+                        const previousAppIdStr = typeof app.userId === 'string' ? app.userId : app.userId?._id;
+                        return app.index < approverMatch.index && !signedUserIds.includes(previousAppIdStr);
+                      });
+
+                      if (!waitingOnPrevious) {
+                        isMyTurn = true; // Employee signed, and all previous approvers signed
+                      }
+                    }
+                  }
+                }
+
+                // 🚀 NEW UI Logic for displayed Status
+                let displayStatus = doc.status;
+
+                if (doc.status === 'completed') {
+                  displayStatus = 'completed'; // If it's completely done, show completed
+                } else if (!hasAlreadySigned) {
+                  displayStatus = 'pending'; // If the current user hasn't signed it yet, show pending
+                }
 
                 return (
                   <TableRow key={doc._id} className="hover:bg-gray-50">
@@ -256,7 +289,9 @@ function SignatureDocumentTab() {
                       </div>
                     </TableCell>
 
-                  
+                    <TableCell>
+                      {doc?.employeeId?.firstName} {doc?.employeeId?.lastName}
+                    </TableCell>
                     <TableCell>
                       <span className="text-sm text-gray-600">
                         {moment(doc.createdAt).format('DD MMM YYYY')}
@@ -267,26 +302,26 @@ function SignatureDocumentTab() {
                       <Badge
                         className={cn(
                           'px-2.5 py-0.5 text-xs font-medium',
-                          doc.status === 'completed' ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-100' :
-                          doc.status === 'submitted' ? 'bg-green-100 text-green-800 hover:bg-green-100' :
-                          doc.status === 'forwarded' ? 'bg-orange-100 text-orange-800 hover:bg-orange-100' :
+                          displayStatus === 'completed' ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-100' :
+                          displayStatus === 'submitted' ? 'bg-green-100 text-green-800 hover:bg-green-100' :
+                          displayStatus === 'forwarded' ? 'bg-orange-100 text-orange-800 hover:bg-orange-100' :
                           'bg-amber-100 text-amber-800 hover:bg-amber-100'
                         )}
                       >
-                        {doc.status === 'completed' && <CheckCircle2 className="mr-1 h-3 w-3 inline" />}
-                        {doc.status === 'submitted' && <CheckCircle2 className="mr-1 h-3 w-3 inline" />}
-                        {doc.status === 'forwarded' && <Clock className="mr-1 h-3 w-3 inline" />}
-                        {doc.status === 'pending' && <Clock className="mr-1 h-3 w-3 inline" />}
+                        {displayStatus === 'completed' && <CheckCircle2 className="mr-1 h-3 w-3 inline" />}
+                        {displayStatus === 'submitted' && <CheckCircle2 className="mr-1 h-3 w-3 inline" />}
+                        {displayStatus === 'forwarded' && <Clock className="mr-1 h-3 w-3 inline" />}
+                        {displayStatus === 'pending' && <Clock className="mr-1 h-3 w-3 inline" />}
                         
-                        <span className="capitalize">{doc.status}</span>
+                        <span className="capitalize">{displayStatus}</span>
                       </Badge>
                     </TableCell>
 
                     <TableCell className="text-right">
                       <div className="flex justify-end items-center gap-2">
                         
-                        {/* 🚀 Updated Logic: Hide button if hasAlreadySigned is TRUE */}
-                        {((doc.status === 'pending' && isEmployee) || (doc.status === 'forwarded' && !isEmployee)) && !hasAlreadySigned && (
+                        {/* 🚀 Render Button ONLY if it is the user's explicit turn */}
+                        {isMyTurn && (
                           <Button
                             onClick={() => handleSignDocument(doc._id)}
                             disabled={signingDocId === doc._id}
@@ -306,15 +341,8 @@ function SignatureDocumentTab() {
                           </Button>
                         )}
 
-                        {/* Shows a friendly badge to let them know their signature was received, but others are pending */}
-                        {/* {doc.status === 'forwarded' && !isEmployee && hasAlreadySigned && (
-                          <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50 mr-2">
-                            <CheckCircle2 className="mr-1 h-3 w-3 inline" /> You Signed
-                          </Badge>
-                        )} */}
-
                         {/* Always show signed/completed document if it exists */}
-                        {doc.signedDocument && (
+                        {doc.signedDocument && hasAlreadySigned && (
                           <Button
                             onClick={() => window.open(doc.signedDocument, '_blank')}
                             size="sm"
