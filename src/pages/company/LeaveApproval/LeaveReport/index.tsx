@@ -372,6 +372,7 @@ const LeaveReportPage: React.FC = () => {
                 onChange={(update) => setDateRange(update)}
                 dateFormat="dd MMMM yyyy"
                 placeholderText="Select date range"
+                isClearable
                 className="w-[260px] bg-transparent text-sm text-gray-800 focus:outline-none"
               />
             </div>
