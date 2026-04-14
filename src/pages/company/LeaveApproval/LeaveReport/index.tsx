@@ -104,7 +104,8 @@ const pdfStyles = StyleSheet.create({
     borderColor: '#e5e7eb',
     borderLeftWidth: 0,
     borderTopWidth: 0,
-    backgroundColor: '#f9fafb'
+    backgroundColor: '#f9fafb',
+    justifyContent: 'center', // added to center the multiline text vertically
   },
   tableCol: {
     borderStyle: 'solid',
@@ -113,8 +114,8 @@ const pdfStyles = StyleSheet.create({
     borderLeftWidth: 0,
     borderTopWidth: 0
   },
-  tableCellHeader: { margin: 5, fontSize: 9, fontWeight: 'bold' },
-  tableCell: { margin: 5, fontSize: 9 },
+  tableCellHeader: { margin: 5, fontSize: 9, fontWeight: 'bold', textAlign: 'center' }, // centered text
+  tableCell: { margin: 5, fontSize: 9, textAlign: 'center' }, // centered text for values too
   // Column Widths
   colName: { width: '22%' },
   colStandard: { width: '13%' }
@@ -140,13 +141,13 @@ const ReportPDF = ({
       <View style={pdfStyles.table}>
         <View style={pdfStyles.tableRow}>
           <View style={[pdfStyles.tableColHeader, pdfStyles.colName]}>
-            <Text style={pdfStyles.tableCellHeader}>Employee Name</Text>
+            <Text style={{ ...pdfStyles.tableCellHeader, textAlign: 'left' }}>Employee Name</Text>
           </View>
           <View style={[pdfStyles.tableColHeader, pdfStyles.colStandard]}>
-            <Text style={pdfStyles.tableCellHeader}>Opening this year</Text>
+            <Text style={pdfStyles.tableCellHeader}>Opening{"\n"}this year</Text>
           </View>
           <View style={[pdfStyles.tableColHeader, pdfStyles.colStandard]}>
-            <Text style={pdfStyles.tableCellHeader}>Holiday Accrued</Text>
+            <Text style={pdfStyles.tableCellHeader}>Holiday{"\n"}Accrued</Text>
           </View>
           <View style={[pdfStyles.tableColHeader, pdfStyles.colStandard]}>
             <Text style={pdfStyles.tableCellHeader}>Taken</Text>
@@ -158,7 +159,7 @@ const ReportPDF = ({
             <Text style={pdfStyles.tableCellHeader}>Requested</Text>
           </View>
           <View style={[pdfStyles.tableColHeader, pdfStyles.colStandard]}>
-            <Text style={pdfStyles.tableCellHeader}>Balance Remaining</Text>
+            <Text style={pdfStyles.tableCellHeader}>Balance{"\n"}Remaining</Text>
           </View>
         </View>
 
@@ -171,7 +172,7 @@ const ReportPDF = ({
               key={item.holidayRecord._id || index}
             >
               <View style={[pdfStyles.tableCol, pdfStyles.colName]}>
-                <Text style={pdfStyles.tableCell}>{empName}</Text>
+                <Text style={{ ...pdfStyles.tableCell, textAlign: 'left' }}>{empName}</Text>
               </View>
               <View style={[pdfStyles.tableCol, pdfStyles.colStandard]}>
                 <Text style={pdfStyles.tableCell}>
@@ -225,6 +226,19 @@ const generateHolidayYears = (backward = 20, forward = 50) => {
   return years;
 };
 
+// --- New Helper to extract April 1 to March 31 from a year string ---
+const getDatesFromHolidayYear = (yearStr: string): [Date, Date] => {
+  const [startYearStr, endYearStr] = yearStr.split('-');
+  const startYear = parseInt(startYearStr, 10);
+  const endYear = parseInt(endYearStr, 10);
+  
+  // Date constructor takes month index (0 = Jan, 1 = Feb, 2 = Mar, 3 = Apr)
+  const startDate = new Date(startYear, 3, 1);   // April 1st
+  const endDate = new Date(endYear, 2, 31);      // March 31st
+  
+  return [startDate, endDate];
+};
+
 const LeaveReportPage: React.FC = () => {
   const { id: companyId } = useParams();
   const navigate = useNavigate();
@@ -249,9 +263,7 @@ const LeaveReportPage: React.FC = () => {
     return `${year}-${month}-${day}`;
   };
 
-  // Default dates: March 1st to April 30th (last date of April)
-  const defaultStartDate = new Date(currentYearNum, 2, 1); // Month index 2 is March
-  const defaultEndDate = new Date(currentYearNum, 3, 30); // Month index 3 is April
+  const [defaultStartDate, defaultEndDate] = getDatesFromHolidayYear(currentYearStr);
 
   // 2. State Management
   const [selectedYear, setSelectedYear] = useState<string>(currentYearStr);
@@ -265,6 +277,14 @@ const LeaveReportPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [pdfLoading, setPdfLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Sync DatePicker with the selected Holiday Year
+  useEffect(() => {
+    if (selectedYear) {
+      const [newStart, newEnd] = getDatesFromHolidayYear(selectedYear);
+      setDateRange([newStart, newEnd]);
+    }
+  }, [selectedYear]);
 
   // 3. Handlers
   const fetchReportData = async () => {
