@@ -107,6 +107,7 @@ import CompanyDocusignDetailsPage from '@/pages/company/companyDocusignDetails';
 import StaffRequestDocumentPage from '@/pages/staff/requestDocument';
 import SignatureDocumentDetail from '@/pages/company/SignatureDoc/DetailDocument';
 import LeaveReportPage from '@/pages/company/LeaveApproval/LeaveReport';
+import CompanyLeaveCalendarPage from '@/pages/company/leave-calendar';
 
 const SignInPage = lazy(() => import('@/pages/auth/signin'));
 
@@ -161,6 +162,36 @@ export default function AppRouter() {
       ]
     }
   ];
+
+
+    const leaveRoutes = [
+    {
+      path: '/company/:id/leave-approval/leave-calendar',
+      element: (
+        <ProtectedRoute>
+          <RoleGuard allowedRoles={['admin', 'company', 'companyAdmin']}>
+
+          <ScheduleStatusProvider>
+            <RotaLayout />
+          </ScheduleStatusProvider>
+          </RoleGuard>
+        </ProtectedRoute>
+      ),
+      children: [
+        {
+          index: true,
+          element: (
+            <Suspense>
+              <CompanyLeaveCalendarPage />
+            </Suspense>
+          )
+        },
+      ]
+    }
+  ];
+
+
+
 
   const companyRoutes = [
     {
@@ -437,7 +468,8 @@ export default function AppRouter() {
     ...companyRoutes,
     ...rotaRoutes,
     ...StaffRoutes,
-    ...attendanceroutes
+    ...attendanceroutes,
+    ...leaveRoutes
   ]);
 
   return routes;

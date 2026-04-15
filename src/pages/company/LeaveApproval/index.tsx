@@ -1039,6 +1039,7 @@ const CompanyLeaveApprovalPage: React.FC = () => {
                   </Sheet>
 
                   <Button variant={'outline'} onClick={()=> navigate('leave-report')}>Report</Button>
+                  <Button variant={'outline'} onClick={()=> navigate('leave-calendar')}>Leave Calendar</Button>
                 </div>
               </div>
             </CardTitle>
