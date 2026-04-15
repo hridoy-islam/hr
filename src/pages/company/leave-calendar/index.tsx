@@ -300,7 +300,7 @@ const EmployeeRow = ({
                       onClick={() => onLeaveClick(seg.leave)}
                       className={`flex min-h-[45px] w-full cursor-pointer flex-col justify-center overflow-hidden rounded-md border ${theme.border} ${theme.bg} px-2 py-1.5 shadow-sm transition-all duration-200 hover:opacity-80`}
                     >
-                      <div className="mb-1 flex items-center justify-between gap-2">
+                      <div className="mb-1 flex items-center justify-start gap-2">
                         <div
                           className={`flex items-center gap-1 ${theme.text} truncate`}
                         >
