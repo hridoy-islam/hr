@@ -5,7 +5,7 @@ import 'react-datepicker/dist/react-datepicker.css';
 import Select from 'react-select';
 import axiosInstance from '@/lib/axios';
 import { useParams, useNavigate } from 'react-router-dom';
-import { MoveLeft } from 'lucide-react';
+import { MoveLeft, FileDown, FileText } from 'lucide-react';
 import {
   Document,
   Page,
@@ -26,7 +26,6 @@ import {
   TableRow
 } from '@/components/ui/table';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
-
 
 // --- Type Definitions ---
 interface UserInfo {
@@ -73,7 +72,15 @@ interface ReportResult {
   dateRangeSummary: DateRangeSummary;
 }
 
-
+// Added Totals Type
+interface Totals {
+  carryForward: number;
+  holidayAccured: number;
+  usedHours: number;
+  bookedHours: number;
+  requestedHours: number;
+  remainingHours: number;
+}
 
 // --- PDF Styles ---
 const pdfStyles = StyleSheet.create({
@@ -107,7 +114,7 @@ const pdfStyles = StyleSheet.create({
     borderLeftWidth: 0,
     borderTopWidth: 0,
     backgroundColor: '#f9fafb',
-    justifyContent: 'center', // added to center the multiline text vertically
+    justifyContent: 'center'
   },
   tableCol: {
     borderStyle: 'solid',
@@ -116,9 +123,13 @@ const pdfStyles = StyleSheet.create({
     borderLeftWidth: 0,
     borderTopWidth: 0
   },
-  tableCellHeader: { margin: 5, fontSize: 9, fontWeight: 'bold', textAlign: 'center' }, // centered text
-  tableCell: { margin: 5, fontSize: 9, textAlign: 'center' }, // centered text for values too
-  // Column Widths
+  tableCellHeader: {
+    margin: 5,
+    fontSize: 9,
+    fontWeight: 'bold',
+    textAlign: 'center'
+  },
+  tableCell: { margin: 5, fontSize: 9, textAlign: 'center' },
   colName: { width: '22%' },
   colStandard: { width: '13%' }
 });
@@ -129,36 +140,41 @@ const ReportPDF = ({
   companyName,
   holidayYear,
   startDate,
-  endDate
+  endDate,
+  totals // Added totals prop
 }: any) => (
   <Document>
     <Page size="A4" style={pdfStyles.page}>
       <Text style={pdfStyles.header}>{companyName}</Text>
       <Text style={pdfStyles.subHeader}>
         Holiday Year: {holidayYear} | Period:{' '}
-     {new Date(startDate).toLocaleDateString('en-GB', {
-  day: '2-digit',
-  month: 'short',
-  year: 'numeric',
-})} -{' '}
-{new Date(endDate).toLocaleDateString('en-GB', {
-  day: '2-digit',
-  month: 'short',
-  year: 'numeric',
- 
-})}
+        {new Date(startDate).toLocaleDateString('en-GB', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric'
+        })}{' '}
+        -{' '}
+        {new Date(endDate).toLocaleDateString('en-GB', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric'
+        })}
       </Text>
 
       <View style={pdfStyles.table}>
         <View style={pdfStyles.tableRow}>
           <View style={[pdfStyles.tableColHeader, pdfStyles.colName]}>
-            <Text style={{ ...pdfStyles.tableCellHeader, textAlign: 'left' }}>Employee Name</Text>
+            <Text style={{ ...pdfStyles.tableCellHeader, textAlign: 'left' }}>
+              Employee Name
+            </Text>
           </View>
           <View style={[pdfStyles.tableColHeader, pdfStyles.colStandard]}>
-            <Text style={pdfStyles.tableCellHeader}>Opening{"\n"}this year</Text>
+            <Text style={pdfStyles.tableCellHeader}>
+              Opening{'\n'}this year
+            </Text>
           </View>
           <View style={[pdfStyles.tableColHeader, pdfStyles.colStandard]}>
-            <Text style={pdfStyles.tableCellHeader}>Holiday{"\n"}Accrued</Text>
+            <Text style={pdfStyles.tableCellHeader}>Holiday{'\n'}Accrued</Text>
           </View>
           <View style={[pdfStyles.tableColHeader, pdfStyles.colStandard]}>
             <Text style={pdfStyles.tableCellHeader}>Taken</Text>
@@ -170,7 +186,9 @@ const ReportPDF = ({
             <Text style={pdfStyles.tableCellHeader}>Requested</Text>
           </View>
           <View style={[pdfStyles.tableColHeader, pdfStyles.colStandard]}>
-            <Text style={pdfStyles.tableCellHeader}>Balance{"\n"}Remaining</Text>
+            <Text style={pdfStyles.tableCellHeader}>
+              Balance{'\n'}Remaining
+            </Text>
           </View>
         </View>
 
@@ -183,47 +201,88 @@ const ReportPDF = ({
               key={item.holidayRecord._id || index}
             >
               <View style={[pdfStyles.tableCol, pdfStyles.colName]}>
-                <Text style={{ ...pdfStyles.tableCell, textAlign: 'left' }}>{empName}</Text>
-              </View>
-              <View style={[pdfStyles.tableCol, pdfStyles.colStandard]}>
-                <Text style={pdfStyles.tableCell}>
-                  {item.holidayRecord.carryForward} 
+                <Text style={{ ...pdfStyles.tableCell, textAlign: 'left' }}>
+                  {empName}
                 </Text>
               </View>
               <View style={[pdfStyles.tableCol, pdfStyles.colStandard]}>
                 <Text style={pdfStyles.tableCell}>
-                  {item.holidayRecord.holidayAccured} 
+                  {item.holidayRecord.carryForward}
                 </Text>
               </View>
               <View style={[pdfStyles.tableCol, pdfStyles.colStandard]}>
                 <Text style={pdfStyles.tableCell}>
-                  {item.holidayRecord.usedHours} 
+                  {item.holidayRecord.holidayAccured}
                 </Text>
               </View>
               <View style={[pdfStyles.tableCol, pdfStyles.colStandard]}>
                 <Text style={pdfStyles.tableCell}>
-                  {item.holidayRecord.bookedHours} 
+                  {item.holidayRecord.usedHours}
                 </Text>
               </View>
               <View style={[pdfStyles.tableCol, pdfStyles.colStandard]}>
                 <Text style={pdfStyles.tableCell}>
-                  {item.holidayRecord.requestedHours} 
+                  {item.holidayRecord.bookedHours}
                 </Text>
               </View>
               <View style={[pdfStyles.tableCol, pdfStyles.colStandard]}>
                 <Text style={pdfStyles.tableCell}>
-                  {item.holidayRecord.remainingHours} 
+                  {item.holidayRecord.requestedHours}
+                </Text>
+              </View>
+              <View style={[pdfStyles.tableCol, pdfStyles.colStandard]}>
+                <Text style={pdfStyles.tableCell}>
+                  {item.holidayRecord.remainingHours}
                 </Text>
               </View>
             </View>
           );
         })}
+
+        {/* Totals Row in PDF */}
+        {data.length > 0 && (
+          <View style={[pdfStyles.tableRow, { backgroundColor: '#f9fafb' }]}>
+            <View style={[pdfStyles.tableColHeader, pdfStyles.colName]}>
+              <Text style={{ ...pdfStyles.tableCellHeader, textAlign: 'left' }}>
+                Total
+              </Text>
+            </View>
+            <View style={[pdfStyles.tableColHeader, pdfStyles.colStandard]}>
+              <Text style={pdfStyles.tableCellHeader}>
+                {totals.carryForward}
+              </Text>
+            </View>
+            <View style={[pdfStyles.tableColHeader, pdfStyles.colStandard]}>
+              <Text style={pdfStyles.tableCellHeader}>
+                {totals.holidayAccured}
+              </Text>
+            </View>
+            <View style={[pdfStyles.tableColHeader, pdfStyles.colStandard]}>
+              <Text style={pdfStyles.tableCellHeader}>{totals.usedHours}</Text>
+            </View>
+            <View style={[pdfStyles.tableColHeader, pdfStyles.colStandard]}>
+              <Text style={pdfStyles.tableCellHeader}>
+                {totals.bookedHours}
+              </Text>
+            </View>
+            <View style={[pdfStyles.tableColHeader, pdfStyles.colStandard]}>
+              <Text style={pdfStyles.tableCellHeader}>
+                {totals.requestedHours}
+              </Text>
+            </View>
+            <View style={[pdfStyles.tableColHeader, pdfStyles.colStandard]}>
+              <Text style={pdfStyles.tableCellHeader}>
+                {totals.remainingHours}
+              </Text>
+            </View>
+          </View>
+        )}
       </View>
     </Page>
   </Document>
 );
 
-// --- Helper Function ---
+// --- Helper Functions ---
 const generateHolidayYears = (backward = 20, forward = 50) => {
   const currentYear = moment().year();
   const years: string[] = [];
@@ -236,23 +295,20 @@ const generateHolidayYears = (backward = 20, forward = 50) => {
   }
   return years;
 };
- const formatLocalDate = (date: Date) => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
 
-// --- New Helper to extract April 1 to March 31 from a year string ---
+const formatLocalDate = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 const getDatesFromHolidayYear = (yearStr: string): [Date, Date] => {
   const [startYearStr, endYearStr] = yearStr.split('-');
   const startYear = parseInt(startYearStr, 10);
   const endYear = parseInt(endYearStr, 10);
-  
-  // Date constructor takes month index (0 = Jan, 1 = Feb, 2 = Mar, 3 = Apr)
-  const startDate = new Date(startYear, 3, 1);   // April 1st
-  const endDate = new Date(endYear, 2, 31);      // March 31st
-  
+  const startDate = new Date(startYear, 3, 1);
+  const endDate = new Date(endYear, 2, 31);
   return [startDate, endDate];
 };
 
@@ -273,9 +329,8 @@ const LeaveReportPage: React.FC = () => {
     []
   );
 
-  
-
-  const [defaultStartDate, defaultEndDate] = getDatesFromHolidayYear(currentYearStr);
+  const [defaultStartDate, defaultEndDate] =
+    getDatesFromHolidayYear(currentYearStr);
 
   // 2. State Management
   const [selectedYear, setSelectedYear] = useState<string>(currentYearStr);
@@ -289,6 +344,30 @@ const LeaveReportPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [pdfLoading, setPdfLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Calculate Totals dynamically
+  const totals = useMemo<Totals>(() => {
+    return reportData.reduce(
+      (acc, curr) => {
+        const rec = curr.holidayRecord;
+        acc.carryForward += rec.carryForward || 0;
+        acc.holidayAccured += rec.holidayAccured || 0;
+        acc.usedHours += rec.usedHours || 0;
+        acc.bookedHours += rec.bookedHours || 0;
+        acc.requestedHours += rec.requestedHours || 0;
+        acc.remainingHours += rec.remainingHours || 0;
+        return acc;
+      },
+      {
+        carryForward: 0,
+        holidayAccured: 0,
+        usedHours: 0,
+        bookedHours: 0,
+        requestedHours: 0,
+        remainingHours: 0
+      }
+    );
+  }, [reportData]);
 
   // Sync DatePicker with the selected Holiday Year
   useEffect(() => {
@@ -327,7 +406,6 @@ const LeaveReportPage: React.FC = () => {
     }
   };
 
-  // Initial fetch on component mount ONLY.
   useEffect(() => {
     fetchReportData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -337,11 +415,9 @@ const LeaveReportPage: React.FC = () => {
     if (!startDate || !endDate) return;
     setPdfLoading(true);
     try {
-      // Fetch company name specifically for the PDF
       const companyRes = await axiosInstance.get(`/users/${companyId}`);
       const companyName = companyRes.data?.data?.name || 'Company Report';
 
-      // Generate PDF Blob
       const blob = await pdf(
         <ReportPDF
           data={reportData}
@@ -349,10 +425,10 @@ const LeaveReportPage: React.FC = () => {
           holidayYear={selectedYear}
           startDate={startDate}
           endDate={endDate}
+          totals={totals} // Pass totals to PDF
         />
       ).toBlob();
 
-      // Download Trigger
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -366,6 +442,57 @@ const LeaveReportPage: React.FC = () => {
     } finally {
       setPdfLoading(false);
     }
+  };
+
+  // CSV Export Handler
+  const handleSaveAsCSV = () => {
+    if (reportData.length === 0) return;
+
+    const headers = [
+      'Employee Name',
+      'Opening this year',
+      'Holiday Accrued',
+      'Taken',
+      'Booked',
+      'Requested',
+      'Balance Remaining'
+    ];
+
+    const rows = reportData.map((item) => {
+      const user = item.holidayRecord.userId;
+      const empName = `${user.firstName} ${user.lastName}`;
+      return [
+        `"${empName}"`, // Encapsulate in quotes in case of commas
+        item.holidayRecord.carryForward,
+        item.holidayRecord.holidayAccured,
+        item.holidayRecord.usedHours,
+        item.holidayRecord.bookedHours,
+        item.holidayRecord.requestedHours,
+        item.holidayRecord.remainingHours
+      ].join(',');
+    });
+
+    const totalRow = [
+      '"Total"',
+      totals.carryForward,
+      totals.holidayAccured,
+      totals.usedHours,
+      totals.bookedHours,
+      totals.requestedHours,
+      totals.remainingHours
+    ].join(',');
+
+    const csvContent = [headers.join(','), ...rows, totalRow].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Leave_Report_${selectedYear}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   // 4. Render
@@ -421,17 +548,29 @@ const LeaveReportPage: React.FC = () => {
             </Button>
 
             <Button
-              onClick={handleSaveAsPDF}
-              disabled={pdfLoading || reportData.length === 0}
-              className="h-[38px] bg-green-600 px-6 text-white hover:bg-green-800"
+              onClick={handleSaveAsCSV}
+              disabled={reportData.length === 0}
+              variant="outline"
+              className="h-[38px] px-4"
             >
-              {pdfLoading ? 'Generating...' : 'Save As PDF'}
+              <FileText className="mr-2 h-4 w-4" />
+              Export CSV
+            </Button>
+
+            <Button
+              onClick={handleSaveAsPDF}
+              variant="outline"
+              disabled={pdfLoading || reportData.length === 0}
+              className="h-[38px]  px-4 "
+            >
+              <FileDown className="mr-2 h-4 w-4" />
+              {pdfLoading ? 'Generating...' : 'Export PDF'}
             </Button>
           </div>
         </div>
 
-        <Button onClick={() => navigate(-1)}>
-          <MoveLeft className="w-4 h-4 mr-2" />
+        <Button onClick={() => navigate(-1)} variant="outline">
+          <MoveLeft className="mr-2 h-4 w-4" />
           Back
         </Button>
       </div>
@@ -447,19 +586,19 @@ const LeaveReportPage: React.FC = () => {
               <TableHead className="rounded-tl-md py-4 font-bold text-gray-900">
                 Employee Name
               </TableHead>
-              <TableHead className="py-4 font-bold text-gray-900">
+              <TableHead className="py-4 font-bold text-gray-900 ">
                 Opening this year
               </TableHead>
-              <TableHead className="py-4 font-bold text-gray-900">
+              <TableHead className="py-4 font-bold text-gray-900 ">
                 Holiday Accrued
               </TableHead>
-              <TableHead className="py-4 font-bold text-gray-900">
+              <TableHead className="py-4 font-bold text-gray-900 ">
                 Taken
               </TableHead>
-              <TableHead className="py-4 font-bold text-gray-900">
+              <TableHead className="py-4 font-bold text-gray-900 ">
                 Booked
               </TableHead>
-              <TableHead className="py-4 font-bold text-gray-900">
+              <TableHead className="py-4 font-bold text-gray-900 ">
                 Requested
               </TableHead>
               <TableHead className="rounded-tr-md py-4 text-right font-bold text-gray-900">
@@ -477,37 +616,66 @@ const LeaveReportPage: React.FC = () => {
                 </TableCell>
               </TableRow>
             ) : reportData.length > 0 ? (
-              reportData.map((item, index) => {
-                const user = item.holidayRecord.userId;
-                const empName = `${user.firstName} ${user.lastName}`;
+              <>
+                {reportData.map((item, index) => {
+                  const user = item.holidayRecord.userId;
+                  const empName = `${user.firstName} ${user.lastName}`;
 
-                return (
-                  <TableRow
-                    key={item.holidayRecord._id || index}
-                    className="hover:bg-gray-50/50"
-                  >
-                    <TableCell className="py-4 font-medium">{empName}</TableCell>
-                    <TableCell className="py-4 font-medium text-gray-800">
-                      {item.holidayRecord.carryForward} 
-                    </TableCell>
-                    <TableCell className="py-4 font-medium text-gray-800">
-                      {item.holidayRecord.holidayAccured} 
-                    </TableCell>
-                    <TableCell className="py-4 font-medium text-gray-800">
-                      {item.holidayRecord.usedHours} 
-                    </TableCell>
-                    <TableCell className="py-4 font-medium text-gray-800">
-                      {item.holidayRecord.bookedHours} 
-                    </TableCell>
-                    <TableCell className="py-4 font-medium text-gray-800">
-                      {item.holidayRecord.requestedHours} 
-                    </TableCell>
-                    <TableCell className="py-4 text-right font-semibold text-gray-800">
-                      {item.holidayRecord.remainingHours} 
-                    </TableCell>
-                  </TableRow>
-                );
-              })
+                  return (
+                    <TableRow
+                      key={item.holidayRecord._id || index}
+                      className="hover:bg-gray-50/50"
+                    >
+                      <TableCell className="py-4 font-medium">
+                        {empName}
+                      </TableCell>
+                      <TableCell className="py-4 font-medium text-gray-800 text-center">
+                        {item.holidayRecord.carryForward}
+                      </TableCell>
+                      <TableCell className="py-4 font-medium text-gray-800 text-center">
+                        {item.holidayRecord.holidayAccured}
+                      </TableCell>
+                      <TableCell className="py-4 font-medium text-gray-800 text-center">
+                        {item.holidayRecord.usedHours}
+                      </TableCell>
+                      <TableCell className="py-4 font-medium text-gray-800 text-center">
+                        {item.holidayRecord.bookedHours}
+                      </TableCell>
+                      <TableCell className="py-4 font-medium text-gray-800 text-center">
+                        {item.holidayRecord.requestedHours}
+                      </TableCell>
+                      <TableCell className="py-4 text-right font-semibold text-gray-800">
+                        {item.holidayRecord.remainingHours}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+
+                {/* --- Totals Row --- */}
+                <TableRow className="border-t-2 border-gray-300 bg-gray-100 hover:bg-gray-100">
+                  <TableCell className="py-4 font-bold text-gray-900">
+                    Total
+                  </TableCell>
+                  <TableCell className="py-4 font-bold text-gray-900 text-center">
+                    {totals.carryForward}
+                  </TableCell>
+                  <TableCell className="py-4 font-bold text-gray-900 text-center">
+                    {totals.holidayAccured}
+                  </TableCell>
+                  <TableCell className="py-4 font-bold text-gray-900 text-center">
+                    {totals.usedHours}
+                  </TableCell>
+                  <TableCell className="py-4 font-bold text-gray-900 text-center">
+                    {totals.bookedHours}
+                  </TableCell>
+                  <TableCell className="py-4 font-bold text-gray-900 text-center">
+                    {totals.requestedHours}
+                  </TableCell>
+                  <TableCell className="py-4 text-right font-bold text-gray-900">
+                    {totals.remainingHours}
+                  </TableCell>
+                </TableRow>
+              </>
             ) : (
               <TableRow className="border-none hover:bg-transparent">
                 <TableCell
