@@ -20,23 +20,12 @@ import axiosInstance from '@/lib/axios';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { useToast } from '@/components/ui/use-toast';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 import Select from 'react-select';
 
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 
 // Types
-type User = {
-  _id: string;
-  name: string;
-  firstName?: string;
-  lastName?: string;
-  role: string;
-  image?: string;
-  designationId?: { _id: string; title: string }[] | { title: string };
-};
-
 type LeaveDay = {
   leaveDate: string;
   leaveType: string;
@@ -153,217 +142,10 @@ const getNormalizedDates = (leave: Leave) => {
   };
 };
 
-// Builds contiguous segments for a single row "lane"
-const buildSegments = (laneLeaves: Leave[], daysArray: moment.Moment[]) => {
-  const segments: any[] = [];
-  let i = 0;
-
-  while (i < daysArray.length) {
-    const currentDay = daysArray[i];
-
-    const activeLeave = laneLeaves.find((l) => {
-      const { start, end } = getNormalizedDates(l);
-      return (
-        currentDay.isSameOrAfter(start, 'day') &&
-        currentDay.isSameOrBefore(end, 'day')
-      );
-    });
-
-    if (activeLeave) {
-      const { end: leaveEnd } = getNormalizedDates(activeLeave);
-      let span = 0;
-      let tempI = i;
-
-      while (
-        tempI < daysArray.length &&
-        daysArray[tempI].isSameOrBefore(leaveEnd, 'day')
-      ) {
-        span++;
-        tempI++;
-      }
-
-      segments.push({
-        type: 'leave',
-        span,
-        leave: activeLeave,
-        startDay: currentDay
-      });
-
-      i = tempI;
-    } else {
-      segments.push({ type: 'empty', span: 1, date: currentDay });
-      i++;
-    }
-  }
-
-  return segments;
-};
-
-// Row Component for an individual Employee, handling multiple lanes
-const EmployeeRow = ({
-  user,
-  daysArray,
-  userLeavesMap,
-  onLeaveClick
-}: {
-  user: User;
-  daysArray: moment.Moment[];
-  userLeavesMap: Record<string, Leave[]>;
-  onLeaveClick: (leave: Leave) => void;
-}) => {
-  const userLeaves = userLeavesMap[user._id] || [];
-
-  const lanes: Leave[][] = [];
-
-  userLeaves.forEach((leave) => {
-    const { start } = getNormalizedDates(leave);
-    let placed = false;
-
-    for (let i = 0; i < lanes.length; i++) {
-      const lastLeave = lanes[i][lanes[i].length - 1];
-      const { end: lastEnd } = getNormalizedDates(lastLeave);
-
-      if (start.isAfter(lastEnd, 'day')) {
-        lanes[i].push(leave);
-        placed = true;
-        break;
-      }
-    }
-
-    if (!placed) lanes.push([leave]);
-  });
-
-  if (lanes.length === 0) lanes.push([]);
-
-  return (
-    <>
-      {lanes.map((laneLeaves, laneIndex) => {
-        const segments = buildSegments(laneLeaves, daysArray);
-
-        return (
-          <tr
-            key={`${user._id}-lane-${laneIndex}`}
-            className="group border-b border-gray-100 transition-colors hover:bg-slate-50/50"
-          >
-            {laneIndex === 0 && (
-              <td
-                rowSpan={lanes.length}
-                className="sticky left-0 z-20 border-r border-gray-200 bg-white p-3 align-top shadow-[2px_0_0_0_rgba(0,0,0,0.03)] group-hover:bg-slate-50/50"
-              >
-                <div className="flex items-center gap-3 pl-1">
-                  <Avatar className="h-8 w-8 flex-shrink-0 ring-1 ring-gray-100">
-                    <AvatarImage
-                      src={user.image || '/placeholder.png'}
-                      alt={user.firstName || 'User'}
-                      className="object-cover"
-                    />
-                    <AvatarFallback className="bg-gray-50 text-[10px] font-bold text-gray-700">
-                      {user.firstName?.charAt(0) || user.name?.charAt(0)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="min-w-0">
-                    <p className="truncate text-[13px] font-semibold text-gray-800">
-                      {user.firstName
-                        ? `${user.firstName} ${user.lastName}`
-                        : user.name}
-                    </p>
-                    <p className="text-[10px] font-medium text-gray-800">
-                      {Array.isArray(user.designationId) && user.designationId.length
-                        ? user.designationId.map((d: any) => d.title).join(', ')
-                        : 'Employee'}
-                    </p>
-                  </div>
-                </div>
-              </td>
-            )}
-
-            {segments.map((seg, idx) => {
-              if (seg.type === 'leave') {
-                const { start, end } = getNormalizedDates(seg.leave);
-                const theme = getLeaveTheme(seg.leave.holidayType);
-
-                const status = (seg.leave.status || '').toLowerCase();
-                const statusBadgeClass =
-                  status === 'pending'
-                    ? 'bg-red-500 text-white'
-                    : status === 'approved'
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-slate-400 text-white';
-
-                return (
-                  <td
-                    key={idx}
-                    colSpan={seg.span}
-                    className="border-r border-gray-100 p-1 align-top"
-                  >
-                    <div
-                      onClick={() => onLeaveClick(seg.leave)}
-                      className={`flex min-h-[45px] w-full cursor-pointer flex-col justify-center overflow-hidden rounded-md border ${theme.border} ${theme.bg} px-2 py-1.5 shadow-sm transition-all duration-200 hover:opacity-80`}
-                    >
-                      <div className="mb-1 flex items-center justify-start gap-2">
-                        <div
-                          className={`flex items-center gap-1 ${theme.text} truncate`}
-                        >
-                          <span className="shrink-0 text-xs">{theme.icon}</span>
-                          <span className="truncate text-[11px] font-bold uppercase tracking-wide">
-                            {leaveTypeOptions.find(
-                              (item) => item.value === seg.leave.holidayType
-                            )?.label || seg.leave.holidayType}
-                          </span>
-                        </div>
-                        <span
-                          className={`shrink-0 rounded px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider ${statusBadgeClass}`}
-                        >
-                          {seg.leave.status || 'N/A'}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-1.5 truncate text-[10px] text-slate-700">
-                        {start.isSame(end, 'day') ? (
-                          <span className="font-semibold">
-                            {start.format('DD MMM YYYY')}
-                          </span>
-                        ) : (
-                          <>
-                            <span className="font-semibold">
-                              {start.format('DD MMM YYYY')}
-                            </span>
-                            <span className="text-[10px] font-medium text-slate-800">
-                              -
-                            </span>
-                            <span className="font-semibold">
-                              {end.format('DD MMM YYYY')}
-                            </span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </td>
-                );
-              } else {
-                const isWeekend = seg.date.day() === 0 || seg.date.day() === 6;
-                return (
-                  <td
-                    key={idx}
-                    className={`min-w-[65px] border-r border-gray-100 p-1 align-top transition-colors hover:bg-slate-100/40 ${isWeekend ? 'bg-slate-50/70' : ''}`}
-                  >
-                    <div className="min-h-[40px] w-full min-w-[50px]"></div>
-                  </td>
-                );
-              }
-            })}
-          </tr>
-        );
-      })}
-    </>
-  );
-};
-
 // Main Component
 export default function CompanyLeaveCalendarPage() {
   const { id: companyId } = useParams();
   const [currentDate, setCurrentDate] = useState(moment());
-  const [users, setUsers] = useState<User[]>([]);
   const [leaves, setLeaves] = useState<Leave[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -404,18 +186,11 @@ export default function CompanyLeaveCalendarPage() {
   const topScrollWrapperRef = useRef<HTMLDivElement>(null);
   const topScrollInnerRef = useRef<HTMLDivElement>(null);
 
-  const fetchUsersAndLeaves = useCallback(
+  const fetchLeaves = useCallback(
     async (isInitial = false) => {
       if (!companyId) return;
       if (isInitial) setIsLoading(true);
       try {
-        const userRes = await axiosInstance.get(
-          `/users?limit=all&role=employee&company=${companyId}`
-        );
-        const fetchedUsers: User[] =
-          userRes.data?.data?.result || userRes.data?.data || [];
-        setUsers(fetchedUsers);
-
         const fromDateStr =
           isCustomRange && appliedStart
             ? moment(appliedStart).format('YYYY-MM-DD')
@@ -439,7 +214,7 @@ export default function CompanyLeaveCalendarPage() {
         setLeaves(leaveRes.data?.data?.result || leaveRes.data?.data || []);
       } catch (err: any) {
         console.error('Error:', err);
-        toast({ title: 'Failed to fetch data', variant: 'destructive' });
+        toast({ title: 'Failed to fetch leaves', variant: 'destructive' });
       } finally {
         setIsLoading(false);
       }
@@ -456,31 +231,8 @@ export default function CompanyLeaveCalendarPage() {
   );
 
   useEffect(() => {
-    fetchUsersAndLeaves(true);
-  }, [fetchUsersAndLeaves]);
-
-  const userLeavesMap = useMemo(() => {
-    const map: Record<string, Leave[]> = {};
-    leaves
-      .filter((leave) => leave.status?.toLowerCase() !== 'rejected')
-      .forEach((leave) => {
-        const empId =
-          typeof leave.userId === 'object' ? leave.userId._id : leave.userId;
-        if (!empId) return;
-        if (!map[empId]) map[empId] = [];
-        map[empId].push(leave);
-      });
-
-    Object.keys(map).forEach((userId) => {
-      map[userId].sort((a, b) => {
-        const { start: startA } = getNormalizedDates(a);
-        const { start: startB } = getNormalizedDates(b);
-        return startA.valueOf() - startB.valueOf();
-      });
-    });
-
-    return map;
-  }, [leaves]);
+    fetchLeaves(true);
+  }, [fetchLeaves]);
 
   const daysArray = useMemo(() => {
     if (isCustomRange && appliedStart && appliedEnd) {
@@ -498,6 +250,21 @@ export default function CompanyLeaveCalendarPage() {
       currentDate.clone().date(i + 1)
     );
   }, [currentDate, isCustomRange, appliedStart, appliedEnd]);
+
+  const leavesPerDay = useMemo(() => {
+    const validLeaves = leaves.filter(
+      (leave) => leave.status?.toLowerCase() !== 'rejected'
+    );
+
+    return daysArray.map((day) => {
+      return validLeaves.filter((l) => {
+        const { start, end } = getNormalizedDates(l);
+        return (
+          day.isSameOrAfter(start, 'day') && day.isSameOrBefore(end, 'day')
+        );
+      });
+    });
+  }, [leaves, daysArray]);
 
   const prevMonth = () => setCurrentDate((d) => d.clone().subtract(1, 'month'));
   const nextMonth = () => setCurrentDate((d) => d.clone().add(1, 'month'));
@@ -560,7 +327,6 @@ export default function CompanyLeaveCalendarPage() {
     }
   };
 
-  // Helpers for the modal
   const getEmployeeName = (leave: Leave): string => {
     if (typeof leave.userId === 'object' && leave.userId !== null) {
       const u = leave.userId;
@@ -756,11 +522,14 @@ export default function CompanyLeaveCalendarPage() {
           <BlinkingDots size="large" color="bg-theme" />
         </div>
       ) : (
-        <div className="relative flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div
+          className="relative flex w-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
+          style={{ height: 'calc(100vh - 160px)' }}
+        >
           {/* Scrollbar mirror */}
           <div
             ref={topScrollWrapperRef}
-            className="custom-scrollbar invisible-hover-scrollbar w-full overflow-x-auto overflow-y-hidden border-b border-slate-100 bg-slate-50"
+            className="custom-scrollbar invisible-hover-scrollbar w-full shrink-0 overflow-x-auto overflow-y-hidden border-b border-slate-100 bg-slate-50"
             style={{ height: '12px' }}
             onScroll={handleTopScroll}
           >
@@ -773,24 +542,18 @@ export default function CompanyLeaveCalendarPage() {
           <div
             ref={tableWrapperRef}
             className="custom-scrollbar hide-x-scrollbar w-full flex-1 overflow-auto bg-white"
-            style={{ maxHeight: 'calc(100vh - 160px)' }}
             onScroll={handleTableScroll}
           >
-            <table className="w-full border-collapse text-left">
+            <table className="h-full w-full border-collapse text-left">
               <thead className="sticky top-0 z-40 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
                 <tr>
-                  <th className="sticky left-0 z-50 min-w-[200px] border-b border-r border-slate-200 bg-gray-50 p-4 shadow-[1px_0_0_0_#e2e8f0]">
-                    <span className="text-[11px] font-bold uppercase tracking-wider">
-                      Staff Member
-                    </span>
-                  </th>
                   {daysArray.map((day) => {
                     const isToday = day.isSame(moment(), 'day');
                     const isWeekend = day.day() === 0 || day.day() === 6;
                     return (
                       <th
                         key={day.format('D')}
-                        className={`w-[65px] min-w-[65px] max-w-[65px] border-b border-r border-slate-100 py-2.5 text-center ${
+                        className={`min-w-[200px] w-[200px] max-w-[200px] border-b border-x border-slate-200 py-2.5 text-center ${
                           isToday
                             ? 'bg-theme/5'
                             : isWeekend
@@ -821,25 +584,69 @@ export default function CompanyLeaveCalendarPage() {
               </thead>
 
               <tbody>
-                {users.map((user) => (
-                  <EmployeeRow
-                    key={user._id}
-                    user={user}
-                    daysArray={daysArray}
-                    userLeavesMap={userLeavesMap}
-                    onLeaveClick={setSelectedLeave}
-                  />
-                ))}
-                {users.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={daysArray.length + 1}
-                      className="py-16 text-center text-[13px] font-medium text-slate-400"
-                    >
-                      No employees found for this period.
-                    </td>
-                  </tr>
-                )}
+                <tr className="h-full">
+                  {daysArray.map((day, idx) => {
+                    const isWeekend = day.day() === 0 || day.day() === 6;
+                    const dayLeaves = leavesPerDay[idx];
+
+                    return (
+                      <td
+                        key={idx}
+                        className={`min-w-[200px] border-x border-slate-200 p-1 align-top transition-colors hover:bg-slate-100/40 ${
+                          isWeekend ? 'bg-slate-50/70' : ''
+                        }`}
+                      >
+                        <div className="flex w-full flex-col gap-1 min-h-[40px]">
+                          {dayLeaves.map((leave, lIdx) => {
+                            const theme = getLeaveTheme(leave.holidayType);
+                            const status = (leave.status || '').toLowerCase();
+                            const statusBadgeClass =
+                              status === 'pending'
+                                ? 'bg-red-500 text-white'
+                                : status === 'approved'
+                                  ? 'bg-blue-500 text-white'
+                                  : 'bg-slate-400 text-white';
+
+                            const employeeName = getEmployeeName(leave);
+
+                            return (
+                              <div
+                                key={leave._id || lIdx}
+                                onClick={() => setSelectedLeave(leave)}
+                                className={`flex min-h-[45px] w-full cursor-pointer flex-col justify-center overflow-hidden rounded-md border ${theme.border} ${theme.bg} px-2 py-1.5 shadow-sm transition-all duration-200 hover:opacity-80`}
+                              >
+                                <div className="mb-1 flex items-center justify-start gap-2">
+                                  <div
+                                    className={`flex items-center gap-1 ${theme.text} truncate`}
+                                  >
+                                    <span className="shrink-0 text-xs">
+                                      {theme.icon}
+                                    </span>
+                                    <span className="truncate text-[11px] font-semibold uppercase tracking-wide">
+                                      {leaveTypeOptions.find(
+                                        (item) =>
+                                          item.value === leave.holidayType
+                                      )?.label || leave.holidayType}
+                                    </span>
+                                  </div>
+                                  <span
+                                    className={`shrink-0 rounded px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider ${statusBadgeClass}`}
+                                  >
+                                    {leave.status || 'N/A'}
+                                  </span>
+                                </div>
+
+                                <div className="pb-1 text-xs font-bold">
+                                  <h1>{employeeName}</h1>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </td>
+                    );
+                  })}
+                </tr>
               </tbody>
             </table>
           </div>
@@ -852,76 +659,77 @@ export default function CompanyLeaveCalendarPage() {
         onOpenChange={(open) => !open && setSelectedLeave(null)}
       >
         <DialogContent className="overflow-hidden border-slate-200 bg-white p-6 shadow-xl sm:max-w-md">
-          {selectedLeave && (() => {
-            const theme = getLeaveTheme(selectedLeave.holidayType);
-            const status = (selectedLeave.status || '').toLowerCase();
-            const statusBadgeClass =
-              status === 'pending'
-                ? 'bg-red-500 text-white'
-                : status === 'approved'
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-slate-400 text-white';
+          {selectedLeave &&
+            (() => {
+              const theme = getLeaveTheme(selectedLeave.holidayType);
+              const status = (selectedLeave.status || '').toLowerCase();
+              const statusBadgeClass =
+                status === 'pending'
+                  ? 'bg-red-500 text-white'
+                  : status === 'approved'
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-slate-400 text-white';
 
-            const { start, end } = getNormalizedDates(selectedLeave);
-            const employeeName = getEmployeeName(selectedLeave);
+              const { start, end } = getNormalizedDates(selectedLeave);
+              const employeeName = getEmployeeName(selectedLeave);
 
-            return (
-              <div className="flex flex-col gap-3">
-                {/* Title Row: Type + Status */}
-                <DialogTitle className="flex items-center justify-start gap-2">
-                  <div className={`flex items-center gap-1.5 ${theme.text}`}>
-                    <span className="text-sm">{theme.icon}</span>
-                    <span className="text-[13px] font-bold uppercase tracking-wide">
-                      {leaveTypeOptions.find(
-                        (item) => item.value === selectedLeave.holidayType
-                      )?.label || selectedLeave.holidayType}
+              return (
+                <div className="flex flex-col gap-3">
+                  {/* Title Row: Type + Status */}
+                  <DialogTitle className="flex items-center justify-start gap-2">
+                    <div className={`flex items-center gap-1.5 ${theme.text}`}>
+                      <span className="text-sm">{theme.icon}</span>
+                      <span className="text-[13px] font-bold uppercase tracking-wide">
+                        {leaveTypeOptions.find(
+                          (item) => item.value === selectedLeave.holidayType
+                        )?.label || selectedLeave.holidayType}
+                      </span>
+                    </div>
+                    <span
+                      className={`shrink-0 rounded px-2 py-1 text-[10px] font-bold uppercase tracking-wider ${statusBadgeClass}`}
+                    >
+                      {selectedLeave.status || 'N/A'}
                     </span>
+                  </DialogTitle>
+
+                  {/* Employee Name */}
+                  <p className="text-[13px] font-semibold text-slate-800">
+                    {employeeName}
+                  </p>
+
+                  {/* Date Range + Duration */}
+                  <p className="text-[13px] font-semibold text-slate-700">
+                    {start.isSame(end, 'day')
+                      ? start.format('DD MMM YYYY')
+                      : `${start.format('DD MMM YYYY')} – ${end.format('DD MMM YYYY')}`}
+                    {(selectedLeave.totalDays || selectedLeave.totalHours) && (
+                      <span className="ml-1.5 text-xs font-semibold text-slate-500">
+                        (
+                        {selectedLeave.totalDays
+                          ? `${selectedLeave.totalDays} Day${selectedLeave.totalDays > 1 ? 's' : ''}`
+                          : ''}
+                        {selectedLeave.totalDays && selectedLeave.totalHours
+                          ? ' • '
+                          : ''}
+                        {selectedLeave.totalHours
+                          ? `${selectedLeave.totalHours} Hours`
+                          : ''}
+                        )
+                      </span>
+                    )}
+                  </p>
+
+                  {/* Reason */}
+                  <div className="min-h-[60px] rounded-md bg-slate-50 p-3 text-sm text-slate-700">
+                    {selectedLeave.reason || (
+                      <span className="italic text-slate-400">
+                        No specific reason provided for this request.
+                      </span>
+                    )}
                   </div>
-                  <span
-                    className={`shrink-0 rounded px-2 py-1 text-[10px] font-bold uppercase tracking-wider ${statusBadgeClass}`}
-                  >
-                    {selectedLeave.status || 'N/A'}
-                  </span>
-                </DialogTitle>
-
-                {/* Employee Name */}
-                <p className="text-[13px] font-semibold text-slate-800">
-                  {employeeName}
-                </p>
-
-                {/* Date Range + Duration */}
-                <p className="text-[13px] font-semibold text-slate-700">
-                  {start.isSame(end, 'day')
-                    ? start.format('DD MMM YYYY')
-                    : `${start.format('DD MMM YYYY')} – ${end.format('DD MMM YYYY')}`}
-                  {(selectedLeave.totalDays || selectedLeave.totalHours) && (
-                    <span className="ml-1.5 text-xs font-semibold text-slate-500">
-                      (
-                      {selectedLeave.totalDays
-                        ? `${selectedLeave.totalDays} Day${selectedLeave.totalDays > 1 ? 's' : ''}`
-                        : ''}
-                      {selectedLeave.totalDays && selectedLeave.totalHours
-                        ? ' • '
-                        : ''}
-                      {selectedLeave.totalHours
-                        ? `${selectedLeave.totalHours} Hours`
-                        : ''}
-                      )
-                    </span>
-                  )}
-                </p>
-
-                {/* Reason */}
-                <div className="min-h-[60px] rounded-md bg-slate-50 p-3 text-sm text-slate-700">
-                  {selectedLeave.reason || (
-                    <span className="italic text-slate-400">
-                      No specific reason provided for this request.
-                    </span>
-                  )}
                 </div>
-              </div>
-            );
-          })()}
+              );
+            })()}
         </DialogContent>
       </Dialog>
     </div>
