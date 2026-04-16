@@ -35,7 +35,15 @@ type LeaveDay = {
 type Leave = {
   _id: string;
   holidayYear: string;
-  userId: string | { _id: string; firstName?: string; lastName?: string; name?: string; [key: string]: any };
+  userId:
+    | string
+    | {
+        _id: string;
+        firstName?: string;
+        lastName?: string;
+        name?: string;
+        [key: string]: any;
+      };
   companyId: string;
   startDate: string;
   endDate: string;
@@ -185,6 +193,7 @@ export default function CompanyLeaveCalendarPage() {
   const tableWrapperRef = useRef<HTMLDivElement>(null);
   const topScrollWrapperRef = useRef<HTMLDivElement>(null);
   const topScrollInnerRef = useRef<HTMLDivElement>(null);
+  const initialScrollDone = useRef(false);
 
   const fetchLeaves = useCallback(
     async (isInitial = false) => {
@@ -277,6 +286,37 @@ export default function CompanyLeaveCalendarPage() {
   const handleRangeChange = (update: [Date | null, Date | null]) => {
     setDateRange(update);
   };
+
+  // Auto-scroll to today's date on initial load
+  useEffect(() => {
+    // Wait until data is loaded and ensure wrapper exists
+    if (isLoading || !tableWrapperRef.current) return;
+
+    // Find the index of today in the current daysArray
+    const todayIndex = daysArray.findIndex((day) =>
+      day.isSame(moment(), 'day')
+    );
+
+    if (todayIndex === -1) return;
+
+    // Use a timeout to ensure the DOM has fully painted before scrolling
+    const timer = setTimeout(() => {
+      if (!tableWrapperRef.current) return;
+
+      const thElements = tableWrapperRef.current.querySelectorAll('th');
+
+      if (thElements && thElements[todayIndex]) {
+        tableWrapperRef.current.scrollTo({
+          left: thElements[todayIndex].offsetLeft,
+          behavior: initialScrollDone.current ? 'smooth' : 'auto'
+        });
+
+        initialScrollDone.current = true;
+      }
+    }, 50);
+
+    return () => clearTimeout(timer);
+  }, [daysArray, isLoading]);
 
   const handleApply = () => {
     if (rangeStart && rangeEnd) {
@@ -553,7 +593,7 @@ export default function CompanyLeaveCalendarPage() {
                     return (
                       <th
                         key={day.format('D')}
-                        className={`min-w-[200px] w-[200px] max-w-[200px] border-b border-x border-slate-200 py-2.5 text-center ${
+                        className={`w-[200px] min-w-[200px] max-w-[200px] border-x border-b border-slate-200 py-2.5 text-center ${
                           isToday
                             ? 'bg-theme/5'
                             : isWeekend
@@ -596,7 +636,7 @@ export default function CompanyLeaveCalendarPage() {
                           isWeekend ? 'bg-slate-50/70' : ''
                         }`}
                       >
-                        <div className="flex w-full flex-col gap-1 min-h-[40px]">
+                        <div className="flex min-h-[40px] w-full flex-col gap-1">
                           {dayLeaves.map((leave, lIdx) => {
                             const theme = getLeaveTheme(leave.holidayType);
                             const status = (leave.status || '').toLowerCase();
