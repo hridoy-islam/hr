@@ -29,6 +29,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Table,
   TableBody,
@@ -90,6 +91,7 @@ interface TEmployeeDocument {
   employeeId: string;
   documentTitle: string;
   documentUrl: string;
+  note?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -125,6 +127,7 @@ export default function EmployeeDocumentTab() {
   // Form State
   const [selectedOption, setSelectedOption] = useState<SelectOption | null>(null);
   const [customDocTitle, setCustomDocTitle] = useState('');
+  const [note, setNote] = useState('');
 
   // File Upload State
   const [fileToUpload, setFileToUpload] = useState<File | null>(null);
@@ -306,6 +309,7 @@ export default function EmployeeDocumentTab() {
     setEditingDoc(null);
     setSelectedOption(null);
     setCustomDocTitle('');
+    setNote('');
     setUploadedDocUrl(null);
     setFileToUpload(null);
     setUploadError(null);
@@ -326,6 +330,7 @@ export default function EmployeeDocumentTab() {
       setCustomDocTitle(doc.documentTitle);
     }
 
+    setNote(doc.note || '');
     setUploadedDocUrl(doc.documentUrl);
     setFileToUpload(null);
     setUploadError(null);
@@ -392,7 +397,8 @@ export default function EmployeeDocumentTab() {
       const payload = {
         employeeId: eid,
         documentTitle: finalTitle,
-        documentUrl: uploadedDocUrl
+        documentUrl: uploadedDocUrl,
+        note: note.trim() || undefined
       };
 
       if (editingDoc) {
@@ -501,6 +507,22 @@ export default function EmployeeDocumentTab() {
                     />
                   </div>
                 )}
+              </div>
+
+              {/* Note Field */}
+              <div className="space-y-2">
+                <Label htmlFor="doc-note">
+                  Note{' '}
+                  <span className="text-xs font-normal text-gray-400"></span>
+                </Label>
+                <Textarea
+                  id="doc-note"
+                  placeholder="Add any relevant notes about this document..."
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  className="resize-none bg-gray-50 text-sm"
+                  rows={3}
+                />
               </div>
 
               <div className="space-y-2">
@@ -755,7 +777,10 @@ export default function EmployeeDocumentTab() {
                 <TableHead className="w-[40%] font-semibold text-gray-900">
                   Document Title
                 </TableHead>
-                <TableHead className="w-[20%] font-semibold text-gray-900">
+                <TableHead className="w-[25%] font-semibold text-gray-900">
+                  Note
+                </TableHead>
+                <TableHead className="w-[15%] font-semibold text-gray-900">
                   Uploaded At
                 </TableHead>
                 <TableHead className="text-right font-semibold text-gray-900">
@@ -776,6 +801,13 @@ export default function EmployeeDocumentTab() {
                           {doc.documentTitle}
                         </span>
                       </div>
+                    </TableCell>
+                    <TableCell className="text-sm text-gray-500">
+                      {doc.note ? (
+                        <span className="line-clamp-2">{doc.note}</span>
+                      ) : (
+                        <span className="text-gray-300">—</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-sm text-gray-500">
                       {doc.createdAt
