@@ -276,7 +276,7 @@ const CompanyLeaveApprovalPage: React.FC = () => {
   const { toast } = useToast();
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [entriesPerPage, setEntriesPerPage] = useState(10);
+  const [entriesPerPage, setEntriesPerPage] = useState(100);
   const navigate = useNavigate();
   const user = useSelector((state: any) => state.auth?.user) || null;
 
