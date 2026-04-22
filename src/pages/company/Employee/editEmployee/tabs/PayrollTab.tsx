@@ -4,7 +4,7 @@ import { Loader2, CreditCard, Landmark } from 'lucide-react';
 
 // --- Layout Components ---
 
-const SectionHeader = ({ icon: Icon, title }: { icon: any, title: string }) => (
+const SectionHeader = ({ icon: Icon, title }: { icon: any; title: string }) => (
   <div className="flex items-center gap-2 border-b border-gray-200 bg-gray-50/80 px-4 py-3">
     <Icon className="h-4 w-4 text-theme" />
     <h3 className="text-sm font-bold uppercase tracking-wide text-gray-700">
@@ -21,8 +21,16 @@ interface FormRowProps {
   isSaving?: boolean;
 }
 
-const FormRow = ({ label, children, className = '', required, isSaving }: FormRowProps) => (
-  <div className={`group flex flex-col border-b border-gray-100 last:border-0 sm:flex-row ${className}`}>
+const FormRow = ({
+  label,
+  children,
+  className = '',
+  required,
+  isSaving
+}: FormRowProps) => (
+  <div
+    className={`group flex flex-col border-b border-gray-100 last:border-0 sm:flex-row ${className}`}
+  >
     {/* Label Column */}
     <div className="flex items-center justify-between bg-gray-50/30 px-4 py-3 sm:w-1/3 lg:w-2/5 xl:w-1/3">
       <div className="flex items-center">
@@ -35,9 +43,7 @@ const FormRow = ({ label, children, className = '', required, isSaving }: FormRo
     </div>
     {/* Input Column */}
     <div className="flex items-center bg-white px-4 py-2 sm:w-2/3 lg:w-3/5 xl:w-2/3">
-      <div className="w-full">
-        {children}
-      </div>
+      <div className="w-full">{children}</div>
     </div>
   </div>
 );
@@ -53,6 +59,7 @@ interface PayrollTabProps {
       accountNumber?: string;
       sortCode?: string;
       beneficiary?: string;
+      payRate?: number | string; // Added payRate
     };
   };
   onNestedUpdate: (parentField: string, fieldName: string, value: any) => void;
@@ -75,30 +82,47 @@ const PayrollTab: React.FC<PayrollTabProps> = ({
   const paymentMethod = payroll.paymentMethod || '';
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
-      
+    <div className="space-y-6 duration-500 animate-in fade-in">
       {/* Main Grid Layout */}
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-
         {/* Left Column: Payroll Configuration */}
-        <div className="rounded-lg border border-gray-200 bg-white shadow-sm h-fit">
+        <div className="h-fit rounded-lg border border-gray-200 bg-white shadow-sm">
           <SectionHeader icon={CreditCard} title="Payroll Configuration" />
           <div className="flex flex-col">
-            <FormRow 
-              label="Payroll Number" 
+            <FormRow
+              label="Payroll Number"
               isSaving={isFieldSaving['payroll.payrollNumber']}
             >
               <EditableField
                 id="payroll.payrollNumber"
                 label=""
                 value={payroll.payrollNumber || ''}
-                onUpdate={(value) => onNestedUpdate('payroll', 'payrollNumber', value)}
+                onUpdate={(value) =>
+                  onNestedUpdate('payroll', 'payrollNumber', value)
+                }
                 isSaving={isFieldSaving['payroll.payrollNumber']}
               />
             </FormRow>
 
-            <FormRow 
-              label="Payment Method" 
+            {/* New Pay Rate Field */}
+            <FormRow
+              label="Pay Rate"
+              isSaving={isFieldSaving['payroll.payRate']}
+            >
+              <EditableField
+                id="payroll.payRate"
+                label=""
+                type="number"
+                value={payroll.payRate ?? ''}
+                onUpdate={(value) =>
+                  onNestedUpdate('payroll', 'payRate', value)
+                }
+                isSaving={isFieldSaving['payroll.payRate']}
+              />
+            </FormRow>
+
+            <FormRow
+              label="Payment Method"
               isSaving={isFieldSaving['payroll.paymentMethod']}
             >
               <EditableField
@@ -107,7 +131,9 @@ const PayrollTab: React.FC<PayrollTabProps> = ({
                 value={paymentMethod}
                 type="select"
                 options={paymentMethodOptions}
-                onUpdate={(value) => onNestedUpdate('payroll', 'paymentMethod', value)}
+                onUpdate={(value) =>
+                  onNestedUpdate('payroll', 'paymentMethod', value)
+                }
                 isSaving={isFieldSaving['payroll.paymentMethod']}
               />
             </FormRow>
@@ -116,64 +142,71 @@ const PayrollTab: React.FC<PayrollTabProps> = ({
 
         {/* Right Column: Bank Details (Conditional) */}
         {paymentMethod === 'Bank Transfer' && (
-          <div className=" rounded-lg border border-gray-200 bg-white shadow-sm h-fit animate-in slide-in-from-left-4 fade-in duration-300">
+          <div className=" h-fit rounded-lg border border-gray-200 bg-white shadow-sm duration-300 animate-in fade-in slide-in-from-left-4">
             <SectionHeader icon={Landmark} title="Bank Details" />
             <div className="flex flex-col">
-              <FormRow 
-                label="Bank Name" 
+              <FormRow
+                label="Bank Name"
                 isSaving={isFieldSaving['payroll.bankName']}
               >
                 <EditableField
                   id="payroll.bankName"
                   label=""
                   value={payroll.bankName || ''}
-                  onUpdate={(value) => onNestedUpdate('payroll', 'bankName', value)}
+                  onUpdate={(value) =>
+                    onNestedUpdate('payroll', 'bankName', value)
+                  }
                   isSaving={isFieldSaving['payroll.bankName']}
                 />
               </FormRow>
 
-              <FormRow 
-                label="Account Number" 
+              <FormRow
+                label="Account Number"
                 isSaving={isFieldSaving['payroll.accountNumber']}
               >
                 <EditableField
                   id="payroll.accountNumber"
                   label=""
                   value={payroll.accountNumber || ''}
-                  onUpdate={(value) => onNestedUpdate('payroll', 'accountNumber', value)}
+                  onUpdate={(value) =>
+                    onNestedUpdate('payroll', 'accountNumber', value)
+                  }
                   isSaving={isFieldSaving['payroll.accountNumber']}
                 />
               </FormRow>
 
-              <FormRow 
-                label="Sort Code" 
+              <FormRow
+                label="Sort Code"
                 isSaving={isFieldSaving['payroll.sortCode']}
               >
                 <EditableField
                   id="payroll.sortCode"
                   label=""
                   value={payroll.sortCode || ''}
-                  onUpdate={(value) => onNestedUpdate('payroll', 'sortCode', value)}
+                  onUpdate={(value) =>
+                    onNestedUpdate('payroll', 'sortCode', value)
+                  }
                   isSaving={isFieldSaving['payroll.sortCode']}
                 />
               </FormRow>
 
-              <FormRow 
-                label="Beneficiary Name" 
+              <FormRow
+                label="Beneficiary Name"
                 isSaving={isFieldSaving['payroll.beneficiary']}
               >
                 <EditableField
                   id="payroll.beneficiary"
                   label=""
                   value={payroll.beneficiary || ''}
-                  onUpdate={(value) => onNestedUpdate('payroll', 'beneficiary', value)}
+                  onUpdate={(value) =>
+                    onNestedUpdate('payroll', 'beneficiary', value)
+                  }
                   isSaving={isFieldSaving['payroll.beneficiary']}
                 />
               </FormRow>
             </div>
           </div>
         )}
-
       </div>
     </div>
   );

@@ -67,7 +67,8 @@ export const useEditEmployee = () => {
       bankName: '',
       accountNumber: '',
       sortCode: '',
-      beneficiary: ''
+      beneficiary: '',
+      payRate:0
     },
 
     // Equality Information
@@ -184,7 +185,8 @@ export const useEditEmployee = () => {
             bankName: data?.payroll?.bankName || '',
             accountNumber: data?.payroll?.accountNumber || '',
             sortCode: data?.payroll?.sortCode || '',
-            beneficiary: data?.payroll?.beneficiary || ''
+            beneficiary: data?.payroll?.beneficiary || '',
+            payRate: data.payroll?.payRate ?? 0
           },
 
           // Equality Information

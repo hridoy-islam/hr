@@ -1530,23 +1530,24 @@ const TableSection = ({
             const selectedRotaOption =
               rotaOptions.find((o) => o.value === editForm.rotaId) || null;
 
-           // --- Calculate Shift Duration ---
+            // --- Calculate Shift Duration ---
             let shiftDurationDisplay = '';
             if (rotaStartTime && rotaEndTime) {
               const rStart = moment(rotaStartTime, 'HH:mm');
               const rEnd = moment(rotaEndTime, 'HH:mm');
               // handle overnight shifts where end time is smaller than start time
               if (rEnd.isBefore(rStart)) rEnd.add(1, 'day');
-              
+
               const diffMins = rEnd.diff(rStart, 'minutes');
               if (diffMins > 0) {
                 const hrs = Math.floor(diffMins / 60);
                 const mins = diffMins % 60;
-                
+
                 // Only show minutes if they are greater than 0
-                shiftDurationDisplay = mins === 0 
-                  ? `(${hrs.toString().padStart(2, '0')}h)` 
-                  : `(${hrs.toString().padStart(2, '0')}h ${mins.toString().padStart(2, '0')}m)`;
+                shiftDurationDisplay =
+                  mins === 0
+                    ? `(${hrs.toString().padStart(2, '0')}h)`
+                    : `(${hrs.toString().padStart(2, '0')}h ${mins.toString().padStart(2, '0')}m)`;
               }
             }
 
@@ -1595,7 +1596,10 @@ const TableSection = ({
 
                       {shiftName && rotaStartTime && rotaEndTime && (
                         <span className="mt-0.5 text-xs font-semibold tracking-wide text-gray-800">
-                          {rotaStartTime} - {rotaEndTime} <span className="text-gray-500 font-medium">{shiftDurationDisplay}</span>
+                          {rotaStartTime} - {rotaEndTime}{' '}
+                          <span className="font-medium text-gray-500">
+                            {shiftDurationDisplay}
+                          </span>
                         </span>
                       )}
                     </div>
@@ -1721,7 +1725,6 @@ const TableSection = ({
                       >
                         <Coffee className="mr-1 h-3 w-3" />
                         Breaks{' '}
-                       
                       </Button>
                     )}
                   </div>
@@ -1817,7 +1820,7 @@ const TableSection = ({
           </div>
         )}
 
-        {data.length > 60 && (
+        {totalPages > 1 && (
           <DynamicPagination
             pageSize={entriesPerPage}
             setPageSize={setEntriesPerPage}

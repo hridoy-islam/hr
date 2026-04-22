@@ -31,6 +31,7 @@ import DisciplinaryTab from './tabs/DisciplinaryTab';
 import QACheckTab from './tabs/QATab';
 import SupervisionTab from './tabs/SuperVisionCheckTab';
 import SignatureDocumentTab from './tabs/SignatureDocumentTab';
+import SickNoteTab from './tabs/SickNoteTab';
 const EditEmployee = () => {
   const navigate = useNavigate();
   const {
@@ -258,6 +259,11 @@ const EditEmployee = () => {
       component: <HolidayTab formData={formData} />
     },
     {
+      id: 'sicknote',
+      label: 'Sick Note',
+      component: <SickNoteTab  />
+    },
+    {
       id: 'contact',
       label: 'Address',
       component: (
@@ -338,7 +344,7 @@ const EditEmployee = () => {
     //   label: 'Signature Documents',
     //   component: (
     //     <SignatureDocumentTab
-        
+
     //     />
     //   )
     // },
