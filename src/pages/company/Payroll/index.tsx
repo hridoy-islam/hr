@@ -2,15 +2,14 @@ import React, { useState, useEffect } from 'react';
 import {
   FileText,
   Calculator,
-  Check,
-  X,
   Plus,
-  Eye, // Added
-  ChevronDown, // Added
-  Download // Added
+  Eye,
+  ChevronDown,
+  Download,
+  X,
+  Filter
 } from 'lucide-react';
 import DatePicker from 'react-datepicker';
-import Select from 'react-select';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -27,145 +26,163 @@ import {
   Dialog,
   DialogContent,
   DialogFooter,
-  DialogHeader, // Added
-  DialogTitle // Added
+  DialogHeader,
+  DialogTitle
 } from '@/components/ui/dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger
-} from '@/components/ui/dropdown-menu'; // Added imports
+} from '@/components/ui/dropdown-menu';
 import moment from '@/lib/moment-setup';
 import { useToast } from '@/components/ui/use-toast';
 import axiosInstance from '@/lib/axios';
 import { Label } from '@/components/ui/label';
-import { useSelector } from 'react-redux';
 import { useNavigate, useParams } from 'react-router-dom';
 import { downloadPayrollPDF, getPayrollPDFBlob } from './components/PayrollPDF';
-// Import the PDF logic
 
-// Types
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+export interface TDesignation {
+  _id: string;
+  title: string;
+}
+
+export interface TDepartment {
+  _id: string;
+  departmentName: string;
+}
+
 export interface TUser {
   _id: string;
-  name?: string;
   firstName: string;
   lastName: string;
   email: string;
-  department: string;
-  designation: string;
-  companyId?: string;
-  departmentId?: {
-    departmentName: string;
-  };
-  designationId?: {
-    title: string;
-  };
+  employeeId?: string;
+  phone?: string;
+  // old aggregation shapes
+  departmentId?: TDepartment | TDepartment[];
+  designationId?: TDesignation | TDesignation[];
+  department?: string;
+  designation?: string;
+  // new aggregation shapes (arrays from $lookup)
+  departments?: TDepartment[];
+  designations?: TDesignation[];
+}
+
+export interface TAttendanceLog {
+  attendanceId: string;
+  payRate: number;
+  duration: number; // minutes
 }
 
 export interface TPayroll {
   _id: string;
-  userId: TUser;
+  refId?: string;
+  // aggregation may return employee as `userId` (populated) or `user` (projected)
+  userId?: TUser;
+  user?: TUser;
   fromDate: Date | string;
   toDate: Date | string;
   status: 'pending' | 'approved' | 'rejected';
   totalHour: number;
   totalAmount: number;
+  attendanceList?: TAttendanceLog[];
   createdAt: Date;
   updatedAt: Date;
-  // Note: Ensure your backend sends attendanceList if you want the Detailed PDF to populate the table
-  attendanceList?: any[];
 }
 
-const AdminPayRoll = () => {
-  const { user } = useSelector((state: any) => state.auth);
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Pick employee object regardless of aggregation shape */
+const resolveUser = (p: TPayroll): TUser | null =>
+  (p.userId as TUser) ?? p.user ?? null;
+
+/** Sum attendance durations (minutes) → "H:MM" */
+const sumDuration = (list?: TAttendanceLog[]): string => {
+  const totalMins = (list ?? []).reduce((s, a) => s + (a.duration ?? 0), 0);
+  const h = Math.floor(totalMins / 60);
+  const m = totalMins % 60;
+  return `${h}:${String(m).padStart(2, '0')}`;
+};
+
+/** Resolve designation title from any shape */
+const getDesignation = (emp: TUser | null): string => {
+  if (!emp) return '—';
+  if (emp.designations?.length) return emp.designations[0].title;
+  if (emp.designationId && !Array.isArray(emp.designationId))
+    return (emp.designationId as TDesignation).title;
+  if (Array.isArray(emp.designationId) && emp.designationId.length)
+    return (emp.designationId as TDesignation[])[0].title;
+  return emp.designation || '—';
+};
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
+const CompanyPayRoll = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const{id} = useParams()
-  const [payrollList, setPayrollList] = useState<TPayroll[]>([]);
-  const [users, setUsers] = useState<TUser[]>([]);
-  const [userOptions, setUserOptions] = useState<
-    { value: string; label: string }[]
-  >([]);
+  const { id: companyId } = useParams();
 
-  // Loading/Error State
+  const [payrollList, setPayrollList] = useState<TPayroll[]>([]);
+
+  // Loading / error
   const [fetching, setFetching] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Pagination & Filters
+  // Pagination
   const [entriesPerPage, setEntriesPerPage] = useState(100);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [selectedSearchUser, setSelectedSearchUser] = useState<{
-    value: string;
-    label: string;
-  } | null>(null);
 
+  // Filter date range
+  const [filterFromDate, setFilterFromDate] = useState<Date | null>(null);
+  const [filterToDate, setFilterToDate] = useState<Date | null>(null);
+
+  // Generate payroll dialog
   const [showPayloadDialog, setShowPayloadDialog] = useState(false);
-  const [showRejectDialog, setShowRejectDialog] = useState(false);
-
-  const [payrollToReject, setPayrollToReject] = useState<string | null>(null);
-const [selectedUsers, setSelectedUsers] = useState<TUser[]>([]);  const [payloadFromDate, setPayloadFromDate] = useState<Date | null>(null);
+  const [payloadFromDate, setPayloadFromDate] = useState<Date | null>(null);
   const [payloadToDate, setPayloadToDate] = useState<Date | null>(null);
 
-  // --- PREVIEW STATE ---
+  // PDF preview
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewDetailed, setPreviewDetailed] = useState(false);
   const [selectedPreviewPayroll, setSelectedPreviewPayroll] =
     useState<TPayroll | null>(null);
 
-  const fetchUsers = async () => {
-    try {
-      const res = await axiosInstance.get('/users', {
-        params: { limit: 'all', company: id, role: 'employee' }
-      });
-      const userList = res.data.data.result || [];
-      setUsers(userList);
-      setUserOptions(
-        userList.map((u: TUser) => ({
-          value: u._id,
-          label: `${u.firstName} ${u.lastName}`
-        }))
-      );
-    } catch (err: any) {
-      toast({
-        title: 'Error',
-        description:
-          err?.response?.data?.message || 'Failed to load user list.',
-        variant: 'destructive'
-      });
-    }
-  };
+  // ── Grand totals ───────────────────────────────────────────────────────────
+  const grandTotalMins = payrollList.reduce(
+    (acc, p) =>
+      acc + (p.attendanceList ?? []).reduce((s, a) => s + (a.duration ?? 0), 0),
+    0
+  );
+  const grandTotalHours = `${Math.floor(grandTotalMins / 60)}:${String(grandTotalMins % 60).padStart(2, '0')}`;
+  const grandTotalAmount = payrollList.reduce(
+    (acc, p) => acc + (p.totalAmount ?? 0),
+    0
+  );
 
-  // Fetch Payroll Data
+  // ── Data fetching ──────────────────────────────────────────────────────────
   const fetchPayrollData = async (page = 1) => {
     setFetching(true);
     setError(null);
     try {
-      const params: any = {
+      const params: Record<string, any> = {
         page,
-        limit: entriesPerPage
+        limit: entriesPerPage,
+        companyId
       };
+      if (filterFromDate) params.fromDate = filterFromDate.toISOString();
+      if (filterToDate) params.toDate = filterToDate.toISOString();
 
-      if (selectedDate) {
-        params.month = selectedDate.getMonth() + 1;
-        params.year = selectedDate.getFullYear();
-      }
-
-      if (selectedSearchUser) {
-        params.userId = selectedSearchUser.value;
-      }
-
-      const response = await axiosInstance.get('/hr/payroll', { params });
-      const result = response.data.data.result;
-      setPayrollList(result);
-      setTotalPages(response.data.data.meta?.totalPages || 1);
+      const res = await axiosInstance.get('/hr/payroll', { params });
+      setPayrollList(res.data.data.result ?? []);
+      setTotalPages(res.data.data.meta?.totalPages ?? 1);
     } catch (err: any) {
-      console.error('Fetch payroll error:', err);
-      setError(err.response?.data?.message || 'Failed to load payroll data');
+      setError(err.response?.data?.message ?? 'Failed to load payroll data');
       setPayrollList([]);
     } finally {
       setFetching(false);
@@ -173,42 +190,32 @@ const [selectedUsers, setSelectedUsers] = useState<TUser[]>([]);  const [payload
   };
 
   useEffect(() => {
-    fetchUsers();
-  }, []);
-
-  useEffect(() => {
     setCurrentPage(1);
     fetchPayrollData(1);
-  }, [selectedDate, selectedSearchUser, entriesPerPage]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterFromDate, filterToDate, entriesPerPage]);
 
   useEffect(() => {
     fetchPayrollData(currentPage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage]);
 
-  // Clean up PDF URL
   useEffect(() => {
     return () => {
       if (previewUrl) URL.revokeObjectURL(previewUrl);
     };
   }, [previewUrl]);
 
-  const handleApproveClick = async (payroll: TPayroll) => {
-    navigate(payroll._id);
-  };
-
-  // --- PREVIEW HANDLER ---
+  // ── Handlers ───────────────────────────────────────────────────────────────
   const handlePreview = async (payroll: TPayroll, detailed: boolean) => {
     try {
       const blob = await getPayrollPDFBlob(payroll, detailed);
       if (previewUrl) URL.revokeObjectURL(previewUrl);
-
-      const url = URL.createObjectURL(blob);
-      setPreviewUrl(url);
+      setPreviewUrl(URL.createObjectURL(blob));
       setPreviewDetailed(detailed);
       setSelectedPreviewPayroll(payroll);
       setPreviewOpen(true);
-    } catch (e) {
-      console.error(e);
+    } catch {
       toast({
         title: 'Error',
         description: 'Could not generate preview',
@@ -217,72 +224,35 @@ const [selectedUsers, setSelectedUsers] = useState<TUser[]>([]);  const [payload
     }
   };
 
-  const handleConfirmReject = async () => {
-    if (!payrollToReject) return;
-    try {
-      await axiosInstance.patch(`/hr/payroll/${payrollToReject}`, {
-        status: 'rejected'
-      });
-      toast({
-        title: 'Success',
-        description: 'Payroll rejected.',
-        variant: 'default'
-      });
-      fetchPayrollData(currentPage);
-    } catch (err) {
-      toast({
-        title: 'Error',
-        description: 'Failed to reject payroll.',
-        variant: 'destructive'
-      });
-    } finally {
-      setShowRejectDialog(false);
-      setPayrollToReject(null);
-    }
-  };
-
-const handleSavePayroll = async () => {
-    // Check if array is empty
-    if (selectedUsers.length === 0 || !payloadFromDate || !payloadToDate) {
+  const handleGeneratePayroll = async () => {
+    if (!payloadFromDate || !payloadToDate) {
       toast({
         title: 'Warning',
-        description: 'Please select at least one employee and the date range.',
+        description: 'Please select a date range.',
         variant: 'default'
       });
       return;
     }
-
     setLoading(true);
     try {
-      // Create array of IDs
-      const userIds = selectedUsers.map((u) => u._id);
-
       await axiosInstance.post('/hr/payroll', {
-        userIds: userIds, // Sending array instead of single userId
-        companyId: id,
+        companyId,
         fromDate: payloadFromDate.toISOString(),
         toDate: payloadToDate.toISOString()
       });
-
-      console.log(userIds)
-
       toast({
         title: 'Success',
         description: 'Payroll generated successfully!'
       });
-
-      // Cleanup
       setShowPayloadDialog(false);
-      setSelectedUsers([]); // Reset array
       setPayloadFromDate(null);
       setPayloadToDate(null);
-
       fetchPayrollData(1);
     } catch (err: any) {
       toast({
         title: 'Error',
         description:
-          err.response?.data?.message || 'Failed to generate payroll.',
+          err.response?.data?.message ?? 'Failed to generate payroll.',
         variant: 'destructive'
       });
     } finally {
@@ -290,328 +260,391 @@ const handleSavePayroll = async () => {
     }
   };
 
+  const statusBadge = (status: TPayroll['status']) => {
+    const map = {
+      approved: 'bg-green-100 text-green-700',
+      rejected: 'bg-red-100 text-red-700',
+      pending: 'bg-yellow-100 text-yellow-700'
+    } as const;
+    return (
+      <span
+        className={`rounded-full px-2.5 py-1 text-xs font-medium ${map[status]}`}
+      >
+        {status.charAt(0).toUpperCase() + status.slice(1)}
+      </span>
+    );
+  };
+
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="">
-      <div className="space-y-4">
-        {/* --- HEADER & TABLE SECTION --- */}
-        <div className="rounded-xl bg-white p-6 shadow-sm">
-          <div className="flex flex-row items-center justify-between pb-4">
-            <div className="mb-4 flex items-center space-x-3">
-              <FileText className="h-6 w-6 text-gray-600" />
-              <h2 className="text-2xl font-bold text-gray-900">Payroll</h2>
-            </div>
-            <Button
-              onClick={() => setShowPayloadDialog(true)}
-              className="bg-theme text-white hover:bg-theme/90"
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Generate Payroll
-            </Button>
+    <div className="space-y-4">
+      <div className="rounded-xl bg-white p-6 shadow-sm">
+        {/* ── Page header ── */}
+        <div className="flex flex-wrap items-center justify-between gap-4 pb-5">
+          <div className="flex items-center gap-3">
+            <FileText className="h-6 w-6 text-gray-500" />
+            <h2 className="text-2xl font-bold text-gray-900">Payroll</h2>
           </div>
 
-          {fetching ? (
-            <div className="flex justify-center py-12">
-              <BlinkingDots size="large" color="bg-theme" />
-            </div>
-          ) : error ? (
-            <div className="rounded-lg bg-red-50 p-4 text-center text-red-600">
-              {error}
-            </div>
-          ) : payrollList.length === 0 ? (
-            <div className="rounded-lg p-6 text-center text-gray-600">
-              No payroll records found.
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Department</TableHead>
-                    <TableHead>Designation</TableHead>
-                    <TableHead>Pay Period</TableHead>
-                    <TableHead>Total Hours</TableHead>
-                    <TableHead>Total Amount</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {payrollList.map((payroll) => (
-                    <TableRow key={payroll._id} className="hover:bg-gray-50">
-                      <TableCell className="font-medium">
-                        {payroll.userId
-                          ? payroll.userId.name ||
-                            `${payroll.userId.firstName} ${payroll.userId.lastName}`
-                          : '—'}
-                      </TableCell>
-                      <TableCell>
-                        {payroll.userId
-                          ? payroll.userId.departmentId?.departmentName ||
-                            payroll.userId.department ||
-                            '—'
-                          : '—'}
-                      </TableCell>
-                      <TableCell>
-                        {payroll.userId
-                          ? payroll.userId.designationId?.title ||
-                            payroll.userId.designation ||
-                            '—'
-                          : '—'}
-                      </TableCell>
-                      <TableCell>
-                        {moment(payroll.fromDate).format('MMM DD')} -{' '}
-                        {moment(payroll.toDate).format('MMM DD, YYYY')}
-                      </TableCell>
-                      <TableCell className="font-bold text-theme">
-                        {payroll.totalHour != null
-                          ? (() => {
-                              const totalMinutes = Number(payroll.totalHour);
+          <Button
+            onClick={() => setShowPayloadDialog(true)}
+            className="bg-theme text-white hover:bg-theme/90"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Generate Payroll
+          </Button>
+        </div>
 
-                              const hours = Math.floor(totalMinutes / 60);
+        {/* ── Filters ── */}
+        <div className="mb-5 flex flex-wrap items-end gap-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+          <div className="flex items-center gap-2 text-sm font-medium text-gray-500">
+            <Filter className="h-4 w-4" />
+            Filter by date
+          </div>
 
-                              const minutes = Math.floor(totalMinutes % 60);
+          <div className="flex flex-col gap-1">
+            <Label className="text-xs text-gray-500">From Date</Label>
+            <DatePicker
+              selected={filterFromDate}
+              onChange={(date) => setFilterFromDate(date)}
+              dateFormat="dd/MM/yyyy"
+              placeholderText="Start date"
+              showMonthDropdown
+              showYearDropdown
+              dropdownMode="select"
+              isClearable
+              className="h-9 w-40 rounded-md border border-gray-300 px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-theme"
+            />
+          </div>
 
-                              return `${hours}:${String(minutes).padStart(2, '0')}`;
-                            })()
-                          : '—'}
-                      </TableCell>
+          <div className="flex flex-col gap-1">
+            <Label className="text-xs text-gray-500">To Date</Label>
+            <DatePicker
+              selected={filterToDate}
+              onChange={(date) => setFilterToDate(date)}
+              dateFormat="dd/MM/yyyy"
+              placeholderText="End date"
+              showMonthDropdown
+              showYearDropdown
+              dropdownMode="select"
+              isClearable
+              minDate={filterFromDate ?? undefined}
+              className="h-9 w-40 rounded-md border border-gray-300 px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-theme"
+            />
+          </div>
 
-                      <TableCell className="font-bold text-theme">
-                        £
-                        {payroll.totalAmount?.toLocaleString(undefined, {
-                          minimumFractionDigits: 2
-                        }) || '—'}
-                      </TableCell>
-                      <TableCell>
-                        <span
-                          className={`rounded-full px-2 py-1 text-xs font-medium ${
-                            payroll.status === 'approved'
-                              ? 'bg-green-100 text-green-800'
-                              : payroll.status === 'rejected'
-                                ? 'bg-red-100 text-red-800'
-                                : 'bg-yellow-100 text-yellow-800'
-                          }`}
-                        >
-                          {payroll.status}
-                        </span>
-                      </TableCell>
-                      <TableCell className="flex items-center justify-end space-x-2 text-right">
-                        <div className="flex flex-row gap-2">
-                          {/* --- PREVIEW DROPDOWN ADDED HERE --- */}
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button size="sm" className="border-gray-300">
-                                <Eye className="mr-2 h-4 w-4" />
-                                Preview
-                                <ChevronDown className="ml-2 h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                onClick={() => handlePreview(payroll, false)}
-                                className="cursor-pointer"
-                              >
-                                Normal Preview (Summary)
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => handlePreview(payroll, true)}
-                                className="cursor-pointer"
-                              >
-                                Detailed Preview (Full)
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-
-                          <Button
-                            size="sm"
-                            onClick={() => handleApproveClick(payroll)}
-                          >
-                            View
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-
-              {payrollList.length > 50 && (
-                <>
-                  <div className="mt-6">
-                    <DynamicPagination
-                      pageSize={entriesPerPage}
-                      setPageSize={setEntriesPerPage}
-                      currentPage={currentPage}
-                      totalPages={totalPages}
-                      onPageChange={setCurrentPage}
-                    />
-                  </div>
-                </>
-              )}
-            </div>
+          {(filterFromDate || filterToDate) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setFilterFromDate(null);
+                setFilterToDate(null);
+              }}
+              className="h-9 gap-1 text-gray-500 hover:text-red-600"
+            >
+              <X className="h-4 w-4" />
+              Clear
+            </Button>
           )}
         </div>
 
-        {/* --- GENERATE PAYROLL DIALOG --- */}
-        <Dialog
-          open={showPayloadDialog}
-          onOpenChange={setShowPayloadDialog}
-          modal={false}
-        >
-          <DialogContent className="overflow-visible border-gray-300">
-            <h1 className="text-xl font-semibold">Generate Payroll</h1>
-          <div>
-                <Label>Select Employees</Label>
-                <Select
-                  isMulti // Enables multiple selection
-                  options={userOptions}
-                  // Map selectedUsers state back to React-Select format {value, label}
-                  value={selectedUsers.map((u) => ({
-                    value: u._id,
-                    label: `${u.firstName} ${u.lastName}`
-                  }))}
-                  onChange={(selectedOptions) => {
-                    // selectedOptions is an array of {value, label}
-                    // Filter the original 'users' list to match selected IDs
-                    const selectedIds = selectedOptions.map((opt) => opt.value);
-                    const newSelectedUsers = users.filter((u) =>
-                      selectedIds.includes(u._id)
+        {/* ── Table ── */}
+        {fetching ? (
+          <div className="flex justify-center py-12">
+            <BlinkingDots size="large" color="bg-theme" />
+          </div>
+        ) : error ? (
+          <div className="rounded-lg bg-red-50 p-4 text-center text-red-600">
+            {error}
+          </div>
+        ) : payrollList.length === 0 ? (
+          <div className="rounded-lg p-10 text-center text-gray-400">
+            No payroll records found.
+          </div>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-gray-50">
+                    <TableHead className="font-semibold text-gray-700">
+                      Payroll #
+                    </TableHead>
+                    <TableHead className="font-semibold text-gray-700">
+                      Employee Name
+                    </TableHead>
+                    <TableHead className="font-semibold text-gray-700">
+                      Designation
+                    </TableHead>
+                    <TableHead className="font-semibold text-gray-700">
+                      Pay Period
+                    </TableHead>
+                    <TableHead className="font-semibold text-gray-700">
+                      Hours Worked
+                    </TableHead>
+                    <TableHead className="font-semibold text-gray-700">
+                      Total Amount
+                    </TableHead>
+                    <TableHead className="font-semibold text-gray-700">
+                      Status
+                    </TableHead>
+                    <TableHead className="text-right font-semibold text-gray-700">
+                      Actions
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+
+                <TableBody>
+                  {payrollList.map((payroll) => {
+                    const emp = resolveUser(payroll);
+                    return (
+                      <TableRow
+                        key={payroll._id}
+                        className="hover:bg-gray-50/60"
+                      >
+                        {/* Payroll Number */}
+                        <TableCell className="font-mono text-sm font-medium text-gray-700">
+                          {payroll.refId ?? '—'}
+                        </TableCell>
+
+                        {/* Employee Name */}
+                        <TableCell className="font-medium text-gray-900">
+                          {emp ? `${emp.firstName} ${emp.lastName}` : '—'}
+                        </TableCell>
+
+                        {/* Designation */}
+                        <TableCell className="text-gray-600">
+                          {getDesignation(emp)}
+                        </TableCell>
+
+                        {/* Pay Period */}
+                        <TableCell className="text-gray-600">
+                          {moment(payroll.fromDate).format('DD MMM')} –{' '}
+                          {moment(payroll.toDate).format('DD MMM YYYY')}
+                        </TableCell>
+
+                        {/* Hours Worked — sum of all attendance durations */}
+                        <TableCell className="font-semibold text-theme">
+                          {sumDuration(payroll.attendanceList)}
+                        </TableCell>
+
+                        {/* Total Amount */}
+                        <TableCell className="font-semibold text-theme">
+                          £
+                          {(payroll.totalAmount ?? 0).toLocaleString('en-GB', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2
+                          })}
+                        </TableCell>
+
+                        {/* Status */}
+                        <TableCell>{statusBadge(payroll.status)}</TableCell>
+
+                        {/* Actions */}
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="border-gray-300"
+                                >
+                                  <Eye className="mr-1.5 h-3.5 w-3.5" />
+                                  Preview
+                                  <ChevronDown className="ml-1.5 h-3.5 w-3.5" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  onClick={() => handlePreview(payroll, false)}
+                                  className="cursor-pointer"
+                                >
+                                  Summary
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => handlePreview(payroll, true)}
+                                  className="cursor-pointer"
+                                >
+                                  Detailed
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+
+                            <Button
+                              size="sm"
+                              className="bg-theme text-white hover:bg-theme/90"
+                              onClick={() => navigate(payroll._id)}
+                            >
+                              Details
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
                     );
-                    setSelectedUsers(newSelectedUsers);
-                  }}
-                  placeholder="Select employees..."
-                  menuPortalTarget={document.body}
-                  className="mt-1"
-                  styles={{
-                    menuPortal: (base) => ({ ...base, zIndex: 9999 }),
-                    menu: (base) => ({ ...base, zIndex: 9999 })
-                  }}
+                  })}
+                </TableBody>
+
+                {/* ── Grand totals footer ── */}
+                <tfoot>
+                  <tr className="border-t-2 border-gray-200 bg-gray-50">
+                    <td
+                      colSpan={4}
+                      className="px-4 py-3 text-right text-sm font-semibold text-gray-600"
+                    >
+                      Total ({payrollList.length} record
+                      {payrollList.length !== 1 ? 's' : ''})
+                    </td>
+                    <td className="px-4 py-3 text-sm font-bold text-theme">
+                      {grandTotalHours}
+                    </td>
+                    <td className="px-4 py-3 text-sm font-bold text-theme">
+                      £
+                      {grandTotalAmount.toLocaleString('en-GB', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                      })}
+                    </td>
+                    <td colSpan={2} />
+                  </tr>
+                </tfoot>
+              </Table>
+            </div>
+
+            {payrollList.length > 50 && (
+              <div className="mt-6">
+                <DynamicPagination
+                  pageSize={entriesPerPage}
+                  setPageSize={setEntriesPerPage}
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={setCurrentPage}
                 />
               </div>
-<div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>From Date</Label>
-                  <DatePicker
-                    selected={payloadFromDate}
-                    onChange={(date) => setPayloadFromDate(date)}
-                    dateFormat="dd/MM/yyyy"
-                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-theme"
-                    placeholderText="Start date"
-                    showMonthDropdown
-                    showYearDropdown
-                    dropdownMode="select"
-                    portalId="root"
-                  />
-                </div>
-                <div>
-                  <Label>To Date</Label>
-                  <DatePicker
-                    selected={payloadToDate}
-                    onChange={(date) => setPayloadToDate(date)}
-                    dateFormat="dd/MM/yyyy"
-                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-theme"
-                    placeholderText="End date"
-                    showMonthDropdown
-                    showYearDropdown
-                    dropdownMode="select"
-                    portalId="root"
-                  />
-                </div>
-                </div>
-            <DialogFooter className="mt-6">
-              <Button
-                variant="secondary"
-                onClick={() => setShowPayloadDialog(false)}
-              >
-                Cancel
-              </Button>
-
-              <Button
-                onClick={handleSavePayroll}
-                disabled={
-                  loading || selectedUsers.length === 0 || !payloadFromDate || !payloadToDate
-                }
-                className="bg-theme text-white hover:bg-theme/90"
-              >
-                {loading ? (
-                  <BlinkingDots size="small" color="bg-white" />
-                ) : (
-                  <>
-                    <Calculator className="mr-2 h-4 w-4" />
-                    Generate Payroll
-                  </>
-                )}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* --- REJECT CONFIRMATION DIALOG --- */}
-        <Dialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
-          <DialogContent>
-            <h2 className="text-lg font-bold">Reject Payroll</h2>
-            <p>Are you sure you want to reject this payroll record?</p>
-            <DialogFooter>
-              <Button
-                variant="secondary"
-                onClick={() => setShowRejectDialog(false)}
-              >
-                Cancel
-              </Button>
-              <Button variant="destructive" onClick={handleConfirmReject}>
-                Reject
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* --- PREVIEW PDF DIALOG --- */}
-        <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-          <DialogContent className="flex h-[96vh] max-w-6xl flex-col gap-0 p-0">
-            <DialogHeader className="border-b px-6 py-4">
-              <DialogTitle>
-                Payroll Preview ({previewDetailed ? 'Detailed' : 'Summary'})
-              </DialogTitle>
-            </DialogHeader>
-
-            <div className="relative w-full flex-1 bg-gray-100">
-              {previewUrl ? (
-                <embed
-                  // Hides toolbar
-                  src={`${previewUrl}#toolbar=0&navpanes=0&scrollbar=0`}
-                  type="application/pdf"
-                  width="100%"
-                  height="100%"
-                  className="absolute inset-0"
-                />
-              ) : (
-                <div className="flex h-full items-center justify-center text-gray-500">
-                  Loading Preview...
-                </div>
-              )}
-            </div>
-
-            <div className="flex justify-end gap-2 border-t bg-white p-4">
-              <Button variant="secondary" onClick={() => setPreviewOpen(false)}>
-                Close
-              </Button>
-              {selectedPreviewPayroll && (
-                <Button
-                  onClick={() =>
-                    downloadPayrollPDF(selectedPreviewPayroll, previewDetailed)
-                  }
-                >
-                  <Download className="mr-2 h-4 w-4" />
-                  Download PDF
-                </Button>
-              )}
-            </div>
-          </DialogContent>
-        </Dialog>
+            )}
+          </>
+        )}
       </div>
+
+      {/* ── Generate Payroll Dialog ── */}
+      <Dialog open={showPayloadDialog} onOpenChange={setShowPayloadDialog}>
+        <DialogContent className="overflow-visible border-gray-300 sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-semibold">
+              Generate Payroll
+            </DialogTitle>
+          </DialogHeader>
+
+          <p className="text-sm text-gray-500">
+            Payroll will be generated for <strong>all active employees</strong>{' '}
+            in this company for the selected date range.
+          </p>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1.5">
+              <Label>From Date</Label>
+              <DatePicker
+                selected={payloadFromDate}
+                onChange={(date) => setPayloadFromDate(date)}
+                dateFormat="dd/MM/yyyy"
+                placeholderText="Start date"
+                showMonthDropdown
+                showYearDropdown
+                dropdownMode="select"
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-theme"
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label>To Date</Label>
+              <DatePicker
+                selected={payloadToDate}
+                onChange={(date) => setPayloadToDate(date)}
+                dateFormat="dd/MM/yyyy"
+                placeholderText="End date"
+                showMonthDropdown
+                showYearDropdown
+                dropdownMode="select"
+                minDate={payloadFromDate ?? undefined}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-theme"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="mt-2">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setShowPayloadDialog(false);
+                setPayloadFromDate(null);
+                setPayloadToDate(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleGeneratePayroll}
+              disabled={loading || !payloadFromDate || !payloadToDate}
+              className="bg-theme text-white hover:bg-theme/90"
+            >
+              {loading ? (
+                <BlinkingDots size="small" color="bg-white" />
+              ) : (
+                <>
+                  <Calculator className="mr-2 h-4 w-4" />
+                  Generate
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Preview PDF Dialog ── */}
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="flex h-[96vh] max-w-6xl flex-col gap-0 p-0">
+          <DialogHeader className="border-b px-6 py-4">
+            <DialogTitle>
+              Payroll Preview — {previewDetailed ? 'Detailed' : 'Summary'}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="relative w-full flex-1 bg-gray-100">
+            {previewUrl ? (
+              <embed
+                src={`${previewUrl}#toolbar=0&navpanes=0&scrollbar=0`}
+                type="application/pdf"
+                width="100%"
+                height="100%"
+                className="absolute inset-0"
+              />
+            ) : (
+              <div className="flex h-full items-center justify-center text-gray-500">
+                Loading Preview…
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-2 border-t bg-white p-4">
+            <Button variant="secondary" onClick={() => setPreviewOpen(false)}>
+              Close
+            </Button>
+            {selectedPreviewPayroll && (
+              <Button
+                className="bg-theme text-white hover:bg-theme/90"
+                onClick={() =>
+                  downloadPayrollPDF(selectedPreviewPayroll, previewDetailed)
+                }
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Download PDF
+              </Button>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
 
-export default AdminPayRoll;
+export default CompanyPayRoll;

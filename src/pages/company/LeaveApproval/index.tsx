@@ -276,7 +276,7 @@ const CompanyLeaveApprovalPage: React.FC = () => {
   const { toast } = useToast();
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [entriesPerPage, setEntriesPerPage] = useState(100);
+  const [entriesPerPage, setEntriesPerPage] = useState(10);
   const navigate = useNavigate();
   const user = useSelector((state: any) => state.auth?.user) || null;
 
@@ -624,14 +624,9 @@ const CompanyLeaveApprovalPage: React.FC = () => {
     setIsSheetOpen(true);
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric'
-    });
-  };
+const formatDate = (dateString: string) => {
+  return moment(dateString).startOf('day').format('DD MMM YYYY');
+};
 
   const getStatusBadgeClass = (status: string) => {
     if (status === 'approved')
@@ -1038,8 +1033,18 @@ const CompanyLeaveApprovalPage: React.FC = () => {
                     </SheetContent>
                   </Sheet>
 
-                  <Button variant={'outline'} onClick={()=> navigate('leave-report')}>Report</Button>
-                  <Button variant={'outline'} onClick={()=> navigate('leave-calendar')}>Leave Calendar</Button>
+                  <Button
+                    variant={'outline'}
+                    onClick={() => navigate('leave-report')}
+                  >
+                    Report
+                  </Button>
+                  <Button
+                    variant={'outline'}
+                    onClick={() => navigate('leave-calendar')}
+                  >
+                    Leave Calendar
+                  </Button>
                 </div>
               </div>
             </CardTitle>
@@ -1217,7 +1222,7 @@ const CompanyLeaveApprovalPage: React.FC = () => {
                     </TableBody>
                   </Table>
 
-                  {leaves.length > 50 && (
+                  {totalPages > 1 && (
                     <DynamicPagination
                       pageSize={entriesPerPage}
                       setPageSize={setEntriesPerPage}

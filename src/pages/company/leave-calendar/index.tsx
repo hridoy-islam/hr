@@ -126,27 +126,26 @@ const leaveTypeOptions = [
 ];
 
 const getNormalizedDates = (leave: Leave) => {
-  let startStr = leave.startDate;
-  let endStr = leave.endDate;
-
+  // Always prioritize leaveDays if it exists and has entries
   if (leave.leaveDays && leave.leaveDays.length > 0) {
     const dates = [...leave.leaveDays]
-      .map((d) => d.leaveDate)
-      .sort((a, b) => a.localeCompare(b));
-    startStr = dates[0];
-    endStr = dates[dates.length - 1];
+      .map((d) => moment(d.leaveDate).startOf('day'))
+      .sort((a, b) => a.valueOf() - b.valueOf());
+
+    return {
+      start: dates[0],
+      end: dates[dates.length - 1]
+    };
   }
 
-  const cleanStart = startStr
-    ? startStr.substring(0, 10)
-    : moment().format('YYYY-MM-DD');
-  const cleanEnd = endStr
-    ? endStr.substring(0, 10)
-    : moment().format('YYYY-MM-DD');
-
+  // Fallback to startDate/endDate
   return {
-    start: moment(cleanStart, 'YYYY-MM-DD').startOf('day'),
-    end: moment(cleanEnd, 'YYYY-MM-DD').startOf('day')
+    start: leave.startDate
+      ? moment(leave.startDate).startOf('day')
+      : moment().startOf('day'),
+    end: leave.endDate
+      ? moment(leave.endDate).startOf('day')
+      : moment().startOf('day')
   };
 };
 

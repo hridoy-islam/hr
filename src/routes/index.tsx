@@ -76,7 +76,6 @@ import AttendancePage from '@/pages/company/Attendance/AttendanceList';
 import AttendanceReport from '@/pages/company/Attendance/Attendance-Report';
 import QAExpiryPage from '@/pages/company/ExpiryPage/QAExpiryPage';
 import BulkAttendancePage from '@/pages/company/Attendance/csvAttendance';
-import AdminPayRoll from '@/pages/company/Payroll';
 import ViewPayroll from '@/pages/company/Payroll/view-payroll';
 import { ScheduleStatusProvider } from '@/context/scheduleStatusContext';
 import EntryAttendance from '@/pages/company/Attendance/entry-attendance';
@@ -108,6 +107,7 @@ import StaffRequestDocumentPage from '@/pages/staff/requestDocument';
 import SignatureDocumentDetail from '@/pages/company/SignatureDoc/DetailDocument';
 import LeaveReportPage from '@/pages/company/LeaveApproval/LeaveReport';
 import CompanyLeaveCalendarPage from '@/pages/company/leave-calendar';
+import CompanyPayRoll from '@/pages/company/Payroll';
 
 const SignInPage = lazy(() => import('@/pages/auth/signin'));
 
@@ -199,10 +199,9 @@ export default function AppRouter() {
       element: (
         <ProtectedRoute>
           <RoleGuard allowedRoles={['admin', 'company', 'companyAdmin']}>
-
-          <ScheduleStatusProvider>
-            <HrLayout />
-          </ScheduleStatusProvider>
+            <ScheduleStatusProvider>
+              <HrLayout />
+            </ScheduleStatusProvider>
           </RoleGuard>
         </ProtectedRoute>
       ),
@@ -285,7 +284,7 @@ export default function AppRouter() {
         // { path: 'staff-attendance', element: <StaffAttendancePage /> },
         { path: 'attendance-report', element: <AttendanceReport /> },
 
-        { path: 'payroll', element: <AdminPayRoll /> },
+        { path: 'payroll', element: <CompanyPayRoll /> },
         { path: 'payroll/:pid', element: <ViewPayroll /> },
 
         { path: 'leave-approve', element: <LeaveApprovalPage /> },
@@ -329,7 +328,10 @@ export default function AppRouter() {
         { path: 'attendance-account', element: <AttendanceAccountPage /> },
         { path: 'service-user', element: <ServiceUserPage /> },
         { path: 'signature-document', element: <SignatureDoc /> },
-        { path: 'signature-document/details', element: <SignatureDocumentDetail /> },
+        {
+          path: 'signature-document/details',
+          element: <SignatureDocumentDetail />
+        },
         { path: 'company-admin', element: <CompanyAdminPage /> },
         {
           path: 'company-admin/:caid/access-control',
