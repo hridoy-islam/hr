@@ -132,16 +132,6 @@ const CompanyPayRoll = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
-  // Filter date range (Defaulting to the current month using standard JS Date)
-  const [filterFromDate, setFilterFromDate] = useState<Date | null>(() => {
-    const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
-  });
-
-  const [filterToDate, setFilterToDate] = useState<Date | null>(() => {
-    const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-  });
 
   // Generate payroll dialog
   const [showPayloadDialog, setShowPayloadDialog] = useState(false);
@@ -167,8 +157,8 @@ const CompanyPayRoll = () => {
       const params: Record<string, any> = {
         page,
         limit: entriesPerPage,
-        companyId
-      };
+        companyId,
+     };
 
       const res = await axiosInstance.get('/hr/payroll', { params });
       setPayrollList(res.data.data.result ?? []);
@@ -221,7 +211,7 @@ const CompanyPayRoll = () => {
       setShowPayloadDialog(false);
       setPayloadFromDate(null);
       setPayloadToDate(null);
-      fetchPayrollData(1, filterFromDate, filterToDate);
+      fetchPayrollData(1,);
     } catch (err: any) {
       toast({
         title: 'Error',
@@ -234,22 +224,8 @@ const CompanyPayRoll = () => {
     }
   };
 
-  const statusBadge = (status: TPayroll['status']) => {
-    const map = {
-      approved: 'bg-green-100 text-green-700',
-      rejected: 'bg-red-100 text-red-700',
-      pending: 'bg-yellow-100 text-yellow-700'
-    } as const;
-    return (
-      <span
-        className={`rounded-full px-2.5 py-1 text-xs font-medium ${map[status]}`}
-      >
-        {status.charAt(0).toUpperCase() + status.slice(1)}
-      </span>
-    );
-  };
 
-  // ✅ Aggregate payrolls into a single object per date range
+
   // ✅ Aggregate payrolls into a single object per date range
   const aggregatedPayrolls = Object.values(
     payrollList.reduce(
@@ -310,12 +286,6 @@ const CompanyPayRoll = () => {
     )
   );
 
-  // Helper to format the summed minutes back to H:MM
-  const formatTotalDuration = (totalMins: number): string => {
-    const h = Math.floor(totalMins / 60);
-    const m = totalMins % 60;
-    return `${h}:${String(m).padStart(2, '0')}`;
-  };
 
   return (
     <div className="space-y-4">
@@ -360,13 +330,7 @@ const CompanyPayRoll = () => {
                     <TableHead className="font-semibold text-gray-700">
                       Payroll Period
                     </TableHead>
-                    {/* <TableHead className="font-semibold text-gray-700">
-                      To Date
-                    </TableHead> */}
-                    {/* <TableHead className="font-semibold text-gray-700">
-                      Created At
-                    </TableHead> */}
-                    
+           
                     <TableHead className="text-right font-semibold text-gray-700">
                       Actions
                     </TableHead>
@@ -383,18 +347,6 @@ const CompanyPayRoll = () => {
                         {moment(group.fromDate).format('DD MMM, YYYY')} -  {moment(group.toDate).format('DD MMM, YYYY')}
                       </TableCell>
 
-                      {/* To Date */}
-                      {/* <TableCell className="font-medium text-gray-800">
-                       
-                      </TableCell> */}
-                      {/* <TableCell
-                        className="max-w-[250px] truncate font-medium text-gray-900"
-                        title={group.employeeNames.join(', ')}
-                      >
-                        {moment(group.createdAt).format('DD MMM, YYYY')}{' '}
-                      </TableCell> */}
-
-                     
 
                       {/* Actions */}
                       <TableCell className="text-right">

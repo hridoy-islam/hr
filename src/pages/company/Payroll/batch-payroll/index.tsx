@@ -168,23 +168,28 @@ const BatchPayrollDetails = () => {
     companyName: ""
   };
 
+  const [currentPayrollIds, setCurrentPayrollIds] = useState<string[]>(payrollIds || []);
   const [payrolls, setPayrolls] = useState<any[]>([]);
   const [companyData, setCompanyData] = useState<any>(null);
+  
   const [loading, setLoading] = useState(true);
   const [isExportingPDF, setIsExportingPDF] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchPayrollDetails = useCallback(async () => {
-    if (!payrollIds || payrollIds.length === 0) {
+  const fetchPayrollDetails = useCallback(async (silent = false, overrideIds?: string[]) => {
+    const idsToFetch = overrideIds || currentPayrollIds;
+
+    if (!idsToFetch || idsToFetch.length === 0) {
       setLoading(false);
       return;
     }
 
-    setLoading(true);
+    if (!silent) setLoading(true);
+    setError(null);
     try {
-      const promises = payrollIds.map((id: string) => 
+      const promises = idsToFetch.map((id: string) => 
         axiosInstance.get(`/hr/payroll/${id}`)
       );
       
@@ -193,29 +198,33 @@ const BatchPayrollDetails = () => {
       
       setPayrolls(fetchedData);
       
-      if (companyId) {
+      if (companyId && !companyData) {
         const companyRes = await axiosInstance.get(`/users/${companyId}`);
         setCompanyData(companyRes.data.data);
       }
     } catch (err: any) {
       console.error(err);
-      setError('Failed to load payroll details for this batch.');
+      if (!silent) setError('Failed to load payroll details for this batch.');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
-  }, [payrollIds, companyId]);
+  }, [currentPayrollIds, companyId, companyData]);
 
   useEffect(() => {
-    fetchPayrollDetails();
-  }, [fetchPayrollDetails]);
+    // If the location state doesn't match the current state, sync it (handles browser back/forward)
+    if (location.state?.payrollIds && location.state.payrollIds !== currentPayrollIds) {
+       setCurrentPayrollIds(location.state.payrollIds);
+    }
+    fetchPayrollDetails(false, location.state?.payrollIds || currentPayrollIds);
+  }, [location.state?.payrollIds]);
 
   const handleRegeneratePayroll = async () => {
-    if (!payrollIds || payrollIds.length === 0) return;
+    if (!currentPayrollIds || currentPayrollIds.length === 0) return;
 
     setIsRegenerating(true);
     try {
-      await axiosInstance.post('/hr/payroll/regenerate', {
-        payrollIds: payrollIds,
+      const response = await axiosInstance.post('/hr/payroll/regenerate', {
+        payrollIds: currentPayrollIds,
       });
 
       toast({
@@ -223,7 +232,27 @@ const BatchPayrollDetails = () => {
         description: 'Payrolls regenerated successfully.',
       });
 
-      await fetchPayrollDetails();
+      const returnedData = response.data?.data?.createdPayrolls || response.data?.data;
+      let newIds = currentPayrollIds;
+
+      if (Array.isArray(returnedData) && returnedData.length > 0) {
+        newIds = returnedData.map((p: any) => p._id);
+        setCurrentPayrollIds(newIds); 
+
+        // ✅ FIX: Overwrite the current browser history state. 
+        // This ensures if you navigate to the detail view and click 'Back',
+        // the router loads these *new* IDs instead of the deleted old ones.
+        navigate(location.pathname, {
+          replace: true,
+          state: {
+            ...location.state,
+            payrollIds: newIds
+          }
+        });
+      }
+
+      await fetchPayrollDetails(true, newIds);
+
     } catch (err: any) {
       console.error(err);
       toast({
@@ -257,7 +286,7 @@ const BatchPayrollDetails = () => {
       const empName = emp ? `${emp.firstName} ${emp.lastName}` : 'Unknown Employee';
       const designations = getDesignation(emp);
       const monthLabel = getMonthLabelForReport(payroll.fromDate, payroll.toDate);
-      const payrollNumber = payroll.payrollNo ?? payroll.refId ?? payroll._id.slice(-8).toUpperCase();
+      const payrollNumber = payroll.payrollNo ?? payroll.refId ?? payroll._id?.slice(-8).toUpperCase();
 
       let totalMins = 0;
       let grandTot = 0;
@@ -294,10 +323,10 @@ const BatchPayrollDetails = () => {
           shiftScheduledStr,
           isDifferentShiftDate,
           startDateStr: clockIn.isValid() ? clockIn.format('DD-MM-YYYY') : '—',
-          startWeekdayStr: clockIn.isValid() ? clockIn.format('dddd') : '—', // Added start weekday
+          startWeekdayStr: clockIn.isValid() ? clockIn.format('dddd') : '—', 
           startTimeStr: clockIn.isValid() ? clockIn.format('HH:mm') : '—',
           endDateStr: clockOut.isValid() ? clockOut.format('DD-MM-YYYY') : '—',
-          endWeekdayStr: clockOut.isValid() ? clockOut.format('dddd') : '—', // Added end weekday
+          endWeekdayStr: clockOut.isValid() ? clockOut.format('dddd') : '—', 
           endTimeStr: clockOut.isValid() ? clockOut.format('HH:mm') : '—',
           workedMinutes,
           durationStr: formatDuration(workedMinutes),
@@ -319,7 +348,6 @@ const BatchPayrollDetails = () => {
     });
   }, [payrolls]);
 
-  // Calculations for Grand Total
   const overallTotalMinutes = processedBatches.reduce((acc, batch) => acc + batch.totalMinutesWorked, 0);
   const overallGrandTotal = processedBatches.reduce((acc, batch) => acc + batch.grandTotal, 0);
   const overallHoursStr = `${Math.floor(overallTotalMinutes / 60)}:${(overallTotalMinutes % 60).toString().padStart(2, '0')}`;
@@ -345,13 +373,9 @@ const BatchPayrollDetails = () => {
       ];
       const periodStr = `${moment(fromDate).format('DD-MM-YYYY')} - ${moment(toDate).format('DD-MM-YYYY')}`;
       
-      // 1. Employee Name
       sheetData.push([batch.empName, periodStr]); 
-      // 2. Designation (directly underneath)
       sheetData.push([batch.designations, '']);
-      // 3. Spacer
       sheetData.push([]); 
-      // 4. Headers
       sheetData.push(headers);
       
       batch.records.forEach((r: any) => {
@@ -464,8 +488,7 @@ const BatchPayrollDetails = () => {
               </Button>
               <Button 
                 variant="outline" 
-                                size="sm"
-
+                size="sm"
                 className="border-none bg-emerald-700 text-white hover:bg-emerald-600"
                 onClick={handleGenerateExcel}
                 disabled={processedBatches.length === 0}
@@ -483,24 +506,6 @@ const BatchPayrollDetails = () => {
                 Payroll Period: <span className="font-bold">{formattedDateRange}</span>
               </p>
             </div>
-            {/* <div className="flex gap-3">
-              <Button 
-                variant="outline" 
-                className="border-none bg-violet-600 text-white hover:bg-violet-600"
-                onClick={handleGeneratePDF}
-                disabled={isExportingPDF || processedBatches.length === 0}
-              >
-                {isExportingPDF ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Download PDF Summary'}
-              </Button>
-              <Button 
-                variant="outline" 
-                className="border-none bg-emerald-700 text-white hover:bg-emerald-600"
-                onClick={handleGenerateExcel}
-                disabled={processedBatches.length === 0}
-              >
-                Download Excel All Report
-              </Button>
-            </div> */}
           </div>
 
           {/* ── Summary Data Table ── */}
@@ -517,7 +522,12 @@ const BatchPayrollDetails = () => {
               No payroll data found for this batch.
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto relative">
+              {/* Subtle visual indication during silent regeneration */}
+              {isRegenerating && (
+                <div className="absolute inset-0 bg-white/40 z-10 flex items-center justify-center rounded cursor-not-allowed" />
+              )}
+              
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -546,7 +556,7 @@ const BatchPayrollDetails = () => {
                           size="sm" 
                           title="View Details"
                           onClick={(e) => {
-                            e.stopPropagation(); // Prevents triggering the row click
+                            e.stopPropagation(); 
                             navigate(`/company/${companyId}/payroll/${row._id}`);
                           }}
                         >
