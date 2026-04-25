@@ -108,6 +108,7 @@ import SignatureDocumentDetail from '@/pages/company/SignatureDoc/DetailDocument
 import LeaveReportPage from '@/pages/company/LeaveApproval/LeaveReport';
 import CompanyLeaveCalendarPage from '@/pages/company/leave-calendar';
 import CompanyPayRoll from '@/pages/company/Payroll';
+import BatchPayrollDetails from '@/pages/company/Payroll/batch-payroll';
 
 const SignInPage = lazy(() => import('@/pages/auth/signin'));
 
@@ -285,6 +286,7 @@ export default function AppRouter() {
         { path: 'attendance-report', element: <AttendanceReport /> },
 
         { path: 'payroll', element: <CompanyPayRoll /> },
+        { path: 'payroll/batch-details', element: <BatchPayrollDetails /> },
         { path: 'payroll/:pid', element: <ViewPayroll /> },
 
         { path: 'leave-approve', element: <LeaveApprovalPage /> },

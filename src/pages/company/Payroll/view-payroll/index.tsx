@@ -1,22 +1,19 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useSelector } from 'react-redux';
-import moment from '@/lib/moment-setup';
-import Select from 'react-select';
-
+import moment from 'moment';
 import {
-  ArrowLeft,
-  Save,
-  Mail,
-  CalendarCheck,
-  ChevronDown,
-  Download,
-  Eye,
-  RefreshCw
-} from 'lucide-react';
+  pdf,
+  Document,
+  Page,
+  Text,
+  View,
+  StyleSheet
+} from '@react-pdf/renderer';
+
+import { ArrowLeft, Loader2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import {
   Table,
   TableBody,
@@ -25,798 +22,670 @@ import {
   TableHeader,
   TableRow
 } from '@/components/ui/table';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { useToast } from '@/components/ui/use-toast';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger
-} from '@/components/ui/dropdown-menu';
 import axiosInstance from '@/lib/axios';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
-import {
-  downloadPayrollPDF,
-  getPayrollPDFBlob
-} from '../components/PayrollPDF';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle
-} from '@/components/ui/dialog';
+import { useToast } from '@/components/ui/use-toast';
 
-interface TShiftDetails {
-  _id: string;
-  name: string;
-  startTime: string;
-  endTime: string;
-  companyId: string;
-}
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-interface TRateMap {
-  [key: string]: { rate: number };
-}
+const formatDuration = (minutes: number): string => {
+  if (!minutes || minutes < 0) return '00:00';
+  const hrs = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+};
 
-interface TEmployeeRateDoc {
-  _id: string;
-  employeeId: string;
-  shiftId: TShiftDetails[];
-  rates: TRateMap;
-}
+const formatShiftScheduledDuration = (minutes: number): string => {
+  if (!minutes || minutes < 0) return '00h';
+  const hrs = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  if (mins === 0) {
+    return `${hrs.toString().padStart(2, '0')}h`;
+  }
+  return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}h`;
+};
 
-interface TAttendanceItem {
-  _id?: string;
-  employementRateId?: string;
-  shiftId?: string;
-  startDate: string;
-  startTime: string;
-  endDate: string;
-  endTime: string;
-  payRate: number;
-  note: string;
-  bankHoliday: boolean;
-  bankHolidayId?: string;
-}
+const calculateRowTotal = (
+  durationMinutes: number,
+  payRate: number
+): number => {
+  const hours = (durationMinutes ?? 0) / 60;
+  return hours * (payRate ?? 0);
+};
 
-interface TBankHoliday {
-  _id: string;
-  title: string;
-  date: string;
-}
+const getMonthLabel = (
+  fromDate: string | Date,
+  toDate: string | Date
+): string => {
+  if (!fromDate && !toDate) return 'UNKNOWN MONTH';
+  if (!fromDate) return moment(toDate).format('MMMM YYYY').toUpperCase();
+  if (!toDate) return moment(fromDate).format('MMMM YYYY').toUpperCase();
 
-interface TPayrollData {
-  _id: string;
-  userId: {
-    _id: string;
-    firstName: string;
-    lastName: string;
-    email: string;
-    phone: string;
-    departmentId?: { departmentName: string };
-    designationId?: { title: string };
-  };
-  attendanceList: TAttendanceItem[];
-  fromDate: string;
-  toDate: string;
-  totalAmount: number;
-  totalHour: number;
-  status: 'pending' | 'approved' | 'rejected';
-}
+  const mFrom = moment(fromDate);
+  const mTo = moment(toDate);
+
+  if (mFrom.isSame(mTo, 'month') && mFrom.isSame(mTo, 'year')) {
+    return mTo.format('MMMM YYYY').toUpperCase();
+  } else if (mFrom.isSame(mTo, 'year')) {
+    return `${mFrom.format('MMMM')} - ${mTo.format('MMMM YYYY')}`.toUpperCase();
+  } else {
+    return `${mFrom.format('MMMM YYYY')} - ${mTo.format('MMMM YYYY')}`.toUpperCase();
+  }
+};
+
+// ─── PDF Styles & Component ────────────────────────────────────────────────────
+
+const pdfStyles = StyleSheet.create({
+  page: { padding: 30, fontSize: 10, fontFamily: 'Helvetica' },
+  // UPDATED: Added top middle company name style
+  companyName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 20,
+    textTransform: 'uppercase'
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 20
+  },
+  title: { fontSize: 16, fontWeight: 'bold', marginBottom: 4 },
+  subtitle: { fontSize: 12, color: '#4b5563', marginBottom: 8 },
+  month: { fontSize: 12, fontWeight: 'bold' },
+  table: {
+    display: 'flex',
+    flexDirection: 'column',
+    width: 'auto',
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb'
+  },
+  tableRow: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+    minHeight: 35,
+    alignItems: 'center'
+  },
+  tableHeader: { fontWeight: 'bold', backgroundColor: '#f9fafb' },
+  colShift: {
+    width: '22%',
+    padding: 4,
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center'
+  },
+  colDate: { width: '14%', padding: 4 },
+  colTime: { width: '10%', padding: 4 },
+  colDuration: { width: '10%', padding: 4 },
+  colRate: { width: '10%', padding: 4 },
+  colTotal: { width: '10%', padding: 4, textAlign: 'right' },
+  shiftDetailText: { fontSize: 8, color: '#4b5563', marginTop: 2 },
+  shiftCrossDayText: { fontSize: 8, color: '#f97316', marginTop: 1 },
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 20,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#000'
+  },
+  footerText: { fontSize: 12, fontWeight: 'bold' }
+});
+
+const PayrollPDF = ({
+  companyName, // Added prop
+  empName,
+  designations,
+  monthLabel,
+  records,
+  totalMinutesWorked,
+  grandTotal
+}: any) => (
+  <Document>
+    <Page size="A4" style={pdfStyles.page}>
+      {/* UPDATED: Added Company Name at top middle */}
+      <Text style={pdfStyles.companyName}>{companyName}</Text>
+
+      <View style={pdfStyles.header}>
+        <View>
+          <Text style={pdfStyles.title}>{empName}</Text>
+          <Text style={pdfStyles.subtitle}>{designations}</Text>
+        </View>
+        <View>
+          <Text style={pdfStyles.month}>Period: {monthLabel}</Text>
+        </View>
+      </View>
+
+      <View style={pdfStyles.table}>
+        <View style={[pdfStyles.tableRow, pdfStyles.tableHeader]}>
+          <Text style={pdfStyles.colShift}>Shift Details</Text>
+          <Text style={pdfStyles.colDate}>Start Date</Text>
+          <Text style={pdfStyles.colTime}>Start Time</Text>
+          <Text style={pdfStyles.colDate}>End Date</Text>
+          <Text style={pdfStyles.colTime}>End Time</Text>
+          <Text style={pdfStyles.colDuration}>Duration</Text>
+          <Text style={pdfStyles.colRate}>Pay Rate</Text>
+          <Text style={pdfStyles.colTotal}>Total</Text>
+        </View>
+
+        {records.map((row: any, i: number) => (
+          <View key={i} style={pdfStyles.tableRow}>
+            {/* Shift Details Column matching UI */}
+            <View style={pdfStyles.colShift}>
+              <Text style={{ fontWeight: 'bold' }}>{row.shiftName}</Text>
+              <Text style={pdfStyles.shiftDetailText}>
+                {row.rotaStartTime} - {row.rotaEndTime} ({row.shiftScheduledStr}
+                )
+              </Text>
+              {row.isDifferentShiftDate && (
+                <Text style={pdfStyles.shiftCrossDayText}>
+                  (Cross-day Shift)
+                </Text>
+              )}
+            </View>
+
+            <Text style={pdfStyles.colDate}>{row.startDateStr}</Text>
+            <Text style={pdfStyles.colTime}>{row.startTimeStr}</Text>
+            <Text style={pdfStyles.colDate}>
+              {row.endDateStr}
+              {row.isDifferentWorkedDate ? '*' : ''}
+            </Text>
+            <Text style={pdfStyles.colTime}>{row.endTimeStr}</Text>
+            <Text style={pdfStyles.colDuration}>{row.durationStr}</Text>
+            <Text style={pdfStyles.colRate}>{row.payRate}</Text>
+            <Text style={pdfStyles.colTotal}>{row.total.toFixed(2)}</Text>
+          </View>
+        ))}
+      </View>
+
+      <View style={pdfStyles.footer}>
+        <Text style={pdfStyles.footerText}>
+          Total Hours Worked: {Math.floor(totalMinutesWorked / 60)}:
+          {(totalMinutesWorked % 60).toString().padStart(2, '0')}
+        </Text>
+        <Text style={pdfStyles.footerText}>Total: {grandTotal.toFixed(2)}</Text>
+      </View>
+    </Page>
+  </Document>
+);
+// ─── Component ────────────────────────────────────────────────────────────────
 
 const ViewPayroll = () => {
-  const { id,pid } = useParams();
+  const { id, pid } = useParams();
   const navigate = useNavigate();
-  const { toast } = useToast();
-  const { user } = useSelector((state: any) => state.auth);
+
+  const [payroll, setPayroll] = useState<any>(null);
+  const [attendanceRecords, setAttendanceRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [regenerating, setRegenerating] = useState(false);
-  const [payroll, setPayroll] = useState<TPayrollData | null>(null);
-  const [attendanceItems, setAttendanceItems] = useState<TAttendanceItem[]>([]);
-  const [employeeRates, setEmployeeRates] = useState<TEmployeeRateDoc[]>([]);
-  const [bankHolidays, setBankHolidays] = useState<TBankHoliday[]>([]);
-  const [previewOpen, setPreviewOpen] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [previewDetailed, setPreviewDetailed] = useState(false);
-  const isApproved = payroll?.status === 'approved';
-
-  const formatTime = (timeStr: string) => {
-    if (!timeStr) return '00:00';
-    const parts = timeStr.split(':');
-    if (parts.length >= 2) {
-      return `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}`;
-    }
-    return '00:00';
-  };
-
-  const formatDurationToHHmm = (minutes: number) => {
-    const hours = Math.floor(minutes / 60);
-    const mins = Math.round(minutes % 60);
-    return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
-  };
-
-  // Helper function to convert time string to minutes
-  const timeToMinutes = (timeStr: string) => {
-    if (!timeStr) return 0;
-    const parts = timeStr.split(':');
-    const hours = parseInt(parts[0], 10);
-    const minutes = parseInt(parts[1], 10);
-    return hours * 60 + minutes;
-  };
-
-  // NEW: Calculate duration based on overlap between shift and attendance
-  const calculateDurationInMinutes = (item: TAttendanceItem) => {
-    if (!item.startDate || !item.startTime || !item.endDate || !item.endTime || !item.shiftId) {
-      return 0;
-    }
-
-    // Find the shift details
-    let shiftDetails: TShiftDetails | null = null;
-    for (const rateDoc of employeeRates) {
-      const shift = rateDoc.shiftId?.find((s) => s._id === item.shiftId);
-      if (shift) {
-        shiftDetails = shift;
-        break;
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
+  const [applyAllOption, setApplyAllOption] = useState<{ rate: number | string, recordId: string } | null>(null);
+  useEffect(() => {
+    const fetchPayroll = async () => {
+      if (!pid) return setLoading(false);
+      setLoading(true);
+      try {
+        const res = await axiosInstance.get(`/hr/payroll/${pid}`);
+        setPayroll(res.data.data);
+        setAttendanceRecords(res.data.data.attendanceList || []);
+      } catch (err: any) {
+        setError('Failed to load payroll details.');
+      } finally {
+        setLoading(false);
       }
-    }
-
-    // If no shift found, calculate regular duration
-    if (!shiftDetails) {
-      const attStart = moment(item.startTime, 'HH:mm');
-      const attEnd = moment(item.endTime, 'HH:mm');
-      return moment.duration(attEnd.diff(attStart)).asMinutes();
-    }
-
-    // Convert times to minutes
-    let attendanceStart = timeToMinutes(item.startTime);
-    let attendanceEnd = timeToMinutes(item.endTime);
-    let shiftStart = timeToMinutes(shiftDetails.startTime);
-    let shiftEnd = timeToMinutes(shiftDetails.endTime);
-
-    // Normalize times to handle overnight scenarios
-    // If attendance crosses midnight (end < start), add 24 hours to end
-    if (attendanceEnd < attendanceStart) {
-      attendanceEnd += 24 * 60;
-    }
-
-    // If shift crosses midnight (end < start), add 24 hours to end
-    if (shiftEnd < shiftStart) {
-      shiftEnd += 24 * 60;
-    }
-
-    // Try multiple scenarios to find overlap
-    let overlapMinutes = 0;
-
-    // Scenario 1: Both on same day (no adjustment needed)
-    const overlap1Start = Math.max(attendanceStart, shiftStart);
-    const overlap1End = Math.min(attendanceEnd, shiftEnd);
-    const overlap1 = Math.max(0, overlap1End - overlap1Start);
-    overlapMinutes = Math.max(overlapMinutes, overlap1);
-
-    // Scenario 2: Shift is 24 hours ahead (for overnight shifts that start late previous day)
-    const shiftStart24 = shiftStart + 24 * 60;
-    const shiftEnd24 = shiftEnd + 24 * 60;
-    const overlap2Start = Math.max(attendanceStart, shiftStart24);
-    const overlap2End = Math.min(attendanceEnd, shiftEnd24);
-    const overlap2 = Math.max(0, overlap2End - overlap2Start);
-    overlapMinutes = Math.max(overlapMinutes, overlap2);
-
-    // Scenario 3: Attendance is 24 hours ahead
-    const attendanceStart24 = attendanceStart + 24 * 60;
-    const attendanceEnd24 = attendanceEnd + 24 * 60;
-    const overlap3Start = Math.max(attendanceStart24, shiftStart);
-    const overlap3End = Math.min(attendanceEnd24, shiftEnd);
-    const overlap3 = Math.max(0, overlap3End - overlap3Start);
-    overlapMinutes = Math.max(overlapMinutes, overlap3);
-
-    return overlapMinutes;
-  };
-
-  const fetchPayrollDetails = useCallback(async () => {
-    if (!pid) return;
-    try {
-      if (!payroll) setLoading(true);
-
-      const payrollRes = await axiosInstance.get(`/hr/payroll/${pid}`);
-      const data = payrollRes.data.data;
-      setPayroll(data);
-
-      const formattedList = (data.attendanceList || []).map((item: any) => ({
-        ...item,
-        startDate: moment(item.startDate).format('YYYY-MM-DD'),
-        endDate: moment(item.endDate).format('YYYY-MM-DD'),
-        startTime: formatTime(item.startTime),
-        endTime: formatTime(item.endTime),
-        bankHoliday: item.bankHoliday || false,
-        note: item.note || '',
-        payRate: item.payRate || 0,
-        employementRateId: item.employementRateId || '',
-        shiftId: item.shiftId || ''
-      }));
-      setAttendanceItems(formattedList);
-
-      if (data.userId?._id) {
-        const rateRes = await axiosInstance.get('/hr/employeerate', {
-          params: { employeeId: data.userId._id, limit: 'all' }
-        });
-        setEmployeeRates(rateRes.data.data.result || []);
-      }
-
-      const payrollYear = moment(data.fromDate).year();
-      const companyId = user?.companyId || user?._id;
-
-      if (companyId) {
-        const holidayRes = await axiosInstance.get('/hr/bank-holiday', {
-          params: { companyId, year: payrollYear, limit: 'all' }
-        });
-        setBankHolidays(holidayRes.data.data.result || []);
-      }
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: 'Failed to load details.',
-        variant: 'destructive'
-      });
-    } finally {
-      setLoading(false);
-    }
+    };
+    fetchPayroll();
   }, [pid]);
 
-  useEffect(() => {
-    fetchPayrollDetails();
-  }, [fetchPayrollDetails]);
+  const handlePayRateChange = (recordId: string, newRate: number | string) => {
+    setAttendanceRecords((prev) =>
+      prev.map((att) =>
+        att._id === recordId ? { ...att, payRate: newRate } : att
+      )
+    );
+    setApplyAllOption({ rate: newRate, recordId });
+  };
 
-  const handleRegenerate = async () => {
+  const handleApplyToAll = () => {
+    if (!applyAllOption) return;
+    setAttendanceRecords((prev) =>
+      prev.map((att) => ({ ...att, payRate: applyAllOption.rate }))
+    );
+    setApplyAllOption(null); // Hide the button after applying
+    toast({ title: 'Pay rate applied to all rows' });
+  };
+
+  const handleUpdate = async () => {
     if (!pid) return;
-    setRegenerating(true);
+    setIsUpdating(true);
     try {
-      await axiosInstance.get(`/hr/payroll/regenerate/${pid}`);
-
-      toast({
-        title: 'Success',
-        description: 'Payroll regenerated successfully. Refreshing data...'
-      });
-
-      await fetchPayrollDetails();
-    } catch (error: any) {
-      console.error(error);
-      toast({
-        title: 'Error',
-        description:
-          error?.response?.data?.message || 'Failed to regenerate payroll.',
-        variant: 'destructive'
-      });
-    } finally {
-      setRegenerating(false);
-    }
-  };
-
-  const getShiftSchedule = (shiftId: string) => {
-    if (!employeeRates.length || !shiftId) return '';
-    for (const doc of employeeRates) {
-      const shift = doc.shiftId?.find((s) => s._id === shiftId);
-      if (shift) {
-        return `${formatTime(shift.startTime)} - ${formatTime(shift.endTime)}`;
-      }
-    }
-    return '';
-  };
-
-  const getCalculatedRate = (rateDocId: string, dateStr: string) => {
-    const rateDoc = employeeRates.find((d) => d._id === rateDocId);
-    if (!rateDoc || !dateStr) return 0;
-    const dayOfWeek = moment(dateStr).format('dddd');
-    const dayRate = rateDoc.rates[dayOfWeek as keyof TRateMap];
-    return dayRate ? dayRate.rate : 0;
-  };
-
-  const updateRow = (
-    index: number,
-    field: keyof TAttendanceItem,
-    value: any
-  ) => {
-    if (isApproved) return;
-    const newItems = [...attendanceItems];
-    const currentRow = { ...newItems[index], [field]: value };
-
-    if (field === 'shiftId') {
-      const targetRateDoc = employeeRates.find((doc) =>
-        doc.shiftId?.some((s) => s._id === value)
-      );
-      if (targetRateDoc) {
-        currentRow.employementRateId = targetRateDoc._id;
-        currentRow.payRate = getCalculatedRate(
-          targetRateDoc._id,
-          currentRow.startDate
-        );
-      }
-    }
-
-    if (field === 'bankHoliday' && value === false) {
-      currentRow.bankHolidayId = undefined;
-      if (currentRow.employementRateId) {
-        currentRow.payRate = getCalculatedRate(
-          currentRow.employementRateId,
-          currentRow.startDate
-        );
-      }
-    }
-
-    newItems[index] = currentRow;
-    setAttendanceItems(newItems);
-  };
-
-  const handlePreview = async (detailed: boolean) => {
-    if (!payroll) return;
-    try {
-      const blob = await getPayrollPDFBlob(payroll, detailed);
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-
-      const url = URL.createObjectURL(blob);
-      setPreviewUrl(url);
-      setPreviewDetailed(detailed);
-      setPreviewOpen(true);
-    } catch (e) {
-      toast({
-        title: 'Error',
-        description: 'Could not generate preview',
-        variant: 'destructive'
-      });
-    }
-  };
-
-  useEffect(() => {
-    return () => {
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-    };
-  }, [previewUrl]);
-
-  const handleSaveWithStatus = async (newStatus: 'pending' | 'approved') => {
-    if (!pid) return;
-    setSaving(true);
-    try {
-      let totalMinutesAccum = 0;
-      let totalAmountAccum = 0;
-
-      const updatedList = attendanceItems.map((item) => {
-        const mins = calculateDurationInMinutes(item);
-        const hours = mins / 60;
-        const lineTotal = hours * Number(item.payRate || 0);
-
-        totalMinutesAccum += mins;
-        totalAmountAccum += lineTotal;
-
-        return item;
-      });
-
       const payload = {
-        attendanceList: updatedList,
-        totalHour: parseFloat(totalMinutesAccum.toFixed(2)),
-        totalAmount: parseFloat(totalAmountAccum.toFixed(2)),
-        status: newStatus
+        attendanceList: attendanceRecords.map((att) => ({
+          _id: att._id,
+          attendanceId: att.attendanceId?._id,
+          payRate: att.payRate,
+          duration: att.duration
+        }))
       };
-
       await axiosInstance.patch(`/hr/payroll/${pid}`, payload);
-
+      toast({ title: 'Payroll updated successfully!' });
+    } catch (err: any) {
       toast({
-        title: 'Success',
-        description: `Payroll ${newStatus === 'approved' ? 'approved' : 'saved as pending'} successfully.`
-      });
-
-      navigate(-1);
-
-      setPayroll((prev) => (prev ? { ...prev, ...payload } : null));
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: 'Failed to save changes.',
+        title: err.response?.data?.message || 'Failed to update payroll',
         variant: 'destructive'
       });
     } finally {
-      setSaving(false);
+      setIsUpdating(false);
+    }
+  };
+  const getMonthLabelForReport = (
+    fromDate: string | Date,
+    toDate: string | Date
+  ): string => {
+    if (!fromDate && !toDate) return 'UNKNOWN PERIOD';
+    if (!fromDate) return moment(toDate).format('D MMM, YYYY');
+    if (!toDate) return moment(fromDate).format('D MMM, YYYY');
+
+    const mFrom = moment(fromDate).format('DD MMM, YYYY');
+    const mTo = moment(toDate).format('DD MMM, YYYY');
+
+    return `${mFrom} - ${mTo}`;
+  };
+  // ─── Data Extraction & Calculations ───────────────────────────────────────────
+  const empName = payroll?.userId
+    ? `${payroll.userId?.firstName} ${payroll.userId?.lastName}`
+    : 'Unknown Employee';
+  const designations = Array.isArray(payroll?.userId?.designationId)
+    ? payroll.userId.designationId.map((d: any) => d.title).join(', ')
+    : 'No Designation';
+  const monthLabel = payroll
+    ? getMonthLabelForReport(payroll.fromDate, payroll.toDate)
+    : '';
+
+  // UPDATED: Extracted company name
+  const companyName = payroll?.companyId?.name || 'Unknown Company';
+
+  // Process data once for UI, PDF, and CSV
+  const processedData = useMemo(() => {
+    let totalMins = 0;
+    let grandTot = 0;
+
+    const records = attendanceRecords.map((att) => {
+      const clockIn = moment(att.attendanceId?.clockIn);
+      const clockOut = moment(att.attendanceId?.clockOut);
+
+      const workedMinutes = att.duration;
+      const isDifferentWorkedDate =
+        clockIn.isValid() &&
+        clockOut.isValid() &&
+        clockIn.format('YYYY-MM-DD') !== clockOut.format('YYYY-MM-DD');
+
+      const shiftName = att.attendanceId?.rotaId?.shiftName || '—';
+      const rotaStartTime = att.attendanceId?.rotaId?.startTime;
+      const rotaEndTime = att.attendanceId?.rotaId?.endTime;
+      const rotaStartDate = att.attendanceId?.rotaId?.startDate;
+      const rotaEndDate = att.attendanceId?.rotaId?.endDate;
+
+      const rStart = moment(`${rotaStartDate} ${rotaStartTime}`);
+      const rEnd = moment(`${rotaEndDate} ${rotaEndTime}`);
+      const shiftScheduledMins =
+        rStart.isValid() && rEnd.isValid()
+          ? Math.max(0, rEnd.diff(rStart, 'minutes'))
+          : 0;
+      const shiftScheduledStr =
+        formatShiftScheduledDuration(shiftScheduledMins);
+      const isDifferentShiftDate = rotaStartDate !== rotaEndDate;
+
+      const total = calculateRowTotal(workedMinutes, att.payRate);
+      totalMins += workedMinutes;
+      grandTot += total;
+
+      return {
+        ...att,
+        shiftName,
+        rotaStartTime,
+        rotaEndTime,
+        shiftScheduledMins,
+        shiftScheduledStr,
+        isDifferentShiftDate,
+        startDateStr: clockIn.isValid() ? clockIn.format('DD-MM-YYYY') : '—',
+        startTimeStr: clockIn.isValid() ? clockIn.format('HH:mm') : '—',
+        endDateStr: clockOut.isValid() ? clockOut.format('DD-MM-YYYY') : '—',
+        endTimeStr: clockOut.isValid() ? clockOut.format('HH:mm') : '—',
+        workedMinutes,
+        durationStr: formatDuration(workedMinutes),
+        isDifferentWorkedDate,
+        total
+      };
+    });
+
+    return { records, totalMinutesWorked: totalMins, grandTotal: grandTot };
+  }, [attendanceRecords]);
+
+  // ─── Export Handlers ──────────────────────────────────────────────────────────
+
+  const handleGenerateCSV = () => {
+    // 1. Employee Info Meta Row (wrapped in quotes)
+    const metaRow = [`"${empName}"`, `"${monthLabel}"`];
+
+    // 2. Table Headers
+    const headers = [
+      'Shift Details',
+      'Start Date',
+      'Start Time',
+      'End Date',
+      'End Time',
+      'Duration',
+      'Pay Rate',
+      'Total'
+    ];
+
+    // 3. Process Data Rows
+    const rows = processedData.records.map((r) => {
+      // Build shiftCell with the EXACT logic you want:
+      // - If shiftName is missing/empty/—, show only times
+      // - Otherwise show "ShiftName : Start - End"
+      // - Append (Cross-day Shift) if isDifferentWorkedDate is true
+      const hasShiftName =
+        r.shiftName && r.shiftName.trim() !== '' && r.shiftName !== '—';
+      let shiftCell = hasShiftName
+        ? `${r.shiftName} : ${r.rotaStartTime} - ${r.rotaEndTime}`
+        : `${r.rotaStartTime} - ${r.rotaEndTime}`;
+
+      if (r.isDifferentWorkedDate) {
+        shiftCell += '\n(Cross-day Shift)';
+      }
+
+      return [
+        `"${shiftCell}"`, // quoted to preserve newlines
+        r.startDateStr,
+        r.startTimeStr,
+        `"${r.endDateStr}${r.isDifferentWorkedDate ? ' *' : ''}"`,
+        r.endTimeStr,
+        r.durationStr,
+        r.payRate ?? 0,
+        r.total.toFixed(2)
+      ];
+    });
+
+    // 4. Footer Totals
+    const totalHoursStr = `${Math.floor(processedData.totalMinutesWorked / 60)}:${(processedData.totalMinutesWorked % 60).toString().padStart(2, '0')}`;
+    rows.push(['', '', '', '', '', '', '', '']); // spacing
+    rows.push([
+      '',
+      '',
+      '',
+      '',
+      '"Total Hours Worked:"',
+      `"${totalHoursStr}"`,
+      '',
+      processedData.grandTotal.toFixed(2)
+    ]);
+
+    // 5. Combine and download
+    const csvContent = [metaRow, [], headers, ...rows]
+      .map((e) => e.join(','))
+      .join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `Payroll_${empName.replace(/\s+/g, '_')}_${monthLabel}.csv`;
+    link.click();
+  };
+
+  const handleGeneratePDF = async () => {
+    setIsExporting(true);
+    try {
+      const blob = await pdf(
+        <PayrollPDF
+          companyName={companyName} // UPDATED: Passed companyName
+          empName={empName}
+          designations={designations}
+          monthLabel={monthLabel}
+          records={processedData.records}
+          totalMinutesWorked={processedData.totalMinutesWorked}
+          grandTotal={processedData.grandTotal}
+        />
+      ).toBlob();
+
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `Payroll_${empName.replace(/\s+/g, '_')}_${monthLabel}.pdf`;
+      link.click();
+    } catch (err) {
+      toast({ title: 'Failed to generate PDF', variant: 'destructive' });
+    } finally {
+      setIsExporting(false);
     }
   };
 
-  const customSelectStyles = {
-    control: (provided: any) => ({
-      ...provided,
-      minHeight: '32px',
-      height: '32px',
-      fontSize: '12px',
-      borderColor: '#e2e8f0'
-    }),
-    valueContainer: (provided: any) => ({
-      ...provided,
-      height: '32px',
-      padding: '0 6px'
-    }),
-    input: (provided: any) => ({
-      ...provided,
-      margin: '0px'
-    }),
-    indicatorSeparator: () => ({ display: 'none' }),
-    indicatorsContainer: (provided: any) => ({
-      ...provided,
-      height: '32px'
-    }),
-    menuPortal: (base: any) => ({ ...base, zIndex: 9999 })
-  };
+  // ─── Render ───────────────────────────────────────────────────────────────────
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <BlinkingDots size="large" />
+      <div className="flex min-h-[50vh] items-center justify-center rounded-md bg-white p-5 shadow-sm">
+        <BlinkingDots />
       </div>
     );
   }
 
-  if (!payroll) return <div>Not Found</div>;
-
-  const shiftOptions = employeeRates.flatMap((rateDoc) =>
-    (rateDoc.shiftId || []).map((s) => ({
-      value: s._id,
-      label: s.name
-    }))
-  );
-
-  const totalMinutes = attendanceItems.reduce(
-    (acc, item) => acc + calculateDurationInMinutes(item),
-    0
-  );
-  const totalAmount = attendanceItems.reduce((acc, item) => {
-    const mins = calculateDurationInMinutes(item);
-    return acc + (mins / 60) * (item.payRate || 0);
-  }, 0);
+  if (error || !payroll) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center rounded-md bg-white p-5 font-medium text-red-500 shadow-sm">
+        {error || 'Payroll not found.'}
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-3 rounded-md bg-white p-5 shadow-sm">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Payroll Details</h1>
-        <div className="flex flex-row items-center gap-2">
-          <Button variant="outline" onClick={() => navigate(-1)}>
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back
-          </Button>
-          {!isApproved && (
-            <Button
-              onClick={handleRegenerate}
-              disabled={regenerating || saving}
-            >
-              <RefreshCw
-                className={`mr-2 h-4 w-4 ${regenerating ? 'animate-spin' : ''}`}
-              />
-              {regenerating ? 'Regenerating...' : 'Regenerate'}
-            </Button>
-          )}
+    <div className="space-y-4">
+      <div className=" flex min-h-[70vh] flex-col justify-between bg-white p-5 shadow-sm">
+        <div>
+          {/* Header Section */}
+          <div className="mb-8 grid grid-cols-2 items-start gap-4">
+            <div className="col-span-1 space-y-2">
+              <h2 className="text-xl font-bold tracking-tight">{empName}</h2>
+              <p className="text-sm font-semibold text-gray-700">
+                {designations}
+              </p>
+              <p className="mt-4 text-sm font-bold tracking-wide">
+                Payroll Period: {monthLabel}
+              </p>
+            </div>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button>
-                <Eye className="mr-2 h-4 w-4" />
-                Preview
-                <ChevronDown className="ml-2 h-4 w-4" />
+            <div className="col-span-1 flex justify-end gap-3">
+              <Button onClick={() => navigate(-1)} className="-ml-3">
+                <ArrowLeft className="mr-2 h-4 w-4" /> Back
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                onClick={() => handlePreview(false)}
-                className="cursor-pointer"
+              <Button
+                variant="outline"
+                className="border-none bg-violet-600 hover:bg-violet-600"
+                onClick={handleGeneratePDF}
+                disabled={isExporting}
               >
-                Normal Preview (Summary)
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => handlePreview(true)}
-                className="cursor-pointer"
-              >
-                Detailed Preview (Full)
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-            <DialogContent className="flex h-[90vh] max-w-4xl flex-col gap-0 p-0">
-              <DialogHeader className="border-b px-6 py-4">
-                <DialogTitle>
-                  Payroll Preview ({previewDetailed ? 'Detailed' : 'Summary'})
-                </DialogTitle>
-              </DialogHeader>
-
-              <div className="relative w-full flex-1 bg-gray-100">
-                {previewUrl ? (
-                  <embed
-                    src={`${previewUrl}#toolbar=0&navpanes=0&scrollbar=0`}
-                    type="application/pdf"
-                    width="100%"
-                    height="100%"
-                    className="absolute inset-0"
-                  />
+                {isExporting ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
-                  <div className="flex h-full items-center justify-center text-gray-500">
-                    Loading Preview...
-                  </div>
+                  'Download PDF'
                 )}
-              </div>
-
-              <div className="flex justify-end gap-2 border-t bg-white p-4">
-                <Button
-                  variant="secondary"
-                  onClick={() => setPreviewOpen(false)}
-                >
-                  Close
-                </Button>
-                <Button
-                  onClick={() => downloadPayrollPDF(payroll!, previewDetailed)}
-                >
-                  <Download className="mr-2 h-4 w-4" />
-                  Download PDF
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-
-          {!isApproved ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  disabled={saving || regenerating}
-                  className="bg-theme text-white"
-                >
-                  <Save className="mr-2 h-4 w-4" />
-                  {saving ? '⏳ Saving...' : 'Save Changes'}
-                  <ChevronDown className="ml-2 h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem
-                  onClick={() => handleSaveWithStatus('pending')}
-                  className="cursor-pointer"
-                >
-                  Save and Pending
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => handleSaveWithStatus('approved')}
-                  className="cursor-pointer"
-                >
-                  Save and Approved
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : (
-            <div className="rounded-full bg-green-100 px-4 py-2 font-medium text-green-800">
-              Status: Approved
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <div className="flex flex-row items-center gap-4">
-            <p className="text-lg font-bold text-gray-900">
-              {payroll.userId.firstName} {payroll.userId.lastName}
-            </p>
-            <div className="flex items-center space-x-4 text-lg">
-              <span className="flex items-center">
-                <Mail className="mr-1 h-5 w-5" /> {payroll.userId.email}
-              </span>
-              <span className="flex items-center">
-                <CalendarCheck className="mr-1 h-5 w-5" />
-                {moment(payroll.fromDate).format('DD MMM')} -{' '}
-                {moment(payroll.toDate).format('DD MMM YYYY')}
-              </span>
-              <span
-                className={`rounded-full px-3 py-1 text-lg font-medium ${
-                  payroll.status === 'approved'
-                    ? 'bg-green-100 text-green-800'
-                    : payroll.status === 'rejected'
-                      ? 'bg-red-100 text-red-800'
-                      : 'bg-yellow-100 text-yellow-800'
-                }`}
+              </Button>
+              <Button
+                variant="outline"
+                className="border-none bg-emerald-700 hover:bg-emerald-600"
+                onClick={handleGenerateCSV}
               >
-                {payroll.status.charAt(0).toUpperCase() +
-                  payroll.status.slice(1)}
-              </span>
+                Download Excel
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleUpdate}
+                disabled={isUpdating}
+              >
+                {isUpdating ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  'Update'
+                )}
+              </Button>
             </div>
+          </div>
+
+          {/* Table Section */}
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-b-2 border-gray-200">
+                  <TableHead className="font-extrabold  text-black">
+                    Shift Name
+                  </TableHead>
+                  <TableHead className="font-extrabold  text-black">
+                    Start Date
+                  </TableHead>
+                  <TableHead className="font-extrabold  text-black">
+                    Start Time
+                  </TableHead>
+                  <TableHead className="font-extrabold  text-black">
+                    End Date
+                  </TableHead>
+                  <TableHead className="font-extrabold  text-black">
+                    End Time
+                  </TableHead>
+                  <TableHead className="font-extrabold  text-black">
+                    Duration
+                  </TableHead>
+                  <TableHead className="w-28 font-extrabold  text-black">
+                    Pay Rate
+                  </TableHead>
+                  <TableHead className="text-right font-extrabold  text-black">
+                    Total
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {processedData.records.length > 0 ? (
+                  processedData.records.map((att: any) => (
+                    <TableRow
+                      key={att._id}
+                      className="border-b border-gray-100 hover:bg-gray-50/50"
+                    >
+                      <TableCell>
+                        <div className="font-semibold text-gray-900">
+                          {att.shiftName}
+                        </div>
+                        <div className="text-xs font-medium text-gray-500">
+                          {att.rotaStartTime} - {att.rotaEndTime} (
+                          {att.shiftScheduledStr})
+                        </div>
+                        {att.isDifferentShiftDate && (
+                          <span className="text-[10px] font-semibold text-orange-500">
+                            (Cross-day Shift)
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        {att.startDateStr}
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        {att.startTimeStr}
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        {att.endDateStr}
+                        {att.isDifferentWorkedDate && (
+                          <span className="ml-1 text-[10px] text-orange-500">
+                            *
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        {att.endTimeStr}
+                      </TableCell>
+                      <TableCell className="font-semibold text-blue-600">
+                        {att.durationStr}
+                      </TableCell>
+                      <TableCell className="align-top">
+                        <div className="flex flex-col gap-2 pt-1">
+                          <Input
+        type="number"
+        min={0}
+        step={0.01}
+        // Allow the input to be empty, otherwise fallback to 0
+        value={att.payRate === '' ? '' : (att.payRate ?? 0)}
+        onChange={(e) => {
+          const val = e.target.value;
+          // Pass empty string directly, otherwise parse it
+          handlePayRateChange(
+            att._id,
+            val === '' ? '' : Number(val)
+          );
+        }}
+        // Re-apply 0 if the user leaves the input completely blank
+        onBlur={(e) => {
+          if (e.target.value === '') {
+             handlePayRateChange(att._id, 0);
+          }
+        }}
+        className="h-8 w-full font-semibold"
+      />
+                          {/* Show Apply to All button only for the active row */}
+                          {applyAllOption?.recordId === att._id && (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={handleApplyToAll}
+                              className="h-7 bg-theme px-2 text-[10px] text-white hover:bg-theme/90"
+                            >
+                              Apply to all
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right font-bold text-gray-900">
+                        {att.total.toFixed(2)}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell
+                      colSpan={8}
+                      className="h-24 text-center font-medium text-gray-500"
+                    >
+                      No attendance records found for this period.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+
+        {/* Footer Totals Section */}
+        <div className="mt-12 flex items-center justify-between border-t border-gray-200 pt-6 text-lg">
+          <div className="font-bold tracking-wide">
+            Total Hours Worked -{' '}
+            <span className="text-black">
+              {Math.floor(processedData.totalMinutesWorked / 60)}:
+              {(processedData.totalMinutesWorked % 60)
+                .toString()
+                .padStart(2, '0')}
+            </span>
+          </div>
+          <div className="font-extrabold tracking-wide">
+            Total:{' '}
+            <span className="text-black">
+              {processedData.grandTotal.toFixed(2)}
+            </span>
           </div>
         </div>
       </div>
-
-      <Card className="overflow-hidden shadow-none">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[160px]">Shift</TableHead>
-                <TableHead className="w-[120px]">Schedule</TableHead>
-                <TableHead className="w-[110px]">Start Date</TableHead>
-                <TableHead className="w-[90px]">Start Time</TableHead>
-                <TableHead className="w-[110px]">End Date</TableHead>
-                <TableHead className="w-[90px]">End Time</TableHead>
-                <TableHead className="w-[100px]">Duration</TableHead>
-                <TableHead className="w-[100px]">Pay Rate</TableHead>
-                <TableHead className="w-[100px] text-right">Total</TableHead>
-                <TableHead className="w-[200px]">Note</TableHead>
-                <TableHead className="w-[220px]">Bank Holiday</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {attendanceItems.map((item, index) => {
-                const durationMinutes = calculateDurationInMinutes(item);
-                const durationHours = durationMinutes / 60;
-                const lineTotal = durationHours * Number(item.payRate || 0);
-
-                return (
-                  <TableRow key={index} className="">
-                    {/* Shift Dropdown */}
-                    <TableCell>
-                      {isApproved ? (
-                        <span className="">
-                          {shiftOptions.find(
-                            (opt) => opt.value === item.shiftId
-                          )?.label || '-'}
-                        </span>
-                      ) : (
-                        <Select
-                          options={shiftOptions}
-                          value={shiftOptions.find(
-                            (opt) => opt.value === item.shiftId
-                          )}
-                          onChange={(option) =>
-                            updateRow(index, 'shiftId', option?.value)
-                          }
-                          styles={customSelectStyles}
-                          menuPortalTarget={document.body}
-                          placeholder="Select..."
-                          isDisabled={isApproved}
-                        />
-                      )}
-                    </TableCell>
-
-                    <TableCell className="text-xs font-medium">
-                      {getShiftSchedule(item.shiftId || '')}
-                    </TableCell>
-
-                    <TableCell>
-                      {moment(item.startDate).format('DD-MM-YYYY')}
-                    </TableCell>
-
-                    <TableCell className="font-medium">
-                      {item.startTime}
-                    </TableCell>
-
-                    <TableCell>
-                      {moment(item.endDate).format('DD-MM-YYYY')}
-                    </TableCell>
-
-                    <TableCell className="font-medium">
-                      {item.endTime}
-                    </TableCell>
-
-                    <TableCell className="font-bold text-theme">
-                      {formatDurationToHHmm(durationMinutes)}
-                    </TableCell>
-
-                    <TableCell>
-                      {item.bankHoliday ? (
-                        <Input
-                          type="number"
-                          className="h-8 w-20 border-blue-300 bg-white"
-                          value={item.payRate}
-                          onChange={(e) =>
-                            updateRow(
-                              index,
-                              'payRate',
-                              parseFloat(e.target.value)
-                            )
-                          }
-                          disabled={isApproved}
-                        />
-                      ) : (
-                        <span className="block  text-center font-medium">
-                          £{item.payRate?.toFixed(2)}
-                        </span>
-                      )}
-                    </TableCell>
-
-                    <TableCell className="text-right font-bold ">
-                      £{lineTotal.toFixed(2)}
-                    </TableCell>
-
-                    <TableCell>
-                      {isApproved ? (
-                        <span className="">{item.note || '-'}</span>
-                      ) : (
-                        <Textarea
-                          value={item.note}
-                          onChange={(e) =>
-                            updateRow(index, 'note', e.target.value)
-                          }
-                          className="h-[35px] min-h-[35px] text-xs"
-                          placeholder="Note"
-                          disabled={isApproved}
-                        />
-                      )}
-                    </TableCell>
-
-                    <TableCell>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`bh-${index}`}
-                          checked={item.bankHoliday}
-                          onCheckedChange={(checked) =>
-                            updateRow(index, 'bankHoliday', checked)
-                          }
-                          disabled={isApproved}
-                        />
-                        {item.bankHoliday && (
-                          <div className="w-full">
-                            <Select
-                              options={bankHolidays
-                                .filter(
-                                  (h) =>
-                                    moment(h.date).year() ===
-                                    moment(item.startDate).year()
-                                )
-                                .map((h) => ({ value: h._id, label: h.title }))}
-                              value={
-                                bankHolidays.find(
-                                  (h) => h._id === item.bankHolidayId
-                                )
-                                  ? {
-                                      value: item.bankHolidayId,
-                                      label: bankHolidays.find(
-                                        (h) => h._id === item.bankHolidayId
-                                      )?.title
-                                    }
-                                  : null
-                              }
-                              onChange={(opt) =>
-                                updateRow(index, 'bankHolidayId', opt?.value)
-                              }
-                              styles={{
-                                ...customSelectStyles,
-                                control: (base) => ({
-                                  ...base,
-                                  minHeight: '30px',
-                                  height: '30px',
-                                  fontSize: '11px',
-                                  borderColor: '#fecaca',
-                                  backgroundColor: '#fef2f2'
-                                })
-                              }}
-                              menuPortalTarget={document.body}
-                              placeholder="Holiday..."
-                              isDisabled={isApproved}
-                            />
-                          </div>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-
-              <TableRow className="border-t-2 font-bold">
-                <TableCell colSpan={6} className="text-right ">
-                  TOTALS:
-                </TableCell>
-                <TableCell className="text-lg text-theme">
-                  {formatDurationToHHmm(totalMinutes)}
-                </TableCell>
-                <TableCell></TableCell>
-                <TableCell className="text-right text-lg text-gray-900">
-                  £{totalAmount.toFixed(2)}
-                </TableCell>
-                <TableCell colSpan={2}></TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
-        </div>
-      </Card>
     </div>
   );
 };
