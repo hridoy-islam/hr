@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useLocation, useParams, useNavigate } from 'react-router-dom';
 import axiosInstance from '@/lib/axios';
 import moment from 'moment';
@@ -12,7 +12,15 @@ import {
   TableHeader,
   TableRow
 } from '@/components/ui/table';
-import { ArrowLeft, Eye, Loader2 } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { ArrowLeft, Eye, Loader2, RefreshCw } from 'lucide-react';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 import { useToast } from '@/components/ui/use-toast';
 import * as XLSX from 'xlsx';
@@ -106,8 +114,6 @@ const BatchSummaryPayrollPDF = ({
   return (
     <Document>
       <Page size="A4" style={pdfStyles.page}>
-        
-        {/* Top Middle Header */}
         <View style={pdfStyles.headerContainer}>
           <Text style={pdfStyles.companyName}>{companyName || "Company Name"}</Text>
           <Text style={pdfStyles.title}>Payroll Summary Report</Text>
@@ -115,7 +121,6 @@ const BatchSummaryPayrollPDF = ({
         </View>
 
         <View style={pdfStyles.table}>
-          {/* Table Header */}
           <View style={[pdfStyles.tableRow, pdfStyles.tableHeader]}>
             <Text style={pdfStyles.colRef}>Payroll Number</Text>
             <Text style={pdfStyles.colEmp}>Employee Name</Text>
@@ -124,7 +129,6 @@ const BatchSummaryPayrollPDF = ({
             <Text style={pdfStyles.colTotal}>Total Amount</Text>
           </View>
 
-          {/* Table Body */}
           {batches.map((row: any, i: number) => {
             const hoursStr = `${Math.floor(row.totalMinutesWorked / 60)}:${(row.totalMinutesWorked % 60).toString().padStart(2, '0')}`;
             return (
@@ -138,13 +142,11 @@ const BatchSummaryPayrollPDF = ({
             )
           })}
           
-          {/* Table Footer / Grand Total */}
           <View style={pdfStyles.footerRow} wrap={false}>
             <Text style={pdfStyles.colFooterLabel}>Total</Text>
             <Text style={pdfStyles.colHours}>{overallHoursStr}</Text>
             <Text style={pdfStyles.colTotal}>{overallGrandTotal.toFixed(2)}</Text>
           </View>
-
         </View>
       </Page>
     </Document>
@@ -167,40 +169,72 @@ const BatchPayrollDetails = () => {
   };
 
   const [payrolls, setPayrolls] = useState<any[]>([]);
-  const [companyData, setCompanyData] = useState(null);
+  const [companyData, setCompanyData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isExportingPDF, setIsExportingPDF] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const fetchPayrollDetails = useCallback(async () => {
+    if (!payrollIds || payrollIds.length === 0) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const promises = payrollIds.map((id: string) => 
+        axiosInstance.get(`/hr/payroll/${id}`)
+      );
+      
+      const responses = await Promise.all(promises);
+      const fetchedData = responses.map(res => res.data.data);
+      
+      setPayrolls(fetchedData);
+      
+      if (companyId) {
+        const companyRes = await axiosInstance.get(`/users/${companyId}`);
+        setCompanyData(companyRes.data.data);
+      }
+    } catch (err: any) {
+      console.error(err);
+      setError('Failed to load payroll details for this batch.');
+    } finally {
+      setLoading(false);
+    }
+  }, [payrollIds, companyId]);
+
   useEffect(() => {
-    const fetchPayrollDetails = async () => {
-      if (!payrollIds || payrollIds.length === 0) {
-        setLoading(false);
-        return;
-      }
-
-      setLoading(true);
-      try {
-        const promises = payrollIds.map((id: string) => 
-          axiosInstance.get(`/hr/payroll/${id}`)
-        );
-        
-        const responses = await Promise.all(promises);
-        const fetchedData = responses.map(res => res.data.data);
-        
-        setPayrolls(fetchedData);
-        const companyData = await axiosInstance.get(`/users/${companyId}`)
-        setCompanyData (companyData.data.data)
-      } catch (err: any) {
-        console.error(err);
-        setError('Failed to load payroll details for this batch.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchPayrollDetails();
-  }, [payrollIds]);
+  }, [fetchPayrollDetails]);
+
+  const handleRegeneratePayroll = async () => {
+    if (!payrollIds || payrollIds.length === 0) return;
+
+    setIsRegenerating(true);
+    try {
+      await axiosInstance.post('/hr/payroll/regenerate', {
+        payrollIds: payrollIds,
+      });
+
+      toast({
+        title: 'Success',
+        description: 'Payrolls regenerated successfully.',
+      });
+
+      await fetchPayrollDetails();
+    } catch (err: any) {
+      console.error(err);
+      toast({
+        title: 'Regeneration Failed',
+        description: err.response?.data?.message || 'Something went wrong while regenerating.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
 
   const formattedDateRange = fromDate && toDate 
     ? `${moment(fromDate).format('DD MMM YYYY')} - ${moment(toDate).format('DD MMM YYYY')}`
@@ -223,7 +257,7 @@ const BatchPayrollDetails = () => {
       const empName = emp ? `${emp.firstName} ${emp.lastName}` : 'Unknown Employee';
       const designations = getDesignation(emp);
       const monthLabel = getMonthLabelForReport(payroll.fromDate, payroll.toDate);
-      const payrollNumber = payroll.refId ?? payroll._id.slice(-8).toUpperCase();
+      const payrollNumber = payroll.payrollNo ?? payroll.refId ?? payroll._id.slice(-8).toUpperCase();
 
       let totalMins = 0;
       let grandTot = 0;
@@ -232,7 +266,7 @@ const BatchPayrollDetails = () => {
         const clockIn = moment(att.attendanceId?.clockIn);
         const clockOut = moment(att.attendanceId?.clockOut);
 
-        const workedMinutes =  att.duration ;
+        const workedMinutes =  att.duration;
         const isDifferentWorkedDate = clockIn.isValid() && clockOut.isValid() && clockIn.format('YYYY-MM-DD') !== clockOut.format('YYYY-MM-DD');
 
         const shiftName = att.attendanceId?.rotaId?.shiftName || '—';
@@ -260,8 +294,10 @@ const BatchPayrollDetails = () => {
           shiftScheduledStr,
           isDifferentShiftDate,
           startDateStr: clockIn.isValid() ? clockIn.format('DD-MM-YYYY') : '—',
+          startWeekdayStr: clockIn.isValid() ? clockIn.format('dddd') : '—', // Added start weekday
           startTimeStr: clockIn.isValid() ? clockIn.format('HH:mm') : '—',
           endDateStr: clockOut.isValid() ? clockOut.format('DD-MM-YYYY') : '—',
+          endWeekdayStr: clockOut.isValid() ? clockOut.format('dddd') : '—', // Added end weekday
           endTimeStr: clockOut.isValid() ? clockOut.format('HH:mm') : '—',
           workedMinutes,
           durationStr: formatDuration(workedMinutes),
@@ -295,15 +331,27 @@ const BatchPayrollDetails = () => {
 
     processedBatches.forEach((batch, index) => {
       const sheetData: any[][] = [];
-      const headers = ['Shift Details', 'Start Date', 'Start Time', 'End Date', 'End Time', 'Duration', 'Pay Rate', 'Total'];
+      const headers = [
+        'Shift Details', 
+        'Start Date', 
+        'Weekdays', 
+        'Start Time', 
+        'End Date', 
+        'Weekdays', 
+        'End Time', 
+        'Duration', 
+        'Pay Rate', 
+        'Total'
+      ];
       const periodStr = `${moment(fromDate).format('DD-MM-YYYY')} - ${moment(toDate).format('DD-MM-YYYY')}`;
       
-      sheetData.push([
-        `${batch.empName}`, 
-        // `Designation: ${batch.designations}`, 
-        `${periodStr}`
-      ]);      
+      // 1. Employee Name
+      sheetData.push([batch.empName, periodStr]); 
+      // 2. Designation (directly underneath)
+      sheetData.push([batch.designations, '']);
+      // 3. Spacer
       sheetData.push([]); 
+      // 4. Headers
       sheetData.push(headers);
       
       batch.records.forEach((r: any) => {
@@ -323,8 +371,10 @@ const BatchPayrollDetails = () => {
         sheetData.push([
           shiftCell,
           r.startDateStr,
+          r.startWeekdayStr,
           r.startTimeStr,
-          r.endDateStr,
+          `${r.endDateStr}${r.isDifferentWorkedDate ? ' *' : ''}`,
+          r.endWeekdayStr,
           r.endTimeStr,
           r.durationStr,
           r.payRate ?? 0,
@@ -334,7 +384,9 @@ const BatchPayrollDetails = () => {
 
       const totalHoursStr = `${Math.floor(batch.totalMinutesWorked / 60)}:${(batch.totalMinutesWorked % 60).toString().padStart(2, '0')}`;
       sheetData.push([]);
-      sheetData.push(['', '', '', '',  'Total Hours Worked:', totalHoursStr,'', Number(batch.grandTotal.toFixed(2))]);
+      sheetData.push([
+        '', '', '', '', '', '', 'Total Hours Worked:', totalHoursStr, '', Number(batch.grandTotal.toFixed(2))
+      ]);
 
       const ws = XLSX.utils.aoa_to_sheet(sheetData);
       const safeEmpName = batch.empName.replace(/[^a-zA-Z0-9 ]/g, "").substring(0, 25).trim();
@@ -379,111 +431,174 @@ const BatchPayrollDetails = () => {
   };
 
   return (
-    <div className="space-y-6 bg-white p-5 rounded-xl shadow-sm min-h-[80vh]">
-      <div className="flex items-center justify-between gap-4">
-        <h2 className="text-2xl font-bold text-gray-900"> Summary</h2>
-        <Button size="sm" onClick={() => navigate(-1)}>
-          <ArrowLeft className="h-5 w-5 mr-2" />Back
-        </Button>
-      </div>
+    <>
+      <div className="space-y-6 rounded-xl bg-white p-5 shadow-sm min-h-[80vh]">
+        <div className="flex items-center justify-between gap-4">
+          <h2 className="text-2xl font-bold text-gray-900">Summary</h2>
+          <div className='flex flex-row items-center gap-2'>
+            <Button size="sm" onClick={() => navigate(-1)}>
+              <ArrowLeft className="h-5 w-5 mr-2" />Back
+            </Button>
+            <Button 
+              variant="outline" 
+              size={'sm'}
+              className="border-none bg-cyan-600 text-white hover:bg-cyan-700"
+              onClick={() => setIsConfirmDialogOpen(true)}
+              disabled={isRegenerating || processedBatches.length === 0}
+            >
+              {isRegenerating ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="mr-2 h-4 w-4" />
+              )}
+              {isRegenerating ? 'Regenerating...' : 'Regenerate Payroll'}
+            </Button>
+            <Button 
+                variant="outline" 
+                size="sm"
+                className="border-none bg-violet-600 text-white hover:bg-violet-600"
+                onClick={handleGeneratePDF}
+                disabled={isExportingPDF || processedBatches.length === 0}
+              >
+                {isExportingPDF ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Download PDF Summary'}
+              </Button>
+              <Button 
+                variant="outline" 
+                                size="sm"
 
-      {/* ── Main Summary Box ── */}
-      <div>
-        <div className="flex justify-between items-start mb-8">
-          <div className="space-y-4">
-            <p className="font-medium text-gray-800">
-              Payroll Period:  <span className="font-bold">{formattedDateRange}</span>
-            </p>
-          </div>
-          <div className="flex gap-3">
-            <Button 
-              variant="outline" 
-              className="bg-violet-600 border-none hover:bg-violet-600 text-white"
-              onClick={handleGeneratePDF}
-              disabled={isExportingPDF || processedBatches.length === 0}
-            >
-              {isExportingPDF ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Download PDF Summary'}
-            </Button>
-            <Button 
-              variant="outline" 
-              className="bg-emerald-700 border-none hover:bg-emerald-600 text-white"
-              onClick={handleGenerateExcel}
-              disabled={processedBatches.length === 0}
-            >
-              Download Excel All Report
-            </Button>
+                className="border-none bg-emerald-700 text-white hover:bg-emerald-600"
+                onClick={handleGenerateExcel}
+                disabled={processedBatches.length === 0}
+              >
+                Download Excel All Report
+              </Button>
           </div>
         </div>
 
-        {/* ── Summary Data Table ── */}
-        {loading ? (
-          <div className="py-12 text-center text-gray-500 font-medium flex justify-center">
-            <BlinkingDots />
+        {/* ── Main Summary Box ── */}
+        <div>
+          <div className="mb-8 flex items-start justify-between">
+            <div className="space-y-4">
+              <p className="font-medium text-gray-800">
+                Payroll Period: <span className="font-bold">{formattedDateRange}</span>
+              </p>
+            </div>
+            {/* <div className="flex gap-3">
+              <Button 
+                variant="outline" 
+                className="border-none bg-violet-600 text-white hover:bg-violet-600"
+                onClick={handleGeneratePDF}
+                disabled={isExportingPDF || processedBatches.length === 0}
+              >
+                {isExportingPDF ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Download PDF Summary'}
+              </Button>
+              <Button 
+                variant="outline" 
+                className="border-none bg-emerald-700 text-white hover:bg-emerald-600"
+                onClick={handleGenerateExcel}
+                disabled={processedBatches.length === 0}
+              >
+                Download Excel All Report
+              </Button>
+            </div> */}
           </div>
-        ) : error ? (
-          <div className="py-12 text-center text-red-500 font-medium">
-            {error}
-          </div>
-        ) : processedBatches.length === 0 ? (
-          <div className="py-12 text-center text-gray-500 font-medium">
-            No payroll data found for this batch.
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="font-bold text-black ">Payroll Number</TableHead>
-                  <TableHead className="font-bold text-black ">Employee Name</TableHead>
-                  <TableHead className="font-bold text-black ">Designation</TableHead>
-                  <TableHead className="font-bold text-black ">Hours Worked</TableHead>
-                  <TableHead className="font-bold text-black  text-right">Total Amount</TableHead>
-                  <TableHead className="font-bold text-black  text-center">View</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {processedBatches.map((row) => (
-                  <TableRow  onClick={() => navigate(`/company/${companyId}/payroll/${row._id}`)} key={row._id} className="border-b border-gray-200 cursor-pointer">
-                    <TableCell className="font-medium">{row.payrollNumber}</TableCell>
-                    <TableCell className='hover:underline'>{row.empName}</TableCell>
-                    <TableCell className="text-gray-600">{row.designations}</TableCell>
-                    <TableCell>
-                      {Math.floor(row.totalMinutesWorked / 60)}:{(row.totalMinutesWorked % 60).toString().padStart(2, '0')}
-                    </TableCell>
-                    <TableCell className="text-right font-semibold">
-                      {row.grandTotal.toFixed(2)}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Button 
-                        size="sm" 
-                        title="View Details"
-                        onClick={(e) => {
-                          e.stopPropagation(); // Prevents triggering the row click
-                          navigate(`/company/${companyId}/payroll/${row._id}`);
-                        }}
-                      >
-                        <Eye className="h-4 w-4 mr-2" /> Detail Report
-                      </Button>
-                    </TableCell>
+
+          {/* ── Summary Data Table ── */}
+          {loading ? (
+            <div className="flex justify-center py-12 font-medium text-gray-500 text-center">
+              <BlinkingDots />
+            </div>
+          ) : error ? (
+            <div className="py-12 font-medium text-red-500 text-center">
+              {error}
+            </div>
+          ) : processedBatches.length === 0 ? (
+            <div className="py-12 font-medium text-gray-500 text-center">
+              No payroll data found for this batch.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="font-bold text-black">Payroll Number</TableHead>
+                    <TableHead className="font-bold text-black">Employee Name</TableHead>
+                    <TableHead className="font-bold text-black">Designation</TableHead>
+                    <TableHead className="font-bold text-black">Hours Worked</TableHead>
+                    <TableHead className="font-bold text-right text-black">Total Amount</TableHead>
+                    <TableHead className="font-bold text-center text-black">View</TableHead>
                   </TableRow>
-                ))}
-                
-                {/* ── Grand Total Row ── */}
-                <TableRow className="bg-gray-50 font-bold border-t-2 border-gray-300 hover:bg-gray-50">
-                  <TableCell colSpan={3} className="text-right text-gray-900 text-base">Total</TableCell>
-                  <TableCell className="text-gray-900 text-base">{overallHoursStr}</TableCell>
-                  <TableCell className="text-right text-gray-900 text-base">
-                    {overallGrandTotal.toFixed(2)}
-                  </TableCell>
-                  <TableCell></TableCell>
-                </TableRow>
-                
-              </TableBody>
-            </Table>
-          </div>
-        )}
+                </TableHeader>
+                <TableBody>
+                  {processedBatches.map((row) => (
+                    <TableRow onClick={() => navigate(`/company/${companyId}/payroll/${row._id}`)} key={row._id} className="cursor-pointer border-b border-gray-200">
+                      <TableCell className="font-medium">{row.payrollNumber}</TableCell>
+                      <TableCell className='hover:underline'>{row.empName}</TableCell>
+                      <TableCell className="text-gray-600">{row.designations}</TableCell>
+                      <TableCell>
+                        {Math.floor(row.totalMinutesWorked / 60)}:{(row.totalMinutesWorked % 60).toString().padStart(2, '0')}
+                      </TableCell>
+                      <TableCell className="font-semibold text-right">
+                        {row.grandTotal.toFixed(2)}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Button 
+                          size="sm" 
+                          title="View Details"
+                          onClick={(e) => {
+                            e.stopPropagation(); // Prevents triggering the row click
+                            navigate(`/company/${companyId}/payroll/${row._id}`);
+                          }}
+                        >
+                          <Eye className="mr-2 h-4 w-4" /> Detail Report
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  
+                  {/* ── Grand Total Row ── */}
+                  <TableRow className="border-t-2 border-gray-300 bg-gray-50 font-bold hover:bg-gray-50">
+                    <TableCell colSpan={3} className="text-base text-right text-gray-900">Total</TableCell>
+                    <TableCell className="text-base text-gray-900">{overallHoursStr}</TableCell>
+                    <TableCell className="text-base text-right text-gray-900">
+                      {overallGrandTotal.toFixed(2)}
+                    </TableCell>
+                    <TableCell></TableCell>
+                  </TableRow>
+                  
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+
+      {/* Confirmation Dialog for Regeneration */}
+      <Dialog open={isConfirmDialogOpen} onOpenChange={setIsConfirmDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Regeneration</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to regenerate the payrolls for this batch? This will pull the latest rotas and attendance records, overwriting any manual overrides currently saved.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setIsConfirmDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              className="bg-cyan-600 text-white hover:bg-cyan-700"
+              onClick={() => {
+                setIsConfirmDialogOpen(false);
+                handleRegeneratePayroll();
+              }}
+            >
+              Confirm
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 

@@ -76,8 +76,7 @@ const getMonthLabel = (
 // ─── PDF Styles & Component ────────────────────────────────────────────────────
 
 const pdfStyles = StyleSheet.create({
-  page: { padding: 30, fontSize: 10, fontFamily: 'Helvetica' },
-  // UPDATED: Added top middle company name style
+  page: { padding: 30, fontSize: 9, fontFamily: 'Helvetica' },
   companyName: {
     fontSize: 18,
     fontWeight: 'bold',
@@ -92,8 +91,8 @@ const pdfStyles = StyleSheet.create({
     marginBottom: 20
   },
   title: { fontSize: 16, fontWeight: 'bold', marginBottom: 4 },
-  subtitle: { fontSize: 12, color: '#4b5563', marginBottom: 8 },
-  month: { fontSize: 12, fontWeight: 'bold' },
+  subtitle: { fontSize: 11, color: '#4b5563', marginBottom: 8 },
+  month: { fontSize: 11, fontWeight: 'bold' },
   table: {
     display: 'flex',
     flexDirection: 'column',
@@ -108,21 +107,22 @@ const pdfStyles = StyleSheet.create({
     minHeight: 35,
     alignItems: 'center'
   },
-  tableHeader: { fontWeight: 'bold', backgroundColor: '#f9fafb' },
+  tableHeader: { fontWeight: 'bold', backgroundColor: '#f9fafb', fontSize: 8 },
   colShift: {
-    width: '22%',
-    padding: 4,
+    width: '18%',
+    padding: 2,
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'center'
   },
-  colDate: { width: '14%', padding: 4 },
-  colTime: { width: '10%', padding: 4 },
-  colDuration: { width: '10%', padding: 4 },
-  colRate: { width: '10%', padding: 4 },
-  colTotal: { width: '10%', padding: 4, textAlign: 'right' },
-  shiftDetailText: { fontSize: 8, color: '#4b5563', marginTop: 2 },
-  shiftCrossDayText: { fontSize: 8, color: '#f97316', marginTop: 1 },
+  colDate: { width: '11%', padding: 2 },
+  colWeekday: { width: '10%', padding: 2 },
+  colTime: { width: '8%', padding: 2 },
+  colDuration: { width: '8%', padding: 2 },
+  colRate: { width: '7%', padding: 2 },
+  colTotal: { width: '9%', padding: 2, textAlign: 'right' },
+  shiftDetailText: { fontSize: 7, color: '#4b5563', marginTop: 2 },
+  shiftCrossDayText: { fontSize: 7, color: '#f97316', marginTop: 1 },
   footer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -135,7 +135,7 @@ const pdfStyles = StyleSheet.create({
 });
 
 const PayrollPDF = ({
-  companyName, // Added prop
+  companyName,
   empName,
   designations,
   monthLabel,
@@ -145,7 +145,6 @@ const PayrollPDF = ({
 }: any) => (
   <Document>
     <Page size="A4" style={pdfStyles.page}>
-      {/* UPDATED: Added Company Name at top middle */}
       <Text style={pdfStyles.companyName}>{companyName}</Text>
 
       <View style={pdfStyles.header}>
@@ -162,22 +161,22 @@ const PayrollPDF = ({
         <View style={[pdfStyles.tableRow, pdfStyles.tableHeader]}>
           <Text style={pdfStyles.colShift}>Shift Details</Text>
           <Text style={pdfStyles.colDate}>Start Date</Text>
+          <Text style={pdfStyles.colWeekday}>Weekdays</Text>
           <Text style={pdfStyles.colTime}>Start Time</Text>
           <Text style={pdfStyles.colDate}>End Date</Text>
+          <Text style={pdfStyles.colWeekday}>Weekdays</Text>
           <Text style={pdfStyles.colTime}>End Time</Text>
           <Text style={pdfStyles.colDuration}>Duration</Text>
-          <Text style={pdfStyles.colRate}>Pay Rate</Text>
+          <Text style={pdfStyles.colRate}>Rate</Text>
           <Text style={pdfStyles.colTotal}>Total</Text>
         </View>
 
         {records.map((row: any, i: number) => (
           <View key={i} style={pdfStyles.tableRow}>
-            {/* Shift Details Column matching UI */}
             <View style={pdfStyles.colShift}>
-              <Text style={{ fontWeight: 'bold' }}>{row.shiftName}</Text>
+              <Text style={{ fontWeight: 'bold', fontSize: 8 }}>{row.shiftName}</Text>
               <Text style={pdfStyles.shiftDetailText}>
-                {row.rotaStartTime} - {row.rotaEndTime} ({row.shiftScheduledStr}
-                )
+                {row.rotaStartTime} - {row.rotaEndTime} ({row.shiftScheduledStr})
               </Text>
               {row.isDifferentShiftDate && (
                 <Text style={pdfStyles.shiftCrossDayText}>
@@ -187,11 +186,13 @@ const PayrollPDF = ({
             </View>
 
             <Text style={pdfStyles.colDate}>{row.startDateStr}</Text>
+            <Text style={pdfStyles.colWeekday}>{row.startWeekdayStr}</Text>
             <Text style={pdfStyles.colTime}>{row.startTimeStr}</Text>
             <Text style={pdfStyles.colDate}>
               {row.endDateStr}
-              {row.isDifferentWorkedDate ? '*' : ''}
+              {/* {row.isDifferentWorkedDate ? '*' : ''} */}
             </Text>
+            <Text style={pdfStyles.colWeekday}>{row.endWeekdayStr}</Text>
             <Text style={pdfStyles.colTime}>{row.endTimeStr}</Text>
             <Text style={pdfStyles.colDuration}>{row.durationStr}</Text>
             <Text style={pdfStyles.colRate}>{row.payRate}</Text>
@@ -210,6 +211,7 @@ const PayrollPDF = ({
     </Page>
   </Document>
 );
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 const ViewPayroll = () => {
@@ -223,7 +225,11 @@ const ViewPayroll = () => {
   const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
-  const [applyAllOption, setApplyAllOption] = useState<{ rate: number | string, recordId: string } | null>(null);
+  const [applyAllOption, setApplyAllOption] = useState<{
+    rate: number | string;
+    recordId: string;
+  } | null>(null);
+
   useEffect(() => {
     const fetchPayroll = async () => {
       if (!pid) return setLoading(false);
@@ -255,7 +261,7 @@ const ViewPayroll = () => {
     setAttendanceRecords((prev) =>
       prev.map((att) => ({ ...att, payRate: applyAllOption.rate }))
     );
-    setApplyAllOption(null); // Hide the button after applying
+    setApplyAllOption(null);
     toast({ title: 'Pay rate applied to all rows' });
   };
 
@@ -282,6 +288,7 @@ const ViewPayroll = () => {
       setIsUpdating(false);
     }
   };
+
   const getMonthLabelForReport = (
     fromDate: string | Date,
     toDate: string | Date
@@ -295,6 +302,7 @@ const ViewPayroll = () => {
 
     return `${mFrom} - ${mTo}`;
   };
+
   // ─── Data Extraction & Calculations ───────────────────────────────────────────
   const empName = payroll?.userId
     ? `${payroll.userId?.firstName} ${payroll.userId?.lastName}`
@@ -306,7 +314,6 @@ const ViewPayroll = () => {
     ? getMonthLabelForReport(payroll.fromDate, payroll.toDate)
     : '';
 
-  // UPDATED: Extracted company name
   const companyName = payroll?.companyId?.name || 'Unknown Company';
 
   // Process data once for UI, PDF, and CSV
@@ -353,8 +360,10 @@ const ViewPayroll = () => {
         shiftScheduledStr,
         isDifferentShiftDate,
         startDateStr: clockIn.isValid() ? clockIn.format('DD-MM-YYYY') : '—',
+        startWeekdayStr: clockIn.isValid() ? clockIn.format('dddd') : '—', 
         startTimeStr: clockIn.isValid() ? clockIn.format('HH:mm') : '—',
         endDateStr: clockOut.isValid() ? clockOut.format('DD-MM-YYYY') : '—',
+        endWeekdayStr: clockOut.isValid() ? clockOut.format('dddd') : '—',
         endTimeStr: clockOut.isValid() ? clockOut.format('HH:mm') : '—',
         workedMinutes,
         durationStr: formatDuration(workedMinutes),
@@ -369,15 +378,18 @@ const ViewPayroll = () => {
   // ─── Export Handlers ──────────────────────────────────────────────────────────
 
   const handleGenerateCSV = () => {
-    // 1. Employee Info Meta Row (wrapped in quotes)
-    const metaRow = [`"${empName}"`, `"${monthLabel}"`];
+    // 1. Employee Info Meta Rows - Designation is placed on its own row immediately below the name
+    const nameRow = [`"${empName}"`, `"${monthLabel}"`];
+    const designationRow = [`"${designations}"`, `""`];
 
-    // 2. Table Headers
+    // 2. Table Headers (Added Weekdays)
     const headers = [
       'Shift Details',
       'Start Date',
+      'Weekdays',
       'Start Time',
       'End Date',
+      'Weekdays',
       'End Time',
       'Duration',
       'Pay Rate',
@@ -386,10 +398,6 @@ const ViewPayroll = () => {
 
     // 3. Process Data Rows
     const rows = processedData.records.map((r) => {
-      // Build shiftCell with the EXACT logic you want:
-      // - If shiftName is missing/empty/—, show only times
-      // - Otherwise show "ShiftName : Start - End"
-      // - Append (Cross-day Shift) if isDifferentWorkedDate is true
       const hasShiftName =
         r.shiftName && r.shiftName.trim() !== '' && r.shiftName !== '—';
       let shiftCell = hasShiftName
@@ -403,8 +411,10 @@ const ViewPayroll = () => {
       return [
         `"${shiftCell}"`, // quoted to preserve newlines
         r.startDateStr,
+        r.startWeekdayStr,
         r.startTimeStr,
         `"${r.endDateStr}${r.isDifferentWorkedDate ? ' *' : ''}"`,
+        r.endWeekdayStr,
         r.endTimeStr,
         r.durationStr,
         r.payRate ?? 0,
@@ -412,10 +422,12 @@ const ViewPayroll = () => {
       ];
     });
 
-    // 4. Footer Totals
+    // 4. Footer Totals (Adjusted spacing for 10 columns)
     const totalHoursStr = `${Math.floor(processedData.totalMinutesWorked / 60)}:${(processedData.totalMinutesWorked % 60).toString().padStart(2, '0')}`;
-    rows.push(['', '', '', '', '', '', '', '']); // spacing
+    rows.push(['', '', '', '', '', '', '', '', '', '']); // spacing
     rows.push([
+      '',
+      '',
       '',
       '',
       '',
@@ -426,8 +438,8 @@ const ViewPayroll = () => {
       processedData.grandTotal.toFixed(2)
     ]);
 
-    // 5. Combine and download
-    const csvContent = [metaRow, [], headers, ...rows]
+    // 5. Combine and download - Using nameRow followed by designationRow
+    const csvContent = [nameRow, designationRow, [], headers, ...rows]
       .map((e) => e.join(','))
       .join('\n');
 
@@ -443,7 +455,7 @@ const ViewPayroll = () => {
     try {
       const blob = await pdf(
         <PayrollPDF
-          companyName={companyName} // UPDATED: Passed companyName
+          companyName={companyName}
           empName={empName}
           designations={designations}
           monthLabel={monthLabel}
@@ -550,10 +562,16 @@ const ViewPayroll = () => {
                     Start Date
                   </TableHead>
                   <TableHead className="font-extrabold  text-black">
+                    Weekdays
+                  </TableHead>
+                  <TableHead className="font-extrabold  text-black">
                     Start Time
                   </TableHead>
                   <TableHead className="font-extrabold  text-black">
                     End Date
+                  </TableHead>
+                  <TableHead className="font-extrabold  text-black">
+                    Weekdays
                   </TableHead>
                   <TableHead className="font-extrabold  text-black">
                     End Time
@@ -569,7 +587,7 @@ const ViewPayroll = () => {
                   </TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody>
+            <TableBody>
                 {processedData.records.length > 0 ? (
                   processedData.records.map((att: any) => (
                     <TableRow
@@ -593,6 +611,11 @@ const ViewPayroll = () => {
                       <TableCell className="font-medium">
                         {att.startDateStr}
                       </TableCell>
+                      
+                      <TableCell className="font-medium text-gray-600">
+                        {att.startWeekdayStr}
+                      </TableCell>
+
                       <TableCell className="font-medium">
                         {att.startTimeStr}
                       </TableCell>
@@ -604,6 +627,11 @@ const ViewPayroll = () => {
                           </span>
                         )}
                       </TableCell>
+
+                      <TableCell className="font-medium text-gray-600">
+                        {att.endWeekdayStr}
+                      </TableCell>
+
                       <TableCell className="font-medium">
                         {att.endTimeStr}
                       </TableCell>
@@ -613,28 +641,24 @@ const ViewPayroll = () => {
                       <TableCell className="align-top">
                         <div className="flex flex-col gap-2 pt-1">
                           <Input
-        type="number"
-        min={0}
-        step={0.01}
-        // Allow the input to be empty, otherwise fallback to 0
-        value={att.payRate === '' ? '' : (att.payRate ?? 0)}
-        onChange={(e) => {
-          const val = e.target.value;
-          // Pass empty string directly, otherwise parse it
-          handlePayRateChange(
-            att._id,
-            val === '' ? '' : Number(val)
-          );
-        }}
-        // Re-apply 0 if the user leaves the input completely blank
-        onBlur={(e) => {
-          if (e.target.value === '') {
-             handlePayRateChange(att._id, 0);
-          }
-        }}
-        className="h-8 w-full font-semibold"
-      />
-                          {/* Show Apply to All button only for the active row */}
+                            type="number"
+                            min={0}
+                            step={0.01}
+                            value={att.payRate === '' ? '' : att.payRate ?? 0}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              handlePayRateChange(
+                                att._id,
+                                val === '' ? '' : Number(val)
+                              );
+                            }}
+                            onBlur={(e) => {
+                              if (e.target.value === '') {
+                                handlePayRateChange(att._id, 0);
+                              }
+                            }}
+                            className="h-8 w-full font-semibold"
+                          />
                           {applyAllOption?.recordId === att._id && (
                             <Button
                               size="sm"
@@ -655,7 +679,7 @@ const ViewPayroll = () => {
                 ) : (
                   <TableRow>
                     <TableCell
-                      colSpan={8}
+                      colSpan={10} 
                       className="h-24 text-center font-medium text-gray-500"
                     >
                       No attendance records found for this period.

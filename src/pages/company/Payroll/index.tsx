@@ -128,7 +128,7 @@ const CompanyPayRoll = () => {
   const [error, setError] = useState<string | null>(null);
 
   // Pagination
-  const [entriesPerPage, setEntriesPerPage] = useState(500);
+  const [entriesPerPage, setEntriesPerPage] = useState(1000);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 

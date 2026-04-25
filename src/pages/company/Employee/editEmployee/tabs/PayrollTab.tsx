@@ -59,7 +59,6 @@ interface PayrollTabProps {
       accountNumber?: string;
       sortCode?: string;
       beneficiary?: string;
-      payRate?: number | string; // Added payRate
     };
   };
   onNestedUpdate: (parentField: string, fieldName: string, value: any) => void;
@@ -104,22 +103,7 @@ const PayrollTab: React.FC<PayrollTabProps> = ({
               />
             </FormRow>
 
-            {/* New Pay Rate Field */}
-            <FormRow
-              label="Pay Rate"
-              isSaving={isFieldSaving['payroll.payRate']}
-            >
-              <EditableField
-                id="payroll.payRate"
-                label=""
-                type="number"
-                value={payroll.payRate ?? ''}
-                onUpdate={(value) =>
-                  onNestedUpdate('payroll', 'payRate', value)
-                }
-                isSaving={isFieldSaving['payroll.payRate']}
-              />
-            </FormRow>
+           
 
             <FormRow
               label="Payment Method"
