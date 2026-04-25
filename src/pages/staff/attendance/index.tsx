@@ -79,6 +79,7 @@ const calculateApprovedDuration = (
     return { display: '00:00', minutes: 0 };
   }
 
+  // 1. Determine actual start and end times
   const actualStart = rStartTime.includes('T')
     ? moment(rStartTime)
     : moment(`${rStartDate} ${rStartTime}`, 'YYYY-MM-DD HH:mm');
@@ -91,27 +92,44 @@ const calculateApprovedDuration = (
     return { display: '00:00', minutes: 0 };
   }
 
-  if (!rotaStartTime || !rotaEndTime) {
-    const diffMins = actualEnd.diff(actualStart, 'minutes');
-    const finalMins = diffMins > 0 ? diffMins : 0;
+  // 2. Calculate actual attendance duration
+  let diffMins = actualEnd.diff(actualStart, 'minutes');
+  
+  // Safety check: if actual duration is negative, assume an overnight shift 
+  // where date data was missing or identical.
+  if (diffMins < 0) {
+    actualEnd.add(1, 'day');
+    diffMins = actualEnd.diff(actualStart, 'minutes');
+  }
+
+  if (diffMins < 0) diffMins = 0;
+
+  // 3. NO ROTA FALLBACK: Return the exact actual duration immediately
+  if (!rotaStartTime || rotaStartTime === '--' || !rotaEndTime || rotaEndTime === '--') {
+    const hrs = Math.floor(diffMins / 60);
+    const mins = diffMins % 60;
+    
     return {
-      display: `${Math.floor(finalMins / 60).toString().padStart(2, '0')}:${(finalMins % 60).toString().padStart(2, '0')}`,
-      minutes: finalMins
+      display: `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`,
+      minutes: diffMins
     };
   }
 
-  const shiftStart = moment(`${rStartDate} ${rotaStartTime}`, 'YYYY-MM-DD HH:mm');
-  const shiftEnd = moment(`${rStartDate} ${rotaEndTime}`, 'YYYY-MM-DD HH:mm');
+  // 4. Calculate total Rota duration (using dummy dates since we only need the time difference)
+  const shiftStart = moment(`1970-01-01 ${rotaStartTime}`, 'YYYY-MM-DD HH:mm');
+  const shiftEnd = moment(`1970-01-01 ${rotaEndTime}`, 'YYYY-MM-DD HH:mm');
 
+  // Handle overnight rota shifts natively
   if (shiftEnd.isBefore(shiftStart)) {
     shiftEnd.add(1, 'day');
   }
 
-  const approvedStart = moment.max(actualStart, shiftStart);
-  const approvedEnd = moment.min(actualEnd, shiftEnd);
+  const maxRotaMins = shiftEnd.diff(shiftStart, 'minutes');
 
-  let diffMins = approvedEnd.diff(approvedStart, 'minutes');
-  if (diffMins < 0) diffMins = 0;
+  // 5. Cap actual attendance duration to not exceed the Rota duration
+  if (diffMins > maxRotaMins) {
+    diffMins = maxRotaMins;
+  }
 
   const hrs = Math.floor(diffMins / 60);
   const mins = diffMins % 60;

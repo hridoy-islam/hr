@@ -108,19 +108,23 @@ const pdfStyles = StyleSheet.create({
     alignItems: 'center'
   },
   tableHeader: { fontWeight: 'bold', backgroundColor: '#f9fafb', fontSize: 8 },
+  
+  // Adjusted widths for 11 columns to equal 100%
   colShift: {
-    width: '18%',
+    width: '16%',
     padding: 2,
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'center'
   },
-  colDate: { width: '11%', padding: 2 },
-  colWeekday: { width: '10%', padding: 2 },
-  colTime: { width: '8%', padding: 2 },
+  colDate: { width: '9%', padding: 2 },
+  colWeekday: { width: '9%', padding: 2 },
+  colTime: { width: '7%', padding: 2 },
+  colActual: { width: '8%', padding: 2 }, // New Actual Hour Column
   colDuration: { width: '8%', padding: 2 },
-  colRate: { width: '7%', padding: 2 },
-  colTotal: { width: '9%', padding: 2, textAlign: 'right' },
+  colRate: { width: '8%', padding: 2 },
+  colTotal: { width: '10%', padding: 2, textAlign: 'right' },
+  
   shiftDetailText: { fontSize: 7, color: '#4b5563', marginTop: 2 },
   shiftCrossDayText: { fontSize: 7, color: '#f97316', marginTop: 1 },
   footer: {
@@ -158,6 +162,7 @@ const PayrollPDF = ({
       </View>
 
       <View style={pdfStyles.table}>
+        {/* PDF Table Header */}
         <View style={[pdfStyles.tableRow, pdfStyles.tableHeader]}>
           <Text style={pdfStyles.colShift}>Shift Details</Text>
           <Text style={pdfStyles.colDate}>Start Date</Text>
@@ -166,11 +171,13 @@ const PayrollPDF = ({
           <Text style={pdfStyles.colDate}>End Date</Text>
           <Text style={pdfStyles.colWeekday}>Weekdays</Text>
           <Text style={pdfStyles.colTime}>End Time</Text>
+          <Text style={pdfStyles.colActual}>Actual Hour</Text>
           <Text style={pdfStyles.colDuration}>Duration</Text>
           <Text style={pdfStyles.colRate}>Rate</Text>
           <Text style={pdfStyles.colTotal}>Total</Text>
         </View>
 
+        {/* PDF Table Data Rows */}
         {records.map((row: any, i: number) => (
           <View key={i} style={pdfStyles.tableRow}>
             <View style={pdfStyles.colShift}>
@@ -194,6 +201,7 @@ const PayrollPDF = ({
             </Text>
             <Text style={pdfStyles.colWeekday}>{row.endWeekdayStr}</Text>
             <Text style={pdfStyles.colTime}>{row.endTimeStr}</Text>
+            <Text style={pdfStyles.colActual}>{row.actualHourStr}</Text>
             <Text style={pdfStyles.colDuration}>{row.durationStr}</Text>
             <Text style={pdfStyles.colRate}>{row.payRate}</Text>
             <Text style={pdfStyles.colTotal}>{row.total.toFixed(2)}</Text>
@@ -201,6 +209,7 @@ const PayrollPDF = ({
         ))}
       </View>
 
+      {/* PDF Footer */}
       <View style={pdfStyles.footer}>
         <Text style={pdfStyles.footerText}>
           Total Hours Worked: {Math.floor(totalMinutesWorked / 60)}:
@@ -211,7 +220,6 @@ const PayrollPDF = ({
     </Page>
   </Document>
 );
-
 // ─── Component ────────────────────────────────────────────────────────────────
 
 const ViewPayroll = () => {
@@ -317,7 +325,7 @@ const ViewPayroll = () => {
   const companyName = payroll?.companyId?.name || 'Unknown Company';
 
   // Process data once for UI, PDF, and CSV
-  const processedData = useMemo(() => {
+const processedData = useMemo(() => {
     let totalMins = 0;
     let grandTot = 0;
 
@@ -330,6 +338,13 @@ const ViewPayroll = () => {
         clockIn.isValid() &&
         clockOut.isValid() &&
         clockIn.format('YYYY-MM-DD') !== clockOut.format('YYYY-MM-DD');
+
+      // ---> NEW: Calculate actual minutes between clock-in and clock-out
+      const actualWorkedMinutes =
+        clockIn.isValid() && clockOut.isValid()
+          ? Math.max(0, clockOut.diff(clockIn, 'minutes'))
+          : 0;
+      const actualHourStr = formatDuration(actualWorkedMinutes);
 
       const shiftName = att.attendanceId?.rotaId?.shiftName || '—';
       const rotaStartTime = att.attendanceId?.rotaId?.startTime;
@@ -360,11 +375,12 @@ const ViewPayroll = () => {
         shiftScheduledStr,
         isDifferentShiftDate,
         startDateStr: clockIn.isValid() ? clockIn.format('DD-MM-YYYY') : '—',
-        startWeekdayStr: clockIn.isValid() ? clockIn.format('dddd') : '—', 
+        startWeekdayStr: clockIn.isValid() ? clockIn.format('dddd') : '—',
         startTimeStr: clockIn.isValid() ? clockIn.format('HH:mm') : '—',
         endDateStr: clockOut.isValid() ? clockOut.format('DD-MM-YYYY') : '—',
         endWeekdayStr: clockOut.isValid() ? clockOut.format('dddd') : '—',
         endTimeStr: clockOut.isValid() ? clockOut.format('HH:mm') : '—',
+        actualHourStr, // ---> NEW: Return the calculated string
         workedMinutes,
         durationStr: formatDuration(workedMinutes),
         isDifferentWorkedDate,
@@ -377,12 +393,12 @@ const ViewPayroll = () => {
 
   // ─── Export Handlers ──────────────────────────────────────────────────────────
 
-  const handleGenerateCSV = () => {
+const handleGenerateCSV = () => {
     // 1. Employee Info Meta Rows - Designation is placed on its own row immediately below the name
     const nameRow = [`"${empName}"`, `"${monthLabel}"`];
     const designationRow = [`"${designations}"`, `""`];
 
-    // 2. Table Headers (Added Weekdays)
+    // 2. Table Headers (11 Columns)
     const headers = [
       'Shift Details',
       'Start Date',
@@ -391,6 +407,7 @@ const ViewPayroll = () => {
       'End Date',
       'Weekdays',
       'End Time',
+      'Actual Hour',
       'Duration',
       'Pay Rate',
       'Total'
@@ -416,15 +433,20 @@ const ViewPayroll = () => {
         `"${r.endDateStr}${r.isDifferentWorkedDate ? ' *' : ''}"`,
         r.endWeekdayStr,
         r.endTimeStr,
+        r.actualHourStr,
         r.durationStr,
         r.payRate ?? 0,
         r.total.toFixed(2)
       ];
     });
 
-    // 4. Footer Totals (Adjusted spacing for 10 columns)
+    // 4. Footer Totals (Adjusted spacing for 11 columns)
     const totalHoursStr = `${Math.floor(processedData.totalMinutesWorked / 60)}:${(processedData.totalMinutesWorked % 60).toString().padStart(2, '0')}`;
-    rows.push(['', '', '', '', '', '', '', '', '', '']); // spacing
+    
+    // Push an empty row of 11 columns for spacing
+    rows.push(['', '', '', '', '', '', '', '', '', '', '']); 
+    
+    // Push the totals row, placing text exactly under the correct columns
     rows.push([
       '',
       '',
@@ -432,13 +454,14 @@ const ViewPayroll = () => {
       '',
       '',
       '',
-      '"Total Hours Worked:"',
+      '',
+      '"Total Hours Worked:"', 
       `"${totalHoursStr}"`,
       '',
       processedData.grandTotal.toFixed(2)
     ]);
 
-    // 5. Combine and download - Using nameRow followed by designationRow
+    // 5. Combine and download
     const csvContent = [nameRow, designationRow, [], headers, ...rows]
       .map((e) => e.join(','))
       .join('\n');
@@ -475,7 +498,6 @@ const ViewPayroll = () => {
       setIsExporting(false);
     }
   };
-
   // ─── Render ───────────────────────────────────────────────────────────────────
 
   if (loading) {
@@ -577,6 +599,9 @@ const ViewPayroll = () => {
                     End Time
                   </TableHead>
                   <TableHead className="font-extrabold  text-black">
+                    Actual Hour
+                  </TableHead>
+                  <TableHead className="font-extrabold  text-black">
                     Duration
                   </TableHead>
                   <TableHead className="w-28 font-extrabold  text-black">
@@ -634,6 +659,9 @@ const ViewPayroll = () => {
 
                       <TableCell className="font-medium">
                         {att.endTimeStr}
+                      </TableCell>
+                      <TableCell className="font-semibold text-gray-700">
+                        {att.actualHourStr}
                       </TableCell>
                       <TableCell className="font-semibold text-blue-600">
                         {att.durationStr}

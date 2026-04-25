@@ -280,7 +280,7 @@ const BatchPayrollDetails = () => {
     return `${fromDateDate.format('MMMM')} - ${toDateDate.format('MMMM YYYY')}`.toUpperCase();
   })();
 
-  const processedBatches = useMemo(() => {
+ const processedBatches = useMemo(() => {
     return payrolls.map((payroll) => {
       const emp = resolveUser(payroll);
       const empName = emp ? `${emp.firstName} ${emp.lastName}` : 'Unknown Employee';
@@ -297,6 +297,12 @@ const BatchPayrollDetails = () => {
 
         const workedMinutes =  att.duration;
         const isDifferentWorkedDate = clockIn.isValid() && clockOut.isValid() && clockIn.format('YYYY-MM-DD') !== clockOut.format('YYYY-MM-DD');
+
+        // ---> NEW: Calculate Actual Hour duration
+        const actualWorkedMinutes = clockIn.isValid() && clockOut.isValid() 
+          ? Math.max(0, clockOut.diff(clockIn, 'minutes')) 
+          : 0;
+        const actualHourStr = formatDuration(actualWorkedMinutes);
 
         const shiftName = att.attendanceId?.rotaId?.shiftName || '—';
         const rotaStartTime = att.attendanceId?.rotaId?.startTime;
@@ -328,6 +334,7 @@ const BatchPayrollDetails = () => {
           endDateStr: clockOut.isValid() ? clockOut.format('DD-MM-YYYY') : '—',
           endWeekdayStr: clockOut.isValid() ? clockOut.format('dddd') : '—', 
           endTimeStr: clockOut.isValid() ? clockOut.format('HH:mm') : '—',
+          actualHourStr, // ---> NEW: Pass string to the export handler
           workedMinutes,
           durationStr: formatDuration(workedMinutes),
           isDifferentWorkedDate,
@@ -354,11 +361,12 @@ const BatchPayrollDetails = () => {
 
   // ─── Export Handlers ──────────────────────────────────────────────────────────
 
-  const handleGenerateExcel = () => {
+ const handleGenerateExcel = () => {
     const wb = XLSX.utils.book_new();
 
     processedBatches.forEach((batch, index) => {
       const sheetData: any[][] = [];
+      // ---> NEW: Added 'Actual Hour' to headers (Now 11 columns total)
       const headers = [
         'Shift Details', 
         'Start Date', 
@@ -367,6 +375,7 @@ const BatchPayrollDetails = () => {
         'End Date', 
         'Weekdays', 
         'End Time', 
+        'Actual Hour', 
         'Duration', 
         'Pay Rate', 
         'Total'
@@ -400,6 +409,7 @@ const BatchPayrollDetails = () => {
           `${r.endDateStr}${r.isDifferentWorkedDate ? ' *' : ''}`,
           r.endWeekdayStr,
           r.endTimeStr,
+          r.actualHourStr, // ---> NEW: Push actual hour data
           r.durationStr,
           r.payRate ?? 0,
           Number(r.total.toFixed(2)),
@@ -408,8 +418,10 @@ const BatchPayrollDetails = () => {
 
       const totalHoursStr = `${Math.floor(batch.totalMinutesWorked / 60)}:${(batch.totalMinutesWorked % 60).toString().padStart(2, '0')}`;
       sheetData.push([]);
+      
+      // ---> NEW: Added one extra empty string '' at the start to push the footer items 1 column to the right
       sheetData.push([
-        '', '', '', '', '', '', 'Total Hours Worked:', totalHoursStr, '', Number(batch.grandTotal.toFixed(2))
+        '', '', '', '', '', '', '', 'Total Hours Worked:', totalHoursStr, '', Number(batch.grandTotal.toFixed(2))
       ]);
 
       const ws = XLSX.utils.aoa_to_sheet(sheetData);
@@ -511,7 +523,7 @@ const BatchPayrollDetails = () => {
           {/* ── Summary Data Table ── */}
           {loading ? (
             <div className="flex justify-center py-12 font-medium text-gray-500 text-center">
-              <BlinkingDots />
+              <BlinkingDots size='large' color='bg-theme' />
             </div>
           ) : error ? (
             <div className="py-12 font-medium text-red-500 text-center">
