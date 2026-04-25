@@ -22,6 +22,15 @@ import {
   TableHeader,
   TableRow
 } from '@/components/ui/table';
+// ---> NEW: Added Dialog imports
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import axiosInstance from '@/lib/axios';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 import { useToast } from '@/components/ui/use-toast';
@@ -234,6 +243,7 @@ const PayrollPDF = ({
     </Document>
   );
 };
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 const ViewPayroll = () => {
@@ -245,6 +255,9 @@ const ViewPayroll = () => {
   const [loading, setLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  // ---> NEW: State for Contract Confirmation Dialog
+  const [isContractDialogOpen, setIsContractDialogOpen] = useState(false);
+  
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
   const [applyAllOption, setApplyAllOption] = useState<{
@@ -265,6 +278,7 @@ const ViewPayroll = () => {
       setLoading(false);
     }
   };
+  
   useEffect(() => {
     fetchPayroll();
   }, [pid]);
@@ -311,13 +325,12 @@ const ViewPayroll = () => {
     }
   };
 
-
-    const handleContract = async () => {
+  const handleContract = async () => {
     if (!pid) return;
     setIsUpdating(true);
     try {
       const payload = {
-        isContract:true
+        isContract: true
       };
       await axiosInstance.patch(`/hr/payroll/${pid}`, payload);
       toast({ title: 'Payroll updated successfully!' });
@@ -360,7 +373,7 @@ const ViewPayroll = () => {
   const companyName = payroll?.companyId?.name || 'Unknown Company';
 
   // Process data once for UI, PDF, and CSV
-const processedData = useMemo(() => {
+  const processedData = useMemo(() => {
     let totalMins = 0;
     let grandTot = 0;
 
@@ -374,7 +387,6 @@ const processedData = useMemo(() => {
         clockOut.isValid() &&
         clockIn.format('YYYY-MM-DD') !== clockOut.format('YYYY-MM-DD');
 
-      // ---> NEW: Calculate actual minutes between clock-in and clock-out
       const actualWorkedMinutes =
         clockIn.isValid() && clockOut.isValid()
           ? Math.max(0, clockOut.diff(clockIn, 'minutes'))
@@ -415,7 +427,7 @@ const processedData = useMemo(() => {
         endDateStr: clockOut.isValid() ? clockOut.format('DD-MM-YYYY') : '—',
         endWeekdayStr: clockOut.isValid() ? clockOut.format('dddd') : '—',
         endTimeStr: clockOut.isValid() ? clockOut.format('HH:mm') : '—',
-        actualHourStr, // ---> NEW: Return the calculated string
+        actualHourStr,
         workedMinutes,
         durationStr: formatDuration(workedMinutes),
         isDifferentWorkedDate,
@@ -427,12 +439,11 @@ const processedData = useMemo(() => {
   }, [attendanceRecords]);
 
   // ─── Export Handlers ──────────────────────────────────────────────────────────
-const handleGenerateCSV = () => {
+  const handleGenerateCSV = () => {
     const isContract = payroll?.isContract;
     const nameRow = [`"${empName}"`, `"${monthLabel}"`];
     const designationRow = [`"${designations}"`, `""`];
 
-    // ---> NEW: Conditionally include Pay Rate & Total in headers
     const headers = [
       'Shift Details',
       'Start Date',
@@ -458,7 +469,6 @@ const handleGenerateCSV = () => {
         shiftCell += '\n(Cross-day Shift)';
       }
 
-      // ---> NEW: Conditionally include row data
       const baseRow = [
         `"${shiftCell}"`,
         r.startDateStr,
@@ -480,11 +490,9 @@ const handleGenerateCSV = () => {
 
     const totalHoursStr = `${Math.floor(processedData.totalMinutesWorked / 60)}:${(processedData.totalMinutesWorked % 60).toString().padStart(2, '0')}`;
     
-    // ---> NEW: Adjusted spacing based on column count
     const colCount = isContract ? 9 : 11;
-    rows.push(Array(colCount).fill('')); // Empty row for spacing
+    rows.push(Array(colCount).fill(''));
     
-    // Create custom footer row
     if (isContract) {
       rows.push([
         '', '', '', '', '', '', '',
@@ -525,8 +533,8 @@ const handleGenerateCSV = () => {
           records={processedData.records}
           totalMinutesWorked={processedData.totalMinutesWorked}
           grandTotal={processedData.grandTotal}
-          isContract={payroll?.isContract}           // ---> NEW: Pass property
-          contractAmount={payroll?.contractAmount}   // ---> NEW: Pass property
+          isContract={payroll?.isContract}
+          contractAmount={payroll?.contractAmount}
         />
       ).toBlob();
 
@@ -540,6 +548,7 @@ const handleGenerateCSV = () => {
       setIsExporting(false);
     }
   };
+  
   // ─── Render ───────────────────────────────────────────────────────────────────
 
   if (loading) {
@@ -565,7 +574,14 @@ const handleGenerateCSV = () => {
           {/* Header Section */}
           <div className="mb-8 grid grid-cols-2 items-start gap-4">
             <div className="col-span-1 space-y-2">
-              <h2 className="text-xl font-bold tracking-tight">{empName} {payroll.isContract &&<span className='ml-4 text-xs font-semibold bg-orange-500 rounded-full py-2 px-3 text-white'> Contracted Salary Applied</span>}</h2>
+              <h2 className="text-xl font-bold tracking-tight">
+                {empName} 
+                {payroll.isContract && (
+                  <span className='ml-4 text-xs font-semibold bg-orange-500 rounded-full py-2 px-3 text-white'> 
+                    Contracted Salary Applied
+                  </span>
+                )}
+              </h2>
               <p className="text-sm font-semibold text-gray-700">
                 {designations}
               </p>
@@ -580,7 +596,7 @@ const handleGenerateCSV = () => {
               </Button>
               <Button
                 variant="outline"
-                className="border-none bg-violet-600 hover:bg-violet-600"
+                className="border-none bg-violet-600 text-white hover:bg-violet-700 hover:text-white"
                 onClick={handleGeneratePDF}
                 disabled={isExporting}
               >
@@ -592,23 +608,28 @@ const handleGenerateCSV = () => {
               </Button>
               <Button
                 variant="outline"
-                className="border-none bg-emerald-700 hover:bg-emerald-600"
+                className="border-none bg-emerald-700 text-white hover:bg-emerald-800 hover:text-white"
                 onClick={handleGenerateCSV}
               >
                 Download Excel
               </Button>
-               {payroll.isContract === false &&<><Button
-                variant="outline"
-                className="border-none bg-orange-600 hover:bg-orange-500"
-                onClick={handleContract}
-                disabled={isUpdating}
-              >
-                {isUpdating ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  'Apply Contracted Salary'
-                )}
-              </Button></>}
+               {payroll.isContract === false && (
+                 <>
+                   <Button
+                     variant="outline"
+                     className="border-none bg-orange-600 text-white hover:bg-orange-700 hover:text-white"
+                     // ---> NEW: Open dialog instead of calling handleContract directly
+                     onClick={() => setIsContractDialogOpen(true)}
+                     disabled={isUpdating}
+                   >
+                     {isUpdating ? (
+                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                     ) : (
+                       'Apply Contracted Salary'
+                     )}
+                   </Button>
+                 </>
+               )}
               
               <Button
                 variant="outline"
@@ -659,13 +680,16 @@ const handleGenerateCSV = () => {
                   <TableHead className="font-extrabold  text-black">
                     Duration
                   </TableHead>
-                  {payroll.isContract === false && <>
-                   <TableHead className="w-28 font-extrabold  text-black">
-                    Pay Rate
-                  </TableHead>
-                  <TableHead className="text-right font-extrabold  text-black">
-                    Total
-                  </TableHead></>}
+                  {payroll.isContract === false && (
+                    <>
+                      <TableHead className="w-28 font-extrabold  text-black">
+                        Pay Rate
+                      </TableHead>
+                      <TableHead className="text-right font-extrabold  text-black">
+                        Total
+                      </TableHead>
+                    </>
+                  )}
                  
                 </TableRow>
               </TableHeader>
@@ -724,42 +748,46 @@ const handleGenerateCSV = () => {
                         {att.durationStr}
                       </TableCell>
 
-                       {payroll.isContract === false && <><TableCell className="align-top">
-                        <div className="flex flex-col gap-2 pt-1">
-                          <Input
-                            type="number"
-                            min={0}
-                            step={0.01}
-                            value={att.payRate === '' ? '' : att.payRate ?? 0}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              handlePayRateChange(
-                                att._id,
-                                val === '' ? '' : Number(val)
-                              );
-                            }}
-                            onBlur={(e) => {
-                              if (e.target.value === '') {
-                                handlePayRateChange(att._id, 0);
-                              }
-                            }}
-                            className="h-8 w-full font-semibold"
-                          />
-                          {applyAllOption?.recordId === att._id && (
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              onClick={handleApplyToAll}
-                              className="h-7 bg-theme px-2 text-[10px] text-white hover:bg-theme/90"
-                            >
-                              Apply to all
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right font-bold text-gray-900">
-                        {att.total.toFixed(2)}
-                      </TableCell></>}
+                       {payroll.isContract === false && (
+                         <>
+                           <TableCell className="align-top">
+                             <div className="flex flex-col gap-2 pt-1">
+                               <Input
+                                 type="number"
+                                 min={0}
+                                 step={0.01}
+                                 value={att.payRate === '' ? '' : att.payRate ?? 0}
+                                 onChange={(e) => {
+                                   const val = e.target.value;
+                                   handlePayRateChange(
+                                     att._id,
+                                     val === '' ? '' : Number(val)
+                                   );
+                                 }}
+                                 onBlur={(e) => {
+                                   if (e.target.value === '') {
+                                     handlePayRateChange(att._id, 0);
+                                   }
+                                 }}
+                                 className="h-8 w-full font-semibold"
+                               />
+                               {applyAllOption?.recordId === att._id && (
+                                 <Button
+                                   size="sm"
+                                   variant="secondary"
+                                   onClick={handleApplyToAll}
+                                   className="h-7 bg-theme px-2 text-[10px] text-white hover:bg-theme/90"
+                                 >
+                                   Apply to all
+                                 </Button>
+                               )}
+                             </div>
+                           </TableCell>
+                           <TableCell className="text-right font-bold text-gray-900">
+                             {att.total.toFixed(2)}
+                           </TableCell>
+                         </>
+                       )}
                       
                     </TableRow>
                   ))
@@ -789,21 +817,49 @@ const handleGenerateCSV = () => {
                 .padStart(2, '0')}
             </span>
           </div>
-          {payroll.isContract?( <div className="font-extrabold tracking-wide">
-            Total:{' '}
-            <span className="text-black">
-              {payroll.contractAmount.toFixed(2)}
-            </span>
-          </div>):(<div className="font-extrabold tracking-wide">
-            Total:{' '}
-            <span className="text-black">
-              {processedData.grandTotal.toFixed(2)}
-            </span>
-          </div>)}
-         
-          
+          {payroll.isContract ? ( 
+            <div className="font-extrabold tracking-wide">
+              Total:{' '}
+              <span className="text-black">
+                {payroll.contractAmount.toFixed(2)}
+              </span>
+            </div>
+          ) : (
+            <div className="font-extrabold tracking-wide">
+              Total:{' '}
+              <span className="text-black">
+                {processedData.grandTotal.toFixed(2)}
+              </span>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* ---> NEW: Contract Confirmation Dialog */}
+      <Dialog open={isContractDialogOpen} onOpenChange={setIsContractDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Apply Contracted Salary</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to apply the contracted salary? This will override individual hourly pay calculations and use the fixed contract amount for this payroll period.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setIsContractDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              className="bg-orange-600 text-white hover:bg-orange-700"
+              onClick={() => {
+                setIsContractDialogOpen(false);
+                handleContract();
+              }}
+            >
+              Confirm
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
