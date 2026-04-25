@@ -145,81 +145,95 @@ const PayrollPDF = ({
   monthLabel,
   records,
   totalMinutesWorked,
-  grandTotal
-}: any) => (
-  <Document>
-    <Page size="A4" style={pdfStyles.page}>
-      <Text style={pdfStyles.companyName}>{companyName}</Text>
+  grandTotal,
+  isContract,       // ---> NEW PROP
+  contractAmount    // ---> NEW PROP
+}: any) => {
+  // If Contracted, we hide Rate (8%) and Total (10%) columns. 
+  // We add that 18% width to the Shift Details column so the table stays 100% wide.
+  const shiftColStyle = isContract ? { width: '34%' } : {};
 
-      <View style={pdfStyles.header}>
-        <View>
-          <Text style={pdfStyles.title}>{empName}</Text>
-          <Text style={pdfStyles.subtitle}>{designations}</Text>
-        </View>
-        <View>
-          <Text style={pdfStyles.month}>Period: {monthLabel}</Text>
-        </View>
-      </View>
+  return (
+    <Document>
+      <Page size="A4" style={pdfStyles.page}>
+        <Text style={pdfStyles.companyName}>{companyName}</Text>
 
-      <View style={pdfStyles.table}>
-        {/* PDF Table Header */}
-        <View style={[pdfStyles.tableRow, pdfStyles.tableHeader]}>
-          <Text style={pdfStyles.colShift}>Shift Details</Text>
-          <Text style={pdfStyles.colDate}>Start Date</Text>
-          <Text style={pdfStyles.colWeekday}>Weekdays</Text>
-          <Text style={pdfStyles.colTime}>Start Time</Text>
-          <Text style={pdfStyles.colDate}>End Date</Text>
-          <Text style={pdfStyles.colWeekday}>Weekdays</Text>
-          <Text style={pdfStyles.colTime}>End Time</Text>
-          <Text style={pdfStyles.colActual}>Actual Hour</Text>
-          <Text style={pdfStyles.colDuration}>Duration</Text>
-          <Text style={pdfStyles.colRate}>Rate</Text>
-          <Text style={pdfStyles.colTotal}>Total</Text>
-        </View>
-
-        {/* PDF Table Data Rows */}
-        {records.map((row: any, i: number) => (
-          <View key={i} style={pdfStyles.tableRow}>
-            <View style={pdfStyles.colShift}>
-              <Text style={{ fontWeight: 'bold', fontSize: 8 }}>{row.shiftName}</Text>
-              <Text style={pdfStyles.shiftDetailText}>
-                {row.rotaStartTime} - {row.rotaEndTime} ({row.shiftScheduledStr})
-              </Text>
-              {row.isDifferentShiftDate && (
-                <Text style={pdfStyles.shiftCrossDayText}>
-                  (Cross-day Shift)
-                </Text>
-              )}
-            </View>
-
-            <Text style={pdfStyles.colDate}>{row.startDateStr}</Text>
-            <Text style={pdfStyles.colWeekday}>{row.startWeekdayStr}</Text>
-            <Text style={pdfStyles.colTime}>{row.startTimeStr}</Text>
-            <Text style={pdfStyles.colDate}>
-              {row.endDateStr}
-              {/* {row.isDifferentWorkedDate ? '*' : ''} */}
-            </Text>
-            <Text style={pdfStyles.colWeekday}>{row.endWeekdayStr}</Text>
-            <Text style={pdfStyles.colTime}>{row.endTimeStr}</Text>
-            <Text style={pdfStyles.colActual}>{row.actualHourStr}</Text>
-            <Text style={pdfStyles.colDuration}>{row.durationStr}</Text>
-            <Text style={pdfStyles.colRate}>{row.payRate}</Text>
-            <Text style={pdfStyles.colTotal}>{row.total.toFixed(2)}</Text>
+        <View style={pdfStyles.header}>
+          <View>
+            <Text style={pdfStyles.title}>{empName}</Text>
+            <Text style={pdfStyles.subtitle}>{designations}</Text>
           </View>
-        ))}
-      </View>
+          <View>
+            <Text style={pdfStyles.month}>Period: {monthLabel}</Text>
+          </View>
+        </View>
 
-      {/* PDF Footer */}
-      <View style={pdfStyles.footer}>
-        <Text style={pdfStyles.footerText}>
-          Total Hours Worked: {Math.floor(totalMinutesWorked / 60)}:
-          {(totalMinutesWorked % 60).toString().padStart(2, '0')}
-        </Text>
-        <Text style={pdfStyles.footerText}>Total: {grandTotal.toFixed(2)}</Text>
-      </View>
-    </Page>
-  </Document>
-);
+        <View style={pdfStyles.table}>
+          {/* PDF Table Header */}
+          <View style={[pdfStyles.tableRow, pdfStyles.tableHeader]}>
+            <Text style={[pdfStyles.colShift, shiftColStyle]}>Shift Details</Text>
+            <Text style={pdfStyles.colDate}>Start Date</Text>
+            <Text style={pdfStyles.colWeekday}>Weekdays</Text>
+            <Text style={pdfStyles.colTime}>Start Time</Text>
+            <Text style={pdfStyles.colDate}>End Date</Text>
+            <Text style={pdfStyles.colWeekday}>Weekdays</Text>
+            <Text style={pdfStyles.colTime}>End Time</Text>
+            <Text style={pdfStyles.colActual}>Actual Hour</Text>
+            <Text style={pdfStyles.colDuration}>Duration</Text>
+            
+            {/* ---> NEW: Conditionally hide headers */}
+            {!isContract && <Text style={pdfStyles.colRate}>Rate</Text>}
+            {!isContract && <Text style={pdfStyles.colTotal}>Total</Text>}
+          </View>
+
+          {/* PDF Table Data Rows */}
+          {records.map((row: any, i: number) => (
+            <View key={i} style={pdfStyles.tableRow}>
+              <View style={[pdfStyles.colShift, shiftColStyle]}>
+                <Text style={{ fontWeight: 'bold', fontSize: 8 }}>{row.shiftName}</Text>
+                <Text style={pdfStyles.shiftDetailText}>
+                  {row.rotaStartTime} - {row.rotaEndTime} ({row.shiftScheduledStr})
+                </Text>
+                {row.isDifferentShiftDate && (
+                  <Text style={pdfStyles.shiftCrossDayText}>
+                    (Cross-day Shift)
+                  </Text>
+                )}
+              </View>
+
+              <Text style={pdfStyles.colDate}>{row.startDateStr}</Text>
+              <Text style={pdfStyles.colWeekday}>{row.startWeekdayStr}</Text>
+              <Text style={pdfStyles.colTime}>{row.startTimeStr}</Text>
+              <Text style={pdfStyles.colDate}>
+                {row.endDateStr}
+              </Text>
+              <Text style={pdfStyles.colWeekday}>{row.endWeekdayStr}</Text>
+              <Text style={pdfStyles.colTime}>{row.endTimeStr}</Text>
+              <Text style={pdfStyles.colActual}>{row.actualHourStr}</Text>
+              <Text style={pdfStyles.colDuration}>{row.durationStr}</Text>
+              
+              {/* ---> NEW: Conditionally hide row data */}
+              {!isContract && <Text style={pdfStyles.colRate}>{row.payRate}</Text>}
+              {!isContract && <Text style={pdfStyles.colTotal}>{row.total.toFixed(2)}</Text>}
+            </View>
+          ))}
+        </View>
+
+        {/* PDF Footer */}
+        <View style={pdfStyles.footer}>
+          <Text style={pdfStyles.footerText}>
+            Total Hours Worked: {Math.floor(totalMinutesWorked / 60)}:
+            {(totalMinutesWorked % 60).toString().padStart(2, '0')}
+          </Text>
+          <Text style={pdfStyles.footerText}>
+            {/* ---> NEW: Use contractAmount if isContract is true */}
+            Total: {isContract ? (contractAmount || 0).toFixed(2) : grandTotal.toFixed(2)}
+          </Text>
+        </View>
+      </Page>
+    </Document>
+  );
+};
 // ─── Component ────────────────────────────────────────────────────────────────
 
 const ViewPayroll = () => {
@@ -238,20 +252,20 @@ const ViewPayroll = () => {
     recordId: string;
   } | null>(null);
 
+  const fetchPayroll = async () => {
+    if (!pid) return setLoading(false);
+    setLoading(true);
+    try {
+      const res = await axiosInstance.get(`/hr/payroll/${pid}`);
+      setPayroll(res.data.data);
+      setAttendanceRecords(res.data.data.attendanceList || []);
+    } catch (err: any) {
+      setError('Failed to load payroll details.');
+    } finally {
+      setLoading(false);
+    }
+  };
   useEffect(() => {
-    const fetchPayroll = async () => {
-      if (!pid) return setLoading(false);
-      setLoading(true);
-      try {
-        const res = await axiosInstance.get(`/hr/payroll/${pid}`);
-        setPayroll(res.data.data);
-        setAttendanceRecords(res.data.data.attendanceList || []);
-      } catch (err: any) {
-        setError('Failed to load payroll details.');
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchPayroll();
   }, [pid]);
 
@@ -287,6 +301,27 @@ const ViewPayroll = () => {
       };
       await axiosInstance.patch(`/hr/payroll/${pid}`, payload);
       toast({ title: 'Payroll updated successfully!' });
+    } catch (err: any) {
+      toast({
+        title: err.response?.data?.message || 'Failed to update payroll',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+
+    const handleContract = async () => {
+    if (!pid) return;
+    setIsUpdating(true);
+    try {
+      const payload = {
+        isContract:true
+      };
+      await axiosInstance.patch(`/hr/payroll/${pid}`, payload);
+      toast({ title: 'Payroll updated successfully!' });
+      fetchPayroll();
     } catch (err: any) {
       toast({
         title: err.response?.data?.message || 'Failed to update payroll',
@@ -392,13 +427,12 @@ const processedData = useMemo(() => {
   }, [attendanceRecords]);
 
   // ─── Export Handlers ──────────────────────────────────────────────────────────
-
 const handleGenerateCSV = () => {
-    // 1. Employee Info Meta Rows - Designation is placed on its own row immediately below the name
+    const isContract = payroll?.isContract;
     const nameRow = [`"${empName}"`, `"${monthLabel}"`];
     const designationRow = [`"${designations}"`, `""`];
 
-    // 2. Table Headers (11 Columns)
+    // ---> NEW: Conditionally include Pay Rate & Total in headers
     const headers = [
       'Shift Details',
       'Start Date',
@@ -408,15 +442,14 @@ const handleGenerateCSV = () => {
       'Weekdays',
       'End Time',
       'Actual Hour',
-      'Duration',
-      'Pay Rate',
-      'Total'
+      'Duration'
     ];
+    if (!isContract) {
+      headers.push('Pay Rate', 'Total');
+    }
 
-    // 3. Process Data Rows
     const rows = processedData.records.map((r) => {
-      const hasShiftName =
-        r.shiftName && r.shiftName.trim() !== '' && r.shiftName !== '—';
+      const hasShiftName = r.shiftName && r.shiftName.trim() !== '' && r.shiftName !== '—';
       let shiftCell = hasShiftName
         ? `${r.shiftName} : ${r.rotaStartTime} - ${r.rotaEndTime}`
         : `${r.rotaStartTime} - ${r.rotaEndTime}`;
@@ -425,8 +458,9 @@ const handleGenerateCSV = () => {
         shiftCell += '\n(Cross-day Shift)';
       }
 
-      return [
-        `"${shiftCell}"`, // quoted to preserve newlines
+      // ---> NEW: Conditionally include row data
+      const baseRow = [
+        `"${shiftCell}"`,
         r.startDateStr,
         r.startWeekdayStr,
         r.startTimeStr,
@@ -434,34 +468,40 @@ const handleGenerateCSV = () => {
         r.endWeekdayStr,
         r.endTimeStr,
         r.actualHourStr,
-        r.durationStr,
-        r.payRate ?? 0,
-        r.total.toFixed(2)
+        r.durationStr
       ];
+
+      if (!isContract) {
+        baseRow.push(r.payRate ?? 0, r.total.toFixed(2));
+      }
+
+      return baseRow;
     });
 
-    // 4. Footer Totals (Adjusted spacing for 11 columns)
     const totalHoursStr = `${Math.floor(processedData.totalMinutesWorked / 60)}:${(processedData.totalMinutesWorked % 60).toString().padStart(2, '0')}`;
     
-    // Push an empty row of 11 columns for spacing
-    rows.push(['', '', '', '', '', '', '', '', '', '', '']); 
+    // ---> NEW: Adjusted spacing based on column count
+    const colCount = isContract ? 9 : 11;
+    rows.push(Array(colCount).fill('')); // Empty row for spacing
     
-    // Push the totals row, placing text exactly under the correct columns
-    rows.push([
-      '',
-      '',
-      '',
-      '',
-      '',
-      '',
-      '',
-      '"Total Hours Worked:"', 
-      `"${totalHoursStr}"`,
-      '',
-      processedData.grandTotal.toFixed(2)
-    ]);
+    // Create custom footer row
+    if (isContract) {
+      rows.push([
+        '', '', '', '', '', '', '',
+        '"Total Hours Worked:"', 
+        `"${totalHoursStr}"`, '',
+        `"Total: ${(payroll.contractAmount || 0).toFixed(2)}"`
+      ]);
+    } else {
+      rows.push([
+        '', '', '', '', '', '', '', 
+        '"Total Hours Worked:"', 
+        `"${totalHoursStr}"`, 
+        '', 
+        processedData.grandTotal.toFixed(2)
+      ]);
+    }
 
-    // 5. Combine and download
     const csvContent = [nameRow, designationRow, [], headers, ...rows]
       .map((e) => e.join(','))
       .join('\n');
@@ -485,6 +525,8 @@ const handleGenerateCSV = () => {
           records={processedData.records}
           totalMinutesWorked={processedData.totalMinutesWorked}
           grandTotal={processedData.grandTotal}
+          isContract={payroll?.isContract}           // ---> NEW: Pass property
+          contractAmount={payroll?.contractAmount}   // ---> NEW: Pass property
         />
       ).toBlob();
 
@@ -523,7 +565,7 @@ const handleGenerateCSV = () => {
           {/* Header Section */}
           <div className="mb-8 grid grid-cols-2 items-start gap-4">
             <div className="col-span-1 space-y-2">
-              <h2 className="text-xl font-bold tracking-tight">{empName}</h2>
+              <h2 className="text-xl font-bold tracking-tight">{empName} {payroll.isContract &&<span className='ml-4 text-xs font-semibold bg-orange-500 rounded-full py-2 px-3 text-white'> Contracted Salary Applied</span>}</h2>
               <p className="text-sm font-semibold text-gray-700">
                 {designations}
               </p>
@@ -555,6 +597,19 @@ const handleGenerateCSV = () => {
               >
                 Download Excel
               </Button>
+               {payroll.isContract === false &&<><Button
+                variant="outline"
+                className="border-none bg-orange-600 hover:bg-orange-500"
+                onClick={handleContract}
+                disabled={isUpdating}
+              >
+                {isUpdating ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  'Apply Contracted Salary'
+                )}
+              </Button></>}
+              
               <Button
                 variant="outline"
                 onClick={handleUpdate}
@@ -604,12 +659,14 @@ const handleGenerateCSV = () => {
                   <TableHead className="font-extrabold  text-black">
                     Duration
                   </TableHead>
-                  <TableHead className="w-28 font-extrabold  text-black">
+                  {payroll.isContract === false && <>
+                   <TableHead className="w-28 font-extrabold  text-black">
                     Pay Rate
                   </TableHead>
                   <TableHead className="text-right font-extrabold  text-black">
                     Total
-                  </TableHead>
+                  </TableHead></>}
+                 
                 </TableRow>
               </TableHeader>
             <TableBody>
@@ -666,7 +723,8 @@ const handleGenerateCSV = () => {
                       <TableCell className="font-semibold text-blue-600">
                         {att.durationStr}
                       </TableCell>
-                      <TableCell className="align-top">
+
+                       {payroll.isContract === false && <><TableCell className="align-top">
                         <div className="flex flex-col gap-2 pt-1">
                           <Input
                             type="number"
@@ -701,7 +759,8 @@ const handleGenerateCSV = () => {
                       </TableCell>
                       <TableCell className="text-right font-bold text-gray-900">
                         {att.total.toFixed(2)}
-                      </TableCell>
+                      </TableCell></>}
+                      
                     </TableRow>
                   ))
                 ) : (
@@ -730,12 +789,19 @@ const handleGenerateCSV = () => {
                 .padStart(2, '0')}
             </span>
           </div>
-          <div className="font-extrabold tracking-wide">
+          {payroll.isContract?( <div className="font-extrabold tracking-wide">
+            Total:{' '}
+            <span className="text-black">
+              {payroll.contractAmount.toFixed(2)}
+            </span>
+          </div>):(<div className="font-extrabold tracking-wide">
             Total:{' '}
             <span className="text-black">
               {processedData.grandTotal.toFixed(2)}
             </span>
-          </div>
+          </div>)}
+         
+          
         </div>
       </div>
     </div>

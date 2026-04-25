@@ -246,6 +246,19 @@ const EmploymentDetailsTab: React.FC<EmploymentDetailsTabProps> = ({
                 isSaving={isFieldSaving['contractHours']}
               />
             </FormRow>
+            <FormRow 
+              label="Contract Amount" 
+              isSaving={isFieldSaving['contractAmount']}
+            >
+              <EditableField
+                id="contractAmount"
+                label=""
+                type="number"
+                value={formData.contractAmount}
+                onUpdate={(value) => onUpdate('contractAmount', value)}
+                isSaving={isFieldSaving['contractAmount']}
+              />
+            </FormRow>
 
             <FormRow 
               label="Car Allowance" 

@@ -3,12 +3,7 @@ import {
   FileText,
   Calculator,
   Plus,
-  Eye,
-  ChevronDown,
-  Download,
-  X,
-  Filter,
-  Search
+  Trash2
 } from 'lucide-react';
 import DatePicker from 'react-datepicker';
 import { Button } from '@/components/ui/button';
@@ -26,21 +21,15 @@ import { DynamicPagination } from '@/components/shared/DynamicPagination';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger
-} from '@/components/ui/dropdown-menu';
 import { useToast } from '@/components/ui/use-toast';
 import axiosInstance from '@/lib/axios';
 import { Label } from '@/components/ui/label';
 import { useNavigate, useParams } from 'react-router-dom';
-import { downloadPayrollPDF, getPayrollPDFBlob } from './components/PayrollPDF';
 import moment from 'moment';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -96,23 +85,6 @@ export interface TPayroll {
 const resolveUser = (p: TPayroll): TUser | null =>
   (p.userId as TUser) ?? p.user ?? null;
 
-const sumDuration = (list?: TAttendanceLog[]): string => {
-  const totalMins = (list ?? []).reduce((s, a) => s + (a.duration ?? 0), 0);
-  const h = Math.floor(totalMins / 60);
-  const m = totalMins % 60;
-  return `${h}:${String(m).padStart(2, '0')}`;
-};
-
-const getDesignation = (emp: TUser | null): string => {
-  if (!emp) return '—';
-  if (emp.designations?.length) return emp.designations[0].title;
-  if (emp.designationId && !Array.isArray(emp.designationId))
-    return (emp.designationId as TDesignation).title;
-  if (Array.isArray(emp.designationId) && emp.designationId.length)
-    return (emp.designationId as TDesignation[])[0].title;
-  return emp.designation || '—';
-};
-
 // ─── Component ────────────────────────────────────────────────────────────────
 
 const CompanyPayRoll = () => {
@@ -132,14 +104,15 @@ const CompanyPayRoll = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
-
   // Generate payroll dialog
   const [showPayloadDialog, setShowPayloadDialog] = useState(false);
   const [payloadFromDate, setPayloadFromDate] = useState<Date | null>(null);
   const [payloadToDate, setPayloadToDate] = useState<Date | null>(null);
 
-  // PDF preview
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  // ---> NEW: Delete Confirmation State
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [batchToDelete, setBatchToDelete] = useState<string[]>([]);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const formatDateToYMD = (date: Date | null) => {
     if (!date) return null;
@@ -158,7 +131,7 @@ const CompanyPayRoll = () => {
         page,
         limit: entriesPerPage,
         companyId,
-     };
+      };
 
       const res = await axiosInstance.get('/hr/payroll', { params });
       setPayrollList(res.data.data.result ?? []);
@@ -181,12 +154,6 @@ const CompanyPayRoll = () => {
     fetchPayrollData(currentPage);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage]);
-
-  useEffect(() => {
-    return () => {
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-    };
-  }, [previewUrl]);
 
   const handleGeneratePayroll = async () => {
     if (!payloadFromDate || !payloadToDate) {
@@ -211,7 +178,7 @@ const CompanyPayRoll = () => {
       setShowPayloadDialog(false);
       setPayloadFromDate(null);
       setPayloadToDate(null);
-      fetchPayrollData(1,);
+      fetchPayrollData(1);
     } catch (err: any) {
       toast({
         title: 'Error',
@@ -224,7 +191,34 @@ const CompanyPayRoll = () => {
     }
   };
 
-
+  // ---> NEW: Delete Batch Logic (One by One)
+  const handleDeleteBatch = async () => {
+    if (!batchToDelete.length) return;
+    setIsDeleting(true);
+    try {
+      // Loop through and delete one by one
+      for (const id of batchToDelete) {
+        await axiosInstance.delete(`/hr/payroll/${id}`);
+      }
+      
+      toast({
+        title: 'Success',
+        description: `Successfully deleted ${batchToDelete.length} payroll records.`
+      });
+      
+      setShowDeleteConfirm(false);
+      setBatchToDelete([]);
+      fetchPayrollData(currentPage); // Refresh the table
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.response?.data?.message ?? 'Failed to delete some payrolls.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   // ✅ Aggregate payrolls into a single object per date range
   const aggregatedPayrolls = Object.values(
@@ -260,15 +254,7 @@ const CompanyPayRoll = () => {
         let userTotalAmount = 0;
 
         (payroll.attendanceList ?? []).forEach((att: any) => {
-          // 1. Calculate actual duration from timestamps since DB duration is often 0
-          const clockIn = moment(att.attendanceId?.clockIn);
-          const clockOut = moment(att.attendanceId?.clockOut);
-
-          let workedMinutes = 0;
-
-          // Fallback to DB duration only if timestamps are completely missing
-          workedMinutes = att.duration ?? 0;
-
+          let workedMinutes = att.duration ?? 0;
           const rate = att.payRate ?? 0;
 
           userTotalMins += workedMinutes;
@@ -285,7 +271,6 @@ const CompanyPayRoll = () => {
       {} as Record<string, any>
     )
   );
-
 
   return (
     <div className="space-y-4">
@@ -330,7 +315,6 @@ const CompanyPayRoll = () => {
                     <TableHead className="font-semibold text-gray-700">
                       Payroll Period
                     </TableHead>
-           
                     <TableHead className="text-right font-semibold text-gray-700">
                       Actions
                     </TableHead>
@@ -340,13 +324,10 @@ const CompanyPayRoll = () => {
                 <TableBody>
                   {aggregatedPayrolls.map((group, idx) => (
                     <TableRow key={idx} className="hover:bg-gray-50/60">
-                      {/* Employee Names joined by comma */}
-
                       {/* From Date */}
                       <TableCell className="font-medium text-gray-800">
                         {moment(group.fromDate).format('DD MMM, YYYY')} -  {moment(group.toDate).format('DD MMM, YYYY')}
                       </TableCell>
-
 
                       {/* Actions */}
                       <TableCell className="text-right">
@@ -365,6 +346,18 @@ const CompanyPayRoll = () => {
                             }
                           >
                             Details
+                          </Button>
+                          
+                          {/* ---> NEW: Updated Delete Button */}
+                          <Button
+                            size="sm"
+                            variant={'destructive'}
+                            onClick={() => {
+                              setBatchToDelete(group.ids);
+                              setShowDeleteConfirm(true);
+                            }}
+                          >
+                            <Trash2 className="w-4 h-4" />
                           </Button>
                         </div>
                       </TableCell>
@@ -388,6 +381,37 @@ const CompanyPayRoll = () => {
           </>
         )}
       </div>
+
+      {/* ---> NEW: Batch Delete Confirmation Dialog */}
+      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Deletion</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete all <strong>{batchToDelete.length}</strong> payroll records in this period? This action will process one by one and cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowDeleteConfirm(false);
+                setBatchToDelete([]);
+              }}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteBatch}
+              disabled={isDeleting}
+            >
+              {isDeleting ? <BlinkingDots size="small" color="bg-white" /> : 'Delete All'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Generate Payroll Dialog ── */}
       <Dialog open={showPayloadDialog} onOpenChange={setShowPayloadDialog}>

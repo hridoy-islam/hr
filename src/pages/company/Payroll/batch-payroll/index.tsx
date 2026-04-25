@@ -24,6 +24,7 @@ import { ArrowLeft, Eye, Loader2, RefreshCw } from 'lucide-react';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 import { useToast } from '@/components/ui/use-toast';
 import * as XLSX from 'xlsx';
+import { Badge } from '@/components/ui/badge';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const resolveUser = (p: any) => p.userId ?? p.user ?? null;
@@ -130,7 +131,9 @@ const BatchSummaryPayrollPDF = ({
           </View>
 
           {batches.map((row: any, i: number) => {
+            // ---> FIX: Always calculate and show the total hours worked
             const hoursStr = `${Math.floor(row.totalMinutesWorked / 60)}:${(row.totalMinutesWorked % 60).toString().padStart(2, '0')}`;
+              
             return (
               <View key={i} style={pdfStyles.tableRow} wrap={false}>
                 <Text style={pdfStyles.colRef}>{row.payrollNumber}</Text>
@@ -211,7 +214,6 @@ const BatchPayrollDetails = () => {
   }, [currentPayrollIds, companyId, companyData]);
 
   useEffect(() => {
-    // If the location state doesn't match the current state, sync it (handles browser back/forward)
     if (location.state?.payrollIds && location.state.payrollIds !== currentPayrollIds) {
        setCurrentPayrollIds(location.state.payrollIds);
     }
@@ -239,9 +241,6 @@ const BatchPayrollDetails = () => {
         newIds = returnedData.map((p: any) => p._id);
         setCurrentPayrollIds(newIds); 
 
-        // ✅ FIX: Overwrite the current browser history state. 
-        // This ensures if you navigate to the detail view and click 'Back',
-        // the router loads these *new* IDs instead of the deleted old ones.
         navigate(location.pathname, {
           replace: true,
           state: {
@@ -283,6 +282,8 @@ const BatchPayrollDetails = () => {
  const processedBatches = useMemo(() => {
     return payrolls.map((payroll) => {
       const emp = resolveUser(payroll);
+      const contract = payroll.isContract;
+      const contractAmount = payroll.contractAmount || 0; 
       const empName = emp ? `${emp.firstName} ${emp.lastName}` : 'Unknown Employee';
       const designations = getDesignation(emp);
       const monthLabel = getMonthLabelForReport(payroll.fromDate, payroll.toDate);
@@ -295,10 +296,9 @@ const BatchPayrollDetails = () => {
         const clockIn = moment(att.attendanceId?.clockIn);
         const clockOut = moment(att.attendanceId?.clockOut);
 
-        const workedMinutes =  att.duration;
+        const workedMinutes = att.duration;
         const isDifferentWorkedDate = clockIn.isValid() && clockOut.isValid() && clockIn.format('YYYY-MM-DD') !== clockOut.format('YYYY-MM-DD');
 
-        // ---> NEW: Calculate Actual Hour duration
         const actualWorkedMinutes = clockIn.isValid() && clockOut.isValid() 
           ? Math.max(0, clockOut.diff(clockIn, 'minutes')) 
           : 0;
@@ -316,9 +316,14 @@ const BatchPayrollDetails = () => {
         const shiftScheduledStr = formatShiftScheduledDuration(shiftScheduledMins);
         const isDifferentShiftDate = rotaStartDate !== rotaEndDate;
 
-        const total = calculateRowTotal(workedMinutes, att.payRate);
+        // ---> FIX: Always add the minutes so Hours Worked doesn't show 0
         totalMins += workedMinutes;
-        grandTot += total;
+
+        let total = 0;
+        if (!contract) {
+          total = calculateRowTotal(workedMinutes, att.payRate);
+          grandTot += total;
+        }
 
         return {
           ...att,
@@ -334,22 +339,30 @@ const BatchPayrollDetails = () => {
           endDateStr: clockOut.isValid() ? clockOut.format('DD-MM-YYYY') : '—',
           endWeekdayStr: clockOut.isValid() ? clockOut.format('dddd') : '—', 
           endTimeStr: clockOut.isValid() ? clockOut.format('HH:mm') : '—',
-          actualHourStr, // ---> NEW: Pass string to the export handler
-          workedMinutes,
-          durationStr: formatDuration(workedMinutes),
+          actualHourStr, // ---> FIX: Now actual hours always show up
+          workedMinutes, // ---> FIX: Now worked minutes always show up
+          durationStr: formatDuration(workedMinutes), // ---> FIX: Duration always shows up
           isDifferentWorkedDate,
+          payRateDisplay: contract ? '—' : (att.payRate ?? 0),
+          totalDisplay: contract ? '—' : Number(total.toFixed(2)),
           total,
+          contract
         };
       });
 
+      if (contract) {
+        grandTot = contractAmount;
+      }
+
       return {
         _id: payroll._id,
+        contract,
         payrollNumber,
         empName,
         designations,
         monthLabel,
         records,
-        totalMinutesWorked: totalMins,
+        totalMinutesWorked: totalMins, // Will now have a real value!
         grandTotal: grandTot
       };
     });
@@ -366,7 +379,6 @@ const BatchPayrollDetails = () => {
 
     processedBatches.forEach((batch, index) => {
       const sheetData: any[][] = [];
-      // ---> NEW: Added 'Actual Hour' to headers (Now 11 columns total)
       const headers = [
         'Shift Details', 
         'Start Date', 
@@ -409,19 +421,20 @@ const BatchPayrollDetails = () => {
           `${r.endDateStr}${r.isDifferentWorkedDate ? ' *' : ''}`,
           r.endWeekdayStr,
           r.endTimeStr,
-          r.actualHourStr, // ---> NEW: Push actual hour data
+          r.actualHourStr, 
           r.durationStr,
-          r.payRate ?? 0,
-          Number(r.total.toFixed(2)),
+          r.payRateDisplay,
+          r.totalDisplay,
         ]);
       });
 
+      // ---> FIX: Always show total hours string on Excel
       const totalHoursStr = `${Math.floor(batch.totalMinutesWorked / 60)}:${(batch.totalMinutesWorked % 60).toString().padStart(2, '0')}`;
       sheetData.push([]);
       
-      // ---> NEW: Added one extra empty string '' at the start to push the footer items 1 column to the right
+      const footerLabel = batch.contract ? 'Contract Total:' : '';
       sheetData.push([
-        '', '', '', '', '', '', '', 'Total Hours Worked:', totalHoursStr, '', Number(batch.grandTotal.toFixed(2))
+        '', '', '', '', '', '', '', 'Total Hours Worked:', totalHoursStr, footerLabel, Number(batch.grandTotal.toFixed(2))
       ]);
 
       const ws = XLSX.utils.aoa_to_sheet(sheetData);
@@ -555,10 +568,11 @@ const BatchPayrollDetails = () => {
                   {processedBatches.map((row) => (
                     <TableRow onClick={() => navigate(`/company/${companyId}/payroll/${row._id}`)} key={row._id} className="cursor-pointer border-b border-gray-200">
                       <TableCell className="font-medium">{row.payrollNumber}</TableCell>
-                      <TableCell className='hover:underline'>{row.empName}</TableCell>
+                      <TableCell ><div className='flex flex-col  gap-1 '>{row.empName} {row.contract && <><span className='text-xs text-orange-500 font-semibold'>Contracted Salary</span></>}</div></TableCell>
                       <TableCell className="text-gray-600">{row.designations}</TableCell>
                       <TableCell>
-                        {Math.floor(row.totalMinutesWorked / 60)}:{(row.totalMinutesWorked % 60).toString().padStart(2, '0')}
+                        {/* ---> FIX: Always show hours worked on the table */}
+                        {`${Math.floor(row.totalMinutesWorked / 60)}:${(row.totalMinutesWorked % 60).toString().padStart(2, '0')}`}
                       </TableCell>
                       <TableCell className="font-semibold text-right">
                         {row.grandTotal.toFixed(2)}
