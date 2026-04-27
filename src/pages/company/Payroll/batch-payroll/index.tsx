@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useLocation, useParams, useNavigate } from 'react-router-dom';
 import axiosInstance from '@/lib/axios';
 import moment from 'moment';
@@ -76,15 +76,6 @@ const calculateRowTotal = (durationMinutes: number, payRate: number): number => 
   return hours * (payRate ?? 0);
 };
 
-const formatDateToYMD = (date: Date | string | null) => {
-  if (!date) return null;
-  const d = new Date(date);
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
-};
-
 // ─── PDF Styles & Summary Component ───────────────────────────────────────────
 
 const pdfStyles = StyleSheet.create({
@@ -140,6 +131,7 @@ const BatchSummaryPayrollPDF = ({
           </View>
 
           {batches.map((row: any, i: number) => {
+            // ---> FIX: Always calculate and show the total hours worked
             const hoursStr = `${Math.floor(row.totalMinutesWorked / 60)}:${(row.totalMinutesWorked % 60).toString().padStart(2, '0')}`;
               
             return (
@@ -189,15 +181,6 @@ const BatchPayrollDetails = () => {
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Reference to hold our polling timer so we can clean it up
-  const pollingTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (pollingTimerRef.current) clearTimeout(pollingTimerRef.current);
-    };
-  }, []);
-
   const fetchPayrollDetails = useCallback(async (silent = false, overrideIds?: string[]) => {
     const idsToFetch = overrideIds || currentPayrollIds;
 
@@ -230,142 +213,54 @@ const BatchPayrollDetails = () => {
     }
   }, [currentPayrollIds, companyId, companyData]);
 
-  // Updated UseEffect Logic as Requested (with Deep Compare to avoid infinite loops)
   useEffect(() => {
-    const incomingIds = location.state?.payrollIds;
-    if (incomingIds && JSON.stringify(incomingIds) !== JSON.stringify(currentPayrollIds)) {
-       setCurrentPayrollIds(incomingIds);
+    if (location.state?.payrollIds && location.state.payrollIds !== currentPayrollIds) {
+       setCurrentPayrollIds(location.state.payrollIds);
     }
-    fetchPayrollDetails(false, incomingIds || currentPayrollIds);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    fetchPayrollDetails(false, location.state?.payrollIds || currentPayrollIds);
   }, [location.state?.payrollIds]);
 
-  // ─── Polling Logic ──────────────────────────────────────────────────────────
- // ─── Polling Logic ──────────────────────────────────────────────────────────
-  const pollForRegeneratedData = useCallback(async (startTime: number, targetFrom: string, targetTo: string, oldIds: string[]) => {
-    try {
-      // Fetch the payroll batches for this company silently
-      const params = { page: 1, limit: 10000, companyId };
-      const res = await axiosInstance.get('/hr/payroll/batch', { params });
-      const batches = res.data?.data?.data ?? [];
-
-      // Find the batch matching our exact date range
-      const matchedBatch = batches.find((b: any) =>
-        formatDateToYMD(b.fromDate) === targetFrom &&
-        formatDateToYMD(b.toDate) === targetTo
-      );
-
-      let isReady = false;
-      let newIds = oldIds;
-
-      if (matchedBatch) {
-        const batchIds = matchedBatch.ids || [];
-        
-        // CRITICAL FIX: Ensure the new batch has finished populating.
-        // It must be different from the old array AND it must have reached the original count.
-        const isDifferent = JSON.stringify(batchIds) !== JSON.stringify(oldIds);
-        const hasReachedTargetCount = batchIds.length >= oldIds.length;
-
-        if (isDifferent && hasReachedTargetCount) {
-          isReady = true;
-          newIds = batchIds;
-        }
-      }
-
-      if (isReady) {
-        // Data is fully ready! Stop polling.
-        setCurrentPayrollIds(newIds);
-        await fetchPayrollDetails(true, newIds);
-        setIsRegenerating(false);
-        toast({
-          title: 'Success',
-          description: 'Payrolls regenerated successfully!',
-        });
-        
-        // Update URL state so refresh doesn't break
-        navigate(location.pathname, {
-          replace: true,
-          state: { ...location.state, payrollIds: newIds }
-        });
-        return;
-      }
-
-      // Check timeout (60 seconds)
-      if (Date.now() - startTime >= 60000) {
-        setIsRegenerating(false);
-        
-        // Fallback: If 60 seconds passed, an employee might have been removed from the rota,
-        // resulting in a genuinely lower count. We load whatever IDs were generated so far.
-        if (matchedBatch && matchedBatch.ids && matchedBatch.ids.length > 0) {
-          const finalIds = matchedBatch.ids;
-          if (JSON.stringify(finalIds) !== JSON.stringify(oldIds)) {
-             setCurrentPayrollIds(finalIds);
-             await fetchPayrollDetails(true, finalIds);
-          }
-        }
-
-        toast({
-          title: 'Regeneration Finished',
-          description: 'Regeneration is complete or timed out. Showing available records.',
-        });
-        return;
-      }
-
-      // Poll again in 5 seconds
-      pollingTimerRef.current = setTimeout(() => pollForRegeneratedData(startTime, targetFrom, targetTo, oldIds), 5000);
-
-    } catch (err) {
-      if (Date.now() - startTime >= 60000) {
-        setIsRegenerating(false);
-        return;
-      }
-      pollingTimerRef.current = setTimeout(() => pollForRegeneratedData(startTime, targetFrom, targetTo, oldIds), 5000);
-    }
-  }, [companyId, fetchPayrollDetails, location, navigate, toast]);
   const handleRegeneratePayroll = async () => {
     if (!currentPayrollIds || currentPayrollIds.length === 0) return;
 
     setIsRegenerating(true);
-    const targetFromStr = formatDateToYMD(fromDate);
-    const targetToStr = formatDateToYMD(toDate);
-    const startTime = Date.now();
-
     try {
       const response = await axiosInstance.post('/hr/payroll/regenerate', {
         payrollIds: currentPayrollIds,
       });
 
-      // Handle Immediate Response (If backend returns data instantly)
+      toast({
+        title: 'Success',
+        description: 'Payrolls regenerated successfully.',
+      });
+
       const returnedData = response.data?.data?.createdPayrolls || response.data?.data;
-      
+      let newIds = currentPayrollIds;
+
       if (Array.isArray(returnedData) && returnedData.length > 0) {
-        const newIds = returnedData.map((p: any) => p._id);
-        setCurrentPayrollIds(newIds);
-        await fetchPayrollDetails(true, newIds);
-        setIsRegenerating(false);
-        
-        toast({ title: 'Success', description: 'Payrolls regenerated successfully.' });
+        newIds = returnedData.map((p: any) => p._id);
+        setCurrentPayrollIds(newIds); 
+
         navigate(location.pathname, {
           replace: true,
-          state: { ...location.state, payrollIds: newIds }
+          state: {
+            ...location.state,
+            payrollIds: newIds
+          }
         });
-      } else {
-        // Handle Async Response (202 Accepted) -> Start Polling
-        if (targetFromStr && targetToStr) {
-          pollForRegeneratedData(startTime, targetFromStr as string, targetToStr as string, currentPayrollIds);
-        } else {
-          setIsRegenerating(false);
-        }
       }
+
+      await fetchPayrollDetails(true, newIds);
 
     } catch (err: any) {
       console.error(err);
-      setIsRegenerating(false);
       toast({
         title: 'Regeneration Failed',
         description: err.response?.data?.message || 'Something went wrong while regenerating.',
         variant: 'destructive',
       });
+    } finally {
+      setIsRegenerating(false);
     }
   };
 
@@ -384,8 +279,7 @@ const BatchPayrollDetails = () => {
     return `${fromDateDate.format('MMMM')} - ${toDateDate.format('MMMM YYYY')}`.toUpperCase();
   })();
 
-  // useMemo ensures this only recalculates when `payrolls` data fully arrives
-  const processedBatches = useMemo(() => {
+ const processedBatches = useMemo(() => {
     return payrolls.map((payroll) => {
       const emp = resolveUser(payroll);
       const contract = payroll.isContract;
@@ -422,6 +316,7 @@ const BatchPayrollDetails = () => {
         const shiftScheduledStr = formatShiftScheduledDuration(shiftScheduledMins);
         const isDifferentShiftDate = rotaStartDate !== rotaEndDate;
 
+        // ---> FIX: Always add the minutes so Hours Worked doesn't show 0
         totalMins += workedMinutes;
 
         let total = 0;
@@ -444,9 +339,9 @@ const BatchPayrollDetails = () => {
           endDateStr: clockOut.isValid() ? clockOut.format('DD-MM-YYYY') : '—',
           endWeekdayStr: clockOut.isValid() ? clockOut.format('dddd') : '—', 
           endTimeStr: clockOut.isValid() ? clockOut.format('HH:mm') : '—',
-          actualHourStr,
-          workedMinutes,
-          durationStr: formatDuration(workedMinutes),
+          actualHourStr, // ---> FIX: Now actual hours always show up
+          workedMinutes, // ---> FIX: Now worked minutes always show up
+          durationStr: formatDuration(workedMinutes), // ---> FIX: Duration always shows up
           isDifferentWorkedDate,
           payRateDisplay: contract ? '—' : (att.payRate ?? 0),
           totalDisplay: contract ? '—' : Number(total.toFixed(2)),
@@ -467,7 +362,7 @@ const BatchPayrollDetails = () => {
         designations,
         monthLabel,
         records,
-        totalMinutesWorked: totalMins,
+        totalMinutesWorked: totalMins, // Will now have a real value!
         grandTotal: grandTot
       };
     });
@@ -479,10 +374,10 @@ const BatchPayrollDetails = () => {
 
   // ─── Export Handlers ──────────────────────────────────────────────────────────
 
-  const handleGenerateExcel = () => {
+ const handleGenerateExcel = () => {
     const wb = XLSX.utils.book_new();
 
-    processedBatches.forEach((batch) => {
+    processedBatches.forEach((batch, index) => {
       const sheetData: any[][] = [];
       const headers = [
         'Shift Details', 
@@ -533,6 +428,7 @@ const BatchPayrollDetails = () => {
         ]);
       });
 
+      // ---> FIX: Always show total hours string on Excel
       const totalHoursStr = `${Math.floor(batch.totalMinutesWorked / 60)}:${(batch.totalMinutesWorked % 60).toString().padStart(2, '0')}`;
       sheetData.push([]);
       
@@ -589,7 +485,7 @@ const BatchPayrollDetails = () => {
         <div className="flex items-center justify-between gap-4">
           <h2 className="text-2xl font-bold text-gray-900">Summary</h2>
           <div className='flex flex-row items-center gap-2'>
-            <Button size="sm" onClick={() => navigate(-1)} disabled={isRegenerating}>
+            <Button size="sm" onClick={() => navigate(-1)}>
               <ArrowLeft className="h-5 w-5 mr-2" />Back
             </Button>
             <Button 
@@ -611,7 +507,7 @@ const BatchPayrollDetails = () => {
                 size="sm"
                 className="border-none bg-violet-600 text-white hover:bg-violet-600"
                 onClick={handleGeneratePDF}
-                disabled={isExportingPDF || processedBatches.length === 0 || isRegenerating}
+                disabled={isExportingPDF || processedBatches.length === 0}
               >
                 {isExportingPDF ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Download PDF Summary'}
               </Button>
@@ -620,7 +516,7 @@ const BatchPayrollDetails = () => {
                 size="sm"
                 className="border-none bg-emerald-700 text-white hover:bg-emerald-600"
                 onClick={handleGenerateExcel}
-                disabled={processedBatches.length === 0 || isRegenerating}
+                disabled={processedBatches.length === 0}
               >
                 Download Excel All Report
               </Button>
@@ -638,7 +534,7 @@ const BatchPayrollDetails = () => {
           </div>
 
           {/* ── Summary Data Table ── */}
-          {loading && !isRegenerating ? (
+          {loading ? (
             <div className="flex justify-center py-12 font-medium text-gray-500 text-center">
               <BlinkingDots size='large' color='bg-theme' />
             </div>
@@ -652,7 +548,7 @@ const BatchPayrollDetails = () => {
             </div>
           ) : (
             <div className="overflow-x-auto relative">
-              {/* Subtle visual indication during silent regeneration polling */}
+              {/* Subtle visual indication during silent regeneration */}
               {isRegenerating && (
                 <div className="absolute inset-0 bg-white/40 z-10 flex items-center justify-center rounded cursor-not-allowed" />
               )}
@@ -675,6 +571,7 @@ const BatchPayrollDetails = () => {
                       <TableCell ><div className='flex flex-col  gap-1 '>{row.empName} {row.contract && <><span className='text-xs text-orange-500 font-semibold'>Contracted Salary</span></>}</div></TableCell>
                       <TableCell className="text-gray-600">{row.designations}</TableCell>
                       <TableCell>
+                        {/* ---> FIX: Always show hours worked on the table */}
                         {`${Math.floor(row.totalMinutesWorked / 60)}:${(row.totalMinutesWorked % 60).toString().padStart(2, '0')}`}
                       </TableCell>
                       <TableCell className="font-semibold text-right">

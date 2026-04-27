@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   FileText,
   Calculator,
@@ -65,13 +65,25 @@ export interface TAttendanceLog {
   duration: number; // minutes
 }
 
-export interface TPayrollBatch {
-  ids: string[];
-  companyId: string;
-  fromDate: string | Date;
-  toDate: string | Date;
-  createdAt: string | Date;
+export interface TPayroll {
+  _id: string;
+  refId?: string;
+  userId?: TUser;
+  user?: TUser;
+  fromDate: Date | string;
+  toDate: Date | string;
+  status: 'pending' | 'approved' | 'rejected';
+  totalHour: number;
+  totalAmount: number;
+  attendanceList?: TAttendanceLog[];
+  createdAt: Date;
+  updatedAt: Date;
 }
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const resolveUser = (p: TPayroll): TUser | null =>
+  (p.userId as TUser) ?? p.user ?? null;
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -80,7 +92,7 @@ const CompanyPayRoll = () => {
   const navigate = useNavigate();
   const { id: companyId } = useParams();
 
-  const [batchList, setBatchList] = useState<TPayrollBatch[]>([]);
+  const [payrollList, setPayrollList] = useState<TPayroll[]>([]);
 
   // Loading / error
   const [fetching, setFetching] = useState(false);
@@ -88,7 +100,7 @@ const CompanyPayRoll = () => {
   const [error, setError] = useState<string | null>(null);
 
   // Pagination
-  const [entriesPerPage, setEntriesPerPage] = useState(100);
+  const [entriesPerPage, setEntriesPerPage] = useState(1000);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
@@ -97,33 +109,23 @@ const CompanyPayRoll = () => {
   const [payloadFromDate, setPayloadFromDate] = useState<Date | null>(null);
   const [payloadToDate, setPayloadToDate] = useState<Date | null>(null);
 
-  // Delete Confirmation State
+  // ---> NEW: Delete Confirmation State
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [batchToDelete, setBatchToDelete] = useState<string[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Polling Reference to clear timers if component unmounts
-  const pollingTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (pollingTimerRef.current) clearTimeout(pollingTimerRef.current);
-    };
-  }, []);
-
   const formatDateToYMD = (date: Date | null) => {
     if (!date) return null;
     const yyyy = date.getFullYear();
-    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const mm = String(date.getMonth() + 1).padStart(2, '0'); // Months are 0-indexed
     const dd = String(date.getDate()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd}`;
   };
 
   // ── Data fetching ──────────────────────────────────────────────────────────
-  const fetchPayrollData = useCallback(async (page = 1, isSilent = false) => {
-    if (!isSilent) setFetching(true);
-    if (!isSilent) setError(null);
+  const fetchPayrollData = async (page = 1) => {
+    setFetching(true);
+    setError(null);
     try {
       const params: Record<string, any> = {
         page,
@@ -131,87 +133,27 @@ const CompanyPayRoll = () => {
         companyId,
       };
 
-      const res = await axiosInstance.get('/hr/payroll/batch', { params });
-      
-      const batches: TPayrollBatch[] = res.data?.data?.data ?? [];
-      const sortedBatches = batches.sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
-
-      setBatchList(sortedBatches);
-      setTotalPages(res.data?.data?.meta?.totalPages ?? 1);
-      return sortedBatches;
+      const res = await axiosInstance.get('/hr/payroll', { params });
+      setPayrollList(res.data.data.result ?? []);
+      setTotalPages(res.data.data.meta?.totalPages ?? 1);
     } catch (err: any) {
-      if (!isSilent) setError(err.response?.data?.message ?? 'Failed to load payroll batches');
-      setBatchList([]);
-      return [];
+      setError(err.response?.data?.message ?? 'Failed to load payroll data');
+      setPayrollList([]);
     } finally {
-      if (!isSilent) setFetching(false);
+      setFetching(false);
     }
-  }, [companyId, entriesPerPage]);
+  };
 
   useEffect(() => {
     setCurrentPage(1);
     fetchPayrollData(1);
-  }, [entriesPerPage, fetchPayrollData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entriesPerPage]);
 
   useEffect(() => {
     fetchPayrollData(currentPage);
-  }, [currentPage, fetchPayrollData]);
-
-  // ─── Polling Logic ──────────────────────────────────────────────────────────
-  const pollForNewData = useCallback(async (startTime: number, targetFrom: string, targetTo: string) => {
-    try {
-      // 1. Silently fetch the latest data
-      const latestBatches = await fetchPayrollData(1, true);
-
-      // 2. Check if the newly generated batch exists in the DB yet
-      const foundNewBatch = latestBatches.find(b => 
-        formatDateToYMD(new Date(b.fromDate)) === targetFrom &&
-        formatDateToYMD(new Date(b.toDate)) === targetTo
-      );
-
-      if (foundNewBatch) {
-        // Data is ready! Stop polling.
-        setLoading(false);
-        setShowPayloadDialog(false);
-        setPayloadFromDate(null);
-        setPayloadToDate(null);
-        toast({
-          title: 'Success',
-          description: 'Payroll generated successfully!'
-        });
-        return;
-      }
-
-      // 3. Check if 60 seconds have passed (Timeout)
-      if (Date.now() - startTime >= 60000) {
-        setLoading(false);
-        setShowPayloadDialog(false);
-        setPayloadFromDate(null);
-        setPayloadToDate(null);
-        toast({
-          title: 'Still Processing',
-          description: 'Payroll generation is taking longer than usual. It will appear here shortly.',
-        });
-        return;
-      }
-
-      // 4. If not found and not timed out, poll again in 5 seconds
-      pollingTimerRef.current = setTimeout(() => {
-        pollForNewData(startTime, targetFrom, targetTo);
-      }, 5000);
-
-    } catch (error) {
-      // If error occurs, keep trying until timeout
-      if (Date.now() - startTime >= 120000) {
-        setLoading(false);
-        setShowPayloadDialog(false);
-        return;
-      }
-      pollingTimerRef.current = setTimeout(() => pollForNewData(startTime, targetFrom, targetTo), 5000);
-    }
-  }, [fetchPayrollData, toast]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage]);
 
   const handleGeneratePayroll = async () => {
     if (!payloadFromDate || !payloadToDate) {
@@ -222,36 +164,39 @@ const CompanyPayRoll = () => {
       });
       return;
     }
-
     setLoading(true);
-    const targetFromStr = formatDateToYMD(payloadFromDate) as string;
-    const targetToStr = formatDateToYMD(payloadToDate) as string;
-
     try {
-      // Send the request to enqueue the job
       await axiosInstance.post('/hr/payroll', {
         companyId,
-        fromDate: targetFromStr,
-        toDate: targetToStr
+        fromDate: formatDateToYMD(payloadFromDate),
+        toDate: formatDateToYMD(payloadToDate)
       });
-
-      // Start the polling cycle (Max 1 minute)
-      pollForNewData(Date.now(), targetFromStr, targetToStr);
-
+      toast({
+        title: 'Success',
+        description: 'Payroll generated successfully!'
+      });
+      setShowPayloadDialog(false);
+      setPayloadFromDate(null);
+      setPayloadToDate(null);
+      fetchPayrollData(1);
     } catch (err: any) {
-      setLoading(false);
       toast({
         title: 'Error',
-        description: err.response?.data?.message ?? 'Failed to start payroll generation.',
+        description:
+          err.response?.data?.message ?? 'Failed to generate payroll.',
         variant: 'destructive'
       });
+    } finally {
+      setLoading(false);
     }
   };
 
+  // ---> NEW: Delete Batch Logic (One by One)
   const handleDeleteBatch = async () => {
     if (!batchToDelete.length) return;
     setIsDeleting(true);
     try {
+      // Loop through and delete one by one
       for (const id of batchToDelete) {
         await axiosInstance.delete(`/hr/payroll/${id}`);
       }
@@ -263,7 +208,7 @@ const CompanyPayRoll = () => {
       
       setShowDeleteConfirm(false);
       setBatchToDelete([]);
-      fetchPayrollData(currentPage); 
+      fetchPayrollData(currentPage); // Refresh the table
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -275,8 +220,57 @@ const CompanyPayRoll = () => {
     }
   };
 
-  // Memoize the data array so UI doesn't stutter/flash during silent background polling
-  const memoizedBatches = useMemo(() => batchList, [batchList]);
+  // ✅ Aggregate payrolls into a single object per date range
+  const aggregatedPayrolls = Object.values(
+    payrollList.reduce(
+      (acc, payroll) => {
+        const from = moment(payroll.fromDate).format('DD MMM, YYYY');
+        const to = moment(payroll.toDate).format('DD MMM, YYYY');
+        const key = `${from} - ${to}`;
+
+        if (!acc[key]) {
+          acc[key] = {
+            ids: [], // Array of payroll IDs
+            fromDate: payroll.fromDate,
+            toDate: payroll.toDate,
+            employeeNames: [],
+            totalDurationMins: 0,
+            totalAmount: 0,
+            count: 0
+          };
+        }
+
+        // Push every payroll ID in this batch into the array
+        acc[key].ids.push(payroll._id);
+
+        // Add employee name
+        const emp = resolveUser(payroll);
+        if (emp) {
+          acc[key].employeeNames.push(`${emp.firstName} ${emp.lastName}`);
+        }
+
+        // Calculate total duration and amount specifically from attendanceList
+        let userTotalMins = 0;
+        let userTotalAmount = 0;
+
+        (payroll.attendanceList ?? []).forEach((att: any) => {
+          let workedMinutes = att.duration ?? 0;
+          const rate = att.payRate ?? 0;
+
+          userTotalMins += workedMinutes;
+          userTotalAmount += (workedMinutes / 60) * rate; // Calculated per attendance log
+        });
+
+        // Accumulate the batch totals
+        acc[key].totalDurationMins += userTotalMins;
+        acc[key].totalAmount += userTotalAmount;
+        acc[key].count += 1;
+
+        return acc;
+      },
+      {} as Record<string, any>
+    )
+  );
 
   return (
     <div className="space-y-4">
@@ -300,7 +294,7 @@ const CompanyPayRoll = () => {
         </div>
 
         {/* ── Table ── */}
-        {fetching && batchList.length === 0 ? (
+        {fetching ? (
           <div className="flex justify-center py-12">
             <BlinkingDots size="large" color="bg-theme" />
           </div>
@@ -308,7 +302,7 @@ const CompanyPayRoll = () => {
           <div className="rounded-lg bg-red-50 p-4 text-center text-red-600">
             {error}
           </div>
-        ) : memoizedBatches.length === 0 ? (
+        ) : payrollList.length === 0 ? (
           <div className="rounded-lg p-10 text-center text-gray-400">
             No payroll records found.
           </div>
@@ -328,12 +322,14 @@ const CompanyPayRoll = () => {
                 </TableHeader>
 
                 <TableBody>
-                  {memoizedBatches.map((batch, idx) => (
+                  {aggregatedPayrolls.map((group, idx) => (
                     <TableRow key={idx} className="hover:bg-gray-50/60">
+                      {/* From Date */}
                       <TableCell className="font-medium text-gray-800">
-                        {moment(batch.fromDate).format('DD MMM, YYYY')} -  {moment(batch.toDate).format('DD MMM, YYYY')}
+                        {moment(group.fromDate).format('DD MMM, YYYY')} -  {moment(group.toDate).format('DD MMM, YYYY')}
                       </TableCell>
 
+                      {/* Actions */}
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
                           <Button
@@ -342,9 +338,9 @@ const CompanyPayRoll = () => {
                             onClick={() =>
                               navigate('batch-details', {
                                 state: {
-                                  payrollIds: batch.ids,
-                                  fromDate: batch.fromDate,
-                                  toDate: batch.toDate
+                                  payrollIds: group.ids,
+                                  fromDate: group.fromDate,
+                                  toDate: group.toDate
                                 }
                               })
                             }
@@ -352,11 +348,12 @@ const CompanyPayRoll = () => {
                             Details
                           </Button>
                           
+                          {/* ---> NEW: Updated Delete Button */}
                           <Button
                             size="sm"
                             variant={'destructive'}
                             onClick={() => {
-                              setBatchToDelete(batch.ids);
+                              setBatchToDelete(group.ids);
                               setShowDeleteConfirm(true);
                             }}
                           >
@@ -385,7 +382,7 @@ const CompanyPayRoll = () => {
         )}
       </div>
 
-      {/* ── Batch Delete Confirmation Dialog ── */}
+      {/* ---> NEW: Batch Delete Confirmation Dialog */}
       <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <DialogContent>
           <DialogHeader>
@@ -417,13 +414,7 @@ const CompanyPayRoll = () => {
       </Dialog>
 
       {/* ── Generate Payroll Dialog ── */}
-      {/* If `loading` is true, we prevent the user from clicking out or closing the dialog to interrupt the flow */}
-      <Dialog 
-        open={showPayloadDialog} 
-        onOpenChange={(open) => {
-          if (!loading) setShowPayloadDialog(open);
-        }}
-      >
+      <Dialog open={showPayloadDialog} onOpenChange={setShowPayloadDialog}>
         <DialogContent className="overflow-visible border-gray-300 sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-xl font-semibold">
@@ -448,8 +439,7 @@ const CompanyPayRoll = () => {
                 showYearDropdown
                 preventOpenOnFocus
                 dropdownMode="select"
-                disabled={loading}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-theme disabled:opacity-50"
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-theme"
               />
             </div>
             <div className="flex flex-col gap-1.5">
@@ -464,8 +454,7 @@ const CompanyPayRoll = () => {
                 dropdownMode="select"
                 preventOpenOnFocus
                 minDate={payloadFromDate ?? undefined}
-                disabled={loading}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-theme disabled:opacity-50"
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-theme"
               />
             </div>
           </div>
@@ -473,7 +462,6 @@ const CompanyPayRoll = () => {
           <DialogFooter className="mt-2">
             <Button
               variant="secondary"
-              disabled={loading}
               onClick={() => {
                 setShowPayloadDialog(false);
                 setPayloadFromDate(null);
