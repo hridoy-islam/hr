@@ -109,7 +109,7 @@ import LeaveReportPage from '@/pages/company/LeaveApproval/LeaveReport';
 import CompanyLeaveCalendarPage from '@/pages/company/leave-calendar';
 import CompanyPayRoll from '@/pages/company/Payroll';
 import BatchPayrollDetails from '@/pages/company/Payroll/batch-payroll';
-import MissingAttendancePage from '@/pages/company/MIssingAttendance';
+import MissingAttendancePage from '@/pages/company/MissingAttendance';
 
 const SignInPage = lazy(() => import('@/pages/auth/signin'));
 
