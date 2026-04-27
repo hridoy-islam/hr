@@ -368,10 +368,10 @@ export default function MissingAttendancePage() {
 
           <div className='flex flex-row items-center gap-2'>
 
-          <Button onClick={() => navigate(-1)} className="">
+          <Button  onClick={() => navigate(-1)} className="">
             <ArrowLeft className="mr-2 h-4 w-4" /> Back
           </Button>
-          <Button onClick={() => navigate(`/company/${companyId}/rota/missing-shift`)} className="">
+          <Button variant={'outline'} onClick={() => navigate(`/company/${companyId}/rota/missing-shift`)} className="">
             Calendar View
           </Button>
           </div>
