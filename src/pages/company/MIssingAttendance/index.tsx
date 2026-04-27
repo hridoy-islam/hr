@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import moment from '@/lib/moment-setup';
 import axiosInstance from '@/lib/axios';
 import DatePicker from 'react-datepicker';
@@ -16,7 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { AlertCircle, Loader2, CalendarRange, X, Search } from 'lucide-react';
+import { AlertCircle, Loader2, CalendarRange, X, Search, ArrowLeft } from 'lucide-react';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -78,7 +78,7 @@ const endOfMonth = formatDate(endOfMonthDate);
   const [dateRange, setDateRange] = useState<[Date|string | null, Date |string| null]>([startOfMonth, endOfMonth]);
   const [startDateFilter, endDateFilter] = dateRange;
 
-  
+  const navigate = useNavigate()
   // Data States
   const [rotas, setRotas] = useState<RotaData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -326,7 +326,13 @@ const endOfMonth = formatDate(endOfMonthDate);
       
       {/* ── Header & Filters ── */}
       <div className="flex flex-col gap-4">
+        <div className='flex flex-row items-center justify-between'>
+
         <h1 className="text-xl font-bold text-gray-900">Missed Attendance</h1>
+        <Button onClick={() => navigate(-1)} className="-ml-3">
+                <ArrowLeft className="mr-2 h-4 w-4" /> Back
+              </Button>
+        </div>
         
         <div className="flex flex-wrap items-center gap-3">
           <div className="w-64 min-w-[200px]">
