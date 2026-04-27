@@ -883,7 +883,7 @@ const AttendancePage = () => {
       <Card className="w-full bg-white shadow-md">
         <CardContent className="space-y-3 p-2 pt-4">
           {/* Filters Top Bar */}
-          <div className="grid grid-cols-1 items-end gap-3 lg:grid-cols-5">
+          <div className="grid grid-cols-1 items-end gap-3 lg:grid-cols-6">
             <div>
               <label className="mb-2 block text-xs font-semibold uppercase tracking-wider">
                 Employee
@@ -948,11 +948,11 @@ const AttendancePage = () => {
                 />
               </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 col-span-2">
               <Button
                 onClick={() => fetchAttendance(currentPage, entriesPerPage)}
                 disabled={isLoading}
-                className="h-10"
+                className="h-10 w-full"
               >
                 {isLoading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -965,9 +965,16 @@ const AttendancePage = () => {
                 variant="outline"
                 onClick={handleReset}
                 title="Reset Filters"
-                className="h-10 px-3"
+                className="h-10 px-3 w-full"
               >
                 Reset
+              </Button>
+              <Button
+                variant="outline"
+                onClick={()=> navigate(`/company/${id}/rota/missed-attendance`)}
+                className="h-10 px-3 w-full"
+              >
+                Missed Shift
               </Button>
             </div>
           </div>

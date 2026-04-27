@@ -65,25 +65,13 @@ export interface TAttendanceLog {
   duration: number; // minutes
 }
 
-export interface TPayroll {
-  _id: string;
-  refId?: string;
-  userId?: TUser;
-  user?: TUser;
-  fromDate: Date | string;
-  toDate: Date | string;
-  status: 'pending' | 'approved' | 'rejected';
-  totalHour: number;
-  totalAmount: number;
-  attendanceList?: TAttendanceLog[];
-  createdAt: Date;
-  updatedAt: Date;
+export interface TPayrollBatch {
+  ids: string[];
+  companyId: string;
+  fromDate: string | Date;
+  toDate: string | Date;
+  createdAt: string | Date;
 }
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-const resolveUser = (p: TPayroll): TUser | null =>
-  (p.userId as TUser) ?? p.user ?? null;
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -92,7 +80,7 @@ const CompanyPayRoll = () => {
   const navigate = useNavigate();
   const { id: companyId } = useParams();
 
-  const [payrollList, setPayrollList] = useState<TPayroll[]>([]);
+  const [batchList, setBatchList] = useState<TPayrollBatch[]>([]);
 
   // Loading / error
   const [fetching, setFetching] = useState(false);
@@ -100,7 +88,7 @@ const CompanyPayRoll = () => {
   const [error, setError] = useState<string | null>(null);
 
   // Pagination
-  const [entriesPerPage, setEntriesPerPage] = useState(1000);
+  const [entriesPerPage, setEntriesPerPage] = useState(100);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
@@ -123,7 +111,7 @@ const CompanyPayRoll = () => {
   };
 
   // ── Data fetching ──────────────────────────────────────────────────────────
-  const fetchPayrollData = async (page = 1) => {
+const fetchPayrollData = async (page = 1) => {
     setFetching(true);
     setError(null);
     try {
@@ -133,12 +121,19 @@ const CompanyPayRoll = () => {
         companyId,
       };
 
-      const res = await axiosInstance.get('/hr/payroll', { params });
-      setPayrollList(res.data.data.result ?? []);
-      setTotalPages(res.data.data.meta?.totalPages ?? 1);
+      const res = await axiosInstance.get('/hr/payroll/batch', { params });
+      
+      // Extract the array and sort by createdAt descending (newest first)
+      const batches: TPayrollBatch[] = res.data?.data?.data ?? [];
+      const sortedBatches = batches.sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+
+      setBatchList(sortedBatches);
+      setTotalPages(res.data?.data?.meta?.totalPages ?? 1);
     } catch (err: any) {
-      setError(err.response?.data?.message ?? 'Failed to load payroll data');
-      setPayrollList([]);
+      setError(err.response?.data?.message ?? 'Failed to load payroll batches');
+      setBatchList([]);
     } finally {
       setFetching(false);
     }
@@ -220,58 +215,6 @@ const CompanyPayRoll = () => {
     }
   };
 
-  // ✅ Aggregate payrolls into a single object per date range
-  const aggregatedPayrolls = Object.values(
-    payrollList.reduce(
-      (acc, payroll) => {
-        const from = moment(payroll.fromDate).format('DD MMM, YYYY');
-        const to = moment(payroll.toDate).format('DD MMM, YYYY');
-        const key = `${from} - ${to}`;
-
-        if (!acc[key]) {
-          acc[key] = {
-            ids: [], // Array of payroll IDs
-            fromDate: payroll.fromDate,
-            toDate: payroll.toDate,
-            employeeNames: [],
-            totalDurationMins: 0,
-            totalAmount: 0,
-            count: 0
-          };
-        }
-
-        // Push every payroll ID in this batch into the array
-        acc[key].ids.push(payroll._id);
-
-        // Add employee name
-        const emp = resolveUser(payroll);
-        if (emp) {
-          acc[key].employeeNames.push(`${emp.firstName} ${emp.lastName}`);
-        }
-
-        // Calculate total duration and amount specifically from attendanceList
-        let userTotalMins = 0;
-        let userTotalAmount = 0;
-
-        (payroll.attendanceList ?? []).forEach((att: any) => {
-          let workedMinutes = att.duration ?? 0;
-          const rate = att.payRate ?? 0;
-
-          userTotalMins += workedMinutes;
-          userTotalAmount += (workedMinutes / 60) * rate; // Calculated per attendance log
-        });
-
-        // Accumulate the batch totals
-        acc[key].totalDurationMins += userTotalMins;
-        acc[key].totalAmount += userTotalAmount;
-        acc[key].count += 1;
-
-        return acc;
-      },
-      {} as Record<string, any>
-    )
-  );
-
   return (
     <div className="space-y-4">
       <div className="rounded-xl bg-white p-6 shadow-sm">
@@ -302,7 +245,7 @@ const CompanyPayRoll = () => {
           <div className="rounded-lg bg-red-50 p-4 text-center text-red-600">
             {error}
           </div>
-        ) : payrollList.length === 0 ? (
+        ) : batchList.length === 0 ? (
           <div className="rounded-lg p-10 text-center text-gray-400">
             No payroll records found.
           </div>
@@ -322,11 +265,11 @@ const CompanyPayRoll = () => {
                 </TableHeader>
 
                 <TableBody>
-                  {aggregatedPayrolls.map((group, idx) => (
+                  {batchList.map((batch, idx) => (
                     <TableRow key={idx} className="hover:bg-gray-50/60">
                       {/* From Date */}
                       <TableCell className="font-medium text-gray-800">
-                        {moment(group.fromDate).format('DD MMM, YYYY')} -  {moment(group.toDate).format('DD MMM, YYYY')}
+                        {moment(batch.fromDate).format('DD MMM, YYYY')} -  {moment(batch.toDate).format('DD MMM, YYYY')}
                       </TableCell>
 
                       {/* Actions */}
@@ -338,9 +281,9 @@ const CompanyPayRoll = () => {
                             onClick={() =>
                               navigate('batch-details', {
                                 state: {
-                                  payrollIds: group.ids,
-                                  fromDate: group.fromDate,
-                                  toDate: group.toDate
+                                  payrollIds: batch.ids,
+                                  fromDate: batch.fromDate,
+                                  toDate: batch.toDate
                                 }
                               })
                             }
@@ -353,7 +296,7 @@ const CompanyPayRoll = () => {
                             size="sm"
                             variant={'destructive'}
                             onClick={() => {
-                              setBatchToDelete(group.ids);
+                              setBatchToDelete(batch.ids);
                               setShowDeleteConfirm(true);
                             }}
                           >

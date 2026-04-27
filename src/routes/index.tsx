@@ -109,6 +109,7 @@ import LeaveReportPage from '@/pages/company/LeaveApproval/LeaveReport';
 import CompanyLeaveCalendarPage from '@/pages/company/leave-calendar';
 import CompanyPayRoll from '@/pages/company/Payroll';
 import BatchPayrollDetails from '@/pages/company/Payroll/batch-payroll';
+import MissingAttendancePage from '@/pages/company/MIssingAttendance';
 
 const SignInPage = lazy(() => import('@/pages/auth/signin'));
 
@@ -398,7 +399,8 @@ export default function AppRouter() {
             </Suspense>
           )
         },
-        { path: 'report', element: <CompanyRotaReport /> }
+        { path: 'report', element: <CompanyRotaReport /> },
+        { path: 'missed-attendance', element: <MissingAttendancePage /> }
       ]
     }
   ];
