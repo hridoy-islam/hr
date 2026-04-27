@@ -377,7 +377,19 @@ const ViewPayroll = () => {
     let totalMins = 0;
     let grandTot = 0;
 
-    const records = attendanceRecords.map((att) => {
+    // ---> NEW: Sort by start date ascending
+    const sortedAttendance = [...attendanceRecords].sort((a, b) => {
+      // Fallback to rota start date if clockIn is not present
+      const dateA = a.attendanceId?.clockIn || a.attendanceId?.rotaId?.startDate;
+      const dateB = b.attendanceId?.clockIn || b.attendanceId?.rotaId?.startDate;
+      
+      const timeA = dateA ? new Date(dateA).getTime() : 0;
+      const timeB = dateB ? new Date(dateB).getTime() : 0;
+      
+      return timeA - timeB;
+    });
+
+    const records = sortedAttendance.map((att) => {
       const clockIn = moment(att.attendanceId?.clockIn);
       const clockOut = moment(att.attendanceId?.clockOut);
 
@@ -748,46 +760,46 @@ const ViewPayroll = () => {
                         {att.durationStr}
                       </TableCell>
 
-                       {payroll.isContract === false && (
-                         <>
-                           <TableCell className="align-top">
-                             <div className="flex flex-col gap-2 pt-1">
-                               <Input
-                                 type="number"
-                                 min={0}
-                                 step={0.01}
-                                 value={att.payRate === '' ? '' : att.payRate ?? 0}
-                                 onChange={(e) => {
-                                   const val = e.target.value;
-                                   handlePayRateChange(
-                                     att._id,
-                                     val === '' ? '' : Number(val)
-                                   );
-                                 }}
-                                 onBlur={(e) => {
-                                   if (e.target.value === '') {
-                                     handlePayRateChange(att._id, 0);
-                                   }
-                                 }}
-                                 className="h-8 w-full font-semibold"
-                               />
-                               {applyAllOption?.recordId === att._id && (
-                                 <Button
-                                   size="sm"
-                                   variant="secondary"
-                                   onClick={handleApplyToAll}
-                                   className="h-7 bg-theme px-2 text-[10px] text-white hover:bg-theme/90"
-                                 >
-                                   Apply to all
-                                 </Button>
-                               )}
-                             </div>
-                           </TableCell>
-                           <TableCell className="text-right font-bold text-gray-900">
-                             {att.total.toFixed(2)}
-                           </TableCell>
-                         </>
-                       )}
+                        {payroll.isContract === false && (
+                          <>
+                            <TableCell className="align-top">
+                              <div className="flex flex-col gap-2 pt-1">
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  step={0.01}
+                                  value={att.payRate === '' ? '' : att.payRate ?? 0}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    handlePayRateChange(
+                                      att._id,
+                                      val === '' ? '' : Number(val)
+                                    );
+                                  }}
+                                  onBlur={(e) => {
+                                    if (e.target.value === '') {
+                                      handlePayRateChange(att._id, 0);
+                                    }
+                                  }}
+                                  className="h-8 w-full font-semibold"
+                                />
+                                {applyAllOption?.recordId === att._id && (
+                                  <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    onClick={handleApplyToAll}
+                                    className="h-7 bg-theme px-2 text-[10px] text-white hover:bg-theme/90"
+                                  >
+                                    Apply to all
+                                  </Button>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right font-bold text-gray-900">
+                              {att.total.toFixed(2)}
+                            </TableCell>
+                          </>
+                        )}
                       
                     </TableRow>
                   ))

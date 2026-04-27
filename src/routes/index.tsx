@@ -341,7 +341,9 @@ export default function AppRouter() {
           element: <UserAccessControl />
         },
         { path: 'manage-holiday', element: <ManageHolidayPage /> },
-        { path: 'docusign-details', element: <CompanyDocusignDetailsPage /> }
+        { path: 'docusign-details', element: <CompanyDocusignDetailsPage /> },
+                { path: 'missed-attendance', element: <MissingAttendancePage /> }
+
       ]
     }
   ];
@@ -400,7 +402,6 @@ export default function AppRouter() {
           )
         },
         { path: 'report', element: <CompanyRotaReport /> },
-        { path: 'missed-attendance', element: <MissingAttendancePage /> }
       ]
     }
   ];
