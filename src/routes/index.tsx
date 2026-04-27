@@ -110,6 +110,7 @@ import CompanyLeaveCalendarPage from '@/pages/company/leave-calendar';
 import CompanyPayRoll from '@/pages/company/Payroll';
 import BatchPayrollDetails from '@/pages/company/Payroll/batch-payroll';
 import MissingAttendancePage from '@/pages/company/MissingAttendance';
+import MissingAttendanceCalendarPage from '@/pages/company/MissingAttendance/MissingShiftCalendar';
 
 const SignInPage = lazy(() => import('@/pages/auth/signin'));
 
@@ -402,6 +403,7 @@ export default function AppRouter() {
           )
         },
         { path: 'report', element: <CompanyRotaReport /> },
+        { path: 'missing-shift', element: <MissingAttendanceCalendarPage /> },
       ]
     }
   ];
