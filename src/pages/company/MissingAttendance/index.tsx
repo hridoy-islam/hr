@@ -687,7 +687,7 @@ export default function MissingAttendancePage() {
                                 {isSubmittingThis && (
                                   <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
                                 )}
-                                Submit
+                                Approved
                               </Button>
                             </>
                           ) : (
@@ -709,7 +709,7 @@ export default function MissingAttendancePage() {
                                 {isSubmittingThis && (
                                   <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
                                 )}
-                                Submit
+                                Approved
                               </Button>
                             </>
                           )}
