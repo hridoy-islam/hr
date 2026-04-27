@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   FileText,
   Calculator,
@@ -97,23 +97,33 @@ const CompanyPayRoll = () => {
   const [payloadFromDate, setPayloadFromDate] = useState<Date | null>(null);
   const [payloadToDate, setPayloadToDate] = useState<Date | null>(null);
 
-  // ---> NEW: Delete Confirmation State
+  // Delete Confirmation State
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [batchToDelete, setBatchToDelete] = useState<string[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Polling Reference to clear timers if component unmounts
+  const pollingTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingTimerRef.current) clearTimeout(pollingTimerRef.current);
+    };
+  }, []);
+
   const formatDateToYMD = (date: Date | null) => {
     if (!date) return null;
     const yyyy = date.getFullYear();
-    const mm = String(date.getMonth() + 1).padStart(2, '0'); // Months are 0-indexed
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
     const dd = String(date.getDate()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd}`;
   };
 
   // ── Data fetching ──────────────────────────────────────────────────────────
-const fetchPayrollData = async (page = 1) => {
-    setFetching(true);
-    setError(null);
+  const fetchPayrollData = useCallback(async (page = 1, isSilent = false) => {
+    if (!isSilent) setFetching(true);
+    if (!isSilent) setError(null);
     try {
       const params: Record<string, any> = {
         page,
@@ -123,7 +133,6 @@ const fetchPayrollData = async (page = 1) => {
 
       const res = await axiosInstance.get('/hr/payroll/batch', { params });
       
-      // Extract the array and sort by createdAt descending (newest first)
       const batches: TPayrollBatch[] = res.data?.data?.data ?? [];
       const sortedBatches = batches.sort(
         (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -131,24 +140,78 @@ const fetchPayrollData = async (page = 1) => {
 
       setBatchList(sortedBatches);
       setTotalPages(res.data?.data?.meta?.totalPages ?? 1);
+      return sortedBatches;
     } catch (err: any) {
-      setError(err.response?.data?.message ?? 'Failed to load payroll batches');
+      if (!isSilent) setError(err.response?.data?.message ?? 'Failed to load payroll batches');
       setBatchList([]);
+      return [];
     } finally {
-      setFetching(false);
+      if (!isSilent) setFetching(false);
     }
-  };
+  }, [companyId, entriesPerPage]);
 
   useEffect(() => {
     setCurrentPage(1);
     fetchPayrollData(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entriesPerPage]);
+  }, [entriesPerPage, fetchPayrollData]);
 
   useEffect(() => {
     fetchPayrollData(currentPage);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage]);
+  }, [currentPage, fetchPayrollData]);
+
+  // ─── Polling Logic ──────────────────────────────────────────────────────────
+  const pollForNewData = useCallback(async (startTime: number, targetFrom: string, targetTo: string) => {
+    try {
+      // 1. Silently fetch the latest data
+      const latestBatches = await fetchPayrollData(1, true);
+
+      // 2. Check if the newly generated batch exists in the DB yet
+      const foundNewBatch = latestBatches.find(b => 
+        formatDateToYMD(new Date(b.fromDate)) === targetFrom &&
+        formatDateToYMD(new Date(b.toDate)) === targetTo
+      );
+
+      if (foundNewBatch) {
+        // Data is ready! Stop polling.
+        setLoading(false);
+        setShowPayloadDialog(false);
+        setPayloadFromDate(null);
+        setPayloadToDate(null);
+        toast({
+          title: 'Success',
+          description: 'Payroll generated successfully!'
+        });
+        return;
+      }
+
+      // 3. Check if 60 seconds have passed (Timeout)
+      if (Date.now() - startTime >= 60000) {
+        setLoading(false);
+        setShowPayloadDialog(false);
+        setPayloadFromDate(null);
+        setPayloadToDate(null);
+        toast({
+          title: 'Still Processing',
+          description: 'Payroll generation is taking longer than usual. It will appear here shortly.',
+        });
+        return;
+      }
+
+      // 4. If not found and not timed out, poll again in 5 seconds
+      pollingTimerRef.current = setTimeout(() => {
+        pollForNewData(startTime, targetFrom, targetTo);
+      }, 5000);
+
+    } catch (error) {
+      // If error occurs, keep trying until timeout
+      if (Date.now() - startTime >= 120000) {
+        setLoading(false);
+        setShowPayloadDialog(false);
+        return;
+      }
+      pollingTimerRef.current = setTimeout(() => pollForNewData(startTime, targetFrom, targetTo), 5000);
+    }
+  }, [fetchPayrollData, toast]);
 
   const handleGeneratePayroll = async () => {
     if (!payloadFromDate || !payloadToDate) {
@@ -159,39 +222,36 @@ const fetchPayrollData = async (page = 1) => {
       });
       return;
     }
+
     setLoading(true);
+    const targetFromStr = formatDateToYMD(payloadFromDate) as string;
+    const targetToStr = formatDateToYMD(payloadToDate) as string;
+
     try {
+      // Send the request to enqueue the job
       await axiosInstance.post('/hr/payroll', {
         companyId,
-        fromDate: formatDateToYMD(payloadFromDate),
-        toDate: formatDateToYMD(payloadToDate)
+        fromDate: targetFromStr,
+        toDate: targetToStr
       });
-      toast({
-        title: 'Success',
-        description: 'Payroll generated successfully!'
-      });
-      setShowPayloadDialog(false);
-      setPayloadFromDate(null);
-      setPayloadToDate(null);
-      fetchPayrollData(1);
+
+      // Start the polling cycle (Max 1 minute)
+      pollForNewData(Date.now(), targetFromStr, targetToStr);
+
     } catch (err: any) {
+      setLoading(false);
       toast({
         title: 'Error',
-        description:
-          err.response?.data?.message ?? 'Failed to generate payroll.',
+        description: err.response?.data?.message ?? 'Failed to start payroll generation.',
         variant: 'destructive'
       });
-    } finally {
-      setLoading(false);
     }
   };
 
-  // ---> NEW: Delete Batch Logic (One by One)
   const handleDeleteBatch = async () => {
     if (!batchToDelete.length) return;
     setIsDeleting(true);
     try {
-      // Loop through and delete one by one
       for (const id of batchToDelete) {
         await axiosInstance.delete(`/hr/payroll/${id}`);
       }
@@ -203,7 +263,7 @@ const fetchPayrollData = async (page = 1) => {
       
       setShowDeleteConfirm(false);
       setBatchToDelete([]);
-      fetchPayrollData(currentPage); // Refresh the table
+      fetchPayrollData(currentPage); 
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -214,6 +274,9 @@ const fetchPayrollData = async (page = 1) => {
       setIsDeleting(false);
     }
   };
+
+  // Memoize the data array so UI doesn't stutter/flash during silent background polling
+  const memoizedBatches = useMemo(() => batchList, [batchList]);
 
   return (
     <div className="space-y-4">
@@ -237,7 +300,7 @@ const fetchPayrollData = async (page = 1) => {
         </div>
 
         {/* ── Table ── */}
-        {fetching ? (
+        {fetching && batchList.length === 0 ? (
           <div className="flex justify-center py-12">
             <BlinkingDots size="large" color="bg-theme" />
           </div>
@@ -245,7 +308,7 @@ const fetchPayrollData = async (page = 1) => {
           <div className="rounded-lg bg-red-50 p-4 text-center text-red-600">
             {error}
           </div>
-        ) : batchList.length === 0 ? (
+        ) : memoizedBatches.length === 0 ? (
           <div className="rounded-lg p-10 text-center text-gray-400">
             No payroll records found.
           </div>
@@ -265,14 +328,12 @@ const fetchPayrollData = async (page = 1) => {
                 </TableHeader>
 
                 <TableBody>
-                  {batchList.map((batch, idx) => (
+                  {memoizedBatches.map((batch, idx) => (
                     <TableRow key={idx} className="hover:bg-gray-50/60">
-                      {/* From Date */}
                       <TableCell className="font-medium text-gray-800">
                         {moment(batch.fromDate).format('DD MMM, YYYY')} -  {moment(batch.toDate).format('DD MMM, YYYY')}
                       </TableCell>
 
-                      {/* Actions */}
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
                           <Button
@@ -291,7 +352,6 @@ const fetchPayrollData = async (page = 1) => {
                             Details
                           </Button>
                           
-                          {/* ---> NEW: Updated Delete Button */}
                           <Button
                             size="sm"
                             variant={'destructive'}
@@ -325,7 +385,7 @@ const fetchPayrollData = async (page = 1) => {
         )}
       </div>
 
-      {/* ---> NEW: Batch Delete Confirmation Dialog */}
+      {/* ── Batch Delete Confirmation Dialog ── */}
       <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <DialogContent>
           <DialogHeader>
@@ -357,7 +417,13 @@ const fetchPayrollData = async (page = 1) => {
       </Dialog>
 
       {/* ── Generate Payroll Dialog ── */}
-      <Dialog open={showPayloadDialog} onOpenChange={setShowPayloadDialog}>
+      {/* If `loading` is true, we prevent the user from clicking out or closing the dialog to interrupt the flow */}
+      <Dialog 
+        open={showPayloadDialog} 
+        onOpenChange={(open) => {
+          if (!loading) setShowPayloadDialog(open);
+        }}
+      >
         <DialogContent className="overflow-visible border-gray-300 sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-xl font-semibold">
@@ -382,7 +448,8 @@ const fetchPayrollData = async (page = 1) => {
                 showYearDropdown
                 preventOpenOnFocus
                 dropdownMode="select"
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-theme"
+                disabled={loading}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-theme disabled:opacity-50"
               />
             </div>
             <div className="flex flex-col gap-1.5">
@@ -397,7 +464,8 @@ const fetchPayrollData = async (page = 1) => {
                 dropdownMode="select"
                 preventOpenOnFocus
                 minDate={payloadFromDate ?? undefined}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-theme"
+                disabled={loading}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-theme disabled:opacity-50"
               />
             </div>
           </div>
@@ -405,6 +473,7 @@ const fetchPayrollData = async (page = 1) => {
           <DialogFooter className="mt-2">
             <Button
               variant="secondary"
+              disabled={loading}
               onClick={() => {
                 setShowPayloadDialog(false);
                 setPayloadFromDate(null);
