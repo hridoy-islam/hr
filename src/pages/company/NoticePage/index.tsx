@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Pen, Plus, Calendar as CalendarIcon } from 'lucide-react';
+import { Pen, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import {
@@ -17,7 +17,6 @@ import moment from '@/lib/moment-setup';
 import { DynamicPagination } from '@/components/shared/DynamicPagination';
 import Select from 'react-select';
 
-// --- IMPORTS FOR REACT DATEPICKER ---
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { NoticeDialog } from './components/NoticeDialog';
@@ -29,15 +28,13 @@ export default function CompanyNoticeBoard() {
   const [editingNotice, setEditingNotice] = useState<any>();
   const [initialLoading, setInitialLoading] = useState(true);
   const { toast } = useToast();
-  const {id:companyId} = useParams()
+  const { id: companyId } = useParams();
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [entriesPerPage, setEntriesPerPage] = useState(10);
 
-  // --- DATE PICKER STATE ---
-  // We store start and end date in a single array or separate variables.
-  // react-datepicker range mode uses [start, end]
+  // Date picker
   const [dateRange, setDateRange] = useState<(Date | null)[]>([null, null]);
   const [startDate, endDate] = dateRange;
 
@@ -55,9 +52,9 @@ export default function CompanyNoticeBoard() {
     const fetchFilters = async () => {
       try {
         const [deptRes, desigRes, userRes] = await Promise.all([
-            axiosInstance.get(`/hr/department?companyId=${companyId}&limit=all`),
-                 axiosInstance.get(`/hr/designation?companyId=${companyId}&limit=all`),
-                 axiosInstance.get(`/users?company=${companyId}&limit=all`)
+          axiosInstance.get(`/hr/department?companyId=${companyId}&limit=all`),
+          axiosInstance.get(`/hr/designation?companyId=${companyId}&limit=all`),
+          axiosInstance.get(`/users?company=${companyId}&limit=all`)
         ]);
         setDepartments(deptRes.data.data.result);
         setDesignations(desigRes.data.data.result);
@@ -154,7 +151,6 @@ export default function CompanyNoticeBoard() {
     setDialogOpen(true);
   };
 
-  // Helper to format dates and fetch
   const handleSearch = () => {
     const formattedStart = startDate
       ? moment(startDate).format('YYYY-MM-DD')
@@ -174,7 +170,6 @@ export default function CompanyNoticeBoard() {
     );
   };
 
-  // Auto-fetch when filters change
   useEffect(() => {
     handleSearch();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -184,8 +179,8 @@ export default function CompanyNoticeBoard() {
     selectedDepartments,
     selectedDesignations,
     selectedUsers,
-    startDate, // Trigger when start date changes
-    endDate // Trigger when end date changes
+    startDate,
+    endDate
   ]);
 
   return (
@@ -214,7 +209,7 @@ export default function CompanyNoticeBoard() {
                 value: d._id,
                 label: d.departmentName
               }))}
-               menuPortalTarget={document.body}
+              menuPortalTarget={document.body}
               menuPosition="fixed"
               styles={{
                 menuPortal: (base) => ({ ...base, zIndex: 9999 })
@@ -236,7 +231,7 @@ export default function CompanyNoticeBoard() {
                 value: d._id,
                 label: d.title
               }))}
-               menuPortalTarget={document.body}
+              menuPortalTarget={document.body}
               menuPosition="fixed"
               styles={{
                 menuPortal: (base) => ({ ...base, zIndex: 9999 })
@@ -268,32 +263,29 @@ export default function CompanyNoticeBoard() {
             />
           </div>
 
-          {/* --- REACT DATEPICKER IMPLEMENTATION --- */}
-          <div className="w-">
+          <div className="w-64">
             <label className="mb-1 block text-sm font-medium">
               Filter By Date
             </label>
-            <div className="relative">
-              <DatePicker
-                selectsRange={true}
-                startDate={startDate}
-                endDate={endDate}
-                onChange={(update) => {
-                  setDateRange(update);
-                }}
-                popperClassName="z-[99999]"
-                dateFormat={'dd-MM-yyyy'}
-                portalId="root-portal"
-                isClearable={true}
-                placeholderText="Select Date Range"
-                className="flex h-10 w-64 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-              />
-            </div>
+            <DatePicker
+              selectsRange={true}
+              startDate={startDate}
+              endDate={endDate}
+              onChange={(update) => {
+                setDateRange(update);
+              }}
+              popperClassName="z-[99999]"
+              dateFormat={'dd-MM-yyyy'}
+              portalId="root-portal"
+              isClearable={true}
+              placeholderText="Select Date Range"
+              className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+            />
           </div>
         </div>
 
         {/* Table */}
-        <div className="py-4 ">
+        <div className="py-4">
           {initialLoading ? (
             <div className="flex justify-center py-6">
               <BlinkingDots size="large" color="bg-theme" />
@@ -313,6 +305,8 @@ export default function CompanyNoticeBoard() {
                   <TableHead>Department</TableHead>
                   <TableHead>Designation</TableHead>
                   <TableHead>Users</TableHead>
+                  {/* ----------------- NEW DOCUMENTS COLUMN ----------------- */}
+                  <TableHead>Documents</TableHead>
                   <TableHead className="w-32 text-center">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -328,10 +322,10 @@ export default function CompanyNoticeBoard() {
                       {moment(n.noticeDate).format('MMMM Do YYYY')}
                     </TableCell>
                     <TableCell>
-  {n.noticeBy?.firstName || n.noticeBy?.lastName
-    ? `${n.noticeBy?.firstName ?? ""} ${n.noticeBy?.lastName ?? ""}`.trim()
-    : n.noticeBy?.name}
-</TableCell>
+                      {n.noticeBy?.firstName || n.noticeBy?.lastName
+                        ? `${n.noticeBy?.firstName ?? ""} ${n.noticeBy?.lastName ?? ""}`.trim()
+                        : n.noticeBy?.name}
+                    </TableCell>
                     <TableCell>
                       {n.department
                         ?.map((d: any) => d.departmentName)
@@ -346,7 +340,33 @@ export default function CompanyNoticeBoard() {
                         ?.map((u: any) => `${u.firstName} ${u.lastName}`)
                         .join(', ') || '-'}
                     </TableCell>
-                    
+                  <TableCell>
+  {n.documents && n.documents.length > 0 ? (
+    n.documents.length === 1 ? (
+      <Button
+      size={'sm'}
+        onClick={() => window.open(n.documents[0], "_blank")}
+      >
+        Document
+      </Button>
+    ) : (
+      <div className="flex flex-wrap gap-2">
+        {n.documents.map((docUrl: string, idx: number) => (
+          <Button
+                size={'sm'}
+
+            key={idx}
+            onClick={() => window.open(docUrl, "_blank")}
+          >
+            Document {idx + 1}
+          </Button>
+        ))}
+      </div>
+    )
+  ) : (
+    "-"
+  )}
+</TableCell>
                     <TableCell className="text-center">
                       <Button
                         variant="ghost"
