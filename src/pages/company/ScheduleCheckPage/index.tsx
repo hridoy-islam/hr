@@ -36,10 +36,11 @@ interface ScheduleCheckValues {
   spotCheckDate: number;
   supervisionCheckDate: number;
   disciplinaryCheckDate: number;
-  qaCheckDate: number; // ← added
+  qaCheckDate: number; 
+  meetingCheckDate: number; // ← added
   spotCheckDuration: number;
   supervisionDuration: number;
-  qaCheckDuration: number; // ← added
+  qaCheckDuration: number; 
 }
 
 export default function CompanyScheduleCheckPage() {
@@ -61,10 +62,11 @@ export default function CompanyScheduleCheckPage() {
       spotCheckDate: 0,
       supervisionCheckDate: 0,
       disciplinaryCheckDate: 0,
-      qaCheckDate: 0, // ← added
+      qaCheckDate: 0, 
+      meetingCheckDate: 0, // ← added (will fallback to 0 or API data)
       spotCheckDuration: 0,
       supervisionDuration: 0,
-      qaCheckDuration: 0 // ← added
+      qaCheckDuration: 0 
     }
   });
 
@@ -92,10 +94,11 @@ export default function CompanyScheduleCheckPage() {
             spotCheckDate: data.spotCheckDate || 0,
             supervisionCheckDate: data.supervisionCheckDate || 0,
             disciplinaryCheckDate: data.disciplinaryCheckDate || 0,
-            qaCheckDate: data.qaCheckDate || 0, // ← added
+            qaCheckDate: data.qaCheckDate || 0, 
+            meetingCheckDate: data.meetingCheckDate || 0, // ← added
             spotCheckDuration: data.spotCheckDuration || 0,
             supervisionDuration: data.supervisionDuration || 0,
-            qaCheckDuration: data.qaDuration || 0 // ← added
+            qaCheckDuration: data.qaDuration || 0 
           });
         }
       } catch (error: any) {
@@ -354,6 +357,28 @@ export default function CompanyScheduleCheckPage() {
                   )}
                 />
 
+                {/* Company Meeting */}
+                <FormField
+                  control={form.control}
+                  name="meetingCheckDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Company Meeting Reminder (Days)</FormLabel>
+                      <FormDescription>{reminderDesc}</FormDescription>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="e.g. 3"
+                          {...field}
+                          value={field.value === 0 ? '' : field.value}
+                          onChange={(e) => field.onChange(Number(e.target.value))}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
                 {/* Divider */}
                 <div className="col-span-full my-4 border-t border-gray-100"></div>
 
@@ -422,9 +447,6 @@ export default function CompanyScheduleCheckPage() {
                     </FormItem>
                   )}
                 />
-
-                {/* Optional: Add spot/supervision reminder fields if needed later */}
-                {/* For now, only durations are used per your schema usage pattern */}
 
               </div>
 

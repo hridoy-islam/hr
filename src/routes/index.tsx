@@ -111,6 +111,10 @@ import CompanyPayRoll from '@/pages/company/Payroll';
 import BatchPayrollDetails from '@/pages/company/Payroll/batch-payroll';
 import MissingAttendancePage from '@/pages/company/MissingAttendance';
 import MissingAttendanceCalendarPage from '@/pages/company/MissingAttendance/MissingShiftCalendar';
+import OfficeMeetingPage from '@/pages/company/officeMeeting';
+import MeetingDetailsPage from '@/pages/company/officeMeeting/meetingDetails/MeetingDetailsPage';
+import StaffMeetingPage from '@/pages/staff/Meeting';
+import StaffMeetingDetailsPage from '@/pages/staff/Meeting/meetingDetails/MeetingDetailsPage';
 
 const SignInPage = lazy(() => import('@/pages/auth/signin'));
 
@@ -141,10 +145,9 @@ export default function AppRouter() {
       element: (
         <ProtectedRoute>
           <RoleGuard allowedRoles={['admin']}>
-
-          <ScheduleStatusProvider>
-            <HrLayout />
-          </ScheduleStatusProvider>
+            <ScheduleStatusProvider>
+              <HrLayout />
+            </ScheduleStatusProvider>
           </RoleGuard>
         </ProtectedRoute>
       ),
@@ -166,17 +169,15 @@ export default function AppRouter() {
     }
   ];
 
-
-    const leaveRoutes = [
+  const leaveRoutes = [
     {
       path: '/company/:id/leave-approval/leave-calendar',
       element: (
         <ProtectedRoute>
           <RoleGuard allowedRoles={['admin', 'company', 'companyAdmin']}>
-
-          <ScheduleStatusProvider>
-            <RotaLayout />
-          </ScheduleStatusProvider>
+            <ScheduleStatusProvider>
+              <RotaLayout />
+            </ScheduleStatusProvider>
           </RoleGuard>
         </ProtectedRoute>
       ),
@@ -188,13 +189,10 @@ export default function AppRouter() {
               <CompanyLeaveCalendarPage />
             </Suspense>
           )
-        },
+        }
       ]
     }
   ];
-
-
-
 
   const companyRoutes = [
     {
@@ -343,8 +341,9 @@ export default function AppRouter() {
         },
         { path: 'manage-holiday', element: <ManageHolidayPage /> },
         { path: 'docusign-details', element: <CompanyDocusignDetailsPage /> },
-                { path: 'missed-attendance', element: <MissingAttendancePage /> }
-
+        { path: 'missed-attendance', element: <MissingAttendancePage /> },
+        { path: 'company-meeting', element: <OfficeMeetingPage /> },
+        { path: 'company-meeting/:mid', element: <MeetingDetailsPage /> }
       ]
     }
   ];
@@ -354,10 +353,9 @@ export default function AppRouter() {
       element: (
         <ProtectedRoute>
           <RoleGuard allowedRoles={['admin', 'employee']}>
-
-          <ScheduleStatusProvider>
-            <HrLayout />
-          </ScheduleStatusProvider>
+            <ScheduleStatusProvider>
+              <HrLayout />
+            </ScheduleStatusProvider>
           </RoleGuard>
         </ProtectedRoute>
       ),
@@ -376,7 +374,9 @@ export default function AppRouter() {
         { path: 'holiday', element: <HolidayPage /> },
         { path: 'profile', element: <StaffProfile /> },
         { path: 'attendance', element: <StaffAttendancePage /> },
-        { path: 'document-request', element: <StaffRequestDocumentPage /> }
+        { path: 'document-request', element: <StaffRequestDocumentPage /> },
+        { path: 'meeting', element: <StaffMeetingPage /> },
+        { path: 'meeting/:mid', element: <StaffMeetingDetailsPage /> }
       ]
     }
   ];
@@ -386,10 +386,9 @@ export default function AppRouter() {
       element: (
         <ProtectedRoute>
           <RoleGuard allowedRoles={['admin', 'company', 'companyAdmin']}>
-
-          <ScheduleStatusProvider>
-            <RotaLayout />
-          </ScheduleStatusProvider>
+            <ScheduleStatusProvider>
+              <RotaLayout />
+            </ScheduleStatusProvider>
           </RoleGuard>
         </ProtectedRoute>
       ),
@@ -403,7 +402,7 @@ export default function AppRouter() {
           )
         },
         { path: 'report', element: <CompanyRotaReport /> },
-        { path: 'missing-shift', element: <MissingAttendanceCalendarPage /> },
+        { path: 'missing-shift', element: <MissingAttendanceCalendarPage /> }
       ]
     }
   ];
@@ -413,11 +412,10 @@ export default function AppRouter() {
       path: '/company/:id/employee-attendance',
       element: (
         <ProtectedRoute>
-          <RoleGuard allowedRoles={[ 'attendance']}>
-
-          <ScheduleStatusProvider>
-            <AttendanceLayout />
-          </ScheduleStatusProvider>
+          <RoleGuard allowedRoles={['attendance']}>
+            <ScheduleStatusProvider>
+              <AttendanceLayout />
+            </ScheduleStatusProvider>
           </RoleGuard>
         </ProtectedRoute>
       ),

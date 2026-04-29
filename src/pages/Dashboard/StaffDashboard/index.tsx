@@ -7,6 +7,7 @@ import moment from '@/lib/moment-setup';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
 import {
   Table,
@@ -20,17 +21,12 @@ import { cn } from '@/lib/utils';
 import {
   Calendar,
   AlertCircle,
-  UserIcon,
   Bell,
   Download,
   QrCode,
-  FileSignature,
-  Loader2,
   FileText,
-  Eye,
-  Clock,
-  CheckCircle2,
-  ChevronRight
+  ChevronRight,
+  Users
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -46,23 +42,21 @@ interface Notice {
     name?: string;
   };
   status: string;
-  documents:string[];
+  documents: string[];
 }
 
-interface SignatureDoc {
+interface Employee {
   _id: string;
-  content: string;
-  document: string;
-  employeeId: any;
-  companyId: string;
-  approverIds?: any[];
-  signedBy?: any[];
-  envelopeId?: string | null;
-  signedDocument?: string;
-  status: 'pending' | 'submitted' | 'forwarded' | 'completed' | 'rejected';
-  submittedAt?: string;
-  createdAt: string;
-  updatedAt: string;
+  firstName: string;
+  lastName: string;
+  name?: string;
+}
+
+interface MeetingMins {
+  _id: string;
+  title: string;
+  nextMeetingDate: string;
+  employeeId: Employee[];
 }
 
 // --- Helpers ---
@@ -130,117 +124,12 @@ const StaffDashboardPage = () => {
   const [userData, setUserData] = useState<any>(null);
   const [shifts, setShifts] = useState<any[]>([]);
   const [notices, setNotices] = useState<Notice[]>([]);
+  
+  // --- Office Meetings State ---
+  const [meetings, setMeetings] = useState<MeetingMins[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  
   const [loading, setLoading] = useState(true);
-
-  // --- Signature Documents State ---
-  const [pendingDocuments, setPendingDocuments] = useState<SignatureDoc[]>([]);
-  const [signingDocId, setSigningDocId] = useState<string | null>(null);
-  const [isProcessingSignature, setIsProcessingSignature] = useState(false);
-  const [pollAttempts, setPollAttempts] = useState(0);
-
-  // --- Document Fetch Logic ---
-  const fetchPendingDocuments = async () => {
-    if (!eid || !id) return;
-    try {
-      const res = await axiosInstance.get(`/signature-documents`, {
-        params: {
-          employeeId: eid,
-          approverIds: eid,
-          companyId: id,
-          page: 1,
-          limit: 5
-        }
-      });
-
-      const docs = res.data?.data?.result || res.data || [];
-
-      // Filter to ONLY show documents where the status is effectively "pending" for the user
-      const pendingDocs = docs.filter((doc: SignatureDoc) => {
-        const empIdStr =
-          typeof doc.employeeId === 'string'
-            ? doc.employeeId
-            : doc.employeeId?._id;
-
-        const isEmployee = empIdStr === eid;
-
-        const signedUserIds =
-          doc.signedBy?.map((s: any) =>
-            typeof s.userId === 'string' ? s.userId : s.userId?._id
-          ) || [];
-
-        const hasAlreadySigned = signedUserIds.includes(eid);
-        const employeeHasSigned = signedUserIds.includes(empIdStr);
-
-        // If the user has already signed it or the doc is fully completed, it's not pending for them
-        if (hasAlreadySigned || doc.status === 'completed') return false;
-
-        const approverMatch = doc.approverIds?.find((app: any) => {
-          const appIdStr =
-            typeof app.userId === 'string' ? app.userId : app.userId?._id;
-          return appIdStr === eid;
-        });
-
-        let isMyTurn = false;
-
-        if (isEmployee) {
-          isMyTurn = true; // Employee goes first
-        } else if (approverMatch) {
-          if (employeeHasSigned) {
-            // Check if any previous approvers haven't signed yet
-            const waitingOnPrevious = doc.approverIds?.some((app: any) => {
-              const previousAppIdStr =
-                typeof app.userId === 'string' ? app.userId : app.userId?._id;
-              return (
-                app.index < approverMatch.index &&
-                !signedUserIds.includes(previousAppIdStr)
-              );
-            });
-
-            if (!waitingOnPrevious) {
-              isMyTurn = true;
-            }
-          }
-        }
-
-        // Only return if it's explicitly their turn (i.e. truly pending for this user)
-        return isMyTurn;
-      });
-
-      pendingDocs.sort(
-        (a: SignatureDoc, b: SignatureDoc) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
-
-      setPendingDocuments(pendingDocs);
-    } catch (err) {
-      console.error('Error fetching signature documents:', err);
-    }
-  };
-
-  const handleSignDocument = async (signatureDocId: string) => {
-    setSigningDocId(signatureDocId);
-    try {
-      const response = await axiosInstance.post(
-        `/signature-documents/initiate-signing/${signatureDocId}`,
-        { signerId: eid, layout: 'staffLayout' }
-      );
-      const signingUrl =
-        response.data?.data?.signingUrl || response.data?.signingUrl;
-      if (signingUrl) {
-        window.location.href = signingUrl;
-      } else {
-        throw new Error('No signing URL returned');
-      }
-    } catch (error) {
-      console.error('Error initiating signing:', error);
-      toast({
-        title: 'Failed to initiate signing process.',
-        description: 'Please try again later.',
-        className: 'bg-destructive text-white'
-      });
-      setSigningDocId(null);
-    }
-  };
 
   // --- Silent background fetch for Rota Data ---
   const fetchRotaData = async () => {
@@ -255,7 +144,6 @@ const StaffDashboardPage = () => {
     }
   };
 
-  // --- Intervals & Signature Completion Watcher ---
   useEffect(() => {
     const fetchInterval = setInterval(
       () => {
@@ -268,43 +156,6 @@ const StaffDashboardPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eid]);
 
-  useEffect(() => {
-    const searchParams = new URLSearchParams(location.search);
-    if (searchParams.get('event') === 'signing_complete') {
-      setIsProcessingSignature(true);
-      setPollAttempts(0);
-      searchParams.delete('event');
-      const newSearch = searchParams.toString();
-      const newUrl = newSearch
-        ? `${location.pathname}?${newSearch}`
-        : location.pathname;
-      navigate(newUrl, { replace: true });
-    }
-  }, [location, navigate]);
-
-  useEffect(() => {
-    let interval: ReturnType<typeof setInterval>;
-    if (isProcessingSignature) {
-      interval = setInterval(() => {
-        fetchPendingDocuments();
-        setPollAttempts((prev) => prev + 1);
-      }, 5000);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isProcessingSignature]);
-
-  useEffect(() => {
-    if (isProcessingSignature && pollAttempts >= 2) {
-      setIsProcessingSignature(false);
-      toast({
-        title: 'Signature Processed',
-        description: 'If you completed the document, it will update shortly.'
-      });
-    }
-  }, [pollAttempts, isProcessingSignature, toast]);
 
   // Initial Data Fetch
   useEffect(() => {
@@ -313,20 +164,20 @@ const StaffDashboardPage = () => {
 
       try {
         setLoading(true);
-        const [userRes, rotaRes, noticeRes] = await Promise.all([
+        const [userRes, rotaRes, noticeRes, meetingsRes] = await Promise.all([
           axiosInstance.get(`/users/${eid}`),
           axiosInstance.get(`/rota/upcoming-rota?employeeId=${eid}`),
           axiosInstance.get(`/hr/notice`, {
             params: { page: 1, limit: 3, userId: eid }
-          })
+          }),
+          axiosInstance.get(`/company-meeting/unacknowledgement-meeting/${eid}?limit=3`)
         ]);
 
         setUserData(userRes.data?.data);
         setShifts(rotaRes.data?.data?.result || []);
         setNotices(noticeRes.data?.data?.result || []);
+        setMeetings(meetingsRes.data?.data?.data || []);
 
-        // Fetch pending documents on load
-        await fetchPendingDocuments();
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
       } finally {
@@ -360,6 +211,8 @@ const StaffDashboardPage = () => {
 
     return groupShiftsByMonth(uniqueShifts);
   }, [shifts]);
+
+ 
 
   // --- Download QR Code Logic ---
   const downloadQRCode = () => {
@@ -421,140 +274,79 @@ const StaffDashboardPage = () => {
         )}
       </div>
 
-      {/* NEW LAYOUT GRID - Solves the Desktop alignment and Mobile ordering issue */}
       <div className="-mt-5 flex flex-col gap-y-8 lg:grid lg:grid-cols-3 lg:items-start lg:gap-x-8 lg:gap-y-0">
         {/* ========================================= */}
-        {/* LEFT COLUMN: Documents & Shifts           */}
+        {/* LEFT COLUMN: Meetings & Shifts            */}
         {/* ========================================= */}
         <div className="contents lg:col-span-2 lg:flex lg:flex-col lg:gap-y-10">
-          {/* === 1. PENDING SIGNATURE DOCUMENTS === */}
-          {pendingDocuments.length > 0 && (
-            <div className="order-2 lg:order-none">
-              <div className="mb-6 flex flex-row items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div>
-                    <h2 className="text-2xl font-extrabold tracking-tight text-black">
-                      Request Documents
-                    </h2>
-                  </div>
+          {meetings?.length>0 && <>
+          
+           <div className="order-2 lg:order-none">
+            <div className="mb-6 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+              <div className="flex flex-row items-center gap-3">
+               
+                <div>
+                  <h2 className="text-2xl font-extrabold tracking-tight text-black">
+                    Meetings
+                  </h2>
                 </div>
-                <Button
-                  variant={'link'}
-                  className="font-semibold text-theme"
-                  onClick={() => navigate('document-request')}
-                >
-                  View All Documents
+              </div>
+             {meetings.length > 1 && (
+              <div className="mt-2 flex justify-end">
+                <Button variant="link" className="text-sm font-semibold text-theme" onClick={() => navigate('meetings')}>
+                  View All Meetings
                 </Button>
               </div>
+            )}
+            </div>
 
-              {isProcessingSignature && (
-                <div className="mb-6 flex items-center justify-center gap-3 rounded-md border border-blue-200 bg-blue-50 p-4 text-blue-800">
-                  <Loader2 className="h-5 w-5 animate-spin text-theme" />
-                  <div>
-                    <p className="font-medium">Finalizing your signature...</p>
-                    <p className="text-sm text-theme/80">
-                      Waiting for DocuSign to seal the document. This usually
-                      takes about 15–30 seconds.
-                    </p>
-                  </div>
+            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+              {meetings.length === 0 ? (
+                <div className="flex flex-col items-center justify-center bg-slate-50 py-10 text-slate-500">
+                  <Users className="mb-2 h-8 w-8 text-slate-300" />
+                  <p className="text-sm font-medium">No pending meetings to acknowledge.</p>
                 </div>
-              )}
-
-              <div className="overflow-hidden rounded-xl bg-white">
+              ) : (
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="bg-slate-50/80">
                     <TableRow>
-                      <TableHead className="font-semibold text-slate-600">
-                        Document Details
-                      </TableHead>
-                      <TableHead className="font-semibold text-slate-600">
-                        Recipient
-                      </TableHead>
-                      <TableHead className="font-semibold text-slate-600">
-                        Date Requested
-                      </TableHead>
-                      <TableHead className="font-semibold text-slate-600">
-                        Status
-                      </TableHead>
-                      <TableHead className="text-right font-semibold text-slate-600">
-                        Action
-                      </TableHead>
+                      <TableHead className="font-semibold text-slate-600">Meeting Title</TableHead>
+                      <TableHead className="font-semibold text-slate-600">Next Meeting Date</TableHead>
+                      <TableHead className="text-right font-semibold text-slate-600">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {pendingDocuments.map((doc) => {
-                      return (
-                        <TableRow
-                          key={doc._id}
-                          className="hover:bg-slate-50/80"
-                        >
-                          <TableCell>
-                            <div className="flex flex-col">
-                              <span className="font-medium text-slate-900">
-                                {doc.content || 'Document Request'}
-                              </span>
-                              {doc.document &&
-                                doc.document !== 'docusign-template-used' && (
-                                  <a
-                                    href={doc.document}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="mt-1 flex items-center gap-1 text-xs text-theme hover:underline"
-                                  >
-                                    <Eye className="h-3 w-3" /> View Original
-                                  </a>
-                                )}
-                            </div>
-                          </TableCell>
-
-                          <TableCell>
-                            <span className="text-sm text-slate-700">
-                              {doc?.employeeId?.firstName}{' '}
-                              {doc?.employeeId?.lastName}
-                            </span>
-                          </TableCell>
-
-                          <TableCell>
-                            <span className="text-sm text-slate-600">
-                              {moment(doc.createdAt).format('DD MMM YYYY')}
-                            </span>
-                          </TableCell>
-
-                          <TableCell>
-                            <Badge className="bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800 hover:bg-amber-100">
-                              <Clock className="mr-1 inline h-3 w-3" />
-                              <span className="capitalize">Pending</span>
-                            </Badge>
-                          </TableCell>
-
-                          <TableCell className="text-right">
-                            <Button
-                              onClick={() => handleSignDocument(doc._id)}
-                              disabled={signingDocId === doc._id}
-                              size="sm"
-                              className="bg-theme text-white hover:bg-theme/90"
-                            >
-                              {signingDocId === doc._id ? (
-                                <span className="flex items-center gap-2">
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                  Preparing...
-                                </span>
-                              ) : (
-                                <span className="flex items-center gap-2">
-                                  <FileSignature className="h-4 w-4" /> Sign
-                                  Document
-                                </span>
-                              )}
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
+                    {meetings.map((meeting) => (
+                      <TableRow key={meeting._id} className="hover:bg-slate-50/50">
+                        <TableCell className="font-medium text-slate-900">
+                          {meeting.title}
+                        </TableCell>
+                       
+                        <TableCell className="text-slate-600 whitespace-nowrap">
+                          {meeting.nextMeetingDate
+                            ? moment(meeting.nextMeetingDate).format('DD MMM, YYYY')
+                            : 'N/A'}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            size="sm"
+                            className="bg-theme text-white hover:bg-theme/90 font-medium tracking-wide"
+                            onClick={() => navigate(`meeting/${meeting._id}`)}
+                          >
+                            Acknowledge
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
                   </TableBody>
                 </Table>
-              </div>
+              )}
             </div>
-          )}
+            
+            
+          </div>
+          </>}
+         
 
           {/* === 2. UPCOMING SHIFTS === */}
           <div className="order-3 lg:order-none">
@@ -574,22 +366,10 @@ const StaffDashboardPage = () => {
             <div className="space-y-10">
               {Object.keys(groupedShifts).length === 0 ? (
                 <div className="rounded-2xl border border-slate-200/60 bg-slate-50 py-16 text-center shadow-sm">
-                  <div className="mx-auto mb-4 h-12 w-12">
-                    <svg
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      aria-hidden="true"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={1.5}
-                        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                      />
-                    </svg>
+                  <div className="mx-auto mb-4 h-12 w-12 text-slate-400">
+                    <Calendar className="h-full w-full opacity-60" />
                   </div>
-                  <h3 className="text-sm font-semibold">No shifts scheduled</h3>
+                  <h3 className="text-sm font-semibold text-slate-700">No shifts scheduled</h3>
                   <p className="mt-1 text-sm text-slate-500">
                     You currently have no upcoming shifts assigned.
                   </p>
@@ -804,7 +584,6 @@ const StaffDashboardPage = () => {
                       {notice.noticeDescription}
                     </p>
 
-                    {/* ---------- NEW: Attachments (same style as previous) ---------- */}
                     {notice.documents && notice.documents.length > 0 && (
                       <div className="mb-2 flex w-fit flex-col items-start gap-2 rounded-lg border border-slate-100 bg-slate-50/80 p-2">
                         <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-slate-500">

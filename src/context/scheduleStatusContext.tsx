@@ -25,6 +25,7 @@ export interface ScheduleStatus {
   disciplinary: number;
   qa: number;
   employeeDocument: number; 
+  meeting: number; 
 }
 
 interface ScheduleStatusContextType {
@@ -47,7 +48,8 @@ const defaultStatus: ScheduleStatus = {
   induction: 0,
   disciplinary: 0,
   qa: 0,
-  employeeDocument: 0 
+  employeeDocument: 0 ,
+  meeting: 0 ,
 };
 
 

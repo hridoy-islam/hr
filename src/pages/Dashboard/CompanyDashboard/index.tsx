@@ -11,7 +11,8 @@ import {
   GraduationCap,
   UserPlus,
   AlertTriangle,
-  FolderOpen
+  FolderOpen,
+  CalendarDays
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import axiosInstance from '@/lib/axios';
@@ -212,6 +213,15 @@ const canViewEmployeeData = hasAccess('employee');
       onClick: () => navigate(`/company/${id}/required-employee-documents`),
       functional: true,
       isWarning: status.employeeDocument > 0
+    },{
+      title: 'COMPANY MEETING',
+      main: loadingStats ? '...' : status.meeting,
+      sub: getSubText(status.meeting),
+      icon: <CalendarDays className="h-6 w-6" />, 
+      gradient: 'from-amber-600 to-amber-800', 
+      onClick: () => navigate(`/company/${id}/company-meeting`), 
+      functional: true,
+      isWarning: status.meeting > 0
     }
   ];
 if (!canViewEmployeeData) {

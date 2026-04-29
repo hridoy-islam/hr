@@ -53,7 +53,9 @@ import {
   UserCog,
   CalendarCheck,
   FileSymlink,
-  PenLine
+  PenLine,
+  CalendarX2,
+  CalendarDays
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Link, useNavigate, useLocation, useParams } from 'react-router-dom';
@@ -101,6 +103,12 @@ const navItems = [
     icon: FileSpreadsheet,
     label: 'Attendance',
     href: 'attendance',
+    roles: ['employee']
+  },
+    {
+    icon: CalendarDays,
+    label: 'Office Meeting',
+    href: 'meeting',
     roles: ['employee']
   },
 
@@ -264,6 +272,13 @@ const navItems = [
     href: 'leave-approval',
     roles: ['company', 'companyAdmin'],
     accessKey: 'leave'
+  },
+  {
+    icon: CalendarDays,
+    label: 'Company Meeting',
+    href: 'company-meeting',
+    roles: ['company', 'companyAdmin'],
+    badgeKey: 'meeting'
   },
   {
     icon: Users2,
