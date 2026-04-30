@@ -8,7 +8,7 @@ import {
   Clock,
   Paperclip,
   CheckCircle2,
-  XCircle, // Imported XCircle for the cross icon
+  XCircle,
   CalendarDays,
   Users2
 } from 'lucide-react';
@@ -33,14 +33,14 @@ import axiosInstance from '@/lib/axios';
 import { cn } from '@/lib/utils';
 import moment from '@/lib/moment-setup';
 
-// Interfaces based on your schema
+// Interfaces
 interface LogEntry {
   _id: string;
   title: string;
   date: string;
   documents: string[];
   note?: string;
-  Acknowledgement?: string[]; // Added Acknowledgement array
+  Acknowledgement?: string[];
 }
 
 interface Employee {
@@ -61,12 +61,11 @@ interface MeetingMins {
   employeeId: Employee[];
 }
 
-// Zod Schema for validation
+// Zod Schema for validation - nextMeetingDate is now optional
 const uploadFormSchema = z.object({
   nextMeetingDate: z.date({
-    required_error: 'Next meeting date is required.',
     invalid_type_error: 'Invalid date format.'
-  }),
+  }).optional(),
   note: z.string().optional(),
   uploadedFiles: z
     .array(
@@ -111,6 +110,11 @@ export default function MeetingDetailsPage() {
   const [viewDocsDialogOpen, setViewDocsDialogOpen] = useState(false);
   const [selectedLog, setSelectedLog] = useState<LogEntry | null>(null);
 
+  // --- Specific Log Upload States ---
+  const [isLogUploading, setIsLogUploading] = useState(false);
+  const [stagedLogFiles, setStagedLogFiles] = useState<File[]>([]);
+  const logFileInputRef = useRef<HTMLInputElement>(null);
+
   const fetchMeetingDetails = async () => {
     try {
       setLoading(true);
@@ -130,7 +134,24 @@ export default function MeetingDetailsPage() {
     fetchMeetingDetails();
   }, [id]);
 
-  // Reset form and errors when dialog closes
+  // Clear staged files when viewing dialog closes
+  useEffect(() => {
+    if (!viewDocsDialogOpen) {
+      setStagedLogFiles([]);
+    }
+  }, [viewDocsDialogOpen]);
+
+  // Sync selectedLog with fresh data when meeting details are refetched
+  useEffect(() => {
+    if (meeting?.logs && selectedLog) {
+      const updatedLog = meeting.logs.find((log) => log._id === selectedLog._id);
+      if (updatedLog) {
+        setSelectedLog(updatedLog);
+      }
+    }
+  }, [meeting, selectedLog?._id]);
+
+  // Reset form and errors when general dialog closes
   const handleDialogChange = (isOpen: boolean) => {
     setUploadDialogOpen(isOpen);
     if (!isOpen) {
@@ -142,7 +163,7 @@ export default function MeetingDetailsPage() {
     }
   };
 
-  // --- Upload Logic ---
+  // --- General Upload Logic ---
   const handleFileSelect = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
@@ -166,7 +187,6 @@ export default function MeetingDetailsPage() {
     setIsUploading(true);
     setUploadError(null);
 
-    // Clear file validation error if uploading new files
     setFormErrors((prev) => ({ ...prev, uploadedFiles: undefined }));
 
     try {
@@ -199,50 +219,119 @@ export default function MeetingDetailsPage() {
   };
 
   // --- Submit Update ---
-  const handleUploadSubmit = async () => {
-    // Zod Validation
-    const validationResult = uploadFormSchema.safeParse({
-      nextMeetingDate,
-      note,
-      uploadedFiles
-    });
+ const handleUploadSubmit = async () => {
+  const validationResult = uploadFormSchema.safeParse({
+    nextMeetingDate: nextMeetingDate || undefined,
+    note,
+    uploadedFiles
+  });
 
-    if (!validationResult.success) {
-      const fieldErrors: Record<string, string> = {};
-      validationResult.error.issues.forEach((issue) => {
-        if (issue.path[0]) {
-          fieldErrors[issue.path[0].toString()] = issue.message;
-        }
-      });
-      setFormErrors(fieldErrors);
-      return;
+  if (!validationResult.success) {
+    const fieldErrors: Record<string, string> = {};
+    validationResult.error.issues.forEach((issue) => {
+      if (issue.path[0]) {
+        fieldErrors[issue.path[0].toString()] = issue.message;
+      }
+    });
+    setFormErrors(fieldErrors);
+    return;
+  }
+
+  setFormErrors({});
+
+  try {
+    setIsSubmitting(true);
+
+    const payload: any = {
+      note,
+      documents: uploadedFiles.map((f) => f.url),
+      updatedBy: user?._id
+    };
+
+    // ✅ only add if exists
+    if (nextMeetingDate) {
+      payload.nextMeetingDate = nextMeetingDate;
     }
 
-    // Clear errors if successful
-    setFormErrors({});
+    await axiosInstance.patch(`/company-meeting/${id}`, payload);
+
+    toast({
+      title: 'Meeting updated successfully',
+      className: 'bg-theme text-white border-none'
+    });
+
+    handleDialogChange(false);
+    fetchMeetingDetails();
+  } catch (error) {
+    toast({ title: 'Failed to update meeting', variant: 'destructive' });
+  } finally {
+    setIsSubmitting(false);
+  }
+};
+
+  // --- Specific Log Upload Logic (Staged) ---
+  const handleLogFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    if (!files.length) return;
+
+    const validTypes = ['application/pdf', 'image/jpeg', 'image/png'];
+    const validFiles = files.filter(file => {
+      if (!validTypes.includes(file.type)) {
+        toast({ title: `Invalid file type: ${file.name}`, variant: 'destructive' });
+        return false;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        toast({ title: `File too large: ${file.name} (Max 5MB)`, variant: 'destructive' });
+        return false;
+      }
+      return true;
+    });
+
+    setStagedLogFiles((prev) => [...prev, ...validFiles]);
+    
+    // Clear input so same file can be selected again if removed
+    if (logFileInputRef.current) logFileInputRef.current.value = '';
+  };
+
+  const handleRemoveStagedLogFile = (indexToRemove: number) => {
+    setStagedLogFiles((prev) => prev.filter((_, index) => index !== indexToRemove));
+  };
+
+  const handleConfirmLogUpload = async () => {
+    if (!stagedLogFiles.length || !selectedLog) return;
+    setIsLogUploading(true);
 
     try {
-      setIsSubmitting(true);
-      const payload = {
-        nextMeetingDate: nextMeetingDate,
-        note: note,
-        documents: uploadedFiles.map((f) => f.url),
-        updatedBy: user?._id
-      };
+      const uploadPromises = stagedLogFiles.map(async (file) => {
+        const formData = new FormData();
+        formData.append('entityId', user?._id);
+        formData.append('file_type', 'document');
+        formData.append('file', file);
 
-      await axiosInstance.patch(`/company-meeting/${id}`, payload);
+        const res = await axiosInstance.post('/documents', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        return res.data?.data?.fileUrl;
+      });
+
+      const uploadedUrls = await Promise.all(uploadPromises);
+
+      // Submit the uploaded URLs to the log endpoint
+      await axiosInstance.patch(`/company-meeting/${id}/log/${selectedLog._id}/documents`, {
+        documents: uploadedUrls
+      });
 
       toast({
-        title: 'Meeting updated successfully',
+        title: 'Documents added to log successfully',
         className: 'bg-theme text-white border-none'
       });
 
-      handleDialogChange(false);
-      fetchMeetingDetails();
-    } catch (error) {
-      toast({ title: 'Failed to update meeting', variant: 'destructive' });
+      setStagedLogFiles([]);
+      fetchMeetingDetails(); 
+    } catch (err) {
+      toast({ title: 'Failed to add documents', variant: 'destructive' });
     } finally {
-      setIsSubmitting(false);
+      setIsLogUploading(false);
     }
   };
 
@@ -341,6 +430,8 @@ export default function MeetingDetailsPage() {
                 meeting?.logs?.map((log, index) => {
                   const hasDocs = log.documents && log.documents.length > 0;
                   const isLatest = index === meeting.logs.length - 1;
+                  const isFirstLog = index === 0;
+                  const canClick = hasDocs || isFirstLog;
 
                   return (
                     <div
@@ -368,11 +459,11 @@ export default function MeetingDetailsPage() {
                           <p
                             className={cn(
                               'text-[15px] font-semibold text-black',
-                              hasDocs &&
+                              canClick &&
                                 'cursor-pointer text-theme hover:underline'
                             )}
                             onClick={() => {
-                              if (!hasDocs) return;
+                              if (!canClick) return;
                               setSelectedLog(log);
                               setViewDocsDialogOpen(true);
                             }}
@@ -390,7 +481,7 @@ export default function MeetingDetailsPage() {
         </div>
       </div>
 
-      {/* Upload Dialog */}
+      {/* General Upload Dialog */}
       <Dialog open={uploadDialogOpen} onOpenChange={handleDialogChange}>
         <DialogContent className="max-w-5xl sm:rounded-xl">
           <DialogHeader className="border-b border-gray-100 pb-4">
@@ -404,7 +495,7 @@ export default function MeetingDetailsPage() {
               {/* Date Input */}
               <div className="flex flex-col space-y-2">
                 <Label className="text-sm font-semibold text-gray-700">
-                  Next Meeting Date <span className="text-red-500">*</span>
+                  Next Meeting Date
                 </Label>
                 <DatePicker
                   selected={nextMeetingDate}
@@ -571,7 +662,7 @@ export default function MeetingDetailsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* View Documents Dialog */}
+      {/* View Documents Dialog (Activity Timeline Log) */}
       <Dialog open={viewDocsDialogOpen} onOpenChange={setViewDocsDialogOpen}>
         <DialogContent className="max-w-5xl sm:rounded-xl border-gray-100">
           <DialogHeader className="border-b border-gray-100 pb-4">
@@ -588,7 +679,7 @@ export default function MeetingDetailsPage() {
           <div className="grid grid-cols-1 gap-6 py-4 md:grid-cols-12">
             {/* Left side: Notes and Files */}
             <div className="space-y-6 md:col-span-8">
-              {/* Note Display (Conditionally rendered) */}
+              {/* Note Display */}
               {selectedLog?.note && (
                 <p className="text-sm font-medium text-gray-700">
                   {selectedLog.note}
@@ -626,10 +717,86 @@ export default function MeetingDetailsPage() {
                     })}
                   </ul>
                 ) : (
-                  <div className="rounded-lg border border-gray-100 bg-gray-50 py-6 text-center text-sm italic text-gray-500">
-                    No documents found for this log.
+                  <div className="rounded-lg border border-gray-100 bg-gray-50 p-6 text-center">
+                    <p className="text-sm italic text-gray-500">
+                      No documents found for this log.
+                    </p>
                   </div>
                 )}
+
+                {/* Inline Upload for Specific Log with Staging/Confirmation */}
+                <div className="mt-6 border-t border-gray-100 pt-4">
+                  <Label className="mb-3 block text-sm font-semibold text-gray-900">
+                    Add Documents
+                  </Label>
+                  <div className="flex flex-col space-y-4">
+                    <input
+                      ref={logFileInputRef}
+                      type="file"
+                      multiple
+                      accept=".pdf,application/pdf,image/*"
+                      onChange={handleLogFileSelect}
+                      className="hidden"
+                      disabled={isLogUploading}
+                    />
+                    
+                    <Button 
+                      variant="outline" 
+                      onClick={() => logFileInputRef.current?.click()}
+                      disabled={isLogUploading}
+                      className="w-fit"
+                    >
+                      <Upload className="mr-2 h-4 w-4" />
+                      Select Documents
+                    </Button>
+
+                    {/* Staged Files Preview List */}
+                    {stagedLogFiles.length > 0 && (
+                      <div className="rounded-xl border border-gray-200 bg-gray-50/50 p-3 shadow-inner">
+                        <ul className="space-y-2">
+                          {stagedLogFiles.map((file, idx) => (
+                            <li
+                              key={idx}
+                              className="flex items-center justify-between rounded-md border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm"
+                            >
+                              <div className="flex items-center gap-2 overflow-hidden">
+                                <FileText className="h-4 w-4 flex-shrink-0 text-theme" />
+                                <span className="truncate font-medium text-gray-700">
+                                  {file.name}
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveStagedLogFile(idx)}
+                                disabled={isLogUploading}
+                                className="ml-3 text-gray-400 transition-colors hover:text-red-500 disabled:opacity-50"
+                              >
+                                &times;
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                        
+                        <div className="mt-4 flex justify-end">
+                          <Button
+                            onClick={handleConfirmLogUpload}
+                            disabled={isLogUploading}
+                            className="bg-theme text-white hover:bg-theme/90"
+                          >
+                            {isLogUploading ? (
+                              <div className="flex items-center gap-2">
+                                <BlinkingDots size="small" color="bg-white" />
+                                <span>Uploading...</span>
+                              </div>
+                            ) : (
+                              'Confirm & Upload'
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -641,48 +808,32 @@ export default function MeetingDetailsPage() {
               {meeting?.employeeId && meeting.employeeId.length > 0 ? (
                 <ul className="space-y-3">
                   {meeting.employeeId.map((emp) => {
-                    // Check if employee _id exists in the selected log's Acknowledgement array
                     const hasAcknowledged = selectedLog?.Acknowledgement?.includes(emp._id);
                     
                     return (
                      <li
-  key={emp._id}
-  className="flex items-center justify-between gap-3 rounded-xl border border-gray-100 bg-white px-3 py-2 shadow-sm hover:shadow-md transition"
->
-  {/* Left: Status Icon */}
-  <div className="shrink-0">
-    {hasAcknowledged ? (
-      <CheckCircle2 className="h-5 w-5 text-green-500" />
-    ) : (
-      <XCircle className="h-5 w-5 text-red-500" />
-    )}
-  </div>
+                        key={emp._id}
+                        className="flex items-center justify-between gap-3 rounded-xl border border-gray-100 bg-white px-3 py-2 shadow-sm transition hover:shadow-md"
+                      >
+                        <div className="shrink-0">
+                          {hasAcknowledged ? (
+                            <CheckCircle2 className="h-5 w-5 text-green-500" />
+                          ) : (
+                            <XCircle className="h-5 w-5 text-red-500" />
+                          )}
+                        </div>
 
-  {/* Middle: User Info */}
-  <div className="flex flex-col flex-1 min-w-0">
-    <span className="text-sm font-semibold text-gray-800 truncate">
-      {emp.name ||
-        `${emp.firstName || ""} ${emp.lastName || ""}`.trim()}
-    </span>
+                        <div className="flex min-w-0 flex-1 flex-col">
+                          <span className="truncate text-sm font-semibold text-gray-800">
+                            {emp.name ||
+                              `${emp.firstName || ""} ${emp.lastName || ""}`.trim()}
+                          </span>
 
-    <span className="text-xs text-gray-500 truncate">
-      {emp.designationId?.map((d) => d.title).join(", ") || "No designation"}
-    </span>
-  </div>
-
-  {/* Right: Status Text */}
-  {/* <div className="shrink-0">
-    <span
-      className={`text-xs font-medium px-2 py-1 rounded-full ${
-        hasAcknowledged
-          ? "bg-green-50 text-green-600"
-          : "bg-red-50 text-red-600"
-      }`}
-    >
-      {hasAcknowledged ? "Acknowledged" : "Pending"}
-    </span>
-  </div> */}
-</li>
+                          <span className="truncate text-xs text-gray-500">
+                            {emp.designationId?.map((d) => d.title).join(", ") || "No designation"}
+                          </span>
+                        </div>
+                      </li>
                     );
                   })}
                 </ul>
