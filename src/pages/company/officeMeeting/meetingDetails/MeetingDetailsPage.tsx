@@ -165,52 +165,45 @@ export default function MeetingDetailsPage() {
 
   // --- General Upload Logic ---
   const handleFileSelect = async (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const files = Array.from(event.target.files || []);
-    if (!files.length) return;
+  event: React.ChangeEvent<HTMLInputElement>
+) => {
+  const files = Array.from(event.target.files || []);
+  if (!files.length) return;
 
-    const validTypes = ['application/pdf', 'image/jpeg', 'image/png'];
-    for (const file of files) {
-      if (!validTypes.includes(file.type)) {
-        setUploadError(
-          `Invalid file type: ${file.name}. Only PDF, JPEG, or PNG allowed.`
-        );
-        return;
-      }
-      if (file.size > 5 * 1024 * 1024) {
-        setUploadError(`File too large: ${file.name}. Must be less than 5MB.`);
-        return;
-      }
+  for (const file of files) {
+    if (file.size > 5 * 1024 * 1024) {
+      setUploadError(`File too large: ${file.name}. Must be less than 5MB.`);
+      return;
     }
+  }
 
-    setIsUploading(true);
-    setUploadError(null);
+  setIsUploading(true);
+  setUploadError(null);
+  setFormErrors((prev) => ({ ...prev, uploadedFiles: undefined }));
 
-    setFormErrors((prev) => ({ ...prev, uploadedFiles: undefined }));
+  try {
+    const uploadPromises = files.map(async (file) => {
+      const formData = new FormData();
+      formData.append('entityId', user?._id);
+      formData.append('file_type', 'document');
+      formData.append('file', file);
 
-    try {
-      const uploadPromises = files.map(async (file) => {
-        const formData = new FormData();
-        formData.append('entityId', user?._id);
-        formData.append('file_type', 'document');
-        formData.append('file', file);
-
-        const res = await axiosInstance.post('/documents', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
-        return { name: file.name, url: res.data?.data?.fileUrl };
+      const res = await axiosInstance.post('/documents', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
       });
 
-      const uploadedResults = await Promise.all(uploadPromises);
-      setUploadedFiles((prev) => [...prev, ...uploadedResults]);
-    } catch (err) {
-      setUploadError('Failed to upload one or more documents.');
-    } finally {
-      setIsUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
-  };
+      return { name: file.name, url: res.data?.data?.fileUrl };
+    });
+
+    const uploadedResults = await Promise.all(uploadPromises);
+    setUploadedFiles((prev) => [...prev, ...uploadedResults]);
+  } catch (err) {
+    setUploadError('Failed to upload one or more documents.');
+  } finally {
+    setIsUploading(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }
+};
 
   const handleRemoveFile = (indexToRemove: number) => {
     setUploadedFiles((prev) =>
@@ -270,28 +263,26 @@ export default function MeetingDetailsPage() {
 };
 
   // --- Specific Log Upload Logic (Staged) ---
-  const handleLogFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files || []);
-    if (!files.length) return;
+ const handleLogFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const files = Array.from(event.target.files || []);
+  if (!files.length) return;
 
-    const validTypes = ['application/pdf', 'image/jpeg', 'image/png'];
-    const validFiles = files.filter(file => {
-      if (!validTypes.includes(file.type)) {
-        toast({ title: `Invalid file type: ${file.name}`, variant: 'destructive' });
-        return false;
-      }
-      if (file.size > 5 * 1024 * 1024) {
-        toast({ title: `File too large: ${file.name} (Max 5MB)`, variant: 'destructive' });
-        return false;
-      }
-      return true;
-    });
+  const validFiles = files.filter(file => {
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: `File too large: ${file.name} (Max 5MB)`,
+        variant: 'destructive'
+      });
+      return false;
+    }
+    return true;
+  });
 
-    setStagedLogFiles((prev) => [...prev, ...validFiles]);
-    
-    // Clear input so same file can be selected again if removed
-    if (logFileInputRef.current) logFileInputRef.current.value = '';
-  };
+  setStagedLogFiles((prev) => [...prev, ...validFiles]);
+
+  // Clear input so same file can be selected again if removed
+  if (logFileInputRef.current) logFileInputRef.current.value = '';
+};
 
   const handleRemoveStagedLogFile = (indexToRemove: number) => {
     setStagedLogFiles((prev) => prev.filter((_, index) => index !== indexToRemove));
@@ -559,7 +550,6 @@ export default function MeetingDetailsPage() {
                   ref={fileInputRef}
                   type="file"
                   multiple
-                  accept=".pdf,application/pdf,image/*"
                   onChange={handleFileSelect}
                   className="absolute inset-0 z-10 cursor-pointer opacity-0"
                   disabled={isUploading}
@@ -594,7 +584,7 @@ export default function MeetingDetailsPage() {
                       Click or drag to upload
                     </span>
                     <span className="text-xs text-gray-500">
-                      PDF, JPG, PNG (Max 5MB)
+                      (Max 5MB)
                     </span>
                   </div>
                 )}
@@ -734,7 +724,6 @@ export default function MeetingDetailsPage() {
                       ref={logFileInputRef}
                       type="file"
                       multiple
-                      accept=".pdf,application/pdf,image/*"
                       onChange={handleLogFileSelect}
                       className="hidden"
                       disabled={isLogUploading}
