@@ -9,12 +9,13 @@ import {
   FormMessage
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { requestOtp } from '@/redux/features/authSlice';
+import { requestOtp, resetError } from '@/redux/features/authSlice'; // Added resetError just in case
 import { AppDispatch } from '@/redux/store';
 import { useRouter } from '@/routes/hooks';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { useDispatch, useSelector } from 'react-redux';
+import { useEffect } from 'react'; // Added useEffect to clear errors on mount
 
 import { Link } from 'react-router-dom';
 import { z } from 'zod';
@@ -31,14 +32,21 @@ export default function ForgotPassword() {
   const { loading, error } = useSelector((state: any) => state.auth);
   const router = useRouter();
   const dispatch = useDispatch<AppDispatch>();
+  
   const defaultValues = {
     email: '',
     password: ''
   };
+  
   const form = useForm<UserFormValue>({
     resolver: zodResolver(formSchema),
     defaultValues
   });
+
+  // Optional but recommended: Clear any leftover errors when the page loads
+  useEffect(() => {
+    dispatch(resetError());
+  }, [dispatch]);
 
   const onSubmit = async (data: UserFormValue) => {
     const result: any = await dispatch(requestOtp(data));
@@ -50,7 +58,7 @@ export default function ForgotPassword() {
 
   return (
     <>
-      <div className="container pt-20  h-svh items-center justify-center bg-primary bg-purple-50 lg:max-w-none lg:px-0">
+      <div className="container pt-20 h-svh items-center justify-center bg-primary bg-purple-50 lg:max-w-none lg:px-0">
         <div className='w-8/12 mx-auto shadow-2xl flex p-5'>
           <div>
             <img
@@ -62,7 +70,6 @@ export default function ForgotPassword() {
           </div>
           <div className="mx-auto flex w-full flex-col justify-center space-y-2 sm:w-[480px] lg:p-8">
             <div className="mb-4 flex items-center justify-center">
-              {/* <img src="/logo.png" alt="Logo" className="w-1/2" /> */}
               <h3 className="text-4xl font-bold text-supperagent">HR</h3>
             </div>
             <Card className="p-6">
@@ -74,6 +81,15 @@ export default function ForgotPassword() {
                   Enter your registered email and <br /> we will send you a link
                   to reset your password.
                 </p>
+
+                {/* --- ERROR MESSAGE DISPLAY --- */}
+                {error && (
+                  <div className="rounded-md bg-red-50 p-3 text-sm text-red-500 font-medium border border-red-200">
+                    {error}
+                  </div>
+                )}
+                {/* ------------------------------- */}
+
                 <Form {...form}>
                   <form
                     onSubmit={form.handleSubmit(onSubmit)}
@@ -108,7 +124,6 @@ export default function ForgotPassword() {
                   </form>
                 </Form>
               </div>
-              {/* <ForgotForm /> */}
               <p className="mt-4 px-8 text-center text-sm text-muted">
                 Don't have an account?{' '}
                 <Link to="/sign-up" className="underline text-supperagent underline-offset-4">

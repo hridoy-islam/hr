@@ -90,29 +90,36 @@ export const registerUser = createAsyncThunk<
 });
 
 // Async thunk for logging in a user
-export const loginUser = createAsyncThunk<UserResponse, UserCredentials>(
-  'auth/login',
-  async (userCredentials) => {
+export const loginUser = createAsyncThunk<
+  UserResponse,
+  UserCredentials,
+  { rejectValue: string } // Define the type of the rejected payload
+>('auth/login', async (userCredentials, { rejectWithValue }) => {
+  try {
     const request = await axios.post(
       `${import.meta.env.VITE_API_URL}/auth/login`,
       userCredentials,
       {
         headers: {
           'Access-Control-Allow-Origin': '*',
-          'Content-Type': 'application/json' //this line solved cors
+          'Content-Type': 'application/json'
         }
       }
     );
 
-    const response = await request.data;
+    const response = request.data;
 
-    localStorage.setItem(
-      'hr',
-      JSON.stringify(response.data.accessToken)
-    );
+    localStorage.setItem('hr', JSON.stringify(response.data.accessToken));
     return response;
+  } catch (error: any) {
+    // Check if the error comes from the backend response
+    if (error.response && error.response.data && error.response.data.message) {
+      return rejectWithValue(error.response.data.message);
+    }
+    // Fallback for network errors or other unexpected issues
+    return rejectWithValue(error.message || 'Login failed');
   }
-);
+});
 
 export const authWithFbORGoogle = createAsyncThunk<
   UserResponse,
@@ -129,17 +136,17 @@ export const authWithFbORGoogle = createAsyncThunk<
     }
   );
   const response = await request.data;
-  localStorage.setItem(
-    'hr',
-    JSON.stringify(response.data.access_token)
-  );
+  localStorage.setItem('hr', JSON.stringify(response.data.access_token));
   return response;
 });
 // forgot password
 
-export const requestOtp = createAsyncThunk<ForgetResponse, forgetCredentials>(
-  'auth/forget',
-  async (userCredentials) => {
+export const requestOtp = createAsyncThunk<
+  ForgetResponse,
+  forgetCredentials,
+  { rejectValue: string }
+>('auth/forget', async (userCredentials, { rejectWithValue }) => {
+  try {
     const request = await axios.post(
       `${import.meta.env.VITE_API_URL}/auth/forget`,
       userCredentials,
@@ -150,11 +157,17 @@ export const requestOtp = createAsyncThunk<ForgetResponse, forgetCredentials>(
         }
       }
     );
-    const response = await request.data;
-
+    const response = request.data;
     return response;
+  } catch (error: any) {
+    // Check if the error comes from the backend response
+    if (error.response && error.response.data && error.response.data.message) {
+      return rejectWithValue(error.response.data.message);
+    }
+    // Fallback for network errors or other unexpected issues
+    return rejectWithValue(error.message || 'Login failed');
   }
-);
+});
 
 // validate request OTP
 export const validateRequestOtp = createAsyncThunk<
@@ -239,7 +252,7 @@ const authSlice = createSlice({
       .addCase(loginUser.rejected, (state, action) => {
         state.loading = false;
         state.user = null;
-        state.error = 'Please Check Your Login Credentials';
+        state.error = action.payload || 'Please Check Your Login Credentials';
         state.token = null;
       })
       .addCase(authWithFbORGoogle.pending, (state) => {
@@ -278,6 +291,21 @@ const authSlice = createSlice({
         state.user = null; // Clear user state on logout
         state.error = null;
         state.token = null;
+      }).addCase(requestOtp.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(requestOtp.fulfilled, (state) => {
+        state.loading = false;
+        state.error = null; 
+        // Note: We don't modify the token or user here because 
+        // requesting an OTP is just an intermediate step.
+      })
+      .addCase(requestOtp.rejected, (state, action) => {
+        state.loading = false;
+        // This will now correctly grab the "Your account has been suspended..." 
+        // message from the rejectWithValue payload.
+        state.error = action.payload || 'Failed to request OTP';
       });
   }
 });
