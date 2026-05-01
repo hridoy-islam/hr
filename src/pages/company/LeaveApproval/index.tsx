@@ -1883,13 +1883,13 @@ const CompanyLeaveApprovalPage: React.FC = () => {
                 >
                   Close
                 </Button>
-                <Button
+                {/* <Button
                   onClick={form.handleSubmit((data) =>
                     handleActionSubmit('update', data)
                   )}
                 >
                   Update Details
-                </Button>
+                </Button> */}
               </div>
             )}
           </div>
