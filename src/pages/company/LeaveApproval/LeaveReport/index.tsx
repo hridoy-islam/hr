@@ -82,6 +82,38 @@ interface Totals {
   remainingHours: number;
 }
 
+// --- Helper Functions ---
+const formatNum = (num: number | undefined | null) => {
+  return Number(num || 0).toFixed(2);
+};
+
+const generateHolidayYears = (backward = 20, forward = 50) => {
+  const currentYear = moment().year();
+  const years: string[] = [];
+  for (let i = backward; i > 0; i--) {
+    years.push(`${currentYear - i}-${currentYear - i + 1}`);
+  }
+  years.push(`${currentYear}-${currentYear + 1}`);
+  for (let i = 1; i <= forward; i++) {
+    years.push(`${currentYear + i}-${currentYear + i + 1}`);
+  }
+  return years;
+};
+
+const formatLocalDate = (date: Date) => {
+  return moment(date).startOf('day').format('DD MMM YYYY');
+};
+
+const getDatesFromHolidayYear = (yearStr: string): [Date, Date] => {
+  const [startYearStr, endYearStr] = yearStr.split('-');
+  const startYear = parseInt(startYearStr, 10);
+  const endYear = parseInt(endYearStr, 10);
+  const startDate = new Date(startYear, 3, 1);
+  const endDate = new Date(endYear, 2, 31);
+  return [startDate, endDate];
+};
+
+
 // --- PDF Styles ---
 const pdfStyles = StyleSheet.create({
   page: { padding: 30, fontSize: 10, fontFamily: 'Helvetica' },
@@ -207,32 +239,32 @@ const ReportPDF = ({
               </View>
               <View style={[pdfStyles.tableCol, pdfStyles.colStandard]}>
                 <Text style={pdfStyles.tableCell}>
-                  {item.holidayRecord.carryForward}
+                  {formatNum(item.holidayRecord.carryForward)}
                 </Text>
               </View>
               <View style={[pdfStyles.tableCol, pdfStyles.colStandard]}>
                 <Text style={pdfStyles.tableCell}>
-                  {item.holidayRecord.holidayAccured}
+                  {formatNum(item.holidayRecord.holidayAccured)}
                 </Text>
               </View>
               <View style={[pdfStyles.tableCol, pdfStyles.colStandard]}>
                 <Text style={pdfStyles.tableCell}>
-                  {item.holidayRecord.usedHours}
+                  {formatNum(item.holidayRecord.usedHours)}
                 </Text>
               </View>
               <View style={[pdfStyles.tableCol, pdfStyles.colStandard]}>
                 <Text style={pdfStyles.tableCell}>
-                  {item.holidayRecord.bookedHours}
+                  {formatNum(item.holidayRecord.bookedHours)}
                 </Text>
               </View>
               <View style={[pdfStyles.tableCol, pdfStyles.colStandard]}>
                 <Text style={pdfStyles.tableCell}>
-                  {item.holidayRecord.requestedHours}
+                  {formatNum(item.holidayRecord.requestedHours)}
                 </Text>
               </View>
               <View style={[pdfStyles.tableCol, pdfStyles.colStandard]}>
                 <Text style={pdfStyles.tableCell}>
-                  {item.holidayRecord.remainingHours}
+                  {formatNum(item.holidayRecord.remainingHours)}
                 </Text>
               </View>
             </View>
@@ -249,30 +281,32 @@ const ReportPDF = ({
             </View>
             <View style={[pdfStyles.tableColHeader, pdfStyles.colStandard]}>
               <Text style={pdfStyles.tableCellHeader}>
-                {totals.carryForward}
+                {formatNum(totals.carryForward)}
               </Text>
             </View>
             <View style={[pdfStyles.tableColHeader, pdfStyles.colStandard]}>
               <Text style={pdfStyles.tableCellHeader}>
-                {totals.holidayAccured}
-              </Text>
-            </View>
-            <View style={[pdfStyles.tableColHeader, pdfStyles.colStandard]}>
-              <Text style={pdfStyles.tableCellHeader}>{totals.usedHours}</Text>
-            </View>
-            <View style={[pdfStyles.tableColHeader, pdfStyles.colStandard]}>
-              <Text style={pdfStyles.tableCellHeader}>
-                {totals.bookedHours}
+                {formatNum(totals.holidayAccured)}
               </Text>
             </View>
             <View style={[pdfStyles.tableColHeader, pdfStyles.colStandard]}>
               <Text style={pdfStyles.tableCellHeader}>
-                {totals.requestedHours}
+                {formatNum(totals.usedHours)}
               </Text>
             </View>
             <View style={[pdfStyles.tableColHeader, pdfStyles.colStandard]}>
               <Text style={pdfStyles.tableCellHeader}>
-                {totals.remainingHours}
+                {formatNum(totals.bookedHours)}
+              </Text>
+            </View>
+            <View style={[pdfStyles.tableColHeader, pdfStyles.colStandard]}>
+              <Text style={pdfStyles.tableCellHeader}>
+                {formatNum(totals.requestedHours)}
+              </Text>
+            </View>
+            <View style={[pdfStyles.tableColHeader, pdfStyles.colStandard]}>
+              <Text style={pdfStyles.tableCellHeader}>
+                {formatNum(totals.remainingHours)}
               </Text>
             </View>
           </View>
@@ -281,34 +315,6 @@ const ReportPDF = ({
     </Page>
   </Document>
 );
-
-// --- Helper Functions ---
-const generateHolidayYears = (backward = 20, forward = 50) => {
-  const currentYear = moment().year();
-  const years: string[] = [];
-  for (let i = backward; i > 0; i--) {
-    years.push(`${currentYear - i}-${currentYear - i + 1}`);
-  }
-  years.push(`${currentYear}-${currentYear + 1}`);
-  for (let i = 1; i <= forward; i++) {
-    years.push(`${currentYear + i}-${currentYear + i + 1}`);
-  }
-  return years;
-};
-
-const formatLocalDate = (date: Date) => {
-    return moment(date).startOf('day').format('DD MMM YYYY');
-  
-};
-
-const getDatesFromHolidayYear = (yearStr: string): [Date, Date] => {
-  const [startYearStr, endYearStr] = yearStr.split('-');
-  const startYear = parseInt(startYearStr, 10);
-  const endYear = parseInt(endYearStr, 10);
-  const startDate = new Date(startYear, 3, 1);
-  const endDate = new Date(endYear, 2, 31);
-  return [startDate, endDate];
-};
 
 const LeaveReportPage: React.FC = () => {
   const { id: companyId } = useParams();
@@ -461,23 +467,23 @@ const LeaveReportPage: React.FC = () => {
       const empName = `${user.firstName} ${user.lastName}`;
       return [
         `"${empName}"`, // Encapsulate in quotes in case of commas
-        item.holidayRecord.carryForward,
-        item.holidayRecord.holidayAccured,
-        item.holidayRecord.usedHours,
-        item.holidayRecord.bookedHours,
-        item.holidayRecord.requestedHours,
-        item.holidayRecord.remainingHours
+        formatNum(item.holidayRecord.carryForward),
+        formatNum(item.holidayRecord.holidayAccured),
+        formatNum(item.holidayRecord.usedHours),
+        formatNum(item.holidayRecord.bookedHours),
+        formatNum(item.holidayRecord.requestedHours),
+        formatNum(item.holidayRecord.remainingHours)
       ].join(',');
     });
 
     const totalRow = [
       '"Total"',
-      totals.carryForward,
-      totals.holidayAccured,
-      totals.usedHours,
-      totals.bookedHours,
-      totals.requestedHours,
-      totals.remainingHours
+      formatNum(totals.carryForward),
+      formatNum(totals.holidayAccured),
+      formatNum(totals.usedHours),
+      formatNum(totals.bookedHours),
+      formatNum(totals.requestedHours),
+      formatNum(totals.remainingHours)
     ].join(',');
 
     const csvContent = [headers.join(','), ...rows, totalRow].join('\n');
@@ -584,19 +590,19 @@ const LeaveReportPage: React.FC = () => {
               <TableHead className="rounded-tl-md py-4 font-bold text-gray-900">
                 Employee Name
               </TableHead>
-              <TableHead className="py-4 font-bold text-gray-900 ">
+              <TableHead className="py-4 font-bold text-gray-900 text-center">
                 Opening this year
               </TableHead>
-              <TableHead className="py-4 font-bold text-gray-900 ">
+              <TableHead className="py-4 font-bold text-gray-900 text-center">
                 Holiday Accrued
               </TableHead>
-              <TableHead className="py-4 font-bold text-gray-900 ">
+              <TableHead className="py-4 font-bold text-gray-900 text-center">
                 Taken
               </TableHead>
-              <TableHead className="py-4 font-bold text-gray-900 ">
+              <TableHead className="py-4 font-bold text-gray-900 text-center">
                 Booked
               </TableHead>
-              <TableHead className="py-4 font-bold text-gray-900 ">
+              <TableHead className="py-4 font-bold text-gray-900 text-center">
                 Requested
               </TableHead>
               <TableHead className="rounded-tr-md py-4 text-right font-bold text-gray-900">
@@ -628,22 +634,22 @@ const LeaveReportPage: React.FC = () => {
                         {empName}
                       </TableCell>
                       <TableCell className="py-4 font-medium text-gray-800 text-center">
-                        {item.holidayRecord.carryForward}
+                        {formatNum(item.holidayRecord.carryForward)}
                       </TableCell>
                       <TableCell className="py-4 font-medium text-gray-800 text-center">
-                        {item.holidayRecord.holidayAccured}
+                        {formatNum(item.holidayRecord.holidayAccured)}
                       </TableCell>
                       <TableCell className="py-4 font-medium text-gray-800 text-center">
-                        {item.holidayRecord.usedHours}
+                        {formatNum(item.holidayRecord.usedHours)}
                       </TableCell>
                       <TableCell className="py-4 font-medium text-gray-800 text-center">
-                        {item.holidayRecord.bookedHours}
+                        {formatNum(item.holidayRecord.bookedHours)}
                       </TableCell>
                       <TableCell className="py-4 font-medium text-gray-800 text-center">
-                        {item.holidayRecord.requestedHours}
+                        {formatNum(item.holidayRecord.requestedHours)}
                       </TableCell>
                       <TableCell className="py-4 text-right font-semibold text-gray-800">
-                        {item.holidayRecord.remainingHours}
+                        {formatNum(item.holidayRecord.remainingHours)}
                       </TableCell>
                     </TableRow>
                   );
@@ -655,22 +661,22 @@ const LeaveReportPage: React.FC = () => {
                     Total
                   </TableCell>
                   <TableCell className="py-4 font-bold text-gray-900 text-center">
-                    {totals.carryForward}
+                    {formatNum(totals.carryForward)}
                   </TableCell>
                   <TableCell className="py-4 font-bold text-gray-900 text-center">
-                    {totals.holidayAccured}
+                    {formatNum(totals.holidayAccured)}
                   </TableCell>
                   <TableCell className="py-4 font-bold text-gray-900 text-center">
-                    {totals.usedHours}
+                    {formatNum(totals.usedHours)}
                   </TableCell>
                   <TableCell className="py-4 font-bold text-gray-900 text-center">
-                    {totals.bookedHours}
+                    {formatNum(totals.bookedHours)}
                   </TableCell>
                   <TableCell className="py-4 font-bold text-gray-900 text-center">
-                    {totals.requestedHours}
+                    {formatNum(totals.requestedHours)}
                   </TableCell>
                   <TableCell className="py-4 text-right font-bold text-gray-900">
-                    {totals.remainingHours}
+                    {formatNum(totals.remainingHours)}
                   </TableCell>
                 </TableRow>
               </>

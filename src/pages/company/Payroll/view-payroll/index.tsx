@@ -22,7 +22,6 @@ import {
   TableHeader,
   TableRow
 } from '@/components/ui/table';
-// ---> NEW: Added Dialog imports
 import {
   Dialog,
   DialogContent,
@@ -118,21 +117,39 @@ const pdfStyles = StyleSheet.create({
   },
   tableHeader: { fontWeight: 'bold', backgroundColor: '#f9fafb', fontSize: 8 },
   
-  // Adjusted widths for 11 columns to equal 100%
+  // ─── Standard columns (Sums to 100%) ───
+  // Reduced Shift from 16% -> 14% and Total from 10% -> 8%
+  // Added extra space to Dates & Weekdays
   colShift: {
-    width: '16%',
+    width: '14%',
     padding: 2,
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'center'
   },
-  colDate: { width: '9%', padding: 2 },
-  colWeekday: { width: '9%', padding: 2 },
+  colDate: { width: '10%', padding: 2 },
+  colWeekday: { width: '10%', padding: 2 },
   colTime: { width: '7%', padding: 2 },
-  colActual: { width: '8%', padding: 2 }, // New Actual Hour Column
+  colActual: { width: '8%', padding: 2 },
   colDuration: { width: '8%', padding: 2 },
   colRate: { width: '8%', padding: 2 },
-  colTotal: { width: '10%', padding: 2, textAlign: 'right' },
+  colTotal: { width: '8%', padding: 2, textAlign: 'right' },
+
+  // ─── Contract columns (Sums to 100%) ───
+  // Reduced Shift Contract from 24% -> 20%
+  // Distributed the saved width to Date and Weekday columns
+  colShiftContract: { 
+    width: '20%', 
+    padding: 2, 
+    display: 'flex', 
+    flexDirection: 'column', 
+    justifyContent: 'center' 
+  },
+  colDateContract: { width: '12%', padding: 2 },
+  colWeekdayContract: { width: '12%', padding: 2 },
+  colTimeContract: { width: '8%', padding: 2 },
+  colActualContract: { width: '8%', padding: 2 },
+  colDurationContract: { width: '8%', padding: 2 },
   
   shiftDetailText: { fontSize: 7, color: '#4b5563', marginTop: 2 },
   shiftCrossDayText: { fontSize: 7, color: '#f97316', marginTop: 1 },
@@ -155,12 +172,9 @@ const PayrollPDF = ({
   records,
   totalMinutesWorked,
   grandTotal,
-  isContract,       // ---> NEW PROP
-  contractAmount    // ---> NEW PROP
+  isContract,       
+  contractAmount    
 }: any) => {
-  // If Contracted, we hide Rate (8%) and Total (10%) columns. 
-  // We add that 18% width to the Shift Details column so the table stays 100% wide.
-  const shiftColStyle = isContract ? { width: '34%' } : {};
 
   return (
     <Document>
@@ -180,17 +194,16 @@ const PayrollPDF = ({
         <View style={pdfStyles.table}>
           {/* PDF Table Header */}
           <View style={[pdfStyles.tableRow, pdfStyles.tableHeader]}>
-            <Text style={[pdfStyles.colShift, shiftColStyle]}>Shift Details</Text>
-            <Text style={pdfStyles.colDate}>Start Date</Text>
-            <Text style={pdfStyles.colWeekday}>Weekdays</Text>
-            <Text style={pdfStyles.colTime}>Start Time</Text>
-            <Text style={pdfStyles.colDate}>End Date</Text>
-            <Text style={pdfStyles.colWeekday}>Weekdays</Text>
-            <Text style={pdfStyles.colTime}>End Time</Text>
-            <Text style={pdfStyles.colActual}>Actual Hour</Text>
-            <Text style={pdfStyles.colDuration}>Duration</Text>
+            <Text style={isContract ? pdfStyles.colShiftContract : pdfStyles.colShift}>Shift Details</Text>
+            <Text style={isContract ? pdfStyles.colDateContract : pdfStyles.colDate}>Start Date</Text>
+            <Text style={isContract ? pdfStyles.colWeekdayContract : pdfStyles.colWeekday}>Weekdays</Text>
+            <Text style={isContract ? pdfStyles.colTimeContract : pdfStyles.colTime}>Start Time</Text>
+            <Text style={isContract ? pdfStyles.colDateContract : pdfStyles.colDate}>End Date</Text>
+            <Text style={isContract ? pdfStyles.colWeekdayContract : pdfStyles.colWeekday}>Weekdays</Text>
+            <Text style={isContract ? pdfStyles.colTimeContract : pdfStyles.colTime}>End Time</Text>
+            <Text style={isContract ? pdfStyles.colActualContract : pdfStyles.colActual}>Actual Hour</Text>
+            <Text style={isContract ? pdfStyles.colDurationContract : pdfStyles.colDuration}>Duration</Text>
             
-            {/* ---> NEW: Conditionally hide headers */}
             {!isContract && <Text style={pdfStyles.colRate}>Rate</Text>}
             {!isContract && <Text style={pdfStyles.colTotal}>Total</Text>}
           </View>
@@ -198,31 +211,31 @@ const PayrollPDF = ({
           {/* PDF Table Data Rows */}
           {records.map((row: any, i: number) => (
             <View key={i} style={pdfStyles.tableRow}>
-              <View style={[pdfStyles.colShift, shiftColStyle]}>
+              <View style={isContract ? pdfStyles.colShiftContract : pdfStyles.colShift}>
                 <Text style={{ fontWeight: 'bold', fontSize: 8 }}>{row.shiftName}</Text>
                 <Text style={pdfStyles.shiftDetailText}>
-                  {row.rotaStartTime} - {row.rotaEndTime} ({row.shiftScheduledStr})
+                  {row.isAL ? '--:-- - --:--' : `${row.rotaStartTime} - ${row.rotaEndTime} (${row.shiftScheduledStr})`}
                 </Text>
-                {row.isDifferentShiftDate && (
+                {row.isDifferentShiftDate && !row.isAL && (
                   <Text style={pdfStyles.shiftCrossDayText}>
                     (Cross-day Shift)
                   </Text>
                 )}
               </View>
 
-              <Text style={pdfStyles.colDate}>{row.startDateStr}</Text>
-              <Text style={pdfStyles.colWeekday}>{row.startWeekdayStr}</Text>
-              <Text style={pdfStyles.colTime}>{row.startTimeStr}</Text>
-              <Text style={pdfStyles.colDate}>
+              <Text style={isContract ? pdfStyles.colDateContract : pdfStyles.colDate}>{row.startDateStr}</Text>
+              <Text style={isContract ? pdfStyles.colWeekdayContract : pdfStyles.colWeekday}>{row.startWeekdayStr}</Text>
+              <Text style={isContract ? pdfStyles.colTimeContract : pdfStyles.colTime}>{row.startTimeStr}</Text>
+              <Text style={isContract ? pdfStyles.colDateContract : pdfStyles.colDate}>
                 {row.endDateStr}
               </Text>
-              <Text style={pdfStyles.colWeekday}>{row.endWeekdayStr}</Text>
-              <Text style={pdfStyles.colTime}>{row.endTimeStr}</Text>
-              <Text style={pdfStyles.colActual}>{row.actualHourStr}</Text>
-              <Text style={pdfStyles.colDuration}>{row.durationStr}</Text>
+              <Text style={isContract ? pdfStyles.colWeekdayContract : pdfStyles.colWeekday}>{row.endWeekdayStr}</Text>
+              <Text style={isContract ? pdfStyles.colTimeContract : pdfStyles.colTime}>{row.endTimeStr}</Text>
+              <Text style={isContract ? pdfStyles.colActualContract : pdfStyles.colActual}>{row.actualHourStr}</Text>
+              <Text style={isContract ? pdfStyles.colDurationContract : pdfStyles.colDuration}>{row.durationStr}</Text>
               
-              {/* ---> NEW: Conditionally hide row data */}
-              {!isContract && <Text style={pdfStyles.colRate}>{row.payRate}</Text>}
+              {/* Force Pay Rate strictly to 2 decimal places */}
+              {!isContract && <Text style={pdfStyles.colRate}>{Number(row.payRate || 0).toFixed(2)}</Text>}
               {!isContract && <Text style={pdfStyles.colTotal}>{row.total.toFixed(2)}</Text>}
             </View>
           ))}
@@ -235,7 +248,6 @@ const PayrollPDF = ({
             {(totalMinutesWorked % 60).toString().padStart(2, '0')}
           </Text>
           <Text style={pdfStyles.footerText}>
-            {/* ---> NEW: Use contractAmount if isContract is true */}
             Total: {isContract ? (contractAmount || 0).toFixed(2) : grandTotal.toFixed(2)}
           </Text>
         </View>
@@ -255,7 +267,6 @@ const ViewPayroll = () => {
   const [loading, setLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
-  // ---> NEW: State for Contract Confirmation Dialog
   const [isContractDialogOpen, setIsContractDialogOpen] = useState(false);
   
   const [error, setError] = useState<string | null>(null);
@@ -377,11 +388,9 @@ const ViewPayroll = () => {
     let totalMins = 0;
     let grandTot = 0;
 
-    // ---> NEW: Sort by start date ascending
     const sortedAttendance = [...attendanceRecords].sort((a, b) => {
-      // Fallback to rota start date if clockIn is not present
-      const dateA = a.attendanceId?.clockIn || a.attendanceId?.rotaId?.startDate;
-      const dateB = b.attendanceId?.clockIn || b.attendanceId?.rotaId?.startDate;
+      const dateA = a.attendanceId?.clockIn || a.rotaId?.startDate;
+      const dateB = b.attendanceId?.clockIn || b.rotaId?.startDate;
       
       const timeA = dateA ? new Date(dateA).getTime() : 0;
       const timeB = dateB ? new Date(dateB).getTime() : 0;
@@ -390,58 +399,93 @@ const ViewPayroll = () => {
     });
 
     const records = sortedAttendance.map((att) => {
-      const clockIn = moment(att.attendanceId?.clockIn);
-      const clockOut = moment(att.attendanceId?.clockOut);
+      const isAL = !att.attendanceId && !!att.rotaId;
 
+      let shiftName = '—';
+      let rotaStartTime = '--:--';
+      let rotaEndTime = '--:--';
+      let shiftScheduledStr = '--';
+      let isDifferentShiftDate = false;
+
+      let startDateStr = '—';
+      let startWeekdayStr = '—';
+      let startTimeStr = '--:--';
+      
+      let endDateStr = '—';
+      let endWeekdayStr = '—';
+      let endTimeStr = '--:--';
+      
+      let actualHourStr = '--';
+      let isDifferentWorkedDate = false;
+
+      // ─── Extract Data based on Record Type ───
+      if (isAL) {
+        shiftName = att.rotaId?.shiftName || 'AL';
+        
+        const mStart = moment(att.rotaId?.startDate);
+        const mEnd = moment(att.rotaId?.endDate);
+        
+        startDateStr = mStart.isValid() ? mStart.format('DD-MM-YYYY') : '—';
+        startWeekdayStr = mStart.isValid() ? mStart.format('dddd') : '—';
+        
+        endDateStr = mEnd.isValid() ? mEnd.format('DD-MM-YYYY') : '—';
+        endWeekdayStr = mEnd.isValid() ? mEnd.format('dddd') : '—';
+        
+        isDifferentShiftDate = att.rotaId?.startDate !== att.rotaId?.endDate;
+      } else {
+        const cIn = moment(att.attendanceId?.clockIn);
+        const cOut = moment(att.attendanceId?.clockOut);
+        const rId = att.attendanceId?.rotaId;
+
+        shiftName = rId?.shiftName || '—';
+        rotaStartTime = rId?.startTime || '--:--';
+        rotaEndTime = rId?.endTime || '--:--';
+
+        const rStart = moment(`${rId?.startDate} ${rId?.startTime}`, 'YYYY-MM-DD HH:mm');
+        const rEnd = moment(`${rId?.endDate} ${rId?.endTime}`, 'YYYY-MM-DD HH:mm');
+        const shiftScheduledMins = rStart.isValid() && rEnd.isValid() ? Math.max(0, rEnd.diff(rStart, 'minutes')) : 0;
+        shiftScheduledStr = formatShiftScheduledDuration(shiftScheduledMins);
+        isDifferentShiftDate = rId?.startDate !== rId?.endDate;
+
+        startDateStr = cIn.isValid() ? cIn.format('DD-MM-YYYY') : '—';
+        startWeekdayStr = cIn.isValid() ? cIn.format('dddd') : '—';
+        startTimeStr = cIn.isValid() ? cIn.format('HH:mm') : '--:--';
+        
+        endDateStr = cOut.isValid() ? cOut.format('DD-MM-YYYY') : '—';
+        endWeekdayStr = cOut.isValid() ? cOut.format('dddd') : '—';
+        endTimeStr = cOut.isValid() ? cOut.format('HH:mm') : '--:--';
+
+        const actualWorkedMinutes = cIn.isValid() && cOut.isValid() ? Math.max(0, cOut.diff(cIn, 'minutes')) : 0;
+        actualHourStr = formatDuration(actualWorkedMinutes);
+        
+        isDifferentWorkedDate = cIn.isValid() && cOut.isValid() && cIn.format('YYYY-MM-DD') !== cOut.format('YYYY-MM-DD');
+      }
+
+      // ─── Process Shared Values ───
       const workedMinutes = att.duration;
-      const isDifferentWorkedDate =
-        clockIn.isValid() &&
-        clockOut.isValid() &&
-        clockIn.format('YYYY-MM-DD') !== clockOut.format('YYYY-MM-DD');
-
-      const actualWorkedMinutes =
-        clockIn.isValid() && clockOut.isValid()
-          ? Math.max(0, clockOut.diff(clockIn, 'minutes'))
-          : 0;
-      const actualHourStr = formatDuration(actualWorkedMinutes);
-
-      const shiftName = att.attendanceId?.rotaId?.shiftName || '—';
-      const rotaStartTime = att.attendanceId?.rotaId?.startTime;
-      const rotaEndTime = att.attendanceId?.rotaId?.endTime;
-      const rotaStartDate = att.attendanceId?.rotaId?.startDate;
-      const rotaEndDate = att.attendanceId?.rotaId?.endDate;
-
-      const rStart = moment(`${rotaStartDate} ${rotaStartTime}`);
-      const rEnd = moment(`${rotaEndDate} ${rotaEndTime}`);
-      const shiftScheduledMins =
-        rStart.isValid() && rEnd.isValid()
-          ? Math.max(0, rEnd.diff(rStart, 'minutes'))
-          : 0;
-      const shiftScheduledStr =
-        formatShiftScheduledDuration(shiftScheduledMins);
-      const isDifferentShiftDate = rotaStartDate !== rotaEndDate;
-
+      const durationStr = formatDuration(workedMinutes);
       const total = calculateRowTotal(workedMinutes, att.payRate);
+      
       totalMins += workedMinutes;
       grandTot += total;
 
       return {
         ...att,
+        isAL,
         shiftName,
         rotaStartTime,
         rotaEndTime,
-        shiftScheduledMins,
         shiftScheduledStr,
         isDifferentShiftDate,
-        startDateStr: clockIn.isValid() ? clockIn.format('DD-MM-YYYY') : '—',
-        startWeekdayStr: clockIn.isValid() ? clockIn.format('dddd') : '—',
-        startTimeStr: clockIn.isValid() ? clockIn.format('HH:mm') : '—',
-        endDateStr: clockOut.isValid() ? clockOut.format('DD-MM-YYYY') : '—',
-        endWeekdayStr: clockOut.isValid() ? clockOut.format('dddd') : '—',
-        endTimeStr: clockOut.isValid() ? clockOut.format('HH:mm') : '—',
+        startDateStr,
+        startWeekdayStr,
+        startTimeStr,
+        endDateStr,
+        endWeekdayStr,
+        endTimeStr,
         actualHourStr,
         workedMinutes,
-        durationStr: formatDuration(workedMinutes),
+        durationStr,
         isDifferentWorkedDate,
         total
       };
@@ -473,11 +517,15 @@ const ViewPayroll = () => {
 
     const rows = processedData.records.map((r) => {
       const hasShiftName = r.shiftName && r.shiftName.trim() !== '' && r.shiftName !== '—';
-      let shiftCell = hasShiftName
-        ? `${r.shiftName} : ${r.rotaStartTime} - ${r.rotaEndTime}`
-        : `${r.rotaStartTime} - ${r.rotaEndTime}`;
+      
+      let shiftCell = hasShiftName ? `${r.shiftName}` : '';
+      if (!r.isAL) {
+        shiftCell += hasShiftName 
+          ? ` : ${r.rotaStartTime} - ${r.rotaEndTime}`
+          : `${r.rotaStartTime} - ${r.rotaEndTime}`;
+      }
 
-      if (r.isDifferentWorkedDate) {
+      if (r.isDifferentWorkedDate && !r.isAL) {
         shiftCell += '\n(Cross-day Shift)';
       }
 
@@ -494,7 +542,8 @@ const ViewPayroll = () => {
       ];
 
       if (!isContract) {
-        baseRow.push(r.payRate ?? 0, r.total.toFixed(2));
+        // Force Pay Rate strictly to 2 decimal places
+        baseRow.push(Number(r.payRate ?? 0).toFixed(2), r.total.toFixed(2));
       }
 
       return baseRow;
@@ -630,7 +679,6 @@ const ViewPayroll = () => {
                    <Button
                      variant="outline"
                      className="border-none bg-orange-600 text-white hover:bg-orange-700 hover:text-white"
-                     // ---> NEW: Open dialog instead of calling handleContract directly
                      onClick={() => setIsContractDialogOpen(true)}
                      disabled={isUpdating}
                    >
@@ -717,10 +765,13 @@ const ViewPayroll = () => {
                           {att.shiftName}
                         </div>
                         <div className="text-xs font-medium text-gray-500">
-                          {att.rotaStartTime} - {att.rotaEndTime} (
-                          {att.shiftScheduledStr})
+                          {att.isAL ? (
+                            <span className="italic text-gray-800"></span>
+                          ) : (
+                            `${att.rotaStartTime} - ${att.rotaEndTime} (${att.shiftScheduledStr})`
+                          )}
                         </div>
-                        {att.isDifferentShiftDate && (
+                        {att.isDifferentShiftDate && !att.isAL && (
                           <span className="text-[10px] font-semibold text-orange-500">
                             (Cross-day Shift)
                           </span>
@@ -730,11 +781,11 @@ const ViewPayroll = () => {
                         {att.startDateStr}
                       </TableCell>
                       
-                      <TableCell className="font-medium text-gray-600">
+                      <TableCell className="font-medium text-gray-800">
                         {att.startWeekdayStr}
                       </TableCell>
 
-                      <TableCell className="font-medium">
+                      <TableCell className="font-medium text-gray-800">
                         {att.startTimeStr}
                       </TableCell>
                       <TableCell className="font-medium">
@@ -746,14 +797,14 @@ const ViewPayroll = () => {
                         )}
                       </TableCell>
 
-                      <TableCell className="font-medium text-gray-600">
+                      <TableCell className="font-medium text-gray-800">
                         {att.endWeekdayStr}
                       </TableCell>
 
-                      <TableCell className="font-medium">
+                      <TableCell className="font-medium text-gray-800">
                         {att.endTimeStr}
                       </TableCell>
-                      <TableCell className="font-semibold text-gray-700">
+                      <TableCell className="font-semibold text-gray-800">
                         {att.actualHourStr}
                       </TableCell>
                       <TableCell className="font-semibold text-blue-600">
@@ -770,7 +821,16 @@ const ViewPayroll = () => {
                                   step={0.01}
                                   value={att.payRate === '' ? '' : att.payRate ?? 0}
                                   onChange={(e) => {
-                                    const val = e.target.value;
+                                    let val = e.target.value;
+
+                                    // Block user from typing more than 2 decimal places
+                                    if (val.includes('.')) {
+                                      const parts = val.split('.');
+                                      if (parts[1].length > 2) {
+                                        val = `${parts[0]}.${parts[1].slice(0, 2)}`;
+                                      }
+                                    }
+
                                     handlePayRateChange(
                                       att._id,
                                       val === '' ? '' : Number(val)
@@ -847,7 +907,6 @@ const ViewPayroll = () => {
         </div>
       </div>
 
-      {/* ---> NEW: Contract Confirmation Dialog */}
       <Dialog open={isContractDialogOpen} onOpenChange={setIsContractDialogOpen}>
         <DialogContent>
           <DialogHeader>

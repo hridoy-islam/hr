@@ -55,6 +55,12 @@ interface HolidayAPI {
   updatedAt?: Date;
 }
 
+interface LeaveDayUI {
+  leaveDate: Date;
+  leaveType: string;
+  duration: number | string; // Allows empty strings while typing safely
+}
+
 // ─── Zod Schema ───────────────────────────────────────────────────────────────
 
 const holidayRequestSchema = z
@@ -62,40 +68,42 @@ const holidayRequestSchema = z
     holidayYear: z
       .string({ required_error: 'Holiday year is required' })
       .min(1, 'Holiday year is required'),
-
     reason: z.string({ required_error: 'Reason is required' }).optional(),
-
     holidayType: z
       .string({ required_error: 'Holiday type is required' })
       .min(1, 'Holiday type is required'),
-
     startDate: z.date({
       required_error: 'Please select a date range',
       invalid_type_error: 'Please select a date range'
     }),
-
     endDate: z.date({
       required_error: 'Please select a date range',
       invalid_type_error: 'Please select a date range'
     }),
-
     totalDays: z
       .number({
         required_error: 'Total days is required',
         invalid_type_error: 'Total days must be a number'
       })
-      .min(0.5, 'Total days must be at least 0.5'),
-
+      .min(0, 'Total days must be at least 0'),
     totalHours: z
       .number({
         required_error: 'Total hours is required',
         invalid_type_error: 'Total hours must be a number'
       })
-      .min(1, 'Total hours must be at least 1')
+      .min(0, 'Total hours must be at least 0')
   })
   .refine((data) => data.endDate >= data.startDate, {
     message: 'End date must be on or after start date',
     path: ['startDate']
+  })
+  .refine((data) => data.holidayType !== 'holiday' || data.totalDays >= 0.5, {
+    message: 'Total days must be at least 0.5 for holidays',
+    path: ['totalDays']
+  })
+  .refine((data) => data.holidayType !== 'holiday' || data.totalHours >= 1, {
+    message: 'Total hours must be at least 1 for holidays',
+    path: ['totalHours']
   });
 
 type HolidayFormErrors = Partial<
@@ -127,8 +135,13 @@ const HolidayPage: React.FC = () => {
   const [title, setTitle] = useState('');
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);
+  
   const [calculatedDays, setCalculatedDays] = useState<number | string>('');
   const [calculatedHours, setCalculatedHours] = useState<number | string>('');
+  
+  // State for Individual Day Durations 
+  const [leaveDays, setLeaveDays] = useState<LeaveDayUI[]>([]);
+
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [formErrors, setFormErrors] = useState<HolidayFormErrors>({});
 
@@ -140,7 +153,7 @@ const HolidayPage: React.FC = () => {
   const { id: companyId, eid } = useParams();
   const [holidays, setHolidays] = useState<any[]>([]);
 
-  // 🚀 Aligning state exactly with DB schema and adding hoursPerDay
+  // Aligning state exactly with DB schema and adding hoursPerDay
   const [leaveAllowance, setLeaveAllowance] = useState({
     holidayAllowance: 0,
     holidayEntitlement: 0,
@@ -155,55 +168,6 @@ const HolidayPage: React.FC = () => {
     unpaidLeaveRequest: 0,
     hoursPerDay: 8 // default fallback
   });
-
-  // ── 🚀 Auto-calculate days & hours ONLY when dates change using dynamic hoursPerDay ──
-  useEffect(() => {
-    if (startDate && endDate) {
-      const days =
-        Math.ceil(
-          (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
-        ) + 1;
-
-      if (days >= 0) {
-        setCalculatedDays(days);
-        setCalculatedHours(days * leaveAllowance.hoursPerDay);
-      } else {
-        setCalculatedDays(0);
-        setCalculatedHours(0);
-      }
-    } else {
-      setCalculatedDays('');
-      setCalculatedHours('');
-    }
-  }, [startDate, endDate, leaveAllowance.hoursPerDay]);
-
-  // ── Handlers ──
-  const handleDaysChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value;
-    setCalculatedDays(raw);
-    const val = parseFloat(raw);
-    if (!isNaN(val) && val >= 0) {
-      // 🚀 Calculate based on dynamic hoursPerDay
-      setCalculatedHours(parseFloat((val * leaveAllowance.hoursPerDay).toFixed(2)));
-    } else {
-      setCalculatedHours('');
-    }
-    setFormErrors((prev) => ({
-      ...prev,
-      totalDays: undefined,
-      totalHours: undefined
-    }));
-  };
-
-  const handleHoursChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value;
-    setCalculatedHours(raw);
-    setFormErrors((prev) => ({ ...prev, totalHours: undefined }));
-  };
-
-  const clearError = (field: keyof HolidayFormErrors) => {
-    setFormErrors((prev) => ({ ...prev, [field]: undefined }));
-  };
 
   // ── Data Fetching ──
   const fetchHolidayAllowance = async () => {
@@ -225,7 +189,6 @@ const HolidayPage: React.FC = () => {
       }
 
       if (holidayRecord) {
-        // Direct map from DB to UI
         setLeaveAllowance({
           carryForward: holidayRecord.carryForward || 0,
           holidayEntitlement: holidayRecord.holidayEntitlement || 0,
@@ -238,10 +201,9 @@ const HolidayPage: React.FC = () => {
           unpaidLeaveTaken: holidayRecord.unpaidLeaveTaken || 0,
           unpaidBookedHours: holidayRecord.unpaidBookedHours || 0,
           unpaidLeaveRequest: holidayRecord.unpaidLeaveRequest || 0,
-          hoursPerDay: holidayRecord.hoursPerDay || 8 // 🚀 Fetching hoursPerDay from DB
+          hoursPerDay: holidayRecord.hoursPerDay || 8
         });
       } else {
-        // Reset if no record found for the year
         setLeaveAllowance({
           carryForward: 0,
           holidayEntitlement: 0,
@@ -303,12 +265,175 @@ const HolidayPage: React.FC = () => {
       } catch (err: any) {
         setError(err.response?.data?.message || 'Failed to load data');
       } finally {
-        setIsInitialLoad(false); // Only set true on initial mount
+        setIsInitialLoad(false);
       }
     };
 
     fetchAllData();
   }, [eid, selectedYear]);
+
+  // ── Dynamic Date Picker & Type Auto-Calculator ──
+ const calculateLeaveData = (start: Date | undefined, end: Date | undefined, type: string) => {
+  if (start && end) {
+    const isHoliday = type === 'holiday';
+    const daysArr: LeaveDayUI[] = [];
+    let current = new Date(start);
+    let totalHrs = 0;
+    let totalDaysCount = 0;
+
+    while (current <= end) {
+      const defaultDuration = isHoliday ? leaveAllowance.hoursPerDay : 0;
+      daysArr.push({
+        leaveDate: new Date(current),
+        leaveType: isHoliday ? 'paid' : 'unpaid',
+        duration: defaultDuration
+      });
+      if (isHoliday) totalHrs += defaultDuration;
+      totalDaysCount++;
+      current.setDate(current.getDate() + 1);
+    }
+
+    setLeaveDays(daysArr);
+
+    if (isHoliday) {
+      setCalculatedHours(String(totalHrs));
+      if (leaveAllowance.hoursPerDay > 0) {
+        setCalculatedDays(String(parseFloat((totalHrs / leaveAllowance.hoursPerDay).toFixed(2))));
+      }
+    } else {
+      setCalculatedDays(String(totalDaysCount)); // ← actual day count, not '0'
+      setCalculatedHours('0');
+    }
+  } else {
+    setLeaveDays([]);
+    setCalculatedDays('');
+    setCalculatedHours('');
+  }
+};
+
+  // ── Handler for Modifying Specific Day Duration ──
+  const handleDayDurationChange = (index: number, newDuration: string) => {
+  let sanitized = newDuration;
+  if (sanitized.includes('.')) {
+    const [whole, decimal] = sanitized.split('.');
+    if (decimal.length > 2) sanitized = `${whole}.${decimal.slice(0, 2)}`;
+  }
+
+  const updatedDays = [...leaveDays];
+  updatedDays[index].duration = sanitized;
+
+  const numericDuration = parseFloat(sanitized);
+  const safeDuration = isNaN(numericDuration) ? 0 : Math.max(0, numericDuration);
+
+  updatedDays[index].leaveType = safeDuration === 0 ? 'dayoff' : 'paid';
+
+  setLeaveDays(updatedDays);
+
+  const totalHrs = updatedDays.reduce((acc, curr) => {
+    const d = parseFloat(String(curr.duration));
+    return acc + (isNaN(d) ? 0 : d);
+  }, 0);
+
+  setCalculatedHours(String(totalHrs));
+  setFormErrors((prev) => ({ ...prev, totalHours: undefined }));
+};
+
+  // ── Handlers for Manual Totals Override (Days & Hours) ──
+  const handleDaysChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  let value = e.target.value;
+
+  // Clamp to 2 decimal places
+  if (value.includes('.')) {
+    const [whole, decimal] = value.split('.');
+    if (decimal.length > 2) value = `${whole}.${decimal.slice(0, 2)}`;
+  }
+
+  setCalculatedDays(value);
+  clearError('totalDays');
+
+  const parsedDays = parseFloat(value);
+
+  if (isNaN(parsedDays) || parsedDays < 0) {
+    if (selectedType === 'holiday') setCalculatedHours('');
+    return;
+  }
+
+  if (startDate) {
+    const addedDays = Math.max(0, Math.ceil(parsedDays) - 1);
+    const newEndDate = new Date(startDate);
+    newEndDate.setDate(newEndDate.getDate() + addedDays);
+    setEndDate(newEndDate);
+
+    if (selectedType === 'holiday') {
+      const newHours = parsedDays * leaveAllowance.hoursPerDay;
+      setCalculatedHours(String(newHours));
+
+      const daysArr: LeaveDayUI[] = [];
+      let current = new Date(startDate);
+      const numDays = addedDays + 1;
+      const hrsPerDay = newHours / numDays;
+
+      while (current <= newEndDate) {
+        daysArr.push({
+          leaveDate: new Date(current),
+          leaveType: hrsPerDay === 0 ? 'dayoff' : 'paid',
+          duration: parseFloat(hrsPerDay.toFixed(2))
+        });
+        current.setDate(current.getDate() + 1);
+      }
+      setLeaveDays(daysArr);
+    } else {
+      // Non-holiday: hours stay 0, rebuild days array with 0 duration
+      setCalculatedHours('0');
+      const daysArr: LeaveDayUI[] = [];
+      let current = new Date(startDate);
+      while (current <= newEndDate) {
+        daysArr.push({
+          leaveDate: new Date(current),
+          leaveType: 'unpaid',
+          duration: 0
+        });
+        current.setDate(current.getDate() + 1);
+      }
+      setLeaveDays(daysArr);
+    }
+  }
+};
+
+const handleHoursChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  let value = e.target.value;
+
+  // Clamp to 2 decimal places
+  if (value.includes('.')) {
+    const [whole, decimal] = value.split('.');
+    if (decimal.length > 2) value = `${whole}.${decimal.slice(0, 2)}`;
+  }
+
+  setCalculatedHours(value);
+  clearError('totalHours');
+
+  const parsedHours = parseFloat(value);
+
+  if (isNaN(parsedHours) || parsedHours < 0) {
+    if (leaveDays.length > 0) {
+      setLeaveDays(leaveDays.map((day) => ({ ...day, duration: '', leaveType: 'dayoff' })));
+    }
+    return;
+  }
+
+  if (leaveDays.length > 0) {
+    const hrsPerDay = parsedHours / leaveDays.length;
+    setLeaveDays(leaveDays.map((day) => ({
+      ...day,
+      duration: parseFloat(hrsPerDay.toFixed(2)),
+      leaveType: hrsPerDay === 0 ? 'dayoff' : 'paid'
+    })));
+  }
+};
+
+  const clearError = (field: keyof HolidayFormErrors) => {
+    setFormErrors((prev) => ({ ...prev, [field]: undefined }));
+  };
 
   // ── Helpers ──
   const mapStatus = (status: string): string => {
@@ -366,29 +491,6 @@ const HolidayPage: React.FC = () => {
     });
   };
 
-  const generateLeaveDaysArray = (
-    start: Date,
-    end: Date,
-    currentHolidayType: string
-  ) => {
-    const daysArray = [];
-    const currentDate = new Date(start);
-
-    while (currentDate <= end) {
-      // Simply check the type: 'holiday' is paid, everything else is unpaid
-      const typeOfLeave = currentHolidayType === 'holiday' ? 'paid' : 'unpaid';
-
-      daysArray.push({
-        leaveDate: new Date(currentDate),
-        leaveType: typeOfLeave
-      });
-
-      currentDate.setDate(currentDate.getDate() + 1);
-    }
-
-    return daysArray;
-  };
-
   const generateHolidayYears = (backward = 20, forward = 50) => {
     const currentYear = moment().year();
     const years: string[] = [];
@@ -406,7 +508,6 @@ const HolidayPage: React.FC = () => {
 
   const holidayYears = useMemo(() => generateHolidayYears(20, 50), []);
 
-  // ── Memoized Allowance Stats (UI Speed Optimization) ──
   const allowanceStatsList = useMemo(
     () => [
       {
@@ -477,8 +578,12 @@ const HolidayPage: React.FC = () => {
       holidayType: selectedType,
       startDate: startDate as Date,
       endDate: endDate as Date,
-      totalDays: parseFloat(String(calculatedDays)),
-      totalHours: parseFloat(String(calculatedHours))
+      totalDays:
+        parseFloat(String(calculatedDays)) || 0,
+      totalHours:
+        selectedType === 'holiday'
+          ? parseFloat(String(calculatedHours)) || 0
+          : 0
     };
 
     const result = holidayRequestSchema.safeParse(formData);
@@ -501,7 +606,14 @@ const HolidayPage: React.FC = () => {
     setIsSubmitting(true);
 
     try {
-      const leaveDays = generateLeaveDaysArray(startDate!, endDate!, selectedType);
+      // 🚀 Explicit fallback enforcement: If not a holiday, force duration strictly to 0 for all days.
+      const dbLeaveDays = leaveDays.map((day) => ({
+        leaveDate: day.leaveDate,
+        leaveType: selectedType === 'holiday' ? day.leaveType : 'unpaid',
+        duration: selectedType === 'holiday' 
+          ? (isNaN(parseFloat(String(day.duration))) ? 0 : parseFloat(String(day.duration)))
+          : 0
+      }));
 
       await axiosInstance.post(`/hr/leave`, {
         holidayYear: selectedYear,
@@ -513,7 +625,7 @@ const HolidayPage: React.FC = () => {
         holidayType: selectedType,
         totalDays: result.data.totalDays,
         totalHours: result.data.totalHours,
-        leaveDays,
+        leaveDays: dbLeaveDays, 
         status: 'pending',
         title: title || `${selectedType} Request`
       });
@@ -527,10 +639,10 @@ const HolidayPage: React.FC = () => {
       setSelectedType('');
       setCalculatedDays('');
       setCalculatedHours('');
+      setLeaveDays([]);
       setFormErrors({});
       setIsDrawerOpen(false);
 
-      // Refetch without turning the whole page into a loading spinner
       await fetchHolidayAllowance();
       await fetchLeaveRequests();
     } catch (err: any) {
@@ -583,132 +695,153 @@ const HolidayPage: React.FC = () => {
                     <CalendarDays className="h-5 w-5 text-theme" />
                     My Leave Requests
                   </div>
+                  
+                  {/* 🚀 NEW UPDATED UI FOR CREATE LEAVE REQUEST DRAWER */}
                   <Sheet open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
                     <SheetTrigger asChild>
-                      <Button className="font-bold">Apply For Leave</Button>
+                      <Button className="">Create Leave Request</Button>
                     </SheetTrigger>
 
-                    <SheetContent className="overflow-y-auto sm:max-w-[450px]">
-                      <SheetHeader className="mb-6">
+                    <SheetContent className="overflow-y-auto sm:max-w-[750px] max-h-screen">
+                      <SheetHeader className="mb-2">
                         <SheetTitle className="flex items-center gap-2">
                           <CheckCircle className="h-5 w-5 text-theme" />
                           Submit Leave Request
                         </SheetTitle>
                       </SheetHeader>
 
-                      <div className="space-y-5">
-                        {/* Holiday Year */}
-                        <div>
-                          <Label htmlFor="holiday-year">Holiday Year</Label>
-                          <ShadcnSelect
-                            value={selectedYear}
-                            onValueChange={(val) => {
-                              setSelectedYear(val);
-                              clearError('holidayYear');
-                            }}
-                          >
-                            <SelectTrigger
-                              id="holiday-year"
-                              className={
-                                formErrors.holidayYear ? 'border-red-500' : ''
-                              }
+                      <div className="space-y-2 max-h-screen">
+                        {/* 2-Column Grid to layout Year and Type side-by-side as requested */}
+                        <div className="grid grid-cols-2 items-start gap-2">
+                          {/* Holiday Year */}
+                          <div className="">
+                            <Label htmlFor="holiday-year" className="mb-1 block">Holiday Year</Label>
+                            <ShadcnSelect
+                              value={selectedYear}
+                              onValueChange={(val) => {
+                                setSelectedYear(val);
+                                clearError('holidayYear');
+                              }}
                             >
-                              <SelectValue placeholder="Select year" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {holidayYears.map((year) => (
-                                <SelectItem key={year} value={year}>
-                                  {year}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </ShadcnSelect>
-                          {formErrors.holidayYear && (
-                            <p className="mt-1 text-xs text-red-500">
-                              {formErrors.holidayYear}
-                            </p>
-                          )}
-                        </div>
+                              <SelectTrigger
+                                id="holiday-year"
+                                className={`h-[38px] ${
+                                  formErrors.holidayYear ? 'border-red-500' : ''
+                                }`}
+                              >
+                                <SelectValue placeholder="Select year" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {holidayYears.map((year) => (
+                                  <SelectItem key={year} value={year}>
+                                    {year}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </ShadcnSelect>
+                            {formErrors.holidayYear && (
+                              <p className="mt-1 text-xs text-red-500">
+                                {formErrors.holidayYear}
+                              </p>
+                            )}
+                          </div>
 
-                        {/* Reason */}
-                        <div>
-                          <Label htmlFor="reason">Reason</Label>
-                          <Textarea
-                            id="reason"
-                            placeholder="Enter reason for leave"
-                            value={reason}
-                            onChange={(e) => {
-                              setReason(e.target.value);
-                              clearError('reason');
-                            }}
-                            className={`border-gray-300 ${formErrors.reason ? 'border-red-500' : ''}`}
-                          />
-                          {formErrors.reason && (
-                            <p className="mt-1 text-xs text-red-500">
-                              {formErrors.reason}
-                            </p>
-                          )}
-                        </div>
-
-                        {/* Holiday Type */}
-                        <div>
-                          <Label htmlFor="type" className="mb-1 block">
-                            Holiday Type
-                          </Label>
-                          <ReactSelect
-                            inputId="type"
-                            options={leaveTypeOptions}
-                            value={
-                              leaveTypeOptions.find(
-                                (opt) => opt.value === selectedType
-                              ) || null
-                            }
-                            onChange={(option) => {
-                              setSelectedType(option?.value || '');
-                              clearError('holidayType');
-                            }}
-                            placeholder="Select type"
-                            className="react-select-container"
-                            classNamePrefix="react-select"
-                            styles={{
-                              control: (base) => ({
-                                ...base,
-                                borderColor: formErrors.holidayType
-                                  ? '#ef4444'
-                                  : base.borderColor,
-                                '&:hover': {
+                          {/* Holiday Type */}
+                          <div>
+                            <Label htmlFor="type" className="mb-1 block">
+                              Holiday Type
+                            </Label>
+                            <ReactSelect
+                              inputId="type"
+                              options={leaveTypeOptions}
+                              value={
+                                leaveTypeOptions.find(
+                                  (opt) => opt.value === selectedType
+                                ) || null
+                              }
+                              onChange={(option) => {
+                                const newType = option?.value || '';
+                                setSelectedType(newType);
+                                clearError('holidayType');
+                                calculateLeaveData(
+                                  startDate,
+                                  endDate,
+                                  newType
+                                );
+                              }}
+                              placeholder="Select type"
+                              className="react-select-container "
+                              classNamePrefix="react-select "
+                              styles={{
+                                control: (base) => ({
+                                  ...base,
+                                  minHeight: '38px',
+                                  height: '38px',
                                   borderColor: formErrors.holidayType
                                     ? '#ef4444'
-                                    : base.borderColor
-                                }
-                              })
-                            }}
-                          />
-                          {formErrors.holidayType && (
-                            <p className="mt-1 text-xs text-red-500">
-                              {formErrors.holidayType}
-                            </p>
-                          )}
+                                    : base.borderColor,
+                                  '&:hover': {
+                                    borderColor: formErrors.holidayType
+                                      ? '#ef4444'
+                                      : base.borderColor
+                                  }
+                                })
+                              }}
+                            />
+                            {formErrors.holidayType && (
+                              <p className="mt-1 text-xs text-red-500">
+                                {formErrors.holidayType}
+                              </p>
+                            )}
+                          </div>
                         </div>
 
                         {/* Date Range Picker */}
-                        <div className="flex flex-col gap-1">
-                          <Label>Leave Period (DD-MM-YYYY)</Label>{' '}
+                        <div className="flex flex-col gap-1 py-2">
+                          <Label>Leave Period (DD-MM-YYYY)</Label>
                           <DatePicker
                             selectsRange
                             startDate={startDate}
                             endDate={endDate}
                             onChange={(dates) => {
                               const [start, end] = dates;
-                              setStartDate(start ?? undefined);
-                              setEndDate(end ?? undefined);
+                              // 🚀 FIX: Normalize dates to exactly 12:00 PM (Noon) local time to prevent UTC boundary shifts!
+                              const safeStart = start
+                                ? new Date(
+                                    start.getFullYear(),
+                                    start.getMonth(),
+                                    start.getDate(),
+                                    12,
+                                    0,
+                                    0
+                                  )
+                                : undefined;
+                              const safeEnd = end
+                                ? new Date(
+                                    end.getFullYear(),
+                                    end.getMonth(),
+                                    end.getDate(),
+                                    12,
+                                    0,
+                                    0
+                                  )
+                                : undefined;
+
+                              setStartDate(safeStart);
+                              setEndDate(safeEnd);
                               clearError('dateRange');
+                              calculateLeaveData(
+                                safeStart,
+                                safeEnd,
+                                selectedType
+                              );
                             }}
                             isClearable
                             placeholderText="Select start and end date"
-                            className={`w-full rounded border px-3 py-2 ${formErrors.dateRange ? 'border-red-500' : 'border-gray-300'}`}
+                            className={`w-full rounded border h-[38px] px-3 py-2 ${
+                              formErrors.dateRange ? 'border-red-500' : 'border-gray-300'
+                            }`}
                             dateFormat="dd-MM-yyyy"
-                           
                           />
                           {formErrors.dateRange && (
                             <p className="mt-1 text-xs text-red-500">
@@ -717,49 +850,135 @@ const HolidayPage: React.FC = () => {
                           )}
                         </div>
 
-                        {/* Total Days */}
-                        <div className="space-y-1">
-                          <Label htmlFor="duration-days">
-                            Holiday Duration (Days)
-                          </Label>
-                          <Input
-                            id="duration-days"
-                            type="number"
-                            min="0"
-                            step="0.5"
-                            value={calculatedDays}
-                            onChange={handleDaysChange}
-                            placeholder="e.g. 2"
-                            className={`bg-white ${formErrors.totalDays ? 'border-red-500' : ''}`}
+                        {/* Reason */}
+                        <div>
+                          <Label htmlFor="create-reason">Reason</Label>
+                          <Textarea
+                            id="create-reason"
+                            placeholder="Enter reason for leave"
+                            value={reason}
+                            onChange={(e) => {
+                              setReason(e.target.value);
+                              clearError('reason');
+                            }}
+                            className={`border-gray-300 ${
+                              formErrors.reason ? 'border-red-500' : ''
+                            }`}
                           />
-                          {formErrors.totalDays && (
-                            <p className="text-xs text-red-500">
-                              {formErrors.totalDays}
+                          {formErrors.reason && (
+                            <p className="mt-1 text-xs text-red-500">
+                              {formErrors.reason}
                             </p>
                           )}
                         </div>
 
-                        {/* Total Hours */}
-                        <div className="space-y-1">
-                          <Label htmlFor="duration-hours">
-                            Duration (Hours)
-                          </Label>
-                          <Input
-                            id="duration-hours"
-                            type="number"
-                            min="0"
-                            step="0.5"
-                            value={calculatedHours}
-                            onChange={handleHoursChange}
-                            placeholder="e.g. 16"
-                            className={`bg-white ${formErrors.totalHours ? 'border-red-500' : ''}`}
-                          />
-                          {formErrors.totalHours && (
-                            <p className="text-xs text-red-500">
-                              {formErrors.totalHours}
-                            </p>
-                          )}
-                        </div>
+                        {/* 🚀 Conditional Render based on Selected Type */}
+                        {selectedType && (
+                          <div className="space-y-1">
+                            {/* Daily Duration Breakdown Grid - Only shows if 'holiday' and leaveDays populated */}
+                            {selectedType === 'holiday' &&
+                              leaveDays.length > 0 && (
+                                <>
+                                  <Label className="block w-full pt-2 text-sm font-semibold text-gray-700">
+                                    Daily Duration Breakdown
+                                  </Label>
+                                  <div className="grid max-h-72 grid-cols-2 gap-3 overflow-y-auto rounded-lg border border-gray-200 bg-gray-50/50 p-3 sm:grid-cols-5">
+                                    {leaveDays.map((day, idx) => (
+                                      <div
+                                        key={idx}
+                                        className="flex flex-col items-center justify-center rounded-md border border-theme/50 bg-white p-3 shadow-sm"
+                                      >
+                                        <span className="mb-2 items-center text-center text-[13px] font-bold text-black">
+                                          {moment(day.leaveDate).format(
+                                            'DD MMM, YYYY'
+                                          )}
+                                          <br />
+                                          {moment(day.leaveDate).format('dddd')}
+                                        </span>
+                                        <div className="flex w-full items-center justify-center gap-1.5">
+                                          <Input
+                                            type="number"
+                                            step="0.01"
+                                            min="0"
+                                            max="24"
+                                            className="h-8 w-24 text-center border-orange-600 text-sm"
+                                            value={day.duration}
+                                            onChange={(e) =>
+                                              handleDayDurationChange(
+                                                idx,
+                                                e.target.value
+                                              )
+                                            }
+                                          />
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </>
+                              )}
+
+                            {/* User Editable Summary Totals */}
+                            <div
+                              className={`grid ${
+                                selectedType === 'holiday'
+                                  ? 'grid-cols-2'
+                                  : 'grid-cols-1'
+                              } mt-4 gap-4`}
+                            >
+                              {/* Total Days - Visible to ALL TYPES */}
+                              <div className="space-y-1">
+                                <Label htmlFor="duration-days">
+                                  {selectedType === 'holiday'
+                                    ? 'Holiday Duration (Days)'
+                                    : 'Duration (Days)'}
+                                </Label>
+                                <Input
+                                  id="duration-days"
+                                  type="number"
+                                  min="1"
+                                  step="0.01"
+                                  value={calculatedDays}
+                                  onChange={handleDaysChange}
+                                  placeholder="e.g. 2"
+                                  className={`bg-white ${
+                                    formErrors.totalDays ? 'border-red-500' : ''
+                                  }`}
+                                />
+                                {formErrors.totalDays && (
+                                  <p className="text-xs text-red-500">
+                                    {formErrors.totalDays}
+                                  </p>
+                                )}
+                              </div>
+
+                              {/* Total Hours - Visible ONLY to HOLIDAY TYPES */}
+                              {selectedType === 'holiday' && (
+                                <div className="space-y-1">
+                                  <Label htmlFor="duration-hours">
+                                    Duration (Hours)
+                                  </Label>
+                                  <Input
+                                    id="duration-hours"
+                                    type="number"
+                                    min="1"
+                                    step="0.01"
+                                    value={calculatedHours}
+                                    onChange={handleHoursChange}
+                                    placeholder="e.g. 16"
+                                    className={`bg-white ${
+                                      formErrors.totalHours ? 'border-red-500' : ''
+                                    }`}
+                                  />
+                                  {formErrors.totalHours && (
+                                  <p className="text-xs text-red-500">
+                                    {formErrors.totalHours}
+                                  </p>
+                                )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
 
                         <Button
                           onClick={handleSubmitRequest}
@@ -915,9 +1134,10 @@ const HolidayPage: React.FC = () => {
                     </div>
                   ))}
 
-                  {/* 🚀 New Stat showing Hours Per Day */}
-                  <div className="flex items-center justify-between border-b border-gray-300 py-2 bg-gray-50 px-2 rounded-md mt-4">
-                    <span className="font-medium text-gray-700">Hours Per Day (Standard)</span>
+                  <div className="mt-4 flex items-center justify-between rounded-md border-b border-gray-300 bg-gray-50 px-2 py-2">
+                    <span className="font-medium text-gray-700">
+                      Hours Per Day (Standard)
+                    </span>
                     <span className="font-bold text-gray-900">
                       {leaveAllowance.hoursPerDay} h
                     </span>

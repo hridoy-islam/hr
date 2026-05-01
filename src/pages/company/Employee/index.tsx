@@ -264,8 +264,8 @@ export default function Employee() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Phone</TableHead>
+                  {/* <TableHead>Email</TableHead> */}
+                  <TableHead className='w-40'>Phone</TableHead>
                   <TableHead>Department</TableHead>
                   <TableHead>Designation</TableHead>
                   <TableHead className="text-center">Status</TableHead>
@@ -276,12 +276,20 @@ export default function Employee() {
                 {employees.map((employee) => (
                   <TableRow key={employee._id} className="cursor-pointer">
                     <TableCell onClick={() => navigate(`${employee._id}`)}>
+                      <div className='flex flex-col '>
+
+                      <span className='text-black'>
                       {employee.title} {employee.firstName} {employee.initial}{' '}
                       {employee.lastName}
+                      </span>
+
+                      <span className='text-xs text-gray-600'>
+                        {employee.email}
+                      </span>
+                      </div>
+                        
                     </TableCell>
-                    <TableCell onClick={() => navigate(`${employee._id}`)}>
-                      {employee.email}
-                    </TableCell>
+                    
                     <TableCell onClick={() => navigate(`${employee._id}`)}>
                       {employee.mobilePhone || '–'}
                     </TableCell>

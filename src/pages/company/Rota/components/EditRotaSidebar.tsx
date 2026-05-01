@@ -26,7 +26,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import axiosInstance from '@/lib/axios';
 import moment from '@/lib/moment-setup';
-import { Trash2, CalendarIcon, Plus } from 'lucide-react';
+import { Trash2, CalendarIcon, Plus, AlertCircle } from 'lucide-react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -56,7 +56,8 @@ const formSchema = z
   })
   .superRefine((data, ctx) => {
     const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
-    if (!data.leaveType) {
+    // Only validate time strictly if it's a standard working shift and not an AL/DO 
+    if (!data.leaveType && !['AL', 'DO'].includes(data.leaveType || '')) {
       data.slots.forEach((slot, index) => {
         if (!slot.startTime) {
           ctx.addIssue({
@@ -121,7 +122,6 @@ export default function EditRotaSidebar({
       slots: [],
       byNotice: false,
       byEmail: false
-
     }
   });
 
@@ -132,9 +132,11 @@ export default function EditRotaSidebar({
 
   const watchLeaveType = form.watch('leaveType');
   const isStandard = !watchLeaveType;
+  
+  // 🚀 Lock UI if the shift is an auto-generated AL or DO 
+  const isLeaveGenerated = watchLeaveType === 'AL' || watchLeaveType === 'DO';
 
   // Collect all history entries across all rota slots, sorted latest first
-// Collect all history entries across all rota slots, sorted latest first
   const allHistory = (() => {
     const rotaArray = Array.isArray(rota) ? rota : rota ? [rota] : [];
     const entries: any[] = [];
@@ -188,13 +190,17 @@ export default function EditRotaSidebar({
   }, [isOpen, rota, form]);
 
   useEffect(() => {
-    if (watchLeaveType) {
+    if (watchLeaveType && !isLeaveGenerated) {
       form.setValue('shiftName', watchLeaveType);
       form.setValue('color', '');
+    } else if (isLeaveGenerated) {
+      form.setValue('shiftName', watchLeaveType); // Map AL/DO to shift name as well for visual consistency
     }
-  }, [watchLeaveType, form]);
+  }, [watchLeaveType, form, isLeaveGenerated]);
 
   const onSubmit = async (values: FormValues) => {
+    if (isLeaveGenerated) return; // Hard block for AL/DO submissions just in case
+    
     try {
       const baseRota = Array.isArray(rota) ? rota[0] : rota;
 
@@ -264,6 +270,8 @@ export default function EditRotaSidebar({
   };
 
   const handleDeleteSlot = async (index: number, rotaId?: string) => {
+    if (isLeaveGenerated) return; 
+
     if (!rotaId) {
       remove(index);
       return;
@@ -280,6 +288,8 @@ export default function EditRotaSidebar({
   };
 
   const handleDeleteAll = async () => {
+    if (isLeaveGenerated) return;
+
     try {
       const existingRotas = fields.filter((f) => f._id);
       const promises = existingRotas.map((f) =>
@@ -307,14 +317,13 @@ export default function EditRotaSidebar({
 
   if (!isOpen || !employee) return null;
 
-  const leaveOptions = [
-    { id: 'DO', label: 'Day Off (DO)' },
-    { id: 'AL', label: 'Annual Leave (AL)' },
+ const leaveOptions = [
+    // { id: 'DO', label: 'Day Off (DO)' },
+    // { id: 'AL', label: 'Annual Leave (AL)' },
     { id: 'S', label: 'Sick (S)' },
     { id: 'ML', label: 'Maternity (ML)' },
     { id: 'NT', label: 'No Task (NT)' }
   ];
-
   const themeColors = [
     '#f44336',
     '#e91e63',
@@ -369,10 +378,22 @@ export default function EditRotaSidebar({
               </div>
             </div>
 
+            {/* 🚀 Restrict Edit Banner for Auto-Generated Leaves */}
+            {isLeaveGenerated && (
+              <div className="mx-5 mt-3 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                <p className="text-xs font-medium leading-relaxed text-amber-800">
+                  This shift was generated from an approved Leave Request (
+                  {watchLeaveType === 'AL' ? 'Annual Leave' : 'Day Off'}). It
+                  cannot be edited or deleted from the Rota.
+                </p>
+              </div>
+            )}
+
             {/* --- Tabs: conditionally show History tab --- */}
             <Tabs
               defaultValue="details"
-              className="flex flex-1 flex-col overflow-hidden"
+              className="flex flex-1 flex-col overflow-hidden mt-2"
             >
               <TabsList
                 className={`mx-5 grid w-[calc(100%-40px)] bg-gray-100 ${
@@ -405,7 +426,7 @@ export default function EditRotaSidebar({
                             {...field}
                             maxLength={10}
                             placeholder="e.g. Morning"
-                            disabled={!isStandard}
+                            disabled={!isStandard || isLeaveGenerated}
                           />
                         </FormControl>
                         <FormMessage />
@@ -414,237 +435,261 @@ export default function EditRotaSidebar({
                   />
                 </div>
 
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-bold">Shift Details</h3>
-                    {isStandard && (
-                      <Button type="button" size="sm" onClick={handleAddSlot}>
-                        <Plus className="mr-1 h-3 w-3" />
-                        Add Slot
-                      </Button>
-                    )}
+                {/* 🚀 AL Display: Show ONLY Duration in Hours */}
+                {watchLeaveType === 'AL' ? (
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-bold">Leave Duration</h3>
+                    
+                      <Input
+                        readOnly
+                        value={`${fields.length * 8}`} // Assuming standard 8 hours per day
+                        className="mt-2 w-32 h-10 cursor-not-allowed bg-gray-100 text-gray-500 font-medium"
+                      />
+                  
                   </div>
-                  {fields.map((slot, index) => {
-                    const startDate = form.watch(`slots.${index}.startDate`);
-                    const startTime = form.watch(`slots.${index}.startTime`);
-                    const endTime = form.watch(`slots.${index}.endTime`);
-                    let displayEndDate = startDate;
-                    if (
-                      isStandard &&
-                      startDate &&
-                      startTime &&
-                      endTime &&
-                      endTime < startTime
-                    ) {
-                      displayEndDate = moment(startDate)
-                        .add(1, 'days')
-                        .toDate();
-                    }
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-bold">Shift Details</h3>
+                      {!isLeaveGenerated && isStandard && (
+                        <Button type="button" size="sm" onClick={handleAddSlot}>
+                          <Plus className="mr-1 h-3 w-3" />
+                          Add Slot
+                        </Button>
+                      )}
+                    </div>
+                    {fields.map((slot, index) => {
+                      const startDate = form.watch(`slots.${index}.startDate`);
+                      const startTime = form.watch(`slots.${index}.startTime`);
+                      const endTime = form.watch(`slots.${index}.endTime`);
+                      let displayEndDate = startDate;
+                      if (
+                        isStandard &&
+                        startDate &&
+                        startTime &&
+                        endTime &&
+                        endTime < startTime
+                      ) {
+                        displayEndDate = moment(startDate)
+                          .add(1, 'days')
+                          .toDate();
+                      }
 
-                    return (
-                      <div
-                        key={slot.id}
-                        className="relative space-y-4 rounded-lg border border-gray-100 bg-gray-50/50 p-4"
-                      >
-                        <div className="absolute right-4 top-4 flex justify-between">
-                          {fields.length > 1 &&
-                            (slot._id ? (
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
+                      return (
+                        <div
+                          key={slot.id}
+                          className={`relative space-y-4 rounded-lg border p-4 ${
+                            isLeaveGenerated ? 'bg-gray-100/50 border-gray-200' : 'bg-gray-50/50 border-gray-100'
+                          }`}
+                        >
+                          {!isLeaveGenerated && isStandard && (
+                            <div className="absolute right-4 top-4 flex justify-between">
+                              {fields.length > 1 &&
+                                (slot._id ? (
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <button
+                                        type="button"
+                                        className="text-gray-400 transition-colors hover:text-red-600"
+                                        title="Delete this slot"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle>
+                                          Delete shift slot?
+                                        </AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          This action cannot be undone. This
+                                          specific shift slot will be permanently
+                                          deleted from the database.
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel>
+                                          Cancel
+                                        </AlertDialogCancel>
+                                        <AlertDialogAction
+                                          onClick={() =>
+                                            handleDeleteSlot(index, slot._id)
+                                          }
+                                          className="bg-red-600 text-white hover:bg-red-700"
+                                        >
+                                          Delete
+                                        </AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
+                                ) : (
                                   <button
                                     type="button"
+                                    onClick={() =>
+                                      handleDeleteSlot(index, slot._id)
+                                    }
                                     className="text-gray-400 transition-colors hover:text-red-600"
-                                    title="Delete this slot"
+                                    title="Remove this slot"
                                   >
                                     <Trash2 className="h-4 w-4" />
                                   </button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>
-                                      Delete shift slot?
-                                    </AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      This action cannot be undone. This
-                                      specific shift slot will be permanently
-                                      deleted from the database.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>
-                                      Cancel
-                                    </AlertDialogCancel>
-                                    <AlertDialogAction
-                                      onClick={() =>
-                                        handleDeleteSlot(index, slot._id)
+                                ))}
+                            </div>
+                          )}
+
+                          <div className="flex gap-4 pr-6">
+                            <div className="flex-1">
+                              <FormField
+                                control={form.control}
+                                name={`slots.${index}.startDate`}
+                                render={({ field }) => (
+                                  <FormItem className="flex flex-col">
+                                    <FormLabel className="text-xs font-bold uppercase">
+                                      Start Date
+                                    </FormLabel>
+                                    <FormControl>
+                                      <div className="relative">
+                                        <DatePicker
+                                          selected={field.value}
+                                          onChange={(date: Date) =>
+                                            field.onChange(date)
+                                          }
+                                          disabled={isLeaveGenerated}
+                                          dateFormat="dd-MM-yyyy"
+                                          className={`flex h-10 w-full rounded-md border border-gray-200 px-3 py-2 pl-10 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-950 ${
+                                            isLeaveGenerated ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'bg-white'
+                                          }`}
+                                          wrapperClassName="w-full"
+                                        />
+                                        <CalendarIcon className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
+                                      </div>
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </div>
+                            <div className="flex-1">
+                              <FormItem className="flex flex-col">
+                                <FormLabel className="text-xs font-bold uppercase text-gray-500">
+                                  End Date
+                                </FormLabel>
+                                <FormControl>
+                                  <div className="relative">
+                                    <Input
+                                      readOnly
+                                      value={
+                                        displayEndDate
+                                          ? moment(displayEndDate).format(
+                                              'DD-MM-YYYY'
+                                            )
+                                          : ''
                                       }
-                                      className="bg-red-600 text-white hover:bg-red-700"
-                                    >
-                                      Delete
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleDeleteSlot(index, slot._id)
-                                }
-                                className="text-gray-400 transition-colors hover:text-red-600"
-                                title="Remove this slot"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            ))}
-                        </div>
-
-                        <div className="flex gap-4 pr-6">
-                          <div className="flex-1">
-                            <FormField
-                              control={form.control}
-                              name={`slots.${index}.startDate`}
-                              render={({ field }) => (
-                                <FormItem className="flex flex-col">
-                                  <FormLabel className="text-xs font-bold uppercase">
-                                    Start Date
-                                  </FormLabel>
-                                  <FormControl>
-                                    <div className="relative">
-                                      <DatePicker
-                                        selected={field.value}
-                                        onChange={(date: Date) =>
-                                          field.onChange(date)
-                                        }
-                                        dateFormat="dd-MM-yyyy"
-                                        className="flex h-10 w-full rounded-md border border-gray-200 bg-white px-3 py-2 pl-10 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-950"
-                                        wrapperClassName="w-full"
-                                      />
-                                      <CalendarIcon className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-                                    </div>
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                          </div>
-                          <div className="flex-1">
-                            <FormItem className="flex flex-col">
-                              <FormLabel className="text-xs font-bold uppercase text-gray-500">
-                                End Date
-                              </FormLabel>
-                              <FormControl>
-                                <div className="relative">
-                                  <Input
-                                    readOnly
-                                    value={
-                                      displayEndDate
-                                        ? moment(displayEndDate).format(
-                                            'DD-MM-YYYY'
-                                          )
-                                        : ''
-                                    }
-                                    className="flex h-10 w-full cursor-not-allowed rounded-md border border-gray-200 bg-gray-50 px-3 py-2 pl-10 text-sm text-gray-500"
-                                  />
-                                  <CalendarIcon className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-                                </div>
-                              </FormControl>
-                            </FormItem>
-                          </div>
-                        </div>
-
-                        {isStandard && (
-                          <div className="flex gap-4">
-                            <div className="flex-1">
-                              <FormField
-                                control={form.control}
-                                name={`slots.${index}.startTime`}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel className="text-xs font-bold uppercase">
-                                      Start Time
-                                    </FormLabel>
-                                    <FormControl>
-                                      <Input
-                                        {...field}
-                                        placeholder="09:00"
-                                        maxLength={5}
-                                        className="font-mono"
-                                        onChange={(e) => {
-                                          let val = e.target.value
-                                            .replace(/[^0-9:]/g, '')
-                                            .slice(0, 5);
-                                          if (
-                                            val.length === 2 &&
-                                            field.value?.length === 1 &&
-                                            !val.includes(':')
-                                          ) {
-                                            val += ':';
-                                          }
-                                          field.onChange(val);
-                                        }}
-                                        onBlur={(e) =>
-                                          handleTimeBlur(
-                                            e.target.value,
-                                            field.onChange
-                                          )
-                                        }
-                                      />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                            </div>
-                            <div className="flex-1">
-                              <FormField
-                                control={form.control}
-                                name={`slots.${index}.endTime`}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel className="text-xs font-bold uppercase">
-                                      End Time
-                                    </FormLabel>
-                                    <FormControl>
-                                      <Input
-                                        {...field}
-                                        placeholder="17:00"
-                                        maxLength={5}
-                                        className="font-mono"
-                                        onChange={(e) => {
-                                          let val = e.target.value
-                                            .replace(/[^0-9:]/g, '')
-                                            .slice(0, 5);
-                                          if (
-                                            val.length === 2 &&
-                                            field.value?.length === 1 &&
-                                            !val.includes(':')
-                                          ) {
-                                            val += ':';
-                                          }
-                                          field.onChange(val);
-                                        }}
-                                        onBlur={(e) =>
-                                          handleTimeBlur(
-                                            e.target.value,
-                                            field.onChange
-                                          )
-                                        }
-                                      />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
+                                      className="flex h-10 w-full cursor-not-allowed rounded-md border border-gray-200 bg-gray-50 px-3 py-2 pl-10 text-sm text-gray-500"
+                                    />
+                                    <CalendarIcon className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
+                                  </div>
+                                </FormControl>
+                              </FormItem>
                             </div>
                           </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
 
-                {isStandard && (
+                          {/* 🚀 Time fields ONLY render for standard working shifts (!watchLeaveType) */}
+                          {isStandard && (
+                            <div className="flex gap-4">
+                              <div className="flex-1">
+                                <FormField
+                                  control={form.control}
+                                  name={`slots.${index}.startTime`}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel className="text-xs font-bold uppercase">
+                                        Start Time
+                                      </FormLabel>
+                                      <FormControl>
+                                        <Input
+                                          {...field}
+                                          placeholder={isLeaveGenerated && !field.value ? '--:--' : '09:00'}
+                                          maxLength={5}
+                                          disabled={isLeaveGenerated}
+                                          className={`font-mono ${isLeaveGenerated ? 'bg-gray-100 cursor-not-allowed text-gray-500' : ''}`}
+                                          onChange={(e) => {
+                                            let val = e.target.value
+                                              .replace(/[^0-9:]/g, '')
+                                              .slice(0, 5);
+                                            if (
+                                              val.length === 2 &&
+                                              field.value?.length === 1 &&
+                                              !val.includes(':')
+                                            ) {
+                                              val += ':';
+                                            }
+                                            field.onChange(val);
+                                          }}
+                                          onBlur={(e) =>
+                                            handleTimeBlur(
+                                              e.target.value,
+                                              field.onChange
+                                            )
+                                          }
+                                        />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              </div>
+                              <div className="flex-1">
+                                <FormField
+                                  control={form.control}
+                                  name={`slots.${index}.endTime`}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel className="text-xs font-bold uppercase">
+                                        End Time
+                                      </FormLabel>
+                                      <FormControl>
+                                        <Input
+                                          {...field}
+                                          placeholder={isLeaveGenerated && !field.value ? '--:--' : '17:00'}
+                                          maxLength={5}
+                                          disabled={isLeaveGenerated}
+                                          className={`font-mono ${isLeaveGenerated ? 'bg-gray-100 cursor-not-allowed text-gray-500' : ''}`}
+                                          onChange={(e) => {
+                                            let val = e.target.value
+                                              .replace(/[^0-9:]/g, '')
+                                              .slice(0, 5);
+                                            if (
+                                              val.length === 2 &&
+                                              field.value?.length === 1 &&
+                                              !val.includes(':')
+                                            ) {
+                                              val += ':';
+                                            }
+                                            field.onChange(val);
+                                          }}
+                                          onBlur={(e) =>
+                                            handleTimeBlur(
+                                              e.target.value,
+                                              field.onChange
+                                            )
+                                          }
+                                        />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {!isLeaveGenerated && isStandard && (
                   <FormField
                     control={form.control}
                     name="color"
@@ -670,41 +715,43 @@ export default function EditRotaSidebar({
                   />
                 )}
 
-                <div className="space-y-3 border-t border-gray-100 pt-4">
-                  <label className="text-xs font-bold uppercase text-gray-900">
-                    Leave Type
-                  </label>
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-md border border-gray-100 bg-gray-50/50 p-4">
-                    {leaveOptions.map((option) => (
-                      <FormField
-                        key={option.id}
-                        control={form.control}
-                        name="leaveType"
-                        render={({ field }) => (
-                          <FormItem className="flex flex-row items-center space-x-2 space-y-0">
-                            <FormControl>
-                              <Checkbox
-                                checked={field.value === option.id}
-                                onCheckedChange={(checked) =>
-                                  field.onChange(checked ? option.id : '')
-                                }
-                              />
-                            </FormControl>
-                            <FormLabel className="cursor-pointer text-xs font-medium leading-none">
-                              {option.label}
-                            </FormLabel>
-                          </FormItem>
-                        )}
-                      />
-                    ))}
+                {!isLeaveGenerated && (
+                  <div className="space-y-3 border-t border-gray-100 pt-4">
+                    <label className="text-xs font-bold uppercase text-gray-900">
+                      Leave Type
+                    </label>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-md border border-gray-100 bg-gray-50/50 p-4">
+                      {leaveOptions.map((option) => (
+                        <FormField
+                          key={option.id}
+                          control={form.control}
+                          name="leaveType"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center space-x-2 space-y-0">
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value === option.id}
+                                  onCheckedChange={(checked) =>
+                                    field.onChange(checked ? option.id : '')
+                                  }
+                                />
+                              </FormControl>
+                              <FormLabel className="cursor-pointer text-xs font-medium leading-none">
+                                {option.label}
+                              </FormLabel>
+                            </FormItem>
+                          )}
+                        />
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <div className="space-y-3 border-t border-gray-100 pt-4">
                   <label className="text-xs font-bold uppercase text-gray-900">
                      Send Notification
                   </label>
-                  <div className="flex gap-6 rounded-md border border-gray-100 bg-gray-50/50 p-4">
+                  <div className={`flex gap-6 rounded-md border p-4 ${isLeaveGenerated ? 'bg-gray-100/50 border-gray-200' : 'bg-gray-50/50 border-gray-100'}`}>
                     <FormField
                       control={form.control}
                       name="byEmail"
@@ -714,9 +761,10 @@ export default function EditRotaSidebar({
                             <Checkbox
                               checked={field.value}
                               onCheckedChange={field.onChange}
+                              disabled={isLeaveGenerated}
                             />
                           </FormControl>
-                          <FormLabel className="cursor-pointer text-sm font-medium leading-none">
+                          <FormLabel className={`text-sm font-medium leading-none ${isLeaveGenerated ? 'text-gray-400' : 'cursor-pointer'}`}>
                             By Email
                           </FormLabel>
                         </FormItem>
@@ -731,9 +779,10 @@ export default function EditRotaSidebar({
                             <Checkbox
                               checked={field.value}
                               onCheckedChange={field.onChange}
+                              disabled={isLeaveGenerated}
                             />
                           </FormControl>
-                          <FormLabel className="cursor-pointer text-sm font-medium leading-none">
+                          <FormLabel className={`text-sm font-medium leading-none ${isLeaveGenerated ? 'text-gray-400' : 'cursor-pointer'}`}>
                             By Notice
                           </FormLabel>
                         </FormItem>
@@ -743,7 +792,6 @@ export default function EditRotaSidebar({
                 </div>
               </TabsContent>
 
-              
               {/* ---- History Tab (only rendered when history exists) ---- */}
               {hasHistory && (
                 <TabsContent
@@ -775,7 +823,6 @@ export default function EditRotaSidebar({
                 </TabsContent>
               )}
 
-
               {/* ---- Notes Tab ---- */}
               <TabsContent value="note" className="flex-1 overflow-y-auto p-5">
                 <FormField
@@ -789,8 +836,9 @@ export default function EditRotaSidebar({
                       <FormControl>
                         <Textarea
                           {...field}
+                          disabled={isLeaveGenerated}
                           placeholder="Specific instructions..."
-                          className="min-h-[150px] resize-none bg-gray-50"
+                          className={`min-h-[150px] resize-none ${isLeaveGenerated ? 'bg-gray-100 cursor-not-allowed' : 'bg-gray-50'}`}
                         />
                       </FormControl>
                     </FormItem>
@@ -801,8 +849,8 @@ export default function EditRotaSidebar({
             </Tabs>
 
             <div className="flex items-center justify-between border-t border-gray-100 bg-gray-50 p-5">
-              {fields.some((f) => !f._id) ? (
-                <div />
+              {fields.some((f) => !f._id) || isLeaveGenerated ? (
+                <div /> // Hidden for AL/DO
               ) : (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
@@ -834,9 +882,11 @@ export default function EditRotaSidebar({
 
               <div className="flex gap-2">
                 <Button type="button" variant="outline" onClick={onClose}>
-                  Cancel
+                  {isLeaveGenerated ? 'Close' : 'Cancel'}
                 </Button>
-                <Button type="submit">Save Changes</Button>
+                {!isLeaveGenerated && (
+                  <Button type="submit">Save Changes</Button>
+                )}
               </div>
             </div>
           </form>

@@ -73,7 +73,14 @@ import { useSelector } from 'react-redux';
 interface LeaveDay {
   leaveDate: string;
   leaveType: string;
+  duration?: number;
   _id?: string;
+}
+
+interface LeaveDayUI {
+  leaveDate: Date;
+  leaveType: string;
+  duration: number | string; // Allows empty strings while typing safely
 }
 
 interface LeaveHistory {
@@ -129,24 +136,44 @@ interface HolidayFormErrors {
 
 // --- ZOD SCHEMAS ---
 const leaveProcessSchema = z.object({
-  totalDays: z.number().min(1, 'Number of days cannot be less than 1'),
-  totalHours: z.number().min(0, 'Hours cannot be negative'),
+  totalDays: z.preprocess(
+    (val) => (val === '' || Number.isNaN(Number(val)) ? NaN : Number(val)),
+    z.number().min(1, 'Number of days cannot be less than 1')
+  ),
+  totalHours: z.preprocess(
+    (val) => (val === '' || Number.isNaN(Number(val)) ? NaN : Number(val)),
+    z.number().min(0, 'Hours cannot be negative')
+  ),
   endDate: z.string(),
-  reason: z.string().optional(),
-  dayStatuses: z.record(z.string(), z.enum(['paid', 'unpaid', 'dayoff']))
+  reason: z.string().optional()
 });
 
 type LeaveProcessFormValues = z.infer<typeof leaveProcessSchema>;
 
-const holidayRequestSchema = z.object({
-  holidayYear: z.string().min(1, 'Holiday year is required'),
-  reason: z.string().optional(),
-  holidayType: z.string().min(1, 'Type is required'),
-  startDate: z.date({ required_error: 'Start date is required' }),
-  endDate: z.date({ required_error: 'End date is required' }),
-  totalDays: z.number().min(1, 'Days must be at least 1'),
-  totalHours: z.number().min(1, 'Hours must be at least 1') // Relaxed to 1 so hours can be changed freely
-});
+const holidayRequestSchema = z
+  .object({
+    holidayYear: z.string().min(1, 'Holiday year is required'),
+    reason: z.string().optional(),
+    holidayType: z.string().min(1, 'Type is required'),
+    startDate: z.date({ required_error: 'Start date is required' }),
+    endDate: z.date({ required_error: 'End date is required' }),
+    totalDays: z.preprocess(
+      (val) => (val === '' || Number.isNaN(Number(val)) ? NaN : Number(val)),
+      z.number().min(1, 'Number of days cannot be less than 1')
+    ),
+    totalHours: z.preprocess(
+      (val) => (val === '' || Number.isNaN(Number(val)) ? NaN : Number(val)),
+      z.number().min(0, 'Hours cannot be negative')
+    )
+  })
+  .refine((data) => data.endDate >= data.startDate, {
+    message: 'End date must be on or after start date',
+    path: ['startDate']
+  })
+  .refine((data) => data.holidayType !== 'holiday' || data.totalHours >= 1, {
+    message: 'Total hours must be at least 1 for holidays',
+    path: ['totalHours']
+  });
 
 // --- CONSTANTS ---
 const STATUS_OPTIONS = [
@@ -200,29 +227,6 @@ const getCurrentHolidayYear = () => {
   return `${year}-${year + 1}`;
 };
 
-// Update this function in your React code
-const generateLeaveDaysArray = (
-  start: Date,
-  end: Date,
-  holidayType: string
-) => {
-  const days = [];
-  let current = moment(start);
-  const endMoment = moment(end);
-
-  // LOGIC: If holiday type is 'holiday', set leaveType to 'paid', otherwise 'unpaid'
-  const dayStatus = holidayType === 'holiday' ? 'paid' : 'unpaid';
-
-  while (current.isSameOrBefore(endMoment)) {
-    days.push({
-      leaveDate: current.format('YYYY-MM-DD'),
-      leaveType: dayStatus // This now safely maps to your Mongoose enum
-    });
-    current.add(1, 'days');
-  }
-  return days;
-};
-
 // --- COMPONENTS ---
 const CompanyLeaveApprovalPage: React.FC = () => {
   const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
@@ -233,9 +237,9 @@ const CompanyLeaveApprovalPage: React.FC = () => {
   // Approval Sheet State
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [selectedLeave, setSelectedLeave] = useState<LeaveRequest | null>(null);
-  const [currentDaysList, setCurrentDaysList] = useState<
-    { date: string; label: string }[]
-  >([]);
+  const [editLeaveDays, setEditLeaveDays] = useState<LeaveDayUI[]>([]);
+  const [approvalEmployeeHoursPerDay, setApprovalEmployeeHoursPerDay] =
+    useState<number>(8);
 
   // Filter State
   const [employeeOptions, setEmployeeOptions] = useState<EmployeeOption[]>([]);
@@ -262,13 +266,19 @@ const CompanyLeaveApprovalPage: React.FC = () => {
   const [selectedType, setSelectedType] = useState('');
   const [createStartDate, setCreateStartDate] = useState<Date | undefined>();
   const [createEndDate, setCreateEndDate] = useState<Date | undefined>();
+
   const [calculatedDays, setCalculatedDays] = useState<string>('');
   const [calculatedHours, setCalculatedHours] = useState<string>('');
+  const [leaveDays, setLeaveDays] = useState<LeaveDayUI[]>([]);
+
   const [createSelectedEmployee, setCreateSelectedEmployee] =
     useState<EmployeeOption | null>(null);
   const [createTitle, setCreateTitle] = useState('');
   const [formErrors, setFormErrors] = useState<HolidayFormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Dynamic State for Selected Employee's hoursPerDay
+  const [employeeHoursPerDay, setEmployeeHoursPerDay] = useState<number>(8);
 
   const holidayYears = useMemo(() => generateHolidayYears(20, 50), []);
 
@@ -286,14 +296,10 @@ const CompanyLeaveApprovalPage: React.FC = () => {
     defaultValues: {
       totalDays: 1,
       totalHours: 8,
-      endDate: '',
-      dayStatuses: {}
+      endDate: ''
     }
   });
 
-  const watchTotalDays = form.watch('totalDays');
-  const watchStartDate = selectedLeave?.startDate;
-  const watchDayStatuses = form.watch('dayStatuses');
   const isInitialLoad = useRef(true);
 
   // --- FETCH EMPLOYEES FOR FILTER & CREATE DROPDOWNS ---
@@ -320,41 +326,71 @@ const CompanyLeaveApprovalPage: React.FC = () => {
     fetchFilterOptions();
   }, [companyId]);
 
-  // --- DYNAMIC DAYS GENERATION ---
+  // 🚀 FETCH DYNAMIC HOURS PER DAY FOR SELECTED EMPLOYEE (CREATE MODE)
   useEffect(() => {
-    if (watchStartDate && watchTotalDays && watchTotalDays >= 1) {
-      const days = [];
-      let current = moment(watchStartDate);
+    if (!createSelectedEmployee || !selectedYear) return;
 
-      for (let i = 0; i < watchTotalDays; i++) {
-        days.push({
-          date: current.format('YYYY-MM-DD'),
-          label: current.format('ddd')
-        });
-        current.add(1, 'days');
+    const fetchEmployeeAllowance = async () => {
+      try {
+        const res = await axiosInstance.get(
+          `/hr/holidays?userId=${createSelectedEmployee.value}&year=${selectedYear}&limit=all`
+        );
+        const data = res.data?.data?.result || res.data?.data || res.data;
+        let record = null;
+
+        if (Array.isArray(data)) {
+          record =
+            data.find((item: any) => item.year === selectedYear) || data[0];
+        } else {
+          record = data;
+        }
+
+        const fetchedHours = record?.hoursPerDay || 8;
+        setEmployeeHoursPerDay(fetchedHours);
+
+        if (createStartDate && createEndDate && selectedType) {
+          calculateLeaveData(
+            createStartDate,
+            createEndDate,
+            selectedType,
+            fetchedHours
+          );
+        }
+      } catch (err) {
+        console.error('Failed to fetch employee allowance data:', err);
+        setEmployeeHoursPerDay(8);
       }
+    };
 
-      setCurrentDaysList(days);
+    fetchEmployeeAllowance();
+  }, [createSelectedEmployee, selectedYear]);
 
-      const newEndDate = moment(watchStartDate)
-        .add(watchTotalDays - 1, 'days')
-        .format('YYYY-MM-DD');
-      form.setValue('endDate', newEndDate);
+  // 🚀 FETCH DYNAMIC HOURS PER DAY FOR APPROVAL MODAL (EDIT MODE)
+  useEffect(() => {
+    if (!selectedLeave) return;
 
-      if (isInitialLoad.current) {
-        isInitialLoad.current = false;
-      } else {
-        form.setValue('totalHours', watchTotalDays * 8);
+    const fetchApprovalEmployeeAllowance = async () => {
+      try {
+        const res = await axiosInstance.get(
+          `/hr/holidays?userId=${selectedLeave.userId._id}&year=${selectedLeave.holidayYear}&limit=all`
+        );
+        const data = res.data?.data?.result || res.data?.data || res.data;
+        let record = null;
+        if (Array.isArray(data)) {
+          record =
+            data.find((item: any) => item.year === selectedLeave.holidayYear) ||
+            data[0];
+        } else {
+          record = data;
+        }
+        setApprovalEmployeeHoursPerDay(record?.hoursPerDay || 8);
+      } catch (err) {
+        setApprovalEmployeeHoursPerDay(8);
       }
+    };
 
-      const currentStatuses = form.getValues('dayStatuses') || {};
-      const newStatuses: Record<string, 'paid' | 'unpaid' | 'dayoff'> = {};
-      days.forEach((d) => {
-        newStatuses[d.date] = currentStatuses[d.date] ?? 'paid';
-      });
-      form.setValue('dayStatuses', newStatuses);
-    }
-  }, [watchTotalDays, watchStartDate]);
+    fetchApprovalEmployeeAllowance();
+  }, [selectedLeave]);
 
   // --- FETCH LEAVE REQUESTS ---
   const fetchLeaveRequests = async (paramsOverride?: {
@@ -429,47 +465,202 @@ const CompanyLeaveApprovalPage: React.FC = () => {
     });
   };
 
-  // --- CREATE LEAVE HANDLERS ---
+  // --- CREATE LEAVE LOGIC ---
+
+  const calculateLeaveData = (
+    start: Date | undefined,
+    end: Date | undefined,
+    type: string,
+    hoursOverride: number = employeeHoursPerDay
+  ) => {
+    if (start && end) {
+      const isHoliday = type === 'holiday';
+      const daysArr: LeaveDayUI[] = [];
+      let current = new Date(start);
+      let totalHrs = 0;
+      let totalDaysCount = 0;
+
+      while (current <= end) {
+        const defaultDuration = isHoliday ? hoursOverride : 0;
+        daysArr.push({
+          leaveDate: new Date(current),
+          leaveType: isHoliday ? 'paid' : 'unpaid',
+          duration: defaultDuration
+        });
+        if (isHoliday) totalHrs += defaultDuration;
+        totalDaysCount++;
+        current.setDate(current.getDate() + 1);
+      }
+
+      setLeaveDays(daysArr);
+
+      if (isHoliday) {
+        setCalculatedHours(String(totalHrs));
+        if (hoursOverride > 0) {
+          setCalculatedDays(
+            String(parseFloat((totalHrs / hoursOverride).toFixed(2)))
+          );
+        } else {
+          setCalculatedDays(String(totalDaysCount));
+        }
+      } else {
+        // For Non-Holiday Types, default the Days based on duration gap natively
+        setCalculatedDays(String(totalDaysCount));
+        setCalculatedHours('0');
+      }
+    } else {
+      setLeaveDays([]);
+      setCalculatedDays('');
+      setCalculatedHours('');
+    }
+  };
+
+  const handleDayDurationChange = (index: number, newDuration: string) => {
+     let sanitized = newDuration;
+  if (sanitized.includes('.')) {
+    const [whole, decimal] = sanitized.split('.');
+    if (decimal.length > 2) sanitized = `${whole}.${decimal.slice(0, 2)}`;
+  }
+    const updatedDays = [...leaveDays];
+    updatedDays[index].duration = newDuration;
+
+    const numericDuration = parseFloat(newDuration);
+    const safeDuration = isNaN(numericDuration)
+      ? 0
+      : Math.max(0, numericDuration);
+
+    if (safeDuration === 0) {
+      updatedDays[index].leaveType = 'dayoff';
+    } else {
+      updatedDays[index].leaveType = 'paid';
+    }
+
+    setLeaveDays(updatedDays);
+
+    const totalHrs = updatedDays.reduce((acc, curr) => {
+      const d = parseFloat(String(curr.duration));
+      return acc + (isNaN(d) ? 0 : d);
+    }, 0);
+
+    setCalculatedHours(String(totalHrs));
+
+    setFormErrors((prev) => ({
+      ...prev,
+      totalHours: undefined
+    }));
+  };
+
+ const handleDaysChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  let value = e.target.value;
+
+  // 1. Intercept and limit to a maximum of 2 decimal places
+  if (value.includes('.')) {
+    const [whole, decimal] = value.split('.');
+    if (decimal.length > 2) {
+      value = `${whole}.${decimal.slice(0, 2)}`;
+    }
+  }
+
+  // 2. Update state with the sanitized value
+  setCalculatedDays(value);
+  clearError('totalDays');
+
+  // 3. Use the sanitized value for all downstream logic
+  const parsedDays = parseFloat(value);
+
+  if (isNaN(parsedDays) || parsedDays < 0) {
+    if (selectedType === 'holiday') {
+      setCalculatedHours('');
+    }
+    return;
+  }
+
+  if (createStartDate) {
+    const addedDays = Math.max(0, Math.ceil(parsedDays) - 1);
+    const newEndDate = new Date(createStartDate);
+    newEndDate.setDate(newEndDate.getDate() + addedDays);
+    setCreateEndDate(newEndDate);
+
+    if (selectedType === 'holiday') {
+      const newHours = parsedDays * employeeHoursPerDay;
+      setCalculatedHours(String(newHours));
+
+      const daysArr: LeaveDayUI[] = [];
+      let current = new Date(createStartDate);
+      const numDays = addedDays + 1;
+      const hrsPerDay = newHours / numDays;
+
+      while (current <= newEndDate) {
+        daysArr.push({
+          leaveDate: new Date(current),
+          leaveType: hrsPerDay === 0 ? 'dayoff' : 'paid',
+          duration: parseFloat(hrsPerDay.toFixed(2))
+        });
+        current.setDate(current.getDate() + 1);
+      }
+      setLeaveDays(daysArr);
+    } else {
+      // NON-HOLIDAY UPDATE: Rebuild the array with 0 duration for the new length
+      setCalculatedHours('0');
+      const daysArr: LeaveDayUI[] = [];
+      let current = new Date(createStartDate);
+      while (current <= newEndDate) {
+        daysArr.push({
+          leaveDate: new Date(current),
+          leaveType: 'unpaid',
+          duration: 0
+        });
+        current.setDate(current.getDate() + 1);
+      }
+      setLeaveDays(daysArr);
+    }
+  }
+};
+
+ const handleHoursChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let  value = e.target.value;
+    if (value.includes('.')) {
+    const [whole, decimal] = value.split('.');
+    if (decimal.length > 2) {
+      value = `${whole}.${decimal.slice(0, 2)}`;
+    }
+  }
+    setCalculatedHours(value);
+    clearError('totalHours');
+
+    const parsedHours = parseFloat(value);
+
+    if (isNaN(parsedHours) || parsedHours < 0) {
+      if (leaveDays.length > 0) {
+        const updatedDays = leaveDays.map((day) => ({
+          ...day,
+          duration: '',
+          leaveType: 'dayoff'
+        }));
+        setLeaveDays(updatedDays);
+      }
+      return;
+    }
+
+    if (leaveDays.length > 0) {
+      const hrsPerDay = parsedHours / leaveDays.length;
+
+      const updatedDays = leaveDays.map((day) => ({
+        ...day,
+        duration: parseFloat(hrsPerDay.toFixed(2)),
+        leaveType: hrsPerDay === 0 ? 'dayoff' : 'paid'
+      }));
+
+      setLeaveDays(updatedDays);
+    }
+  };
+
   const clearError = (field: string) => {
     setFormErrors((prev: any) => {
       const newErrs = { ...prev };
       delete newErrs[field];
       return newErrs;
     });
-  };
-
-  const handleDaysChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setCalculatedDays(value);
-
-    const parsedDays = parseFloat(value);
-    if (!isNaN(parsedDays) && parsedDays >= 1) {
-      setCalculatedHours(String(parsedDays * 8)); // Days still updates hours by default
-
-      if (createStartDate) {
-        const newEndDate = moment(createStartDate)
-          .add(parsedDays - 1, 'days')
-          .toDate();
-        setCreateEndDate(newEndDate);
-      }
-    } else if (!isNaN(parsedDays) && parsedDays < 1) {
-      // Force minimum 1 day if user types a lower number
-      setCalculatedDays('1');
-      setCalculatedHours('8');
-      if (createStartDate) {
-        setCreateEndDate(createStartDate);
-      }
-    } else {
-      setCalculatedHours('');
-    }
-    clearError('totalDays');
-  };
-
-  const handleHoursChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    // Just update the hours state. Do not touch calculatedDays or createEndDate.
-    setCalculatedHours(value);
-    clearError('totalHours');
   };
 
   const handleSubmitRequest = async () => {
@@ -487,8 +678,14 @@ const CompanyLeaveApprovalPage: React.FC = () => {
       holidayType: selectedType,
       startDate: createStartDate as Date,
       endDate: createEndDate as Date,
-      totalDays: parseFloat(String(calculatedDays)),
-      totalHours: parseFloat(String(calculatedHours))
+      totalDays:
+        calculatedDays === '' ? '' : parseFloat(String(calculatedDays)),
+      totalHours:
+        selectedType === 'holiday'
+          ? calculatedHours === ''
+            ? ''
+            : parseFloat(String(calculatedHours))
+          : 0
     };
 
     const result = holidayRequestSchema.safeParse(formData);
@@ -511,11 +708,17 @@ const CompanyLeaveApprovalPage: React.FC = () => {
     setIsSubmitting(true);
 
     try {
-      const leaveDays = generateLeaveDaysArray(
-        createStartDate!,
-        createEndDate!,
-        selectedType
-      );
+      const dbLeaveDays = leaveDays.map((day) => ({
+        leaveDate: day.leaveDate,
+        leaveType: selectedType === 'holiday' ? day.leaveType : 'unpaid',
+        duration:
+          selectedType === 'holiday'
+            ? isNaN(parseFloat(String(day.duration)))
+              ? 0
+              : parseFloat(String(day.duration))
+            : 0
+      }));
+
       await axiosInstance.post(`/hr/leave`, {
         holidayYear: selectedYear,
         userId: createSelectedEmployee.value,
@@ -526,7 +729,7 @@ const CompanyLeaveApprovalPage: React.FC = () => {
         holidayType: selectedType,
         totalDays: result.data.totalDays,
         totalHours: result.data.totalHours,
-        leaveDays,
+        leaveDays: dbLeaveDays,
         status: 'pending',
         title: createTitle || `${selectedType} Request`
       });
@@ -540,8 +743,9 @@ const CompanyLeaveApprovalPage: React.FC = () => {
       setSelectedType('');
       setCalculatedDays('');
       setCalculatedHours('');
+      setLeaveDays([]);
       setCreateSelectedEmployee(null);
-      setSelectedYear(getCurrentHolidayYear()); // Reset to the current year after submittal
+      setSelectedYear(getCurrentHolidayYear());
       setFormErrors({});
       setIsDrawerOpen(false);
 
@@ -558,11 +762,54 @@ const CompanyLeaveApprovalPage: React.FC = () => {
   };
 
   // --- APPROVE/UPDATE/REJECT ACTIONS ---
+
+  const handleEditDayDurationChange = (index: number, newDuration: string) => {
+     let sanitized = newDuration;
+  if (sanitized.includes('.')) {
+    const [whole, decimal] = sanitized.split('.');
+    if (decimal.length > 2) sanitized = `${whole}.${decimal.slice(0, 2)}`;
+  }
+    const updatedDays = [...editLeaveDays];
+    updatedDays[index].duration = newDuration;
+
+    const numericDuration = parseFloat(newDuration);
+    const safeDuration = isNaN(numericDuration)
+      ? 0
+      : Math.max(0, numericDuration);
+
+    if (safeDuration === 0) {
+      updatedDays[index].leaveType = 'dayoff';
+    } else {
+      updatedDays[index].leaveType =
+        selectedLeave?.holidayType === 'holiday' ? 'paid' : 'unpaid';
+    }
+
+    setEditLeaveDays(updatedDays);
+
+    const totalHrs = updatedDays.reduce((acc, curr) => {
+      const d = parseFloat(String(curr.duration));
+      return acc + (isNaN(d) ? 0 : d);
+    }, 0);
+
+    form.setValue('totalHours', totalHrs);
+  };
+
   const handleActionSubmit = async (
     action: 'approved' | 'rejected' | 'update',
     formData?: LeaveProcessFormValues
   ) => {
     if (!selectedLeave) return;
+
+    // Validate manually for approval modal that hours must be >= 1 for holidays
+    if ((action === 'approved' || action === 'update') && formData) {
+      if (selectedLeave?.holidayType === 'holiday' && formData.totalHours < 1) {
+        form.setError('totalHours', {
+          type: 'manual',
+          message: 'Total hours must be at least 1 for holidays'
+        });
+        return;
+      }
+    }
 
     try {
       const payload: any = {};
@@ -576,8 +823,19 @@ const CompanyLeaveApprovalPage: React.FC = () => {
         payload.totalHours = formData.totalHours;
         payload.endDate = formData.endDate;
         payload.reason = formData.reason;
-        payload.dayBreakdown = formData.dayStatuses;
+        payload.leaveDays = editLeaveDays.map((day) => ({
+          leaveDate: day.leaveDate,
+          leaveType:
+            selectedLeave?.holidayType === 'holiday' ? day.leaveType : 'unpaid',
+          duration:
+            selectedLeave?.holidayType === 'holiday'
+              ? isNaN(parseFloat(String(day.duration)))
+                ? 0
+                : parseFloat(String(day.duration))
+              : 0
+        }));
       }
+
       payload.actionUserId = user?._id;
       await axiosInstance.patch(`/hr/leave/${selectedLeave._id}`, payload);
 
@@ -600,33 +858,29 @@ const CompanyLeaveApprovalPage: React.FC = () => {
 
   const openApprovalSheet = (request: LeaveRequest) => {
     setSelectedLeave(request);
-    isInitialLoad.current = true;
 
-    const existingDayStatuses: Record<string, 'paid' | 'unpaid' | 'dayoff'> =
-      {};
-    if (request.leaveDays && request.leaveDays.length > 0) {
-      request.leaveDays.forEach((ld) => {
-        const dateKey = moment(ld.leaveDate).format('YYYY-MM-DD');
-        existingDayStatuses[dateKey] = ld.leaveType as
-          | 'paid'
-          | 'unpaid'
-          | 'dayoff';
-      });
-    }
+    const mappedDays =
+      request.leaveDays?.map((ld) => ({
+        leaveDate: new Date(ld.leaveDate),
+        leaveType: ld.leaveType,
+        duration: ld.duration ?? 0
+      })) || [];
+
+    setEditLeaveDays(mappedDays);
 
     form.reset({
       totalDays: request.totalDays,
-      totalHours: request.totalHours || request.totalDays * 8,
+      totalHours: request.totalHours || 0,
       endDate: request.endDate,
-      reason: request.reason || '',
-      dayStatuses: existingDayStatuses
+      reason: request.reason || ''
     });
+
     setIsSheetOpen(true);
   };
 
-const formatDate = (dateString: string) => {
-  return moment(dateString).startOf('day').format('DD MMM YYYY');
-};
+  const formatDate = (dateString: string) => {
+    return moment(dateString).startOf('day').format('DD MMM YYYY');
+  };
 
   const getStatusBadgeClass = (status: string) => {
     if (status === 'approved')
@@ -752,7 +1006,6 @@ const formatDate = (dateString: string) => {
 
     return (
       <div className="w-auto space-y-3 rounded-lg bg-white p-1 shadow-lg">
-        {/* Optional Header mapping to User Details. It was not in the immediate crop but helps context. */}
         <div className="flex hidden items-center space-x-2 border-b border-gray-100 px-2 pb-2 pt-1">
           <User className="h-4 w-4" />
           <span className="font-semibold text-gray-800">
@@ -813,17 +1066,19 @@ const formatDate = (dateString: string) => {
                       <Button className="">Create Leave Request</Button>
                     </SheetTrigger>
 
-                    <SheetContent className="overflow-y-auto sm:max-w-[450px]">
-                      <SheetHeader className="mb-6">
+                    <SheetContent className="overflow-y-auto sm:max-w-[750px] max-h-screen">
+                      <SheetHeader className="mb-2">
                         <SheetTitle className="flex items-center gap-2">
                           <CheckCircle className="h-5 w-5 text-theme" />
                           Submit Leave Request
                         </SheetTitle>
                       </SheetHeader>
 
-                      <div className="space-y-5">
+                      <div className="space-y-2 max-h-screen">
                         {/* Employee Selection */}
-                        <div>
+
+                        <div className='grid grid-cols-2 items-center gap-2'>
+<div>
                           <Label className="mb-1 block">Employee</Label>
                           <ReactSelect
                             options={employeeOptions}
@@ -844,7 +1099,7 @@ const formatDate = (dateString: string) => {
                         </div>
 
                         {/* Holiday Year */}
-                        <div>
+                        <div className='-mt-2'>
                           <Label htmlFor="holiday-year">Holiday Year</Label>
                           <ShadcnSelect
                             value={selectedYear}
@@ -855,9 +1110,9 @@ const formatDate = (dateString: string) => {
                           >
                             <SelectTrigger
                               id="holiday-year"
-                              className={
-                                formErrors.holidayYear ? 'border-red-500' : ''
-                              }
+                               className={`h-[38px]  ${
+    formErrors.holidayYear ? 'border-red-500' : ''
+  }`}
                             >
                               <SelectValue placeholder="Select year" />
                             </SelectTrigger>
@@ -876,26 +1131,6 @@ const formatDate = (dateString: string) => {
                           )}
                         </div>
 
-                        {/* Reason */}
-                        <div>
-                          <Label htmlFor="create-reason">Reason</Label>
-                          <Textarea
-                            id="create-reason"
-                            placeholder="Enter reason for leave"
-                            value={createReason}
-                            onChange={(e) => {
-                              setCreateReason(e.target.value);
-                              clearError('reason');
-                            }}
-                            className={`border-gray-300 ${formErrors.reason ? 'border-red-500' : ''}`}
-                          />
-                          {formErrors.reason && (
-                            <p className="mt-1 text-xs text-red-500">
-                              {formErrors.reason}
-                            </p>
-                          )}
-                        </div>
-
                         {/* Holiday Type */}
                         <div>
                           <Label htmlFor="type" className="mb-1 block">
@@ -910,12 +1145,18 @@ const formatDate = (dateString: string) => {
                               ) || null
                             }
                             onChange={(option) => {
-                              setSelectedType(option?.value || '');
+                              const newType = option?.value || '';
+                              setSelectedType(newType);
                               clearError('holidayType');
+                              calculateLeaveData(
+                                createStartDate,
+                                createEndDate,
+                                newType
+                              );
                             }}
                             placeholder="Select type"
-                            className="react-select-container"
-                            classNamePrefix="react-select"
+                            className="react-select-container "
+                            classNamePrefix="react-select "
                             styles={{
                               control: (base) => ({
                                 ...base,
@@ -938,7 +1179,7 @@ const formatDate = (dateString: string) => {
                         </div>
 
                         {/* Date Range Picker */}
-                        <div className="flex flex-col gap-1">
+                        <div className="flex flex-col gap-1 py-2">
                           <Label>Leave Period (DD-MM-YYYY)</Label>
                           <DatePicker
                             selectsRange
@@ -946,28 +1187,40 @@ const formatDate = (dateString: string) => {
                             endDate={createEndDate}
                             onChange={(dates) => {
                               const [start, end] = dates;
-                              setCreateStartDate(start ?? undefined);
-                              setCreateEndDate(end ?? undefined);
-                              clearError('dateRange');
+                              // 🚀 FIX: Normalize dates to exactly 12:00 PM (Noon) local time to prevent UTC boundary shifts!
+                              const safeStart = start
+                                ? new Date(
+                                    start.getFullYear(),
+                                    start.getMonth(),
+                                    start.getDate(),
+                                    12,
+                                    0,
+                                    0
+                                  )
+                                : undefined;
+                              const safeEnd = end
+                                ? new Date(
+                                    end.getFullYear(),
+                                    end.getMonth(),
+                                    end.getDate(),
+                                    12,
+                                    0,
+                                    0
+                                  )
+                                : undefined;
 
-                              // Auto calculate total days and hours
-                              if (start && end) {
-                                const daysDiff =
-                                  moment(end).diff(moment(start), 'days') + 1;
-                                const validDays = Math.max(1, daysDiff);
-                                setCalculatedDays(String(validDays));
-                                setCalculatedHours(String(validDays * 8));
-                              } else if (start && !end) {
-                                setCalculatedDays('1');
-                                setCalculatedHours('8');
-                              } else {
-                                setCalculatedDays('');
-                                setCalculatedHours('');
-                              }
+                              setCreateStartDate(safeStart);
+                              setCreateEndDate(safeEnd);
+                              clearError('dateRange');
+                              calculateLeaveData(
+                                safeStart,
+                                safeEnd,
+                                selectedType
+                              );
                             }}
                             isClearable
                             placeholderText="Select start and end date"
-                            className={`w-full rounded border px-3 py-2 ${formErrors.dateRange ? 'border-red-500' : 'border-gray-300'}`}
+                            className={`w-full rounded border h-[38px] px-3 py-2 ${formErrors.dateRange ? 'border-red-500' : 'border-gray-300'}`}
                             dateFormat="dd-MM-yyyy"
                           />
                           {formErrors.dateRange && (
@@ -977,49 +1230,133 @@ const formatDate = (dateString: string) => {
                           )}
                         </div>
 
-                        {/* Total Days */}
-                        <div className="space-y-1">
-                          <Label htmlFor="duration-days">
-                            Holiday Duration (Days)
-                          </Label>
-                          <Input
-                            id="duration-days"
-                            type="number"
-                            min="1"
-                            step="1"
-                            value={calculatedDays}
-                            onChange={handleDaysChange}
-                            placeholder="e.g. 2"
-                            className={`bg-white ${formErrors.totalDays ? 'border-red-500' : ''}`}
+                        </div>
+                        
+
+                        {/* Reason */}
+                        <div>
+                          <Label htmlFor="create-reason">Reason</Label>
+                          <Textarea
+                            id="create-reason"
+                            placeholder="Enter reason for leave"
+                            value={createReason}
+                            onChange={(e) => {
+                              setCreateReason(e.target.value);
+                              clearError('reason');
+                            }}
+                            className={`border-gray-300 ${formErrors.reason ? 'border-red-500' : ''}`}
                           />
-                          {formErrors.totalDays && (
-                            <p className="text-xs text-red-500">
-                              {formErrors.totalDays}
+                          {formErrors.reason && (
+                            <p className="mt-1 text-xs text-red-500">
+                              {formErrors.reason}
                             </p>
                           )}
                         </div>
 
-                        {/* Total Hours */}
-                        <div className="space-y-1">
-                          <Label htmlFor="duration-hours">
-                            Duration (Hours)
-                          </Label>
-                          <Input
-                            id="duration-hours"
-                            type="number"
-                            min="1"
-                            step="0.5"
-                            value={calculatedHours}
-                            onChange={handleHoursChange}
-                            placeholder="e.g. 16"
-                            className={`bg-white ${formErrors.totalHours ? 'border-red-500' : ''}`}
-                          />
-                          {formErrors.totalHours && (
-                            <p className="text-xs text-red-500">
-                              {formErrors.totalHours}
-                            </p>
-                          )}
-                        </div>
+                        
+
+                        {/* 🚀 Conditional Render based on Selected Type */}
+                        {selectedType && (
+                          <div className="space-y-1">
+                            {/* Daily Duration Breakdown Grid - Only shows if 'holiday' and leaveDays populated */}
+                            {selectedType === 'holiday' &&
+                              leaveDays.length > 0 && (
+                                <>
+                                  <Label className="block w-full  text-sm font-semibold text-gray-700">
+                                    Daily Duration Breakdown
+                                  </Label>
+                                  <div className="grid max-h-72 grid-cols-2 gap-3 overflow-y-auto rounded-lg border border-gray-200 bg-gray-50/50 p-3 sm:grid-cols-5">
+                                    {leaveDays.map((day, idx) => (
+                                      <div
+                                        key={idx}
+                                        className="flex flex-col items-center justify-center rounded-md border border-theme/50 bg-white p-3 shadow-sm"
+                                      >
+                                        <span className="mb-2 items-center text-center text-[13px] font-bold text-black">
+                                          {moment(day.leaveDate).format(
+                                            'DD MMM, YYYY'
+                                          )}
+                                          <br />
+                                          {moment(day.leaveDate).format('dddd')}
+                                        </span>
+                                        <div className="flex w-full items-center justify-center gap-1.5">
+                                          <Input
+                                            type="number"
+                                            step="0.5"
+                                            min="0"
+                                            max="24"
+                                            className="h-8 w-24 text-center border-orange-600 text-sm"
+                                            value={day.duration}
+                                            onChange={(e) =>
+                                              handleDayDurationChange(
+                                                idx,
+                                                e.target.value
+                                              )
+                                            }
+                                          />
+                                          {/* <span className="text-xs font-medium text-gray-500">
+                                            h
+                                          </span> */}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </>
+                              )}
+
+                            {/* User Editable Summary Totals */}
+                            <div
+                              className={`grid ${selectedType === 'holiday' ? 'grid-cols-2' : 'grid-cols-1'} mt-4 gap-4`}
+                            >
+                              {/* Total Days - Visible to ALL TYPES */}
+                              <div className="space-y-1">
+                                <Label htmlFor="duration-days">
+                                  {selectedType === 'holiday'
+                                    ? 'Holiday Duration (Days)'
+                                    : 'Duration (Days)'}
+                                </Label>
+                                <Input
+                                  id="duration-days"
+                                  type="number"
+                                  min="1"
+                                  step="0.5"
+                                  value={calculatedDays}
+                                  onChange={handleDaysChange}
+                                  placeholder="e.g. 2"
+                                  className={`bg-white ${formErrors.totalDays ? 'border-red-500' : ''}`}
+                                />
+                                {formErrors.totalDays && (
+                                  <p className="text-xs text-red-500">
+                                    {formErrors.totalDays}
+                                  </p>
+                                )}
+                              </div>
+
+                              {/* Total Hours - Visible ONLY to HOLIDAY TYPES */}
+                              {selectedType === 'holiday' && (
+                                <div className="space-y-1">
+                                  <Label htmlFor="duration-hours">
+                                    Duration (Hours)
+                                  </Label>
+                                  <Input
+                                    id="duration-hours"
+                                    type="number"
+                                    min="1"
+                                    step="0.5"
+                                    value={calculatedHours}
+                                    onChange={handleHoursChange}
+                                    placeholder="e.g. 16"
+                                    className={`bg-white ${formErrors.totalHours ? 'border-red-500' : ''}`}
+                                  />
+                                  {formErrors.totalHours && (
+                                    <p className="text-xs text-red-500">
+                                      {formErrors.totalHours}
+                                    </p>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
 
                         <Button
                           onClick={handleSubmitRequest}
@@ -1088,9 +1425,31 @@ const formatDate = (dateString: string) => {
                   selectsRange
                   startDate={startDate}
                   endDate={endDate}
-                  onChange={(update) =>
-                    setDateRange(update as [Date | null, Date | null])
-                  }
+                  onChange={(update) => {
+                    const [start, end] = update as [Date | null, Date | null];
+                    // 🚀 FIX: Normalize dates for the Filter DatePicker as well
+                    const safeStart = start
+                      ? new Date(
+                          start.getFullYear(),
+                          start.getMonth(),
+                          start.getDate(),
+                          12,
+                          0,
+                          0
+                        )
+                      : null;
+                    const safeEnd = end
+                      ? new Date(
+                          end.getFullYear(),
+                          end.getMonth(),
+                          end.getDate(),
+                          12,
+                          0,
+                          0
+                        )
+                      : null;
+                    setDateRange([safeStart, safeEnd]);
+                  }}
                   dateFormat="dd-MM-yyyy"
                   placeholderText="Select date range"
                   className="h-10 w-full rounded-md border border-gray-200 px-3 text-sm focus:border-theme focus:outline-none focus:ring-1 focus:ring-theme"
@@ -1237,180 +1596,335 @@ const formatDate = (dateString: string) => {
 
             {/* ── LEAVE APPROVAL SHEET ── */}
             <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-              <SheetContent className="w-[90vw] overflow-y-auto sm:max-w-[800px]">
-                <SheetHeader className="mb-6">
-                  <SheetTitle className="text-2xl font-bold">
-                    Process Leave Request
-                  </SheetTitle>
-                </SheetHeader>
+  <SheetContent className="w-[90vw] overflow-y-auto sm:max-w-[800px]">
+    {selectedLeave && (
+      <> {/* 🚀 ADDED REACT FRAGMENT HERE */}
+        <SheetHeader className="mb-6">
+          <SheetTitle className="text-2xl font-bold flex flex-row items-center gap-5">
+            <span>
 
-                {selectedLeave && (
-                  <div>
-                    {/* Header Info */}
-                    <div className="text-md flex items-center justify-between pb-4 font-semibold">
-                      <span>
-                        Staff: {selectedLeave.userId.firstName}{' '}
-                        {selectedLeave.userId.lastName}
+            Process Leave Request{' '}
+            </span>
+             <span className="flex  text-lg">
+              {formatDate(selectedLeave.startDate)}
+              <span className="mx-2 font-bold">&rarr;</span>
+              {formatDate(selectedLeave.endDate)}
+            </span>
+          </SheetTitle>
+        </SheetHeader>
+
+        <div>
+          {/* Header Info */}
+          <div className="text-md flex items-center justify-between pb-4 font-semibold">
+            <div className="flex flex-row items-center gap-2">
+              <span>
+                Staff: {selectedLeave.userId?.firstName}{' '}
+                {selectedLeave.userId?.lastName}
+              </span>
+              {selectedLeave?.holidayType && (
+              <span className="rounded-full bg-theme px-3 py-1 text-sm font-medium text-white">
+                {selectedLeave.holidayType.charAt(0).toUpperCase() +
+                  selectedLeave.holidayType.slice(1).toLowerCase()}
+              </span>
+            )}
+            </div>
+
+           
+          </div>
+
+          {/* Reason Box */}
+          <div className="space-y-2 pb-6">
+            <Label htmlFor="reason">Reason</Label>
+            <Controller
+              name="reason"
+              control={form.control}
+              render={({ field }) => (
+                <Textarea
+                  {...field}
+                  id="reason"
+                  placeholder="Employee's reason for leave..."
+                  className="min-h-[80px] border-theme/20 bg-theme/5 focus-visible:ring-theme/20"
+                />
+              )}
+            />
+          </div>
+
+          {/* 🚀 Daily Duration Breakdown Grid for Approval */}
+          {selectedLeave.holidayType === 'holiday' &&
+            editLeaveDays.length > 0 && (
+              <div className="mb-6 space-y-3 border-b border-gray-100 pb-6">
+                <Label className="block w-full text-sm font-semibold text-gray-700">
+                  Daily Duration Breakdown
+                </Label>
+                <div className="grid max-h-72 grid-cols-2 gap-3 overflow-y-auto rounded-lg border border-gray-200 bg-gray-50/50 p-3 sm:grid-cols-3">
+                  {editLeaveDays.map((day: any, idx: number) => (
+                    <div
+                      key={idx}
+                      className="flex flex-col items-center justify-center rounded-md border border-gray-100 bg-white p-3 shadow-sm"
+                    >
+                      <span className="mb-2 items-center text-center text-[13px] font-semibold text-gray-800">
+                        {moment(day.leaveDate).format('DD MMM, YYYY')}
+                        <br />
+                        {moment(day.leaveDate).format('dddd')}
                       </span>
-                      <span className="flex items-center gap-2">
-                        {formatDate(selectedLeave.startDate)}
-                        <span className="mx-2 font-bold">&rarr;</span>
-                        {formatDate(form.watch('endDate'))}
+                      <div className="flex w-full items-center justify-center gap-1.5">
+                        <Input
+                          type="number"
+                          step="0.5"
+                          min="0"
+                          max="24"
+                          className="h-8 w-24 text-center text-sm font-semibold "
+                          value={day.duration}
+                          onChange={(e) =>
+                            handleEditDayDurationChange(idx, e.target.value)
+                          }
+                          disabled={
+                            selectedLeave.status !== 'pending' &&
+                            selectedLeave.status !== 'approved'
+                          }
+                        />
+                        {/* <span className="text-xs font-medium text-gray-500">
+                          h
+                        </span> */}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+          {/* Form Inputs (Total Days / Hours) */}
+          <div className={`grid grid-cols-2 gap-6 pb-6`}>
+            <div className="space-y-2">
+              <Label htmlFor="totalDays">Number Of Days</Label>
+              <Controller
+                name="totalDays"
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <>
+                    <Input
+                      id="totalDays"
+                      type="number"
+                      min={1}
+                      step="0.5"
+                      {...field}
+                      value={
+                        field.value === 0 || Number.isNaN(field.value)
+                          ? ''
+                          : field.value
+                      }
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        const newDays = isNaN(val) ? '' : val;
+                        field.onChange(newDays);
+
+                        // If they clear the field, clear breakdown cards and hours
+                        if (newDays === '') {
+                          if (selectedLeave.holidayType === 'holiday') {
+                            form.setValue('totalHours', 0);
+                            setEditLeaveDays([]);
+                          }
+                          return;
+                        }
+
+                        // Automatically stretch the End Date and recalculate breakdown cards
+                        if (newDays >= 1 && selectedLeave?.startDate) {
+                          const start = new Date(selectedLeave.startDate);
+                          const addedDays = Math.max(
+                            0,
+                            Math.ceil(Number(newDays)) - 1
+                          );
+                          const newEndDate = new Date(start);
+                          newEndDate.setDate(
+                            newEndDate.getDate() + addedDays
+                          );
+                          form.setValue(
+                            'endDate',
+                            newEndDate.toISOString()
+                          );
+
+                          if (selectedLeave.holidayType === 'holiday') {
+                            const newHours =
+                              Number(newDays) * approvalEmployeeHoursPerDay;
+                            form.setValue('totalHours', newHours);
+
+                            const daysArr = [];
+                            let current = new Date(start);
+                            const numDays = addedDays + 1;
+                            const hrsPerDay = newHours / numDays;
+
+                            while (current <= newEndDate) {
+                              daysArr.push({
+                                leaveDate: new Date(current),
+                                leaveType:
+                                  hrsPerDay === 0 ? 'dayoff' : 'paid',
+                                duration: parseFloat(hrsPerDay.toFixed(2))
+                              });
+                              current.setDate(current.getDate() + 1);
+                            }
+                            setEditLeaveDays(daysArr);
+                          } else {
+                            // NON-HOLIDAY UPDATE: stretch array with 0 duration
+                            form.setValue('totalHours', 0);
+                            const daysArr = [];
+                            let current = new Date(start);
+                            while (current <= newEndDate) {
+                              daysArr.push({
+                                leaveDate: new Date(current),
+                                leaveType: 'unpaid',
+                                duration: 0
+                              });
+                              current.setDate(current.getDate() + 1);
+                            }
+                            setEditLeaveDays(daysArr);
+                          }
+                        }
+                      }}
+                    />
+                    {fieldState.error && (
+                      <span className="text-xs text-red-500">
+                        {fieldState.error.message}
                       </span>
-                      <span>{selectedLeave.holidayType.toUpperCase()}</span>
-                    </div>
-
-                    {/* Reason Box */}
-                    <div className="space-y-2 pb-6">
-                      <Label htmlFor="reason">Reason</Label>
-                      <Controller
-                        name="reason"
-                        control={form.control}
-                        render={({ field }) => (
-                          <Textarea
-                            {...field}
-                            id="reason"
-                            placeholder="Employee's reason for leave..."
-                            className="min-h-[120px] border-theme/20 bg-theme/5 focus-visible:ring-theme/20"
-                          />
-                        )}
-                      />
-                    </div>
-
-                    {/* Form Inputs */}
-                    <div className="grid grid-cols-2 gap-6 pb-6">
-                      <div className="space-y-2">
-                        <Label htmlFor="totalDays">Number Of Days</Label>
-                        <Controller
-                          name="totalDays"
-                          control={form.control}
-                          render={({ field, fieldState }) => (
-                            <>
-                              <Input
-                                id="totalDays"
-                                type="number"
-                                min={1}
-                                {...field}
-                                onChange={(e) =>
-                                  field.onChange(parseFloat(e.target.value))
-                                }
-                              />
-                              {fieldState.error && (
-                                <span className="text-xs text-red-500">
-                                  {fieldState.error.message}
-                                </span>
-                              )}
-                            </>
-                          )}
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="totalHours">Number Of Hours</Label>
-                        <Controller
-                          name="totalHours"
-                          control={form.control}
-                          render={({ field, fieldState }) => (
-                            <>
-                              <Input
-                                id="totalHours"
-                                type="number"
-                                {...field}
-                                onChange={(e) =>
-                                  field.onChange(parseFloat(e.target.value))
-                                }
-                              />
-                              {fieldState.error && (
-                                <span className="text-xs text-red-500">
-                                  {fieldState.error.message}
-                                </span>
-                              )}
-                            </>
-                          )}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Action Footer */}
-                    <div className=" flex justify-between gap-3 border-t border-gray-100 pt-6">
-                      {selectedLeave.status === 'pending' ? (
-                        <>
-                          <Button
-                            variant="destructive"
-                            onClick={() => {
-                              setIsSheetOpen(false);
-                              setShowRejectConfirmModal(true);
-                            }}
-                          >
-                            Reject
-                          </Button>
-
-                          <div className="flex flex-row items-center gap-4">
-                            <Button
-                              variant="outline"
-                              onClick={() => setIsSheetOpen(false)}
-                            >
-                              Cancel
-                            </Button>
-                            <Button
-                              onClick={form.handleSubmit((data) =>
-                                handleActionSubmit('approved', data)
-                              )}
-                            >
-                              Approve
-                            </Button>
-                          </div>
-                        </>
-                      ) : (
-                        <div className="flex w-full justify-end gap-3">
-                          <Button
-                            variant="outline"
-                            onClick={() => setIsSheetOpen(false)}
-                          >
-                            Close
-                          </Button>
-                          <Button
-                            onClick={form.handleSubmit((data) =>
-                              handleActionSubmit('update', data)
-                            )}
-                          >
-                            Update Details
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* History Timeline Section */}
-                    {selectedLeave.history &&
-                      selectedLeave.history.length > 0 && (
-                        <div className="mb-6 mt-8 space-y-4 rounded-lg  ">
-                          <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider ">
-                            <Clock className="h-4 w-4" /> Activity History
-                          </h3>
-                          <div className="space-y-3">
-                            {[...selectedLeave.history]
-                              .reverse()
-                              .map((log, idx) => (
-                                <div
-                                  key={idx}
-                                  className="flex flex-col border-l-2 border-theme/30 pl-3 text-sm"
-                                >
-                                  <span className="font-medium text-gray-800">
-                                    {log.message}{' '}
-                                    {moment(log?.createdAt).format(
-                                      'DD MMM YYYY, hh:mm '
-                                    )}
-                                  </span>
-                                  <span className="mt-0.5 text-xs text-gray-400"></span>
-                                </div>
-                              ))}
-                          </div>
-                        </div>
-                      )}
-                  </div>
+                    )}
+                  </>
                 )}
-              </SheetContent>
-            </Sheet>
+              />
+            </div>
+
+            {/* Visible ONLY to HOLIDAY TYPES */}
+            {selectedLeave.holidayType === 'holiday' && (
+              <div className="space-y-2">
+                <Label htmlFor="totalHours">Number Of Hours</Label>
+                <Controller
+                  name="totalHours"
+                  control={form.control}
+                  render={({ field, fieldState }) => (
+                    <>
+                      <Input
+                        id="totalHours"
+                        type="number"
+                        min={1}
+                        step="0.5"
+                        {...field}
+                        value={
+                          field.value === 0 || Number.isNaN(field.value)
+                            ? ''
+                            : field.value
+                        }
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value);
+                          const parsedHours = isNaN(val) ? '' : val;
+                          field.onChange(parsedHours);
+
+                          // Distribute evenly across editLeaveDays without changing selected dates
+                          if (
+                            parsedHours !== '' &&
+                            Number(parsedHours) >= 0 &&
+                            editLeaveDays.length > 0
+                          ) {
+                            const hrsPerDay =
+                              Number(parsedHours) / editLeaveDays.length;
+                            const updatedDays = editLeaveDays.map((day: any) => ({
+                              ...day,
+                              duration: parseFloat(hrsPerDay.toFixed(2)),
+                              leaveType: hrsPerDay === 0 ? 'dayoff' : 'paid'
+                            }));
+                            setEditLeaveDays(updatedDays);
+                          }
+                        }}
+                      />
+                      {fieldState.error && (
+                        <span className="text-xs text-red-500">
+                          {fieldState.error.message}
+                        </span>
+                      )}
+                    </>
+                  )}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Action Footer */}
+          <div className="flex justify-between gap-3 border-t border-gray-100 pt-6">
+            {selectedLeave.status === 'pending' ? (
+              <>
+                <Button
+                  variant="destructive"
+                  onClick={() => {
+                    setIsSheetOpen(false);
+                    setShowRejectConfirmModal(true);
+                  }}
+                >
+                  Reject
+                </Button>
+
+                <div className="flex flex-row items-center gap-4">
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsSheetOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={form.handleSubmit((data) =>
+                      handleActionSubmit('approved', data)
+                    )}
+                  >
+                    Approve
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <div className="flex w-full justify-end gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => setIsSheetOpen(false)}
+                >
+                  Close
+                </Button>
+                <Button
+                  onClick={form.handleSubmit((data) =>
+                    handleActionSubmit('update', data)
+                  )}
+                >
+                  Update Details
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {/* History Timeline Section */}
+          {selectedLeave.history && selectedLeave.history.length > 0 && (
+            <div className="mb-6 mt-8 space-y-4 rounded-lg">
+              <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider ">
+                <Clock className="h-4 w-4" /> Activity History
+              </h3>
+              <div className="space-y-3">
+                {[...selectedLeave.history]
+                  .reverse()
+                  .map((log: any, idx: number) => (
+                    <div
+                      key={idx}
+                      className="flex flex-col border-l-2 border-theme/30 pl-3 text-sm"
+                    >
+                      <span className="font-medium text-gray-800">
+                        {log.message}{' '}
+                        {moment(log?.createdAt).format(
+                          'DD MMM YYYY, hh:mm '
+                        )}
+                      </span>
+                      <span className="mt-0.5 text-xs text-gray-400"></span>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </> /* 🚀 CLOSED REACT FRAGMENT HERE */
+    )}
+  </SheetContent>
+</Sheet>
 
             {/* ── REJECT CONFIRMATION MODAL ── */}
             <Dialog

@@ -57,7 +57,8 @@ const daysOfWeek = [
   'Thursday',
   'Friday',
   'Saturday',
-  'Sunday'
+  'Sunday',
+  'Holiday'
 ];
 
 export default function EmployeeRate() {
