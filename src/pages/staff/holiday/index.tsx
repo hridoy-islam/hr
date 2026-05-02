@@ -340,7 +340,7 @@ const HolidayPage: React.FC = () => {
   const UploadSection = () => (
     <div className="space-y-2 mb-6">
       <Label className="text-sm font-semibold text-gray-700">
-        Attachments <span className="text-red-500">*</span>
+        Attachments 
       </Label>
       <div
         className={cn(

@@ -397,7 +397,7 @@ const CompanyLeaveApprovalPage: React.FC = () => {
   const UploadSection = () => (
     <div className="space-y-2 mt-4">
       <Label className="text-sm font-semibold text-gray-700">
-        Attachments <span className="text-red-500">*</span>
+        Attachments 
       </Label>
       <div
         className={cn(
@@ -865,13 +865,7 @@ const CompanyLeaveApprovalPage: React.FC = () => {
       return;
     }
 
-    if (selectedType === 'sick' && uploadedFiles.length === 0) {
-      setFormErrors((prev) => ({
-        ...prev,
-        uploadedFiles: 'At least one document is required for sick leave'
-      }));
-      return;
-    }
+   
 
     const formData = {
       holidayYear: selectedYear,
