@@ -32,6 +32,7 @@ import QACheckTab from './tabs/QATab';
 import SupervisionTab from './tabs/SuperVisionCheckTab';
 import SignatureDocumentTab from './tabs/SignatureDocumentTab';
 import SickNoteTab from './tabs/SickNoteTab';
+import LeaverTab from './tabs/leaverTab';
 const EditEmployee = () => {
   const navigate = useNavigate();
   const {
@@ -362,6 +363,20 @@ const EditEmployee = () => {
       )
     },
 
+    {
+      id: 'leaver',
+      label: 'Leaver',
+      component: (
+        <LeaverTab
+          formData={formData}
+          onDateChange={handleDateChange}
+          onUpdate={handleNestedFieldUpdate}
+          onSelectChange={handleSelectChange}
+          onCheckboxChange={handleCheckboxChange}
+          isFieldSaving={isFieldSaving}
+        />
+      )
+    },
     {
       id: 'settings',
       label: 'Settings',
