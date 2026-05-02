@@ -30,9 +30,9 @@ const getInitials = (firstName?: string, lastName?: string, name?: string) => {
 };
 
 const leaveOptions = [
-  { id: 'DO', label: 'Day Off (DO)' },
-  { id: 'AL', label: 'Annual Leave (AL)' },
-  { id: 'S', label: 'Sick (S)' },
+  // { id: 'DO', label: 'Day Off (DO)' },
+  // { id: 'AL', label: 'Annual Leave (AL)' },
+  // { id: 'S', label: 'Sick (S)' },
   { id: 'ML', label: 'Maternity (ML)' },
   { id: 'NT', label: 'No Task (NT)' }
 ];

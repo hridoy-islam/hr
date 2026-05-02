@@ -46,7 +46,7 @@ export default function AdminNoticeBoard() {
   useEffect(() => {
     const fetchFilters = async () => {
       try {
-        const userRes = await axiosInstance.get('/users?role=company&limit=all');
+        const userRes = await axiosInstance.get('/users?role=company&limit=all&status=active');
         setUsers(userRes.data.data.result);
       } catch (err) {
         console.error('Error fetching filters', err);

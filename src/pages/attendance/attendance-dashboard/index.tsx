@@ -128,7 +128,7 @@ export default function AttendanceScanner() {
       if (!companyId) return;
       const [empRes, suRes] = await Promise.all([
         axiosInstance.get(
-          `/users?company=${companyId}&limit=all&role=employee&fields=firstName lastName email phone name`
+          `/users?company=${companyId}&limit=all&status=active&role=employee&fields=firstName lastName email phone name`
         ),
         axiosInstance.get(`/serviceuser?companyId=${companyId}&limit=all`)
       ]);
@@ -351,7 +351,7 @@ const submitDobSearch = async () => {
       console.log('formattedDob we are searching for:', formattedDob);
       
       const response = await axiosInstance.get(
-        `/users?company=${companyId}&limit=all&role=employee`
+        `/users?company=${companyId}&limit=all&role=employee&status=active`
       );
       const usersList = response.data?.data?.result || response.data?.data || [];
 

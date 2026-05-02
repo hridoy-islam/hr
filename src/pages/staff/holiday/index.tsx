@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -26,7 +26,7 @@ import {
   SheetTitle,
   SheetTrigger
 } from '@/components/ui/sheet';
-import { Calendar, CalendarDays, Users, CheckCircle } from 'lucide-react';
+import { Calendar, CalendarDays, Users, CheckCircle, Upload, FileText } from 'lucide-react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import ReactSelect from 'react-select';
@@ -37,6 +37,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 import moment from '@/lib/moment-setup';
 import { useParams } from 'react-router-dom';
+import { cn } from '@/lib/utils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -51,6 +52,7 @@ interface HolidayAPI {
   holidayYear: string;
   totalDays?: number;
   totalHours?: number;
+  documents?: string[];
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -107,7 +109,7 @@ const holidayRequestSchema = z
   });
 
 type HolidayFormErrors = Partial<
-  Record<keyof z.infer<typeof holidayRequestSchema> | 'dateRange', string>
+  Record<keyof z.infer<typeof holidayRequestSchema> | 'dateRange' | 'uploadedFiles', string>
 >;
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -141,6 +143,12 @@ const HolidayPage: React.FC = () => {
   
   // State for Individual Day Durations 
   const [leaveDays, setLeaveDays] = useState<LeaveDayUI[]>([]);
+
+  // File Upload State
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadedFiles, setUploadedFiles] = useState<{ name: string; url: string }[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [formErrors, setFormErrors] = useState<HolidayFormErrors>({});
@@ -272,164 +280,308 @@ const HolidayPage: React.FC = () => {
     fetchAllData();
   }, [eid, selectedYear]);
 
-  // ── Dynamic Date Picker & Type Auto-Calculator ──
- const calculateLeaveData = (start: Date | undefined, end: Date | undefined, type: string) => {
-  if (start && end) {
-    const isHoliday = type === 'holiday';
-    const daysArr: LeaveDayUI[] = [];
-    let current = new Date(start);
-    let totalHrs = 0;
-    let totalDaysCount = 0;
+  // ── File Upload Logic for Sick Leave ──
+  const getFileNameFromUrl = (url: string) => {
+    if (!url) return 'Document';
+    try {
+      const decoded = decodeURIComponent(url);
+      const parts = decoded.split('/');
+      const filenameWithPrefix = parts[parts.length - 1];
+      const match = filenameWithPrefix.match(/^\d+-(.+)$/);
+      return match ? match[1] : filenameWithPrefix;
+    } catch (e) {
+      return 'Document';
+    }
+  };
 
-    while (current <= end) {
-      const defaultDuration = isHoliday ? leaveAllowance.hoursPerDay : 0;
-      daysArr.push({
-        leaveDate: new Date(current),
-        leaveType: isHoliday ? 'paid' : 'unpaid',
-        duration: defaultDuration
-      });
-      if (isHoliday) totalHrs += defaultDuration;
-      totalDaysCount++;
-      current.setDate(current.getDate() + 1);
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    if (!files.length) return;
+
+    for (const file of files) {
+      if (file.size > 5 * 1024 * 1024) {
+        setUploadError(`File too large: ${file.name}. Must be less than 5MB.`);
+        return;
+      }
     }
 
-    setLeaveDays(daysArr);
+    setIsUploading(true);
+    setUploadError(null);
+    setFormErrors((prev) => ({ ...prev, uploadedFiles: undefined }));
 
-    if (isHoliday) {
-      setCalculatedHours(String(totalHrs));
-      if (leaveAllowance.hoursPerDay > 0) {
-        setCalculatedDays(String(parseFloat((totalHrs / leaveAllowance.hoursPerDay).toFixed(2))));
+    try {
+      const uploadPromises = files.map(async (file) => {
+        const formData = new FormData();
+        formData.append('entityId', eid || '');
+        formData.append('file_type', 'document');
+        formData.append('file', file);
+
+        const res = await axiosInstance.post('/documents', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+
+        return { name: file.name, url: res.data?.data?.fileUrl };
+      });
+
+      const uploadedResults = await Promise.all(uploadPromises);
+      setUploadedFiles((prev) => [...prev, ...uploadedResults]);
+    } catch (err) {
+      setUploadError('Failed to upload one or more documents.');
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleRemoveFile = (indexToRemove: number) => {
+    setUploadedFiles((prev) => prev.filter((_, index) => index !== indexToRemove));
+  };
+
+  const UploadSection = () => (
+    <div className="space-y-2 mb-6">
+      <Label className="text-sm font-semibold text-gray-700">
+        Attachments <span className="text-red-500">*</span>
+      </Label>
+      <div
+        className={cn(
+          'relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-8 transition-all',
+          isUploading
+            ? 'border-theme bg-theme/5'
+            : formErrors.uploadedFiles
+              ? 'border-red-500 bg-red-50 hover:bg-red-100/50'
+              : 'border-gray-300 bg-gray-50 hover:border-gray-400 hover:bg-gray-100/80'
+        )}
+      >
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          onChange={handleFileSelect}
+          className="absolute inset-0 z-10 cursor-pointer opacity-0"
+          disabled={isUploading}
+        />
+        {isUploading ? (
+          <div className="flex flex-col items-center gap-3">
+            <div className="h-6 w-6 animate-spin rounded-full border-2 border-theme border-t-transparent"></div>
+            <p className="text-sm font-medium text-theme">Uploading files...</p>
+          </div>
+        ) : (
+          <div className="pointer-events-none flex flex-col items-center gap-2 text-center h-12">
+            <div className="mb-1 flex h-10 w-10 items-center justify-center rounded-full ">
+              <Upload
+                className={cn(
+                  'h-5 w-5',
+                  formErrors.uploadedFiles ? 'text-red-500' : 'text-gray-500'
+                )}
+              />
+            </div>
+            <span
+              className={cn(
+                'text-sm font-semibold',
+                formErrors.uploadedFiles ? 'text-red-600' : 'text-gray-700'
+              )}
+            >
+              Click or drag to upload
+            </span>
+            <span className="text-xs text-gray-500">(Max 5MB)</span>
+          </div>
+        )}
+      </div>
+
+      {formErrors.uploadedFiles && !isUploading && (
+        <p className="text-xs font-medium text-red-500">{formErrors.uploadedFiles}</p>
+      )}
+
+      {uploadError && (
+        <p className="mt-2 flex items-center gap-1 text-sm font-medium text-red-500">
+          <span className="h-1 w-1 rounded-full bg-red-500"></span> {uploadError}
+        </p>
+      )}
+
+      {uploadedFiles.length > 0 && (
+        <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50/50 p-2">
+          <ul className="max-h-[140px] space-y-2 overflow-y-auto pr-1">
+            {uploadedFiles.map((file, index) => (
+              <li
+                key={index}
+                className="flex items-center justify-between rounded-md border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm"
+              >
+                <div className="flex items-center gap-2 overflow-hidden">
+                  <FileText className="h-4 w-4 flex-shrink-0 text-theme" />
+                  <span className="truncate font-medium text-gray-700" title={file.name}>
+                    {getFileNameFromUrl(file.url)}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleRemoveFile(index)}
+                  className="ml-3 text-gray-400 transition-colors hover:text-red-500"
+                >
+                  &times;
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+
+  // ── Dynamic Date Picker & Type Auto-Calculator ──
+  const calculateLeaveData = (start: Date | undefined, end: Date | undefined, type: string) => {
+    if (start && end) {
+      const isHoliday = type === 'holiday';
+      const daysArr: LeaveDayUI[] = [];
+      let current = new Date(start);
+      let totalHrs = 0;
+      let totalDaysCount = 0;
+
+      while (current <= end) {
+        const defaultDuration = isHoliday ? leaveAllowance.hoursPerDay : 0;
+        daysArr.push({
+          leaveDate: new Date(current),
+          leaveType: isHoliday ? 'paid' : 'unpaid',
+          duration: defaultDuration
+        });
+        if (isHoliday) totalHrs += defaultDuration;
+        totalDaysCount++;
+        current.setDate(current.getDate() + 1);
+      }
+
+      setLeaveDays(daysArr);
+
+      if (isHoliday) {
+        setCalculatedHours(String(totalHrs));
+        if (leaveAllowance.hoursPerDay > 0) {
+          setCalculatedDays(String(parseFloat((totalHrs / leaveAllowance.hoursPerDay).toFixed(2))));
+        }
+      } else {
+        setCalculatedDays(String(totalDaysCount)); // ← actual day count, not '0'
+        setCalculatedHours('0');
       }
     } else {
-      setCalculatedDays(String(totalDaysCount)); // ← actual day count, not '0'
-      setCalculatedHours('0');
+      setLeaveDays([]);
+      setCalculatedDays('');
+      setCalculatedHours('');
     }
-  } else {
-    setLeaveDays([]);
-    setCalculatedDays('');
-    setCalculatedHours('');
-  }
-};
+  };
 
   // ── Handler for Modifying Specific Day Duration ──
   const handleDayDurationChange = (index: number, newDuration: string) => {
-  let sanitized = newDuration;
-  if (sanitized.includes('.')) {
-    const [whole, decimal] = sanitized.split('.');
-    if (decimal.length > 2) sanitized = `${whole}.${decimal.slice(0, 2)}`;
-  }
+    let sanitized = newDuration;
+    if (sanitized.includes('.')) {
+      const [whole, decimal] = sanitized.split('.');
+      if (decimal.length > 2) sanitized = `${whole}.${decimal.slice(0, 2)}`;
+    }
 
-  const updatedDays = [...leaveDays];
-  updatedDays[index].duration = sanitized;
+    const updatedDays = [...leaveDays];
+    updatedDays[index].duration = sanitized;
 
-  const numericDuration = parseFloat(sanitized);
-  const safeDuration = isNaN(numericDuration) ? 0 : Math.max(0, numericDuration);
+    const numericDuration = parseFloat(sanitized);
+    const safeDuration = isNaN(numericDuration) ? 0 : Math.max(0, numericDuration);
 
-  updatedDays[index].leaveType = safeDuration === 0 ? 'dayoff' : 'paid';
+    updatedDays[index].leaveType = safeDuration === 0 ? 'dayoff' : 'paid';
 
-  setLeaveDays(updatedDays);
+    setLeaveDays(updatedDays);
 
-  const totalHrs = updatedDays.reduce((acc, curr) => {
-    const d = parseFloat(String(curr.duration));
-    return acc + (isNaN(d) ? 0 : d);
-  }, 0);
+    const totalHrs = updatedDays.reduce((acc, curr) => {
+      const d = parseFloat(String(curr.duration));
+      return acc + (isNaN(d) ? 0 : d);
+    }, 0);
 
-  setCalculatedHours(String(totalHrs));
-  setFormErrors((prev) => ({ ...prev, totalHours: undefined }));
-};
+    setCalculatedHours(String(totalHrs));
+    setFormErrors((prev) => ({ ...prev, totalHours: undefined }));
+  };
 
   // ── Handlers for Manual Totals Override (Days & Hours) ──
   const handleDaysChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-  let value = e.target.value;
+    let value = e.target.value;
 
-  // Clamp to 2 decimal places
-  if (value.includes('.')) {
-    const [whole, decimal] = value.split('.');
-    if (decimal.length > 2) value = `${whole}.${decimal.slice(0, 2)}`;
-  }
-
-  setCalculatedDays(value);
-  clearError('totalDays');
-
-  const parsedDays = parseFloat(value);
-
-  if (isNaN(parsedDays) || parsedDays < 0) {
-    if (selectedType === 'holiday') setCalculatedHours('');
-    return;
-  }
-
-  if (startDate) {
-    const addedDays = Math.max(0, Math.ceil(parsedDays) - 1);
-    const newEndDate = new Date(startDate);
-    newEndDate.setDate(newEndDate.getDate() + addedDays);
-    setEndDate(newEndDate);
-
-    if (selectedType === 'holiday') {
-      const newHours = parsedDays * leaveAllowance.hoursPerDay;
-      setCalculatedHours(String(newHours));
-
-      const daysArr: LeaveDayUI[] = [];
-      let current = new Date(startDate);
-      const numDays = addedDays + 1;
-      const hrsPerDay = newHours / numDays;
-
-      while (current <= newEndDate) {
-        daysArr.push({
-          leaveDate: new Date(current),
-          leaveType: hrsPerDay === 0 ? 'dayoff' : 'paid',
-          duration: parseFloat(hrsPerDay.toFixed(2))
-        });
-        current.setDate(current.getDate() + 1);
-      }
-      setLeaveDays(daysArr);
-    } else {
-      // Non-holiday: hours stay 0, rebuild days array with 0 duration
-      setCalculatedHours('0');
-      const daysArr: LeaveDayUI[] = [];
-      let current = new Date(startDate);
-      while (current <= newEndDate) {
-        daysArr.push({
-          leaveDate: new Date(current),
-          leaveType: 'unpaid',
-          duration: 0
-        });
-        current.setDate(current.getDate() + 1);
-      }
-      setLeaveDays(daysArr);
+    if (value.includes('.')) {
+      const [whole, decimal] = value.split('.');
+      if (decimal.length > 2) value = `${whole}.${decimal.slice(0, 2)}`;
     }
-  }
-};
 
-const handleHoursChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-  let value = e.target.value;
+    setCalculatedDays(value);
+    clearError('totalDays');
 
-  // Clamp to 2 decimal places
-  if (value.includes('.')) {
-    const [whole, decimal] = value.split('.');
-    if (decimal.length > 2) value = `${whole}.${decimal.slice(0, 2)}`;
-  }
+    const parsedDays = parseFloat(value);
 
-  setCalculatedHours(value);
-  clearError('totalHours');
+    if (isNaN(parsedDays) || parsedDays < 0) {
+      if (selectedType === 'holiday') setCalculatedHours('');
+      return;
+    }
 
-  const parsedHours = parseFloat(value);
+    if (startDate) {
+      const addedDays = Math.max(0, Math.ceil(parsedDays) - 1);
+      const newEndDate = new Date(startDate);
+      newEndDate.setDate(newEndDate.getDate() + addedDays);
+      setEndDate(newEndDate);
 
-  if (isNaN(parsedHours) || parsedHours < 0) {
+      if (selectedType === 'holiday') {
+        const newHours = parsedDays * leaveAllowance.hoursPerDay;
+        setCalculatedHours(String(newHours));
+
+        const daysArr: LeaveDayUI[] = [];
+        let current = new Date(startDate);
+        const numDays = addedDays + 1;
+        const hrsPerDay = newHours / numDays;
+
+        while (current <= newEndDate) {
+          daysArr.push({
+            leaveDate: new Date(current),
+            leaveType: hrsPerDay === 0 ? 'dayoff' : 'paid',
+            duration: parseFloat(hrsPerDay.toFixed(2))
+          });
+          current.setDate(current.getDate() + 1);
+        }
+        setLeaveDays(daysArr);
+      } else {
+        setCalculatedHours('0');
+        const daysArr: LeaveDayUI[] = [];
+        let current = new Date(startDate);
+        while (current <= newEndDate) {
+          daysArr.push({
+            leaveDate: new Date(current),
+            leaveType: 'unpaid',
+            duration: 0
+          });
+          current.setDate(current.getDate() + 1);
+        }
+        setLeaveDays(daysArr);
+      }
+    }
+  };
+
+  const handleHoursChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value;
+
+    if (value.includes('.')) {
+      const [whole, decimal] = value.split('.');
+      if (decimal.length > 2) value = `${whole}.${decimal.slice(0, 2)}`;
+    }
+
+    setCalculatedHours(value);
+    clearError('totalHours');
+
+    const parsedHours = parseFloat(value);
+
+    if (isNaN(parsedHours) || parsedHours < 0) {
+      if (leaveDays.length > 0) {
+        setLeaveDays(leaveDays.map((day) => ({ ...day, duration: '', leaveType: 'dayoff' })));
+      }
+      return;
+    }
+
     if (leaveDays.length > 0) {
-      setLeaveDays(leaveDays.map((day) => ({ ...day, duration: '', leaveType: 'dayoff' })));
+      const hrsPerDay = parsedHours / leaveDays.length;
+      setLeaveDays(leaveDays.map((day) => ({
+        ...day,
+        duration: parseFloat(hrsPerDay.toFixed(2)),
+        leaveType: hrsPerDay === 0 ? 'dayoff' : 'paid'
+      })));
     }
-    return;
-  }
-
-  if (leaveDays.length > 0) {
-    const hrsPerDay = parsedHours / leaveDays.length;
-    setLeaveDays(leaveDays.map((day) => ({
-      ...day,
-      duration: parseFloat(hrsPerDay.toFixed(2)),
-      leaveType: hrsPerDay === 0 ? 'dayoff' : 'paid'
-    })));
-  }
-};
+  };
 
   const clearError = (field: keyof HolidayFormErrors) => {
     setFormErrors((prev) => ({ ...prev, [field]: undefined }));
@@ -572,18 +724,15 @@ const handleHoursChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 
   // ── Submit ──
   const handleSubmitRequest = async () => {
+   
     const formData = {
       holidayYear: selectedYear,
       reason,
       holidayType: selectedType,
       startDate: startDate as Date,
       endDate: endDate as Date,
-      totalDays:
-        parseFloat(String(calculatedDays)) || 0,
-      totalHours:
-        selectedType === 'holiday'
-          ? parseFloat(String(calculatedHours)) || 0
-          : 0
+      totalDays: parseFloat(String(calculatedDays)) || 0,
+      totalHours: selectedType === 'holiday' ? parseFloat(String(calculatedHours)) || 0 : 0
     };
 
     const result = holidayRequestSchema.safeParse(formData);
@@ -606,11 +755,10 @@ const handleHoursChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setIsSubmitting(true);
 
     try {
-      // 🚀 Explicit fallback enforcement: If not a holiday, force duration strictly to 0 for all days.
       const dbLeaveDays = leaveDays.map((day) => ({
         leaveDate: day.leaveDate,
         leaveType: selectedType === 'holiday' ? day.leaveType : 'unpaid',
-        duration: selectedType === 'holiday' 
+        duration: (selectedType === 'holiday' || selectedType === 'sick') 
           ? (isNaN(parseFloat(String(day.duration))) ? 0 : parseFloat(String(day.duration)))
           : 0
       }));
@@ -626,6 +774,7 @@ const handleHoursChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         totalDays: result.data.totalDays,
         totalHours: result.data.totalHours,
         leaveDays: dbLeaveDays, 
+        documents: uploadedFiles.map(f => f.url),
         status: 'pending',
         title: title || `${selectedType} Request`
       });
@@ -640,6 +789,7 @@ const handleHoursChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       setCalculatedDays('');
       setCalculatedHours('');
       setLeaveDays([]);
+      setUploadedFiles([]);
       setFormErrors({});
       setIsDrawerOpen(false);
 
@@ -696,8 +846,13 @@ const handleHoursChange = (e: React.ChangeEvent<HTMLInputElement>) => {
                     My Leave Requests
                   </div>
                   
-                  {/* 🚀 NEW UPDATED UI FOR CREATE LEAVE REQUEST DRAWER */}
-                  <Sheet open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
+                  <Sheet open={isDrawerOpen} onOpenChange={(val) => {
+                      setIsDrawerOpen(val);
+                      if (val) {
+                          setUploadedFiles([]);
+                          setFormErrors({});
+                      }
+                  }}>
                     <SheetTrigger asChild>
                       <Button className="">Create Leave Request</Button>
                     </SheetTrigger>
@@ -711,7 +866,6 @@ const handleHoursChange = (e: React.ChangeEvent<HTMLInputElement>) => {
                       </SheetHeader>
 
                       <div className="space-y-2 max-h-screen">
-                        {/* 2-Column Grid to layout Year and Type side-by-side as requested */}
                         <div className="grid grid-cols-2 items-start gap-2">
                           {/* Holiday Year */}
                           <div className="">
@@ -805,7 +959,6 @@ const handleHoursChange = (e: React.ChangeEvent<HTMLInputElement>) => {
                             endDate={endDate}
                             onChange={(dates) => {
                               const [start, end] = dates;
-                              // 🚀 FIX: Normalize dates to exactly 12:00 PM (Noon) local time to prevent UTC boundary shifts!
                               const safeStart = start
                                 ? new Date(
                                     start.getFullYear(),
@@ -875,8 +1028,7 @@ const handleHoursChange = (e: React.ChangeEvent<HTMLInputElement>) => {
                         {/* 🚀 Conditional Render based on Selected Type */}
                         {selectedType && (
                           <div className="space-y-1">
-                            {/* Daily Duration Breakdown Grid - Only shows if 'holiday' and leaveDays populated */}
-                            {selectedType === 'holiday' &&
+                            {(selectedType === 'holiday') &&
                               leaveDays.length > 0 && (
                                 <>
                                   <Label className="block w-full pt-2 text-sm font-semibold text-gray-700">
@@ -917,15 +1069,11 @@ const handleHoursChange = (e: React.ChangeEvent<HTMLInputElement>) => {
                                 </>
                               )}
 
-                            {/* User Editable Summary Totals */}
                             <div
-                              className={`grid ${
-                                selectedType === 'holiday'
-                                  ? 'grid-cols-2'
-                                  : 'grid-cols-1'
-                              } mt-4 gap-4`}
+                              className={`grid grid-cols-2
+                                 
+                               mt-4 gap-4`}
                             >
-                              {/* Total Days - Visible to ALL TYPES */}
                               <div className="space-y-1">
                                 <Label htmlFor="duration-days">
                                   {selectedType === 'holiday'
@@ -951,7 +1099,6 @@ const handleHoursChange = (e: React.ChangeEvent<HTMLInputElement>) => {
                                 )}
                               </div>
 
-                              {/* Total Hours - Visible ONLY to HOLIDAY TYPES */}
                               {selectedType === 'holiday' && (
                                 <div className="space-y-1">
                                   <Label htmlFor="duration-hours">
@@ -977,13 +1124,16 @@ const handleHoursChange = (e: React.ChangeEvent<HTMLInputElement>) => {
                                 </div>
                               )}
                             </div>
+
+                            {/* 🚀 Required Upload For Sick Leave */}
+                            {selectedType === 'sick' && <UploadSection />}
                           </div>
                         )}
 
                         <Button
                           onClick={handleSubmitRequest}
                           className="mt-4 w-full bg-theme text-white hover:bg-theme/90"
-                          disabled={isSubmitting}
+                          disabled={isSubmitting || isUploading}
                         >
                           <Calendar className="mr-2 h-4 w-4" />
                           {isSubmitting ? 'Submitting...' : 'Submit Request'}

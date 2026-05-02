@@ -134,7 +134,7 @@ export default function EditRotaSidebar({
   const isStandard = !watchLeaveType;
   
   // 🚀 Lock UI if the shift is an auto-generated AL or DO 
-  const isLeaveGenerated = watchLeaveType === 'AL' || watchLeaveType === 'DO';
+  const isLeaveGenerated = watchLeaveType === 'AL' || watchLeaveType === 'DO' || watchLeaveType === 'S';
 
   // Collect all history entries across all rota slots, sorted latest first
   const allHistory = (() => {
@@ -320,7 +320,7 @@ export default function EditRotaSidebar({
  const leaveOptions = [
     // { id: 'DO', label: 'Day Off (DO)' },
     // { id: 'AL', label: 'Annual Leave (AL)' },
-    { id: 'S', label: 'Sick (S)' },
+    // { id: 'S', label: 'Sick (S)' },
     { id: 'ML', label: 'Maternity (ML)' },
     { id: 'NT', label: 'No Task (NT)' }
   ];
@@ -383,10 +383,14 @@ export default function EditRotaSidebar({
               <div className="mx-5 mt-3 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3">
                 <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
                 <p className="text-xs font-medium leading-relaxed text-amber-800">
-                  This shift was generated from an approved Leave Request (
-                  {watchLeaveType === 'AL' ? 'Annual Leave' : 'Day Off'}). It
-                  cannot be edited or deleted from the Rota.
-                </p>
+  This shift was generated from an approved Leave Request (
+  {watchLeaveType === 'AL'
+    ? 'Annual Leave'
+    : watchLeaveType === 'S'
+    ? 'Sick Leave'
+    : 'Day Off'}
+  ). It cannot be edited or deleted from the Rota.
+</p>
               </div>
             )}
 
@@ -436,7 +440,7 @@ export default function EditRotaSidebar({
                 </div>
 
                 {/* 🚀 AL Display: Show ONLY Duration in Hours */}
-                {watchLeaveType === 'AL' ? (
+                {watchLeaveType === 'AL'  ? (
                   <div className="space-y-4">
                     <h3 className="text-sm font-bold">Leave Duration</h3>
                     

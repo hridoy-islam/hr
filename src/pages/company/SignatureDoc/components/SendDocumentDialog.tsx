@@ -98,7 +98,7 @@ export function SendDocumentDialog({
   useEffect(() => {
     if (companyId) {
       axiosInstance
-        .get(`/users?company=${companyId}&limit=all&role=employee`)
+        .get(`/users?company=${companyId}&limit=all&role=employee&status=active`)
         .then((res) => setEmployees(res.data.data.result || []))
         .catch((err) => console.error(err));
     }

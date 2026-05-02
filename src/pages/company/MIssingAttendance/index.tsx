@@ -137,7 +137,7 @@ export default function MissingAttendancePage() {
       if (!companyId) return;
       try {
         const res = await axiosInstance.get(
-          `/users?limit=all&role=employee&company=${companyId}`
+          `/users?limit=all&role=employee&company=${companyId}&status=active`
         );
         const fetchedUsers: User[] =
           res.data?.data?.result || res.data?.data || [];

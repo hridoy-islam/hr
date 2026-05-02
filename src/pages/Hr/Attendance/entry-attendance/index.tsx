@@ -73,7 +73,7 @@ export default function EntryAttendance() {
       try {
         setLoading((prev) => ({ ...prev, employees: true }));
         const empRes = await axiosInstance.get(
-          '/users?role=employee&limit=all'
+          '/users?role=employee&limit=all&status=active'
         );
         setEmployees(empRes?.data?.data?.result || []);
       } catch (error: any) {

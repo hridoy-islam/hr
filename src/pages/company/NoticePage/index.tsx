@@ -54,7 +54,7 @@ export default function CompanyNoticeBoard() {
         const [deptRes, desigRes, userRes] = await Promise.all([
           axiosInstance.get(`/hr/department?companyId=${companyId}&limit=all`),
           axiosInstance.get(`/hr/designation?companyId=${companyId}&limit=all`),
-          axiosInstance.get(`/users?company=${companyId}&limit=all`)
+          axiosInstance.get(`/users?company=${companyId}&limit=all&status=active`)
         ]);
         setDepartments(deptRes.data.data.result);
         setDesignations(desigRes.data.data.result);

@@ -260,7 +260,7 @@ const AttendancePage = () => {
           axiosInstance.get(`/hr/designation?companyId=${companyId}&limit=all`),
           axiosInstance.get(`/hr/department?companyId=${companyId}&limit=all`),
           axiosInstance.get(
-            `/users?company=${companyId}&limit=all&role=employee`
+            `/users?company=${companyId}&limit=all&role=employee&status=active`
           )
         ]);
 

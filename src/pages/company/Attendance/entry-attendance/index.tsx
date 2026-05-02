@@ -119,7 +119,7 @@ export default function EntryAttendance() {
     const fetchEmployees = async () => {
       try {
         const empRes = await axiosInstance.get(
-          `/users?company=${companyId}&role=employee&limit=all`
+          `/users?company=${companyId}&status=active&role=employee&limit=all`
         );
         setEmployees(empRes.data.data.result || []);
       } catch (error) {

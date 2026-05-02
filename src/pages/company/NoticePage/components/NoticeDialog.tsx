@@ -74,7 +74,7 @@ export function NoticeDialog({
       const [deptRes, desigRes, usersRes] = await Promise.all([
         axiosInstance.get(`/hr/department?companyId=${companyId}&limit=all`),
         axiosInstance.get(`/hr/designation?companyId=${companyId}&limit=all`),
-        axiosInstance.get(`/users?company=${companyId}&limit=all`)
+        axiosInstance.get(`/users?company=${companyId}&limit=all&status=active`)
       ]);
 
       setDepartmentOptions(

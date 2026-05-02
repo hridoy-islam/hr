@@ -54,8 +54,23 @@ interface TSickNote {
   updatedAt?: string;
 }
 
+// Extract actual filename, stripping the timestamp prefix
+const getFileNameFromUrl = (url: string) => {
+  if (!url) return 'Document';
+  try {
+    const decoded = decodeURIComponent(url);
+    const parts = decoded.split('/');
+    const filenameWithPrefix = parts[parts.length - 1];
+    // Regex matches numbers followed by a hyphen (e.g. 1777724870607-Payroll.pdf)
+    const match = filenameWithPrefix.match(/^\d+-(.+)$/);
+    return match ? match[1] : filenameWithPrefix;
+  } catch (e) {
+    return 'Document';
+  }
+};
+
 export default function SickNoteTab() {
-  const { id,eid } = useParams();
+  const { id, eid } = useParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // --- State ---
@@ -78,6 +93,7 @@ export default function SickNoteTab() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [entriesPerPage, setEntriesPerPage] = useState(50);
+
   // --- Data Fetching ---
   const fetchSickNotes = async (page: number, entriesPerPage: number) => {
     if (!eid) return;
@@ -87,11 +103,10 @@ export default function SickNoteTab() {
         params: {
           page,
           limit: entriesPerPage,
-          companyId: id,
+          companyId: id
         }
       });
-            setTotalPages(res.data.data.meta.totalPage);
-
+      setTotalPages(res.data.data.meta.totalPage);
       setSickNotes(res.data?.data?.result || []);
     } catch (error) {
       console.error('Failed to fetch sick notes', error);
@@ -215,8 +230,6 @@ export default function SickNoteTab() {
     }
   };
 
-
-
   return (
     <div className="w-full space-y-6">
       {/* Header & Actions */}
@@ -229,23 +242,23 @@ export default function SickNoteTab() {
 
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button
+            {/* <Button
               onClick={handleOpenCreate}
               className="bg-theme text-white shadow-sm hover:bg-theme/90"
             >
               <Plus className="mr-2 h-4 w-4" /> Add Sick Note
-            </Button>
+            </Button> */}
           </DialogTrigger>
 
-          <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
+          <DialogContent className="max-h-[90vh] overflow-y-auto border-none sm:max-w-xl">
             <DialogHeader>
               <DialogTitle>
                 {editingNote ? 'Edit Sick Note' : 'Record Sick Note'}
               </DialogTitle>
-              <DialogDescription>
+              {/* <DialogDescription>
                 Provide details and dates of the sickness absence, and attach
                 any relevant medical documents.
-              </DialogDescription>
+              </DialogDescription> */}
             </DialogHeader>
 
             <form onSubmit={handleSubmit} className="space-y-5 py-4">
@@ -259,7 +272,7 @@ export default function SickNoteTab() {
                   placeholder="Describe the reason for the sick leave..."
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
-                  className="resize-none bg-gray-50 text-sm"
+                  className="h-20 resize-none bg-gray-50 text-sm"
                   rows={4}
                   required
                 />
@@ -281,6 +294,7 @@ export default function SickNoteTab() {
                       placeholderText="Select start date"
                       className="flex h-10 w-full rounded-md border border-gray-400 bg-gray-50 px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                       required
+                      wrapperClassName="w-full"
                       preventOpenOnFocus
                     />
                   </div>
@@ -301,6 +315,7 @@ export default function SickNoteTab() {
                       placeholderText="Select end date"
                       className="flex h-10 w-full rounded-md border border-gray-400 bg-gray-50 px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                       required
+                      wrapperClassName="w-full"
                       preventOpenOnFocus
                     />
                   </div>
@@ -363,15 +378,15 @@ export default function SickNoteTab() {
                           key={index}
                           className="flex items-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-1.5 shadow-sm"
                         >
-                          <FileText className="h-4 w-4 text-emerald-600" />
+                          <FileText className="h-4 w-4 shrink-0 text-emerald-600" />
                           <a
                             href={docUrl}
                             target="_blank"
                             rel="noreferrer"
-                            className="max-w-[120px] truncate text-xs font-medium text-gray-700 hover:underline"
-                            title={docUrl}
+                            className="max-w-[150px] truncate text-xs font-medium text-gray-700 hover:underline"
+                            title={getFileNameFromUrl(docUrl)}
                           >
-                            Document {index + 1}
+                            {getFileNameFromUrl(docUrl)}
                           </a>
                           <button
                             type="button"
@@ -492,10 +507,13 @@ export default function SickNoteTab() {
                             href={docUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100"
+                            className="inline-flex max-w-[150px] items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100"
+                            title={getFileNameFromUrl(docUrl)}
                           >
-                            <FileText className="h-3 w-3" />
-                            Document {index + 1}
+                            <FileText className="h-3 w-3 shrink-0" />
+                            <span className="truncate">
+                              {getFileNameFromUrl(docUrl)}
+                            </span>
                           </a>
                         ))}
                       </div>
@@ -522,7 +540,7 @@ export default function SickNoteTab() {
         )}
 
         {totalPages > 1 && (
-          <div className='p-2'>
+          <div className="p-2">
             <DynamicPagination
               pageSize={entriesPerPage}
               setPageSize={setEntriesPerPage}

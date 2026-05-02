@@ -612,7 +612,7 @@ export default function MissingAttendanceCalendarPage() {
       );
 
       const userRes = await axiosInstance.get(
-        `/users?limit=all&role=employee&company=${companyId}`
+        `/users?limit=all&role=employee&company=${companyId}&status=active`
       );
       const fetchedUsers: User[] =
         userRes.data?.data?.result || userRes.data?.data || [];
