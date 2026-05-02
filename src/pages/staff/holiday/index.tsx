@@ -601,12 +601,10 @@ const HolidayPage: React.FC = () => {
     }
   };
 
-  const formatHours = (hours: number): string => {
-    if (!hours) return '0:00';
-    const h = Math.floor(hours);
-    const min = Math.round((hours - h) * 60);
-    return `${h}:${min.toString().padStart(2, '0')}`;
-  };
+const formatHours = (hours: number): string => {
+  if (!hours) return '0 h';
+  return `${hours.toFixed(2)} h`;
+};
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -1208,7 +1206,7 @@ const HolidayPage: React.FC = () => {
                           <TableHead>Start Date</TableHead>
                           <TableHead>End Date</TableHead>
                           <TableHead className="w-[30%]">Reason</TableHead>
-                          <TableHead>Hours</TableHead>
+                          <TableHead className="w-[10%]">Hours</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
