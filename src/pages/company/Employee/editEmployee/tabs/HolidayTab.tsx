@@ -286,7 +286,7 @@ const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
 
   const formatHours = (hours: number): string => {
   if (!hours) return '0 h';
-  return `${hours.toFixed(2)} h`;
+  return `${hours.toFixed(1)} h`;
 };
 
   const getStatusBadge = (status: string) => {
