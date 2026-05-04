@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Users, Plus, Search, X, Upload, FileText } from 'lucide-react';
+import { Users, Plus, Search, X, Upload, FileText, Trash2 } from 'lucide-react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { z } from 'zod';
@@ -25,6 +25,17 @@ import {
   DialogTitle,
   DialogFooter
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { useToast } from '@/components/ui/use-toast';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 import { DynamicPagination } from '@/components/shared/DynamicPagination';
@@ -130,7 +141,7 @@ export default function OfficeMeetingPage() {
   const fetchEmployees = async () => {
     try {
       const response = await axiosInstance.get(`/users`, {
-        params: { company: id, role: 'employee', fields: "firstName lastName email designationId", limit: 'all' }
+        params: { company: id, role: 'employee', fields: "firstName lastName email designationId", limit: 'all', status: 'active' }
       });
       setEmployees(response.data.data.result || response.data.data);
     } catch (error) {
@@ -252,6 +263,25 @@ export default function OfficeMeetingPage() {
     }
   };
 
+  // --- Delete Handler ---
+  const handleDeleteMeeting = async (meetingId: string) => {
+    try {
+      const response = await axiosInstance.delete(`/company-meeting/${meetingId}`);
+      if (response.data?.success) {
+        toast({
+          title: 'Meeting deleted successfully',
+          className: 'bg-theme border-none text-white'
+        });
+        fetchMeetings(currentPage, entriesPerPage);
+      }
+    } catch (error: any) {
+      toast({
+        title: error.response?.data?.message || 'Failed to delete meeting',
+        className: 'bg-red-500 border-none text-white'
+      });
+    }
+  };
+
   // --- Dialog Selection Logic ---
   const filteredEmployees = employees.filter((emp) => {
     const fullName = emp.name || `${emp.firstName} ${emp.lastName}`;
@@ -359,12 +389,39 @@ export default function OfficeMeetingPage() {
                       : 'N/A'}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      size="sm"
-                      onClick={() => navigate(`${meeting._id}`)}
-                    >
-                      View Details
-                    </Button>
+                    <div className='flex flex-row items-center gap-2 justify-end'>
+                      <Button
+                        size="sm"
+                        onClick={() => navigate(`${meeting._id}`)}
+                      >
+                        View Details
+                      </Button>
+                      
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="destructive" size="sm">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This action cannot be undone. This will permanently delete this meeting and remove its data from our servers.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              className="bg-red-500 hover:bg-red-600 text-white"
+                              onClick={() => handleDeleteMeeting(meeting._id)}
+                            >
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
