@@ -1044,10 +1044,7 @@ const CompanyLeaveApprovalPage: React.FC = () => {
         });
         return;
       }
-      if (selectedLeave?.holidayType === 'sick' && uploadedFiles.length === 0) {
-        setUploadError('At least one document is required for sick leave approval');
-        return;
-      }
+      
     }
 
     try {
