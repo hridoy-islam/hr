@@ -233,7 +233,7 @@ export default function CreateRotaDialog({
   if (!isOpen) return null;
 
   const leaveOptions = [
-    // { id: 'DO', label: 'Day Off (DO)' },
+    { id: 'DO', label: 'Day Off (DO)' },
     // { id: 'AL', label: 'Annual Leave (AL)' },
     // { id: 'S', label: 'Sick (S)' },
     { id: 'ML', label: 'Maternity (ML)' },

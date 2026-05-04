@@ -134,7 +134,7 @@ export default function EditRotaSidebar({
   const isStandard = !watchLeaveType;
   
   // 🚀 Lock UI if the shift is an auto-generated AL or DO 
-  const isLeaveGenerated = watchLeaveType === 'AL' || watchLeaveType === 'DO' || watchLeaveType === 'S';
+  const isLeaveGenerated = watchLeaveType === 'AL'  || watchLeaveType === 'S';
 
   // Collect all history entries across all rota slots, sorted latest first
   const allHistory = (() => {
@@ -318,7 +318,7 @@ export default function EditRotaSidebar({
   if (!isOpen || !employee) return null;
 
  const leaveOptions = [
-    // { id: 'DO', label: 'Day Off (DO)' },
+    { id: 'DO', label: 'Day Off (DO)' },
     // { id: 'AL', label: 'Annual Leave (AL)' },
     // { id: 'S', label: 'Sick (S)' },
     { id: 'ML', label: 'Maternity (ML)' },
@@ -387,8 +387,8 @@ export default function EditRotaSidebar({
   {watchLeaveType === 'AL'
     ? 'Annual Leave'
     : watchLeaveType === 'S'
-    ? 'Sick Leave'
-    : 'Day Off'}
+    && 'Sick Leave'
+    }
   ). It cannot be edited or deleted from the Rota.
 </p>
               </div>
