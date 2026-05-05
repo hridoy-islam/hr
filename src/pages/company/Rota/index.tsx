@@ -997,7 +997,8 @@ export default function CompanyRota() {
           startDate: dateKey,
           endDate: dateKey,
           // Requirement: If column is published, paste as published
-          status: isColumnPublished ? 'publish' : 'pending'
+          // status: isColumnPublished ? 'publish' : 'pending'
+          status: 'pending'
         };
         return axiosInstance.post('/rota', payload);
       });

@@ -238,9 +238,6 @@ export default function AddRotaDialog({
 
     const startDate = moment(values.date).format('YYYY-MM-DD');
 
-    // --- NEW: Check if the date is already published ---
-    const isPublished = publishedDates?.has(startDate);
-    const extraPayload = isPublished ? { status: 'publish' } : {};
 
     try {
       if (!isStandardShift) {
@@ -253,7 +250,6 @@ export default function AddRotaDialog({
           endDate: startDate,
           leaveType: values.leaveType,
           shiftName: values.leaveType,
-          ...extraPayload 
         };
         const response = await axiosInstance.post('/rota', payload);
         toast({ title: 'Rota created successfully' });
@@ -281,7 +277,6 @@ export default function AddRotaDialog({
             startTime: shift.startTime,
             endTime: shift.endTime,
             color: values.color,
-            ...extraPayload // <--- ADDED
           };
           const response = await axiosInstance.post('/rota', payload);
           results.push(response.data.data);

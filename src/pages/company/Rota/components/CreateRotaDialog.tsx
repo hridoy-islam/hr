@@ -187,7 +187,6 @@ export default function CreateRotaDialog({
           leaveType: values.leaveType,
           shiftName: values.leaveType,
           departmentId,
-          ...extraPayload // <--- ADDED
         };
         const response = await axiosInstance.post('/rota', payload);
         toast({ title: 'Shift created successfully' });
@@ -216,7 +215,6 @@ export default function CreateRotaDialog({
             endTime: shift.endTime,
             color: values.color,
             departmentId,
-            ...extraPayload // <--- ADDED
           };
           const response = await axiosInstance.post('/rota', payload);
           results.push(response.data.data);
