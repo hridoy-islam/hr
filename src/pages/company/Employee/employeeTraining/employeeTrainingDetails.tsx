@@ -574,7 +574,7 @@ const TrainingDetailsPage: React.FC = () => {
               size={'sm'}
               className="w-full bg-green-600 text-white shadow-sm hover:bg-green-700 md:w-auto"
             >
-              Approve
+              Complete
             </Button>
           )}
           <Button variant="outline" size={'sm'} onClick={onEdit}>
