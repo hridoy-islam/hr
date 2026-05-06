@@ -321,18 +321,10 @@ const TrainingDetailsPage: React.FC = () => {
 
   // Universal Save
   const handleSaveDialog = async () => {
-    if (dialogMode === 'complete') {
-      if (!formData.completedAt) return toast.error('Please select a completion date.');
-      if (formData.certificates.length === 0)
-        return toast.error('Please upload at least one completion certificate.');
-    }
-
+    // Only validate assigned and expire dates in edit_log mode
     if (dialogMode === 'edit_log') {
       if (!formData.assignedDate) return toast.error('Assigned date is required.');
       if (!formData.expireDate) return toast.error('Expiry date is required.');
-      if (!formData.completedAt) return toast.error('Completion date is required.');
-      if (formData.certificates.length === 0)
-        return toast.error('Please upload at least one certificate.');
     }
 
     try {
@@ -457,8 +449,7 @@ const TrainingDetailsPage: React.FC = () => {
     <>
       <div className="space-y-2 pt-2">
         <Label className="text-sm font-medium text-gray-700">
-          Certificate(s){' '}
-          {dialogMode === 'complete' && <span className="text-red-500">*</span>}
+          Certificate(s)
         </Label>
         <div
           className={cn(
@@ -728,10 +719,7 @@ const TrainingDetailsPage: React.FC = () => {
             {dialogMode !== 'edit_active' && (
               <div className="flex flex-col space-y-2 pt-2">
                 <Label className="mb-1">
-                  Completion Date{' '}
-                  {(dialogMode === 'complete' || dialogMode === 'edit_log') && (
-                    <span className="text-red-500">*</span>
-                  )}
+                  Completion Date
                 </Label>
                 <DatePicker
                   selected={formData.completedAt}
@@ -750,7 +738,7 @@ const TrainingDetailsPage: React.FC = () => {
               <>
                 <div className="space-y-2 pt-2">
                   <Label>
-                    Certificate(s) <span className="text-red-500">*</span>
+                    Certificate(s)
                   </Label>
                   <div
                     className={cn(
@@ -831,13 +819,7 @@ const TrainingDetailsPage: React.FC = () => {
               }
               disabled={
                 isUploading ||
-                (dialogMode === 'complete' &&
-                  (formData.certificates.length === 0 || !formData.completedAt)) ||
-                (dialogMode === 'edit_log' &&
-                  (!formData.assignedDate ||
-                    !formData.expireDate ||
-                    !formData.completedAt ||
-                    formData.certificates.length === 0))
+                (dialogMode === 'edit_log' && (!formData.assignedDate || !formData.expireDate))
               }
             >
               {dialogMode === 'complete' ? 'Confirm Completion' : 'Save Changes'}
