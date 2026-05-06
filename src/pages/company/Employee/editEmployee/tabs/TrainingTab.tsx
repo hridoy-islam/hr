@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
   DialogContent,
@@ -18,7 +19,7 @@ import {
   TableHeader,
   TableRow
 } from '@/components/ui/table';
-import { Eye, Plus } from 'lucide-react';
+import { Eye, Plus, CheckCircle, Clock, AlertCircle, AlertTriangle } from 'lucide-react';
 import axiosInstance from '@/lib/axios';
 import moment from '@/lib/moment-setup';
 import ReactSelect from 'react-select';
@@ -37,6 +38,14 @@ type TrainingOption = {
   validityDays?: number;
 };
 
+type CompletionHistoryRecord = {
+  _id: string;
+  assignedDate?: string;
+  expireDate?: string;
+  completedAt?: string;
+  certificate?: string[] | string;
+};
+
 type EmployeeTrainingRecord = {
   _id: string;
   employeeId: {
@@ -49,17 +58,18 @@ type EmployeeTrainingRecord = {
     name: string;
     description?: string;
     validityDays?: number;
-    reminderBeforeDays?: number; // Added this field
+    reminderBeforeDays?: number;
   };
-  assignedDate: string;
-  expireDate: string;
+  assignedDate: string | null;
+  expireDate: string | null;
   status: 'pending' | 'in-progress' | 'completed' | 'expired';
-  certificate?: string;
+  certificate?: string[] | string;
+  completionHistory?: CompletionHistoryRecord[];
 };
 
 const TrainingTab: React.FC = () => {
   const navigate = useNavigate();
-  const { id,eid: employeeId } = useParams();
+  const { id, eid: employeeId } = useParams();
   const { user } = useSelector((state: any) => state.auth);
 
   // State
@@ -188,15 +198,48 @@ const TrainingTab: React.FC = () => {
     }
   };
 
-  // --- 4. Helper: Calculate Status Badge Logic ---
+  // --- 4. Helper: Get the latest completion history log ---
+  const getLatestCompletionLog = (record: EmployeeTrainingRecord): CompletionHistoryRecord | null => {
+    if (record.completionHistory && record.completionHistory.length > 0) {
+      // Sort by completedAt descending to get the latest
+      const sortedHistory = [...record.completionHistory].sort((a, b) => {
+        const dateA = a.completedAt ? new Date(a.completedAt).getTime() : 0;
+        const dateB = b.completedAt ? new Date(b.completedAt).getTime() : 0;
+        return dateB - dateA;
+      });
+      return sortedHistory[0];
+    }
+    return null;
+  };
+
+  // --- 5. Helper: Calculate Status Badge Logic ---
   const getStatusDetails = (record: EmployeeTrainingRecord) => {
-    const { status, expireDate, trainingId } = record;
+    const { status, expireDate, trainingId, assignedDate } = record;
+
+    // If assignedDate and expireDate are null, check completion history
+    if (!assignedDate && !expireDate) {
+      const latestLog = getLatestCompletionLog(record);
+      if (latestLog) {
+        return { 
+          label: 'Completed', 
+          className: 'bg-green-100 text-green-800 border-green-200',
+          icon: <CheckCircle className="h-3 w-3" />
+        };
+      }
+      // If no completion history, show as Pending
+      return { 
+        label: 'Pending', 
+        className: 'bg-blue-100 text-blue-800 border-blue-200',
+        icon: <Clock className="h-3 w-3" />
+      };
+    }
 
     // 1. Completed
     if (status === 'completed') {
       return { 
         label: 'Completed', 
-        className: 'bg-green-100 text-green-800 border-green-200' 
+        className: 'bg-green-100 text-green-800 border-green-200',
+        icon: <CheckCircle className="h-3 w-3" />
       };
     }
 
@@ -204,7 +247,8 @@ const TrainingTab: React.FC = () => {
     if (!expireDate) {
       return { 
         label: 'Pending', 
-        className: 'bg-blue-100 text-blue-800 border-blue-200' 
+        className: 'bg-blue-100 text-blue-800 border-blue-200',
+        icon: <Clock className="h-3 w-3" />
       };
     }
 
@@ -218,7 +262,8 @@ const TrainingTab: React.FC = () => {
     if (today.isAfter(expiry, 'day')) {
       return { 
         label: 'Expired', 
-        className: 'bg-red-100 text-red-800 border-red-200' 
+        className: 'bg-red-100 text-red-800 border-red-200',
+        icon: <AlertCircle className="h-3 w-3" />
       };
     }
 
@@ -226,16 +271,68 @@ const TrainingTab: React.FC = () => {
     if (today.isSameOrAfter(reminderDate, 'day')) {
       return { 
         label: 'Expiring Soon', 
-        className: 'bg-orange-100 text-orange-800 border-orange-200' 
+        className: 'bg-orange-100 text-orange-800 border-orange-200',
+        icon: <AlertTriangle className="h-3 w-3" />
       };
     }
 
-    // 5. Active
+    // 5. In Progress
     return { 
-      label: 'Active', 
-      className: 'bg-blue-100 text-blue-800 border-blue-200' 
+      label: 'In Progress', 
+      className: 'bg-blue-100 text-blue-800 border-blue-200',
+      icon: <Clock className="h-3 w-3" />
     };
   };
+
+  // --- 6. Helper: Get display dates for records with null assignedDate/expireDate ---
+  const getDisplayDates = (record: EmployeeTrainingRecord) => {
+    if (!record.assignedDate && !record.expireDate) {
+      const latestLog = getLatestCompletionLog(record);
+      if (latestLog) {
+        return {
+          assignedDate: latestLog.assignedDate || null,
+          expireDate: latestLog.expireDate || null
+        };
+      }
+    }
+    return {
+      assignedDate: record.assignedDate,
+      expireDate: record.expireDate
+    };
+  };
+
+  // --- 7. Sort training records - Active/In Progress first, then Completed at bottom ---
+  const sortedTrainings = [...employeeTrainings].sort((a, b) => {
+    const statusInfoA = getStatusDetails(a);
+    const statusInfoB = getStatusDetails(b);
+    
+    // Completed records go to the bottom
+    if (statusInfoA.label === 'Completed' && statusInfoB.label !== 'Completed') return 1;
+    if (statusInfoA.label !== 'Completed' && statusInfoB.label === 'Completed') return -1;
+    
+    // For non-completed records, sort by expireDate (ascending - closest expiry first)
+    if (statusInfoA.label !== 'Completed' && statusInfoB.label !== 'Completed') {
+      const datesA = getDisplayDates(a);
+      const datesB = getDisplayDates(b);
+      
+      if (datesA.expireDate && datesB.expireDate) {
+        return new Date(datesA.expireDate).getTime() - new Date(datesB.expireDate).getTime();
+      }
+      if (datesA.expireDate) return -1;
+      if (datesB.expireDate) return 1;
+    }
+    
+    // For completed records, sort by completion date (most recent first)
+    if (statusInfoA.label === 'Completed' && statusInfoB.label === 'Completed') {
+      const logA = getLatestCompletionLog(a);
+      const logB = getLatestCompletionLog(b);
+      const dateA = logA?.completedAt ? new Date(logA.completedAt).getTime() : 0;
+      const dateB = logB?.completedAt ? new Date(logB.completedAt).getTime() : 0;
+      return dateB - dateA;
+    }
+    
+    return 0;
+  });
 
   return (
     <Card className="w-full shadow-sm">
@@ -256,9 +353,9 @@ const TrainingTab: React.FC = () => {
         </div>
 
         {/* Data Table */}
-        <div className="overflow-hidden ">
+        <div className="overflow-hidden">
           <Table>
-            <TableHeader className="">
+            <TableHeader>
               <TableRow>
                 <TableHead>Training Name</TableHead>
                 <TableHead>Assigned Date</TableHead>
@@ -274,10 +371,11 @@ const TrainingTab: React.FC = () => {
                     <BlinkingDots size="large" color="bg-theme" />
                   </TableCell>
                 </TableRow>
-              ) : employeeTrainings.length > 0 ? (
-                employeeTrainings.map((t) => {
+              ) : sortedTrainings.length > 0 ? (
+                sortedTrainings.map((t) => {
                   // Calculate status for this row
                   const statusInfo = getStatusDetails(t);
+                  const displayDates = getDisplayDates(t);
 
                   return (
                     <TableRow key={t._id} className="hover:bg-gray-50/50">
@@ -285,19 +383,20 @@ const TrainingTab: React.FC = () => {
                         {t.trainingId?.name || 'Unknown Training'}
                       </TableCell>
                       <TableCell>
-                        {t.assignedDate
-                          ? moment(t.assignedDate).format('DD MMM YYYY')
+                        {displayDates.assignedDate
+                          ? moment(displayDates.assignedDate).format('DD MMM YYYY')
                           : '-'}
                       </TableCell>
                       <TableCell>
-                        {t.expireDate
-                          ? moment(t.expireDate).format('DD MMM YYYY')
+                        {displayDates.expireDate
+                          ? moment(displayDates.expireDate).format('DD MMM YYYY')
                           : '-'}
                       </TableCell>
                       <TableCell>
                         <span
-                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium border ${statusInfo.className}`}
+                          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium border ${statusInfo.className}`}
                         >
+                          {statusInfo.icon}
                           {statusInfo.label}
                         </span>
                       </TableCell>

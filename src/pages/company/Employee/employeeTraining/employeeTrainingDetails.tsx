@@ -12,14 +12,6 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow
-} from '@/components/ui/table';
-import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -42,17 +34,17 @@ import {
   Upload,
   X,
   AlertTriangle,
-  Eye
+  Edit
 } from 'lucide-react';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 
 // --- Types ---
 type TCompletionRecord = {
   _id: string;
-  assignedDate: string;
+  assignedDate?: string;
   expireDate?: string;
   completedAt?: string;
-  certificate?: string;
+  certificate?: string[] | string;
 };
 
 type TEmployeeTraining = {
@@ -69,40 +61,69 @@ type TEmployeeTraining = {
     validityDays?: number;
     reminderBeforeDays?: number;
   };
-  assignedDate: string;
+  assignedDate?: string;
   expireDate?: string;
   status: 'pending' | 'in-progress' | 'completed' | 'expired';
-  certificate?: string;
+  certificate?: string[] | string;
   completionHistory: TCompletionRecord[];
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// KEY FIX: Convert a JS Date (local) to a UTC ISO string that preserves the
+// calendar date the user actually picked, regardless of browser timezone.
+// e.g. user picks "20 Mar" → "2026-03-20T00:00:00.000Z"  (never 19 Mar)
+// ─────────────────────────────────────────────────────────────────────────────
+const toDateOnlyISO = (date: Date | null | undefined): string | undefined => {
+  if (!date) return undefined;
+  return moment
+    .utc([date.getFullYear(), date.getMonth(), date.getDate()])
+    .toISOString();
+};
+
+// Helper: Extract filename from URL
+const getFileNameFromUrl = (url: string) => {
+  if (!url) return 'Document';
+  try {
+    const cleanUrl = url.split('?')[0];
+    const fileName = cleanUrl.substring(cleanUrl.lastIndexOf('/') + 1);
+    return decodeURIComponent(fileName).replace(/^\d+-/, '');
+  } catch (e) {
+    return 'Document';
+  }
+};
+
 const TrainingDetailsPage: React.FC = () => {
-  const { id,eid,tid } = useParams<{ tid: string }>();
+  const { id, eid, tid } = useParams<{
+    tid: string;
+    id: string;
+    eid: string;
+  }>();
   const navigate = useNavigate();
 
-  // Refs for file inputs
-  const completeFileInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // --- Data State ---
-  const [trainingRecord, setTrainingRecord] =
-    useState<TEmployeeTraining | null>(null);
+  const [trainingRecord, setTrainingRecord] = useState<TEmployeeTraining | null>(null);
   const [loading, setLoading] = useState(true);
 
-  
+  // Reassign State
   const [isReassignOpen, setIsReassignOpen] = useState(false);
   const [reassignDate, setReassignDate] = useState<Date | null>(null);
 
-  
-  const [isCompleteOpen, setIsCompleteOpen] = useState(false);
+  // --- Unified Edit & Complete State ---
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [dialogMode, setDialogMode] = useState<'complete' | 'edit_active' | 'edit_log'>('complete');
+  const [editingLogId, setEditingLogId] = useState<string | null>(null);
 
-  const [completionDate, setCompletionDate] = useState<Date | null>(null);
+  const [formData, setFormData] = useState({
+    assignedDate: null as Date | null,
+    expireDate: null as Date | null,
+    completedAt: null as Date | null,
+    certificates: [] as string[]
+  });
 
-
-  const [uploadedFileUrl, setUploadedFileUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
-
 
   const fetchTrainingData = async () => {
     setLoading(true);
@@ -122,59 +143,81 @@ const TrainingDetailsPage: React.FC = () => {
   }, [tid]);
 
   // --- File Upload Handler ---
-  const handleFileSelect = async (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = event.target.files?.[0];
-    if (!file || !trainingRecord?.employeeId._id) return;
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0 || !trainingRecord?.employeeId._id) return;
 
     const validTypes = ['application/pdf', 'image/jpeg', 'image/png'];
-    if (!validTypes.includes(file.type)) {
-      setUploadError('Only PDF, JPEG, or PNG files are allowed.');
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      setUploadError('File must be less than 5MB.');
-      return;
+    const newFilesArray = Array.from(files);
+
+    for (const file of newFilesArray) {
+      if (!validTypes.includes(file.type)) {
+        setUploadError('Only PDF, JPEG, or PNG files are allowed.');
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        setUploadError('Each file must be less than 5MB.');
+        return;
+      }
     }
 
     setIsUploading(true);
     setUploadError(null);
-    setSelectedFileName(file.name);
 
-    const formData = new FormData();
-    formData.append('entityId', trainingRecord.employeeId._id);
-    formData.append('file_type', 'document');
-    formData.append('file', file);
+    const newUploadedUrls: string[] = [];
 
     try {
-      const res = await axiosInstance.post('/documents', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-      setUploadedFileUrl(res.data?.data?.fileUrl || res.data?.url);
-      toast.success('Document uploaded successfully');
+      await Promise.all(
+        newFilesArray.map(async (file) => {
+          const formPayload = new FormData();
+          formPayload.append('entityId', trainingRecord.employeeId._id);
+          formPayload.append('file_type', 'document');
+          formPayload.append('file', file);
+
+          const res = await axiosInstance.post('/documents', formPayload, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+          });
+
+          const url = res.data?.data?.fileUrl || res.data?.url;
+          if (url) newUploadedUrls.push(url);
+        })
+      );
+
+      setFormData((prev) => ({
+        ...prev,
+        certificates: [...prev.certificates, ...newUploadedUrls]
+      }));
+      toast.success('Document(s) uploaded successfully');
     } catch (err) {
       console.error(err);
-      setUploadError('Failed to upload document.');
-      setUploadedFileUrl(null);
+      setUploadError('Failed to upload some documents.');
     } finally {
       setIsUploading(false);
+      if (event.target) event.target.value = '';
     }
   };
 
-  const handleRemoveFile = (inputRef: React.RefObject<HTMLInputElement>) => {
-    setUploadedFileUrl(null);
-    setSelectedFileName(null);
-    setUploadError(null);
-    if (inputRef.current) inputRef.current.value = '';
+  const handleRemoveFile = (indexToRemove: number) => {
+    setFormData((prev) => {
+      const newCerts = prev.certificates.filter((_, index) => index !== indexToRemove);
+      if (newCerts.length === 0 && fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      return { ...prev, certificates: newCerts };
+    });
   };
 
-  const resetUploadState = () => {
-    setUploadedFileUrl(null);
-    setSelectedFileName(null);
+  const resetDialogState = () => {
+    setFormData({
+      assignedDate: null,
+      expireDate: null,
+      completedAt: null,
+      certificates: []
+    });
     setUploadError(null);
     setIsUploading(false);
-    if (completeFileInputRef.current) completeFileInputRef.current.value = '';
+    setEditingLogId(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   // --- Action Handlers ---
@@ -186,15 +229,20 @@ const TrainingDetailsPage: React.FC = () => {
     }
 
     try {
-      let newExpireDate = '';
+      // FIX: use toDateOnlyISO to preserve the calendar date
+      const assignedISO = toDateOnlyISO(reassignDate)!;
+
+      let newExpireDate: string | null = null;
       if (trainingRecord?.trainingId?.validityDays) {
-        newExpireDate = moment(reassignDate)
+        // FIX: add days in UTC so the result date is also timezone-safe
+        newExpireDate = moment
+          .utc([reassignDate.getFullYear(), reassignDate.getMonth(), reassignDate.getDate()])
           .add(trainingRecord.trainingId.validityDays, 'days')
-          .format('YYYY-MM-DD');
+          .toISOString();
       }
 
       const payload = {
-        assignedDate: moment(reassignDate).format('YYYY-MM-DD'),
+        assignedDate: assignedISO,
         expireDate: newExpireDate,
         status: 'pending'
       };
@@ -209,34 +257,115 @@ const TrainingDetailsPage: React.FC = () => {
     }
   };
 
-  const handleComplete = async () => {
-    if (!completionDate) {
-      toast.error('Please select a completion date.');
-      return;
+  const openCompleteDialog = () => {
+    setDialogMode('complete');
+    setFormData({
+      // FIX: parse ISO dates back to local Date using moment.utc so the
+      // calendar date shown in the picker matches what was stored.
+      assignedDate: trainingRecord?.assignedDate
+        ? moment.utc(trainingRecord.assignedDate).toDate()
+        : null,
+      expireDate: trainingRecord?.expireDate
+        ? moment.utc(trainingRecord.expireDate).toDate()
+        : null,
+      completedAt: null,
+      certificates: Array.isArray(trainingRecord?.certificate)
+        ? trainingRecord.certificate
+        : trainingRecord?.certificate
+        ? [trainingRecord.certificate]
+        : []
+    });
+    setIsDialogOpen(true);
+  };
+
+  const openActiveEditDialog = () => {
+    setDialogMode('edit_active');
+    setFormData({
+      assignedDate: trainingRecord?.assignedDate
+        ? moment.utc(trainingRecord.assignedDate).toDate()
+        : null,
+      expireDate: trainingRecord?.expireDate
+        ? moment.utc(trainingRecord.expireDate).toDate()
+        : null,
+      completedAt: null,
+      certificates: Array.isArray(trainingRecord?.certificate)
+        ? trainingRecord.certificate
+        : trainingRecord?.certificate
+        ? [trainingRecord.certificate]
+        : []
+    });
+    setIsDialogOpen(true);
+  };
+
+  const openEditLogDialog = (log: TCompletionRecord) => {
+    setDialogMode('edit_log');
+    setEditingLogId(log._id);
+    setFormData({
+      assignedDate: log.assignedDate
+        ? moment.utc(log.assignedDate).toDate()
+        : null,
+      expireDate: log.expireDate
+        ? moment.utc(log.expireDate).toDate()
+        : null,
+      completedAt: log.completedAt
+        ? moment.utc(log.completedAt).toDate()
+        : null,
+      certificates: Array.isArray(log.certificate)
+        ? log.certificate
+        : log.certificate
+        ? [log.certificate]
+        : []
+    });
+    setIsDialogOpen(true);
+  };
+
+  // Universal Save
+  const handleSaveDialog = async () => {
+    if (dialogMode === 'complete') {
+      if (!formData.completedAt) return toast.error('Please select a completion date.');
+      if (formData.certificates.length === 0)
+        return toast.error('Please upload at least one completion certificate.');
     }
-    if (!uploadedFileUrl) {
-      toast.error('Please upload the completion certificate.');
-      return;
+
+    if (dialogMode === 'edit_log') {
+      if (!formData.assignedDate) return toast.error('Assigned date is required.');
+      if (!formData.expireDate) return toast.error('Expiry date is required.');
+      if (!formData.completedAt) return toast.error('Completion date is required.');
+      if (formData.certificates.length === 0)
+        return toast.error('Please upload at least one certificate.');
     }
 
     try {
-      const payload = {
-        status: 'completed',
-        // CHANGED: Format the date object to string
-        completedAt: moment(completionDate).format('YYYY-MM-DD'),
-        certificate: uploadedFileUrl
+      // FIX: all dates go through toDateOnlyISO — preserves calendar date in UTC
+      const payload: any = {
+        assignedDate: toDateOnlyISO(formData.assignedDate),
+        expireDate: toDateOnlyISO(formData.expireDate),
+        certificate: formData.certificates
       };
 
-      await axiosInstance.patch(`/employee-training/${tid}`, payload);
+      if (formData.completedAt) {
+        payload.completedAt = toDateOnlyISO(formData.completedAt);
+      }
 
-      toast.success('Training marked as completed!');
-      setIsCompleteOpen(false);
-      resetUploadState();
+      if (dialogMode === 'complete') {
+        payload.status = 'completed';
+      }
+
+      if (dialogMode === 'edit_log' && editingLogId) {
+        await axiosInstance.patch(`/employee-training/${tid}/logs/${editingLogId}`, payload);
+        toast.success('History log updated successfully!');
+      } else {
+        await axiosInstance.patch(`/employee-training/${tid}`, payload);
+        toast.success(
+          dialogMode === 'complete' ? 'Training marked as completed!' : 'Training record updated!'
+        );
+      }
+
+      setIsDialogOpen(false);
+      resetDialogState();
       fetchTrainingData();
     } catch (error: any) {
-      toast.error(
-        error.response?.data?.message || 'Failed to complete training.'
-      );
+      toast.error(error.response?.data?.message || 'Failed to process request.');
     }
   };
 
@@ -245,7 +374,36 @@ const TrainingDetailsPage: React.FC = () => {
       state: { activeTab: 'training' }
     });
   };
-  // --- Helper: Status Badge Logic ---
+
+  const renderCertificateLinks = (certData?: string[] | string) => {
+    if (!certData || (Array.isArray(certData) && certData.length === 0)) {
+      return <span className="text-sm text-black">-</span>;
+    }
+
+    const certArray = Array.isArray(certData) ? certData : [certData];
+
+    return (
+      <div className="flex flex-col gap-1 mt-1">
+        {certArray.map((certLink, index) => {
+          const fileName = getFileNameFromUrl(certLink);
+          return (
+            <a
+              key={index}
+              href={certLink}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-800 hover:underline"
+              title={fileName}
+            >
+              <FileText className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate max-w-[200px]">{fileName}</span>
+            </a>
+          );
+        })}
+      </div>
+    );
+  };
+
   const getStatusBadge = () => {
     if (!trainingRecord) return null;
     const { status, expireDate, trainingId } = trainingRecord;
@@ -266,10 +424,11 @@ const TrainingDetailsPage: React.FC = () => {
       );
     }
 
-    const today = moment();
-    const expiry = moment(expireDate);
+    // FIX: compare dates in UTC so "today" isn't shifted by the London default
+    const today = moment.utc().startOf('day');
+    const expiry = moment.utc(expireDate).startOf('day');
     const reminderDays = trainingId.reminderBeforeDays || 30;
-    const reminderDate = moment(expireDate).subtract(reminderDays, 'days');
+    const reminderDate = moment.utc(expireDate).subtract(reminderDays, 'days').startOf('day');
 
     if (today.isAfter(expiry, 'day')) {
       return (
@@ -289,125 +448,194 @@ const TrainingDetailsPage: React.FC = () => {
 
     return (
       <Badge className="gap-1 border-blue-200 bg-blue-100 px-3 py-1 text-blue-700 hover:bg-blue-200">
-        <Clock className="h-3 w-3" /> Active
+        <Clock className="h-3 w-3" /> In Progress
       </Badge>
     );
   };
 
-  // --- Reusable UI: Upload Box ---
-  const renderUploadUI = (inputRef: React.RefObject<HTMLInputElement>) => (
-    <div className="space-y-2 pt-2">
-      <Label className="text-sm font-medium text-gray-700">
-        Certificate <span className="text-red-500">*</span>
-      </Label>
-      <div
-        className={cn(
-          'relative flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 transition-colors',
-          uploadedFileUrl
-            ? 'border-green-500 bg-green-50'
-            : isUploading
+  const renderUploadUI = () => (
+    <>
+      <div className="space-y-2 pt-2">
+        <Label className="text-sm font-medium text-gray-700">
+          Certificate(s){' '}
+          {dialogMode === 'complete' && <span className="text-red-500">*</span>}
+        </Label>
+        <div
+          className={cn(
+            'relative flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 transition-colors',
+            isUploading
               ? 'border-blue-500 bg-blue-50'
               : 'border-gray-300 bg-gray-50 hover:bg-gray-100'
-        )}
-      >
-        <input
-          ref={inputRef}
-          type="file"
-          accept=".pdf,application/pdf,image/*"
-          onChange={handleFileSelect}
-          className="absolute inset-0 cursor-pointer opacity-0"
-          disabled={isUploading}
-        />
+          )}
+        >
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            onChange={handleFileSelect}
+            className="absolute inset-0 z-0 cursor-pointer opacity-0"
+            disabled={isUploading}
+          />
 
-        {isUploading ? (
-          <div className="flex flex-col items-center gap-2">
-            <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent"></div>
-            <p className="text-xs text-blue-600">Uploading...</p>
-          </div>
-        ) : uploadedFileUrl ? (
-          <div className="flex w-full items-center justify-between">
-            <div className="flex items-center gap-2 overflow-hidden">
-              <FileText className="h-5 w-5 flex-shrink-0 text-green-600" />
-              <div className="overflow-hidden">
-                <p className="text-sm font-medium text-green-700">
-                  File attached
-                </p>
-                <p className="max-w-[150px] truncate text-xs text-gray-500">
-                  {selectedFileName}
+          {isUploading ? (
+            <div className="flex flex-col items-center gap-2">
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-theme border-t-transparent"></div>
+              <p className="text-xs text-theme">Uploading...</p>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-1 text-center">
+              <Upload className="h-6 w-6 text-gray-400" />
+              <span className="text-sm font-medium text-gray-600">Upload Copy</span>
+              <span className="text-xs text-gray-400">PDF/Image (Max 5MB)</span>
+            </div>
+          )}
+        </div>
+        {uploadError && <p className="text-xs text-red-500">{uploadError}</p>}
+      </div>
+
+      {formData.certificates.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-sm font-medium text-gray-700">Attached Documents:</p>
+          {formData.certificates.map((url, index) => (
+            <div
+              key={index}
+              className="flex w-full items-center justify-between rounded border border-green-200 bg-white p-2"
+            >
+              <div className="flex items-center gap-2 overflow-hidden">
+                <FileText className="h-5 w-5 flex-shrink-0 text-green-600" />
+                <p
+                  className="max-w-[150px] truncate text-xs text-gray-600 sm:max-w-[250px]"
+                  title={getFileNameFromUrl(url)}
+                >
+                  {getFileNameFromUrl(url)}
                 </p>
               </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleRemoveFile(index);
+                }}
+                className="z-20 h-7 w-7 hover:bg-red-50 hover:text-red-600"
+              >
+                <X className="h-4 w-4" />
+              </Button>
             </div>
+          ))}
+        </div>
+      )}
+    </>
+  );
+
+  const renderTrainingRow = (
+    data: any,
+    isLog: boolean,
+    statusElement: React.ReactNode,
+    onEdit: () => void,
+    onComplete?: () => void
+  ) => (
+    <div className="flex flex-col items-start justify-between gap-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition-colors hover:border-gray-300 md:flex-row md:items-center">
+      <div className="grid w-full grid-cols-1 gap-x-2 gap-y-2 sm:grid-cols-2 lg:grid-cols-6">
+        <div>
+          <span className="text-xs font-semibold uppercase text-black">Assigned Date</span>
+          <p className="font-medium text-gray-800">
+            {/* FIX: format using moment.utc so the date isn't shifted by London tz */}
+            {data.assignedDate ? moment.utc(data.assignedDate).format('DD MMM, YYYY') : '-'}
+          </p>
+        </div>
+        <div>
+          <span className="text-xs font-semibold uppercase text-black">Expiry Date</span>
+          <p className="font-medium text-gray-800">
+            {data.expireDate ? moment.utc(data.expireDate).format('DD MMM, YYYY') : '-'}
+          </p>
+        </div>
+        <div>
+          <span className="text-xs font-semibold uppercase text-black">Completed On</span>
+          <p className={isLog ? 'font-medium text-green-600' : 'font-medium text-gray-800'}>
+            {data.completedAt ? moment.utc(data.completedAt).format('DD MMM, YYYY') : '-'}
+          </p>
+        </div>
+
+        <div>
+          <span className="text-xs font-semibold uppercase text-black">Status</span>
+          <div className="mt-1 font-medium">{statusElement}</div>
+        </div>
+        <div>
+          <span className="block text-xs font-semibold uppercase text-black">Certificate</span>
+          {renderCertificateLinks(data.certificate)}
+        </div>
+        <div className="flex flex-row items-center gap-2 justify-end">
+          {!isLog && onComplete && (
             <Button
-              variant="ghost"
-              size="icon"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleRemoveFile(inputRef);
-              }}
-              className="h-8 w-8 hover:bg-red-50 hover:text-red-600"
+              onClick={onComplete}
+              size={'sm'}
+              className="w-full bg-green-600 text-white shadow-sm hover:bg-green-700 md:w-auto"
             >
-              <X className="h-4 w-4" />
+              Approve
             </Button>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center gap-1 text-center">
-            <Upload className="h-6 w-6 text-gray-400" />
-            <span className="text-sm font-medium text-gray-600">
-              Upload Copy
-            </span>
-            <span className="text-xs text-gray-400">PDF/Image (Max 5MB)</span>
-          </div>
-        )}
+          )}
+          <Button variant="outline" size={'sm'} onClick={onEdit}>
+            Edit
+          </Button>
+        </div>
       </div>
-      {uploadError && <p className="text-xs text-red-500">{uploadError}</p>}
     </div>
   );
 
   if (loading)
     return (
       <div className="p-10 text-center">
-        {' '}
         <BlinkingDots size="large" color="bg-theme" />
       </div>
     );
+
   if (!trainingRecord)
-    return (
-      <div className="p-10 text-center text-red-500">Record not found</div>
-    );
+    return <div className="p-10 text-center text-red-500">Record not found</div>;
 
   const isCompleted = trainingRecord.status === 'completed';
 
-  // Calculate Min Date for Reassign (Can't be before previous expiry)
-  const minReassignDate = trainingRecord.expireDate
-    ? new Date(trainingRecord.expireDate)
-    : new Date();
+  // FIX: parse minReassignDate in UTC
+  const minReassignDate = trainingRecord?.expireDate
+    ? moment.utc(trainingRecord.expireDate).toDate()
+    : moment.utc().toDate();
 
-  // Calculate Predicted Expiry for Reassign Dialog
   const predictedExpiry =
     reassignDate && trainingRecord.trainingId.validityDays
-      ? moment(reassignDate)
+      ? moment
+          .utc([reassignDate.getFullYear(), reassignDate.getMonth(), reassignDate.getDate()])
           .add(trainingRecord.trainingId.validityDays, 'days')
-          .format('YYYY-MM-DD')
+          .format('DD-MM-YYYY')
       : '';
+
+  const dialogTitleMap = {
+    complete: 'Complete Training',
+    edit_active: 'Edit Active Training',
+    edit_log: 'Edit Training'
+  };
+
+  const sortedCompletionHistory =
+    trainingRecord.completionHistory && trainingRecord.completionHistory.length > 0
+      ? [...trainingRecord.completionHistory].reverse()
+      : [];
 
   return (
     <div className="space-y-4">
-      <Card className="shadow-md">
+      <Card className="shadow-none">
         <CardHeader>
           <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
             <div className="flex flex-row items-center gap-2 font-semibold text-black">
-              Employee:
               <h1>
-                {trainingRecord.employeeId.firstName}{' '}
-                {trainingRecord.employeeId.lastName}
+                {trainingRecord.employeeId.firstName} {trainingRecord.employeeId.lastName}
               </h1>
+              - <h1>{trainingRecord.trainingId.name}</h1>
             </div>
 
             <div className="flex items-center gap-2">
               <Button
-                onClick={() =>
-                  handleEmployeeClick(trainingRecord?.employeeId?._id)
-                }
+                onClick={() => handleEmployeeClick(trainingRecord?.employeeId?._id)}
                 variant="outline"
               >
                 <ArrowLeft className="mr-2 h-4 w-4" /> Back to List
@@ -416,184 +644,203 @@ const TrainingDetailsPage: React.FC = () => {
                 <Button onClick={() => setIsReassignOpen(true)}>
                   <RotateCcw className="mr-2 h-4 w-4" /> Re-assign Course
                 </Button>
-              ) : (
-                <Button
-                  onClick={() => setIsCompleteOpen(true)}
-                  className="gap-2 bg-green-600 text-white hover:bg-green-700"
-                >
-                  <CheckSquare className="h-4 w-4" /> Complete Course
-                </Button>
-              )}
+              ) : null}
             </div>
           </div>
         </CardHeader>
 
         <CardContent className="space-y-4">
-          <div className="flex items-center gap-3 text-xl font-bold">
-            Training Name:
-            <h1>{trainingRecord.trainingId.name}</h1>
-            {getStatusBadge()}
-          </div>
+          <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold">
+            Training History
+          </h3>
 
-          {/* Detail Grid */}
-          <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-3">
-            {/* Assigned On */}
-            <div className="flex items-center gap-3 rounded-lg border border-gray-100 bg-gray-50 p-3">
-              <div className="rounded-full bg-white p-2 shadow-sm">
-                <Calendar className="h-5 w-5 text-gray-600" />
-              </div>
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-                  Assigned On
-                </p>
-                <p className="text-sm font-semibold text-gray-800">
-                  {moment(trainingRecord.assignedDate).format('DD MMM, YYYY')}
-                </p>
-              </div>
-            </div>
+          <div className="space-y-4">
+            {!isCompleted &&
+              trainingRecord.assignedDate &&
+              renderTrainingRow(
+                trainingRecord,
+                false,
+                getStatusBadge(),
+                openActiveEditDialog,
+                openCompleteDialog
+              )}
 
-            {/* Expiry Date */}
-            <div className="flex items-center gap-3 rounded-lg border border-gray-100 bg-gray-50 p-3">
-              <div className="rounded-full bg-white p-2 shadow-sm">
-                <Clock className="h-5 w-5 text-gray-600" />
+            {sortedCompletionHistory.length > 0 ? (
+              sortedCompletionHistory.map((log) =>
+                renderTrainingRow(
+                  log,
+                  true,
+                  <Badge className="gap-1 border-green-200 bg-green-100 px-3 py-1 text-green-700 hover:bg-green-200">
+                    <CheckCircle className="h-3 w-3" /> Completed
+                  </Badge>,
+                  () => openEditLogDialog(log)
+                )
+              )
+            ) : isCompleted || !trainingRecord.assignedDate ? (
+              <div className="rounded-lg border bg-gray-50 p-8 text-center italic text-black">
+                No previous history logs available.
               </div>
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-                  Expires On
-                </p>
-                <p
-                  className={`text-sm font-semibold ${
-                    moment().isAfter(trainingRecord.expireDate) &&
-                    trainingRecord.status !== 'completed'
-                      ? 'text-red-600'
-                      : 'text-gray-800'
-                  }`}
-                >
-                  {trainingRecord.expireDate
-                    ? moment(trainingRecord.expireDate).format('DD MMM, YYYY')
-                    : 'No Expiry'}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* HISTORY TABLE */}
-          <div className="mt-8">
-            <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold">
-              Training History
-            </h3>
-            <div className="rounded-md">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Training Date</TableHead>
-                    <TableHead>Completed On</TableHead>
-                    <TableHead>Expiry</TableHead>
-                    <TableHead className="text-right">Certificate</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {trainingRecord.completionHistory &&
-                  trainingRecord.completionHistory.length > 0 ? (
-                    trainingRecord.completionHistory.map((log) => (
-                      <TableRow key={log._id}>
-                        <TableCell className="font-medium">
-                          {moment(log.assignedDate).format('DD MMM, YYYY')}
-                        </TableCell>
-                        <TableCell>
-                          {log.completedAt ? (
-                            <span className="flex items-center gap-1 text-xs font-medium text-green-600">
-                              {moment(log.completedAt).format('DD MMM, YYYY')}
-                            </span>
-                          ) : (
-                            <span className="text-gray-400">-</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {log.expireDate
-                            ? moment(log.expireDate).format('DD MMM, YYYY')
-                            : '-'}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {log.certificate ? (
-                            <Button size="sm" asChild className="gap-1">
-                              <a
-                                href={log.certificate}
-                                target="_blank"
-                                rel="noreferrer"
-                              >
-                                <Eye className="h-4 w-4" />
-                                View
-                              </a>
-                            </Button>
-                          ) : (
-                            <span className="text-xs text-gray-400">N/A</span>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell
-                        colSpan={4}
-                        className="h-24 text-center italic text-gray-500"
-                      >
-                        No previous history logs available.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+            ) : null}
           </div>
         </CardContent>
       </Card>
 
-      {/* --- COMPLETE COURSE DIALOG --- */}
+      {/* --- UNIFIED DIALOG (COMPLETE / EDIT ACTIVE / EDIT LOG) --- */}
       <Dialog
-        open={isCompleteOpen}
+        open={isDialogOpen}
         onOpenChange={(open) => {
-          if (!open) {
-            resetUploadState();
-            setCompletionDate(null); // Reset date on close
-          }
-          setIsCompleteOpen(open);
+          if (!open) resetDialogState();
+          setIsDialogOpen(open);
         }}
       >
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Complete Course</DialogTitle>
+            <DialogTitle>{dialogTitleMap[dialogMode]}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-6 py-4">
-            <div className="flex flex-col space-y-2">
-              <Label className="mb-1">
-                Completion Date <span className="text-red-500">*</span>
-              </Label>
-              {/* CHANGED: Replaced standard input with DatePicker */}
-              <DatePicker
-                selected={completionDate}
-                onChange={(date) => setCompletionDate(date)}
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                dateFormat="dd-MM-yyyy"
-                placeholderText="Select completion date"
-                showMonthDropdown
-                showYearDropdown
-                dropdownMode="select"
-                preventOpenOnFocus
-              />
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex flex-col space-y-2">
+                <Label>Assigned Date</Label>
+                <DatePicker
+                  selected={formData.assignedDate}
+                  onChange={(date) => setFormData({ ...formData, assignedDate: date })}
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+                  dateFormat="dd-MM-yyyy"
+                  showMonthDropdown
+                  showYearDropdown
+                  preventOpenOnFocus
+                />
+              </div>
+              <div className="flex flex-col space-y-2">
+                <Label>Expiry Date</Label>
+                <DatePicker
+                  selected={formData.expireDate}
+                  onChange={(date) => setFormData({ ...formData, expireDate: date })}
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+                  dateFormat="dd-MM-yyyy"
+                  showMonthDropdown
+                  showYearDropdown
+                  preventOpenOnFocus
+                />
+              </div>
             </div>
-            {renderUploadUI(completeFileInputRef)}
+
+            {dialogMode !== 'edit_active' && (
+              <div className="flex flex-col space-y-2 pt-2">
+                <Label className="mb-1">
+                  Completion Date{' '}
+                  {(dialogMode === 'complete' || dialogMode === 'edit_log') && (
+                    <span className="text-red-500">*</span>
+                  )}
+                </Label>
+                <DatePicker
+                  selected={formData.completedAt}
+                  onChange={(date) => setFormData({ ...formData, completedAt: date })}
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+                  dateFormat="dd-MM-yyyy"
+                  placeholderText="Select completion date"
+                  showMonthDropdown
+                  showYearDropdown
+                  preventOpenOnFocus
+                />
+              </div>
+            )}
+
+            {dialogMode === 'edit_log' ? (
+              <>
+                <div className="space-y-2 pt-2">
+                  <Label>
+                    Certificate(s) <span className="text-red-500">*</span>
+                  </Label>
+                  <div
+                    className={cn(
+                      'relative flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 transition-colors',
+                      isUploading
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-300 bg-gray-50 hover:bg-gray-100'
+                    )}
+                  >
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      multiple
+                      onChange={handleFileSelect}
+                      className="absolute inset-0 z-0 cursor-pointer opacity-0"
+                      disabled={isUploading}
+                    />
+                    {isUploading ? (
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="h-5 w-5 animate-spin rounded-full border-2 border-theme border-t-transparent"></div>
+                        <p className="text-xs text-theme">Uploading...</p>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-1 text-center">
+                        <Upload className="h-6 w-6 text-gray-400" />
+                        <span className="text-sm font-medium text-gray-600">Upload Copy</span>
+                        <span className="text-xs text-gray-400">PDF/Image (Max 5MB)</span>
+                      </div>
+                    )}
+                  </div>
+                  {uploadError && <p className="text-xs text-red-500">{uploadError}</p>}
+                </div>
+
+                {formData.certificates.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-gray-700">Attached Documents:</p>
+                    {formData.certificates.map((url, index) => (
+                      <div
+                        key={index}
+                        className="flex w-full items-center justify-between rounded border border-green-200 bg-white p-2"
+                      >
+                        <div className="flex items-center gap-2 overflow-hidden">
+                          <FileText className="h-5 w-5 flex-shrink-0 text-green-600" />
+                          <p
+                            className="max-w-[150px] truncate text-xs text-gray-600 sm:max-w-[250px]"
+                            title={getFileNameFromUrl(url)}
+                          >
+                            {getFileNameFromUrl(url)}
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleRemoveFile(index)}
+                          className="h-7 w-7 hover:bg-red-50 hover:text-red-600"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : (
+              renderUploadUI()
+            )}
           </div>
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsCompleteOpen(false)}>
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
               Cancel
             </Button>
             <Button
-              onClick={handleComplete}
-              className="bg-green-600 text-white hover:bg-green-700"
-              disabled={isUploading || !uploadedFileUrl || !completionDate}
+              onClick={handleSaveDialog}
+              className={
+                dialogMode === 'complete' ? 'bg-green-600 text-white hover:bg-green-700' : ''
+              }
+              disabled={
+                isUploading ||
+                (dialogMode === 'complete' &&
+                  (formData.certificates.length === 0 || !formData.completedAt)) ||
+                (dialogMode === 'edit_log' &&
+                  (!formData.assignedDate ||
+                    !formData.expireDate ||
+                    !formData.completedAt ||
+                    formData.certificates.length === 0))
+              }
             >
-              Confirm Completion
+              {dialogMode === 'complete' ? 'Confirm Completion' : 'Save Changes'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -614,13 +861,9 @@ const TrainingDetailsPage: React.FC = () => {
           <div className="space-y-4 py-4">
             <p className="text-sm text-gray-600">
               Start a new training cycle for{' '}
-              <span className="font-semibold">
-                {trainingRecord.employeeId.firstName}
-              </span>
-              .
+              <span className="font-semibold">{trainingRecord.employeeId.firstName}</span>.
             </p>
 
-            {/* New Assigned Date */}
             <div className="flex flex-col space-y-2">
               <Label className="mb-1">
                 New Assigned Date <span className="text-red-500">*</span>
@@ -629,17 +872,15 @@ const TrainingDetailsPage: React.FC = () => {
                 selected={reassignDate}
                 onChange={(date) => setReassignDate(date)}
                 minDate={minReassignDate}
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
                 dateFormat="dd-MM-yyyy"
                 placeholderText="Select start date"
                 showMonthDropdown
                 showYearDropdown
-                dropdownMode="select"
                 preventOpenOnFocus
               />
             </div>
 
-            {/* Disabled Expiry Date Field */}
             <div className="space-y-2">
               <Label>Expiry Date</Label>
               <Input
