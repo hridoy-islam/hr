@@ -45,7 +45,7 @@ const formSchema = z.object({
   departmentId: z.string().min(1, 'Please select a department'),
   employeeId: z.string().min(1, 'Please select an employee'),
   date: z.date({ required_error: 'Date is required' }),
-  shiftName: z.string().max(20, 'Max 20 characters').optional(),
+  shiftName: z.string().max(40, 'Max 40 characters').optional(),
   leaveType: z.string().optional(),
   note: z.string().optional(),
   color: z.string().optional()
@@ -494,7 +494,7 @@ export default function AddRotaDialog({
                             <FormControl>
                               <Input
                                 {...field}
-                                maxLength={20}
+                                maxLength={40}
                                 placeholder="e.g. Morning"
                               />
                             </FormControl>

@@ -32,7 +32,7 @@ type ShiftEntry = {
 
 // ─── Zod Schema ─────────────────────────────────────────────────────────────
 const formSchema = z.object({
-  shiftName: z.string().max(20, 'Max 20 characters').optional(),
+  shiftName: z.string().max(40, 'Max 40 characters').optional(),
   leaveType: z.string().optional(),
   note: z.string().optional(),
   color: z.string().optional()
@@ -365,8 +365,8 @@ export default function CreateRotaDialog({
                               <FormControl>
                                 <Input
                                   {...field}
-                                  maxLength={20}
-                                  placeholder="e.g. Morning (Max 20 chars)"
+                                  maxLength={40}
+                                  placeholder="e.g. Morning (Max 40 chars)"
                                 />
                               </FormControl>
                               <FormMessage />

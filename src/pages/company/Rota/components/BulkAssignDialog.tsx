@@ -474,7 +474,7 @@ export default function BulkAssignDialog({
                       <Input
                         value={shiftName}
                         onChange={(e) => setShiftName(e.target.value)}
-                        maxLength={20}
+                        maxLength={40}
                         placeholder="e.g. Morning"
                       />
                     </div>

@@ -47,7 +47,7 @@ const slotSchema = z.object({
 const formSchema = z
   .object({
     leaveType: z.string().optional(),
-    shiftName: z.string().max(20, 'Max 20 characters').optional(),
+    shiftName: z.string().max(40, 'Max 40 characters').optional(),
     color: z.string().optional(),
     note: z.string().optional(),
     slots: z.array(slotSchema),
@@ -428,7 +428,7 @@ export default function EditRotaSidebar({
                         <FormControl>
                           <Input
                             {...field}
-                            maxLength={10}
+                            maxLength={40}
                             placeholder="e.g. Morning"
                             disabled={!isStandard || isLeaveGenerated}
                           />
