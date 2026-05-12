@@ -654,7 +654,7 @@ export default function MeetingDetailsPage() {
 
       {/* View Documents Dialog (Activity Timeline Log) */}
       <Dialog open={viewDocsDialogOpen} onOpenChange={setViewDocsDialogOpen}>
-        <DialogContent className="max-w-5xl sm:rounded-xl border-gray-100">
+        <DialogContent className="max-w-5xl sm:rounded-xl border-gray-100 max-h-[90vh] overflow-y-auto">
           <DialogHeader className="border-b border-gray-100 pb-4">
             <DialogTitle className="flex items-center gap-2 text-xl font-bold">
               <FileText className="h-5 w-5 text-theme" />
@@ -790,48 +790,58 @@ export default function MeetingDetailsPage() {
             </div>
 
             {/* Right side: Employee List and Acknowledgement */}
-            <div className="space-y-4 md:col-span-4 md:border-l md:border-gray-100 md:pl-6">
-              <Label className="block text-sm font-semibold text-gray-900">
-                Acknowledgement
-              </Label>
-              {meeting?.employeeId && meeting.employeeId.length > 0 ? (
-                <ul className="space-y-3">
-                  {meeting.employeeId.map((emp) => {
-                    const hasAcknowledged = selectedLog?.Acknowledgement?.includes(emp._id);
-                    
-                    return (
-                     <li
-                        key={emp._id}
-                        className="flex items-center justify-between gap-3 rounded-xl border border-gray-100 bg-white px-3 py-2 shadow-sm transition hover:shadow-md"
-                      >
-                        <div className="shrink-0">
-                          {hasAcknowledged ? (
-                            <CheckCircle2 className="h-5 w-5 text-green-500" />
-                          ) : (
-                            <XCircle className="h-5 w-5 text-red-500" />
-                          )}
-                        </div>
+             <div className="space-y-4 md:col-span-4 md:border-l md:border-gray-100 md:pl-6">
+        <Label className="block text-sm font-semibold text-gray-900">
+          Acknowledgement
+        </Label>
+        {meeting?.employeeId && meeting.employeeId.length > 0 ? (
+          <ul className="space-y-3">
+            {[...meeting.employeeId]
+              .sort((a, b) => {
+                const aAcknowledged = selectedLog?.Acknowledgement?.includes(a._id) ? 1 : 0;
+                const bAcknowledged = selectedLog?.Acknowledgement?.includes(b._id) ? 1 : 0;
+                return bAcknowledged - aAcknowledged;
+              })
+              .map((emp) => {
+                const hasAcknowledged = selectedLog?.Acknowledgement?.includes(emp._id);
+                
+                return (
+                  <li
+                    key={emp._id}
+                    className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-2 shadow-sm transition hover:shadow-md ${
+                      hasAcknowledged 
+                        ? 'border-green-200 bg-green-50/50' 
+                        : 'border-gray-100 bg-white'
+                    }`}
+                  >
+                    <div className="shrink-0">
+                      {hasAcknowledged ? (
+                        <CheckCircle2 className="h-5 w-5 text-green-500" />
+                      ) : (
+                        <XCircle className="h-5 w-5 text-red-500" />
+                      )}
+                    </div>
 
-                        <div className="flex min-w-0 flex-1 flex-col">
-                          <span className="truncate text-sm font-semibold text-gray-800">
-                            {emp.name ||
-                              `${emp.firstName || ""} ${emp.lastName || ""}`.trim()}
-                          </span>
+                    <div className="flex min-w-0 flex-1 flex-col">
+                      <span className="truncate text-sm font-semibold text-gray-800">
+                        {emp.name ||
+                          `${emp.firstName || ""} ${emp.lastName || ""}`.trim()}
+                      </span>
 
-                          <span className="truncate text-xs text-gray-500">
-                            {emp.designationId?.map((d) => d.title).join(", ") || "No designation"}
-                          </span>
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              ) : (
-                <p className="text-sm italic text-gray-500">
-                  No attendees listed.
-                </p>
-              )}
-            </div>
+                      <span className=" text-xs text-gray-500">
+                        {emp.designationId?.map((d) => d.title).join(", ") || "No designation"}
+                      </span>
+                    </div>
+                  </li>
+                );
+              })}
+          </ul>
+        ) : (
+          <p className="text-sm italic text-gray-500">
+            No attendees listed.
+          </p>
+        )}
+      </div>
           </div>
         </DialogContent>
       </Dialog>
