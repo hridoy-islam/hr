@@ -509,7 +509,7 @@ function InductionTab() {
 
       {/* 1. Schedule Modal (Create Only) */}
       <Dialog open={showScheduleModal} onOpenChange={setShowScheduleModal}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Schedule Induction</DialogTitle>
           </DialogHeader>
@@ -555,7 +555,7 @@ function InductionTab() {
 
       {/* 2. Promotion Modal */}
       <Dialog open={showPromotionModal} onOpenChange={setShowPromotionModal}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Review for Promotion</DialogTitle>
           </DialogHeader>

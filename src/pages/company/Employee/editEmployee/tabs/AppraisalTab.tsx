@@ -449,7 +449,7 @@ function AppraisalTab() {
 
       {/* Update Dialog */}
       <Dialog open={showUpdateModal} onOpenChange={setShowUpdateModal}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle>Update Appraisal Details</DialogTitle>
           </DialogHeader>

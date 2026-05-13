@@ -563,7 +563,7 @@ function QACheckTab() {
       </div>
 
       <Dialog open={showScheduleModal} onOpenChange={setShowScheduleModal}>
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{scheduledDate ? 'Update QA Schedule' : 'Schedule QA Check'}</DialogTitle>
           </DialogHeader>

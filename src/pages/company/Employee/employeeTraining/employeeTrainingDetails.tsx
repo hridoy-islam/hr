@@ -151,10 +151,7 @@ const TrainingDetailsPage: React.FC = () => {
     const newFilesArray = Array.from(files);
 
     for (const file of newFilesArray) {
-      if (!validTypes.includes(file.type)) {
-        setUploadError('Only PDF, JPEG, or PNG files are allowed.');
-        return;
-      }
+     
       if (file.size > 5 * 1024 * 1024) {
         setUploadError('Each file must be less than 5MB.');
         return;
@@ -684,7 +681,7 @@ const TrainingDetailsPage: React.FC = () => {
           setIsDialogOpen(open);
         }}
       >
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{dialogTitleMap[dialogMode]}</DialogTitle>
           </DialogHeader>

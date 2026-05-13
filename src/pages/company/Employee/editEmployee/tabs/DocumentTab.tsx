@@ -61,8 +61,8 @@ export const REQUIRED_DOCUMENTS_LIST = [
   'GDPR declaration form',
   'Health Declaration / Post employment Medical Questionnaire',
   'Identification Document',
-  'DBS Reference', 
-  'Reference', 
+  'DBS Reference',
+  'Reference',
   'National Insurance',
   'Bank Account Details',
   'P46 / P45',
@@ -90,7 +90,7 @@ interface TEmployeeDocument {
   _id: string;
   employeeId: string;
   documentTitle: string;
-  documentUrl: string;
+  documentUrl: string[];
   note?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -109,7 +109,7 @@ interface SelectOption {
 export default function EmployeeDocumentTab() {
   const { eid } = useParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   // Camera Refs
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -129,17 +129,18 @@ export default function EmployeeDocumentTab() {
   const [customDocTitle, setCustomDocTitle] = useState('');
   const [note, setNote] = useState('');
 
-  // File Upload State
-  const [fileToUpload, setFileToUpload] = useState<File | null>(null);
-  const [uploadedDocUrl, setUploadedDocUrl] = useState<string | null>(null);
+  // File Upload State - Multiple files
+  const [filesToUpload, setFilesToUpload] = useState<File[]>([]);
+  const [uploadedDocUrls, setUploadedDocUrls] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Camera State
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
-  
+
   // Image Preview State (Captured but not yet accepted)
   const [capturedImageFile, setCapturedImageFile] = useState<File | null>(null);
   const [capturedImagePreview, setCapturedImagePreview] = useState<string | null>(null);
@@ -190,7 +191,7 @@ export default function EmployeeDocumentTab() {
     const referenceCount = uploadedTitles.filter((t) => t === 'Reference').length;
 
     let dynamicRequiredList = [...REQUIRED_DOCUMENTS_LIST];
-    
+
     if (userData?.noRtwCheck) {
       dynamicRequiredList = dynamicRequiredList.filter(
         (req) => !["Immigration Status", "Right to Work", "Passport", "Ni number/Driving licence"].includes(req)
@@ -247,12 +248,11 @@ export default function EmployeeDocumentTab() {
     clearCaptureState();
     setUploadError(null);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'environment' } // Prefers back camera on mobile
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' }
       });
       setCameraStream(stream);
       setIsCameraOpen(true);
-      // Using a timeout to ensure the video element has rendered before setting srcObject
       setTimeout(() => {
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
@@ -286,7 +286,7 @@ export default function EmployeeDocumentTab() {
           const file = new File([blob], `capture-${Date.now()}.jpg`, { type: 'image/jpeg' });
           setCapturedImageFile(file);
           setCapturedImagePreview(URL.createObjectURL(blob));
-          stopCamera(); // Turn off camera while user reviews the photo
+          stopCamera();
         }
       }, 'image/jpeg', 0.9);
     }
@@ -299,8 +299,8 @@ export default function EmployeeDocumentTab() {
 
   const acceptPhoto = () => {
     if (capturedImageFile) {
-      uploadFileFromSource(capturedImageFile);
-      clearCaptureState(); // Cleanup preview state once upload starts
+      uploadMultipleFiles([capturedImageFile]);
+      clearCaptureState();
     }
   };
 
@@ -310,9 +310,10 @@ export default function EmployeeDocumentTab() {
     setSelectedOption(null);
     setCustomDocTitle('');
     setNote('');
-    setUploadedDocUrl(null);
-    setFileToUpload(null);
+    setUploadedDocUrls([]);
+    setFilesToUpload([]);
     setUploadError(null);
+    setUploadProgress(0);
     stopCamera();
     clearCaptureState();
     setIsDialogOpen(true);
@@ -331,52 +332,70 @@ export default function EmployeeDocumentTab() {
     }
 
     setNote(doc.note || '');
-    setUploadedDocUrl(doc.documentUrl);
-    setFileToUpload(null);
+    setUploadedDocUrls(doc.documentUrl || []);
+    setFilesToUpload([]);
     setUploadError(null);
+    setUploadProgress(0);
     stopCamera();
     clearCaptureState();
     setIsDialogOpen(true);
   };
 
-  const uploadFileFromSource = async (file: File) => {
+  const uploadMultipleFiles = async (files: File[]) => {
     if (!eid) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      setUploadError('File size exceeds 5MB limit.');
+    // Validate file sizes
+    const oversizedFiles = files.filter(file => file.size > 5 * 1024 * 1024);
+    if (oversizedFiles.length > 0) {
+      setUploadError(`File(s) exceed 5MB limit: ${oversizedFiles.map(f => f.name).join(', ')}`);
       return;
     }
 
-    setFileToUpload(file);
-    setUploadError(null);
     setIsUploading(true);
-
-    const formData = new FormData();
-    formData.append('entityId', eid);
-    formData.append('file_type', 'employeeDoc');
-    formData.append('file', file);
+    setUploadError(null);
+    const newUrls: string[] = [...uploadedDocUrls];
+    const newFiles: File[] = [...filesToUpload];
 
     try {
-      const res = await axiosInstance.post('/documents', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-      const url = res.data?.data?.fileUrl;
-      if (!url) throw new Error('No file URL returned');
-      setUploadedDocUrl(url);
+      for (let i = 0; i < files.length; i++) {
+        const formData = new FormData();
+        formData.append('entityId', eid);
+        formData.append('file_type', 'employeeDoc');
+        formData.append('file', files[i]);
+
+        setUploadProgress(((i + 1) / files.length) * 100);
+
+        const res = await axiosInstance.post('/documents', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+
+        const url = res.data?.data?.fileUrl;
+        if (!url) throw new Error(`No file URL returned for ${files[i].name}`);
+        newUrls.push(url);
+        newFiles.push(files[i]);
+      }
+
+      setUploadedDocUrls(newUrls);
+      setFilesToUpload(newFiles);
     } catch (err) {
       console.error('Upload failed:', err);
-      setUploadError('Upload failed. Please try again.');
-      setFileToUpload(null);
+      setUploadError('Failed to upload one or more files. Please try again.');
     } finally {
       setIsUploading(false);
+      setUploadProgress(0);
     }
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      uploadFileFromSource(file);
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      uploadMultipleFiles(files);
     }
+  };
+
+  const removeUploadedFile = (index: number) => {
+    setUploadedDocUrls(prev => prev.filter((_, i) => i !== index));
+    setFilesToUpload(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -387,8 +406,8 @@ export default function EmployeeDocumentTab() {
       finalTitle = customDocTitle;
     }
 
-    if (!eid || !uploadedDocUrl || !finalTitle) {
-      setUploadError('Please complete all fields.');
+    if (!eid || uploadedDocUrls.length === 0 || !finalTitle) {
+      setUploadError('Please complete all fields and upload at least one file.');
       return;
     }
 
@@ -397,7 +416,7 @@ export default function EmployeeDocumentTab() {
       const payload = {
         employeeId: eid,
         documentTitle: finalTitle,
-        documentUrl: uploadedDocUrl,
+        documentUrl: uploadedDocUrls,
         note: note.trim() || undefined
       };
 
@@ -480,7 +499,7 @@ export default function EmployeeDocumentTab() {
                 {editingDoc ? 'Edit Document' : 'Upload New Document'}
               </DialogTitle>
               <DialogDescription>
-                Select the document type and attach the corresponding file.
+                Select the document type and attach the corresponding file(s).
               </DialogDescription>
             </DialogHeader>
 
@@ -513,7 +532,7 @@ export default function EmployeeDocumentTab() {
               <div className="space-y-2">
                 <Label htmlFor="doc-note">
                   Note{' '}
-                  <span className="text-xs font-normal text-gray-400"></span>
+                  <span className="text-xs font-normal text-gray-400">(Optional)</span>
                 </Label>
                 <Textarea
                   id="doc-note"
@@ -530,16 +549,16 @@ export default function EmployeeDocumentTab() {
                   <Label>
                     File Attachment <span className="text-red-500">*</span>
                   </Label>
-                  {!isCameraOpen && !capturedImagePreview && !uploadedDocUrl && !isUploading && (
-                     <Button 
-                       type="button" 
-                       variant="outline" 
-                       size="sm" 
-                       onClick={startCamera}
-                       className="text-xs font-medium"
-                     >
-                       <Camera className="mr-2 h-3.5 w-3.5" /> Take Photo
-                     </Button>
+                  {!isCameraOpen && !capturedImagePreview && !isUploading && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={startCamera}
+                      className="text-xs font-medium"
+                    >
+                      <Camera className="mr-2 h-3.5 w-3.5" /> Take Photo
+                    </Button>
                   )}
                 </div>
 
@@ -548,6 +567,8 @@ export default function EmployeeDocumentTab() {
                   type="file"
                   onChange={handleFileSelect}
                   className="hidden"
+                  multiple
+                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
                   disabled={isUploading || isCameraOpen || !!capturedImagePreview}
                 />
 
@@ -555,24 +576,24 @@ export default function EmployeeDocumentTab() {
                 {isCameraOpen ? (
                   // State 1: Camera is ON
                   <div className="relative flex flex-col items-center justify-center overflow-hidden rounded-lg bg-black text-center shadow-inner">
-                    <video 
-                      ref={videoRef} 
-                      autoPlay 
-                      playsInline 
-                      className="w-full h-auto max-h-[350px] object-cover" 
+                    <video
+                      ref={videoRef}
+                      autoPlay
+                      playsInline
+                      className="w-full h-auto max-h-[350px] object-cover"
                     />
                     <canvas ref={canvasRef} className="hidden" />
                     <div className="absolute bottom-4 flex gap-3">
-                      <Button 
-                        type="button" 
-                        variant="destructive" 
+                      <Button
+                        type="button"
+                        variant="destructive"
                         size="sm"
                         onClick={stopCamera}
                       >
                         <X className="mr-1 h-4 w-4" /> Cancel
                       </Button>
-                      <Button 
-                        type="button" 
+                      <Button
+                        type="button"
                         className="bg-white text-black hover:bg-gray-200 font-semibold"
                         size="sm"
                         onClick={capturePhoto}
@@ -584,23 +605,23 @@ export default function EmployeeDocumentTab() {
                 ) : capturedImagePreview ? (
                   // State 2: Photo captured, awaiting approval
                   <div className="relative flex flex-col items-center justify-center overflow-hidden rounded-lg bg-gray-900 p-2 text-center shadow-inner">
-                    <img 
-                      src={capturedImagePreview} 
-                      alt="Captured Preview" 
-                      className="w-full h-auto max-h-[350px] rounded-md object-contain" 
+                    <img
+                      src={capturedImagePreview}
+                      alt="Captured Preview"
+                      className="w-full h-auto max-h-[350px] rounded-md object-contain"
                     />
                     <div className="absolute bottom-4 flex gap-3">
-                      <Button 
-                        type="button" 
-                        variant="secondary" 
+                      <Button
+                        type="button"
+                        variant="secondary"
                         size="sm"
                         onClick={retakePhoto}
                         className="bg-white/90 text-gray-900 hover:bg-white backdrop-blur-sm"
                       >
                         <RefreshCw className="mr-2 h-4 w-4" /> Retake
                       </Button>
-                      <Button 
-                        type="button" 
+                      <Button
+                        type="button"
                         className="bg-theme text-white hover:bg-theme/90 shadow-md"
                         size="sm"
                         onClick={acceptPhoto}
@@ -611,59 +632,114 @@ export default function EmployeeDocumentTab() {
                   </div>
                 ) : (
                   // State 3: Default Upload View
-                  <div
-                    onClick={() => !isUploading && fileInputRef.current?.click()}
-                    className={`relative flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 text-center transition-colors
-                      ${
-                        isUploading
-                          ? 'cursor-wait border-blue-300 bg-blue-50'
-                          : uploadedDocUrl
-                            ? 'border-emerald-300 bg-emerald-50'
-                            : 'border-gray-200 bg-gray-50 hover:border-gray-400 hover:bg-gray-100'
-                      }`}
-                  >
-                    {isUploading ? (
-                      <div className="flex flex-col items-center gap-2">
-                        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-                        <p className="text-sm font-medium text-blue-700">
-                          Uploading...
-                        </p>
-                      </div>
-                    ) : uploadedDocUrl ? (
-                      <div className="flex flex-col items-center gap-2">
-                        <CheckCircle className="h-8 w-8 text-emerald-500" />
-                        <p className="text-sm font-medium text-emerald-700">
-                          File Ready
-                        </p>
-                        <p className="max-w-[200px] truncate text-xs text-emerald-600">
-                          {fileToUpload?.name || 'Captured Image / Existing File'}
-                        </p>
-                        <button
+                  <div className="space-y-3">
+                    <div
+                      onClick={() => !isUploading && fileInputRef.current?.click()}
+                      className={`relative flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 text-center transition-colors
+                        ${
+                          isUploading
+                            ? 'cursor-wait border-blue-300 bg-blue-50'
+                            : uploadedDocUrls.length > 0
+                              ? 'border-emerald-300 bg-emerald-50'
+                              : 'border-gray-200 bg-gray-50 hover:border-gray-400 hover:bg-gray-100'
+                        }`}
+                    >
+                      {isUploading ? (
+                        <div className="flex flex-col items-center gap-2">
+                          <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                          <p className="text-sm font-medium text-blue-700">
+                            Uploading... {Math.round(uploadProgress)}%
+                          </p>
+                        </div>
+                      ) : uploadedDocUrls.length > 0 ? (
+                        <div className="flex flex-col items-center gap-2">
+                          <CheckCircle className="h-8 w-8 text-emerald-500" />
+                          <p className="text-sm font-medium text-emerald-700">
+                            {uploadedDocUrls.length} file(s) ready
+                          </p>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setUploadedDocUrls([]);
+                              setFilesToUpload([]);
+                            }}
+                            className="mt-1 text-xs font-semibold text-emerald-800 hover:underline"
+                          >
+                            Remove all files
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center gap-2">
+                          <div className="rounded-full bg-white p-2 shadow-sm">
+                            <Upload className="h-5 w-5 text-gray-400" />
+                          </div>
+                          <div className="text-sm text-gray-600">
+                            <span className="font-semibold text-theme">
+                              Click to upload
+                            </span>{' '}
+                            or drag and drop
+                          </div>
+                          <p className="text-xs text-gray-400">
+                            PDF, DOCX, JPG (Max 5MB each)
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Show list of uploaded files */}
+                    {uploadedDocUrls.length > 0 && (
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium text-gray-700">
+                          Uploaded Files ({uploadedDocUrls.length})
+                        </Label>
+                        <div className="max-h-40 space-y-1 overflow-y-auto">
+                          {filesToUpload.map((file, index) => (
+                            <div key={index} className="flex items-center justify-between rounded-lg bg-gray-50 p-2 text-xs">
+                              <div className="flex items-center gap-2 truncate">
+                                <FileText className="h-3 w-3 flex-shrink-0 text-gray-400" />
+                                <span className="truncate">{file.name}</span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => removeUploadedFile(index)}
+                                className="ml-2 flex-shrink-0 text-gray-400 hover:text-red-500"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </div>
+                          ))}
+                          {/* Show existing URLs with actual file names */}
+                          {editingDoc && uploadedDocUrls.slice(filesToUpload.length).map((url, index) => {
+                            const fileName = url.split('/').pop() || `Existing file ${index + 1}`;
+                            
+                            return (
+                              <div key={`existing-${index}`} className="flex items-center justify-between rounded-lg bg-gray-50 p-2 text-xs">
+                                <div className="flex items-center gap-2 truncate">
+                                  <FileText className="h-3 w-3 flex-shrink-0 text-gray-400" />
+                                  <span className="truncate" title={fileName}>{fileName}</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => removeUploadedFile(filesToUpload.length + index)}
+                                  className="ml-2 flex-shrink-0 text-gray-400 hover:text-red-500"
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <Button
                           type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setUploadedDocUrl(null);
-                            setFileToUpload(null);
-                          }}
-                          className="mt-1 text-xs font-semibold text-emerald-800 hover:underline"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={isUploading}
+                          className="w-full text-xs"
                         >
-                          Remove & Replace
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center gap-2">
-                        <div className="rounded-full bg-white p-2 shadow-sm">
-                          <Upload className="h-5 w-5 text-gray-400" />
-                        </div>
-                        <div className="text-sm text-gray-600">
-                          <span className="font-semibold text-theme">
-                            Click to upload
-                          </span>
-                          
-                        </div>
-                        <p className="text-xs text-gray-400">
-                          PDF, DOCX, JPG (Max 5MB)
-                        </p>
+                          <Plus className="mr-1 h-3 w-3" /> Add More Files
+                        </Button>
                       </div>
                     )}
                   </div>
@@ -688,7 +764,7 @@ export default function EmployeeDocumentTab() {
                 <Button
                   type="submit"
                   className="bg-theme text-white hover:bg-theme/90"
-                  disabled={isSubmitting || !uploadedDocUrl || !selectedOption}
+                  disabled={isSubmitting || uploadedDocUrls.length === 0 || !selectedOption}
                 >
                   {isSubmitting ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -756,7 +832,7 @@ export default function EmployeeDocumentTab() {
       <div className="overflow-hidden">
         {isLoading ? (
           <div className="flex h-40 items-center justify-center">
-           <BlinkingDots size="large" color="bg-theme" />
+            <BlinkingDots size="large" color="bg-theme" />
           </div>
         ) : documents.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -774,10 +850,10 @@ export default function EmployeeDocumentTab() {
           <Table>
             <TableHeader className="bg-gray-50">
               <TableRow>
-                <TableHead className="w-[40%] font-semibold text-gray-900">
+                <TableHead className="w-[35%] font-semibold text-gray-900">
                   Document Title
                 </TableHead>
-                <TableHead className="w-[25%] font-semibold text-gray-900">
+                <TableHead className="w-[20%] font-semibold text-gray-900">
                   Note
                 </TableHead>
                 <TableHead className="w-[15%] font-semibold text-gray-900">
@@ -797,9 +873,12 @@ export default function EmployeeDocumentTab() {
                         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50">
                           <FileText className="h-4 w-4 text-blue-600" />
                         </div>
-                        <span className="font-medium text-gray-900">
-                          {doc.documentTitle}
-                        </span>
+                        <div>
+                          <span className="font-medium text-gray-900">
+                            {doc.documentTitle}
+                          </span>
+                         
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell className="text-sm text-gray-500">
@@ -816,13 +895,33 @@ export default function EmployeeDocumentTab() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        <Button
-                          size="icon"
-                          onClick={() => window.open(doc.documentUrl, '_blank')}
-                          title="View"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
+                        {/* View button - shows Document or Document 1, Document 2, etc. */}
+                        {doc.documentUrl && doc.documentUrl.length > 0 && (
+                          doc.documentUrl.length === 1 ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => window.open(doc.documentUrl[0], '_blank')}
+                              title="View Document"
+                              className="text-xs"
+                            >
+                              Document
+                            </Button>
+                          ) : (
+                            doc.documentUrl.map((url, idx) => (
+                              <Button
+                                key={idx}
+                                variant="outline"
+                                size="sm"
+                                onClick={() => window.open(url, '_blank')}
+                                title={`View Document ${idx + 1}`}
+                                className="text-xs"
+                              >
+                                Document {idx + 1}
+                              </Button>
+                            ))
+                          )
+                        )}
                         <Button
                           size="icon"
                           onClick={() => handleOpenEdit(doc)}

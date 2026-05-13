@@ -488,7 +488,7 @@ function PassportTab() {
 
       {/* Update Dialog */}
       <Dialog open={showUpdateModal} onOpenChange={setShowUpdateModal}>
-        <DialogContent className="sm:max-w-xl">
+        <DialogContent className="sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle>Update Passport Details</DialogTitle>
           </DialogHeader>
