@@ -211,10 +211,7 @@ function QACheckTab() {
         setUploadError(`Invalid file type: ${file.name}. Only PDF, JPEG, or PNG allowed.`);
         return;
       }
-      if (file.size > 20 * 1024 * 1024) {
-        setUploadError(`File too large: ${file.name}. Must be less than 20MB.`);
-        return;
-      }
+      
     }
 
     setIsUploading(true);
@@ -375,7 +372,6 @@ function QACheckTab() {
           ref={fileInputRef}
           type="file"
           multiple // Enables multiple file selection
-          accept=".pdf,application/pdf,image/*"
           onChange={handleFileSelect}
           className="absolute inset-0 cursor-pointer opacity-0"
           disabled={isUploading}
