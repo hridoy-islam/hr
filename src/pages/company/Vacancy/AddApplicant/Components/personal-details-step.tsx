@@ -165,8 +165,8 @@ export function PersonalDetailsStep({
 
   // --- File Upload Logic ---
   const validateFile = (file: File) => {
-    if (file.size > 5 * 1024 * 1024) {
-      setUploadError('File size exceeds 5MB limit.');
+    if (file.size > 20 * 1024 * 1024) {
+      setUploadError('File size exceeds 20MB limit.');
       return false;
     }
     if (!file.type.startsWith('image/')) {
@@ -793,7 +793,7 @@ export function PersonalDetailsStep({
                       Click to upload photo
                     </p>
                     <p className="mt-1 text-xs text-gray-500">
-                      JPG, PNG (Max 5MB)
+                      JPG, PNG (Max 20MB)
                     </p>
                   </>
                 )}

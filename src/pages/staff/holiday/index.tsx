@@ -299,8 +299,8 @@ const HolidayPage: React.FC = () => {
     if (!files.length) return;
 
     for (const file of files) {
-      if (file.size > 5 * 1024 * 1024) {
-        setUploadError(`File too large: ${file.name}. Must be less than 5MB.`);
+      if (file.size > 20 * 1024 * 1024) {
+        setUploadError(`File too large: ${file.name}. Must be less than 20MB.`);
         return;
       }
     }
@@ -383,7 +383,7 @@ const HolidayPage: React.FC = () => {
             >
               Click or drag to upload
             </span>
-            <span className="text-xs text-gray-500">(Max 5MB)</span>
+            <span className="text-xs text-gray-500">(Max 20MB)</span>
           </div>
         )}
       </div>

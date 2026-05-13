@@ -211,8 +211,8 @@ function SupervisionTab() {
         setUploadError(`Invalid file type: ${file.name}. Only PDF, JPEG, or PNG allowed.`);
         return;
       }
-      if (file.size > 5 * 1024 * 1024) {
-        setUploadError(`File too large: ${file.name}. Must be less than 5MB.`);
+      if (file.size > 20 * 1024 * 1024) {
+        setUploadError(`File too large: ${file.name}. Must be less than 20MB.`);
         return;
       }
     }
@@ -399,7 +399,7 @@ function SupervisionTab() {
           <div className="flex flex-col items-center gap-1 text-center">
             <Upload className="h-6 w-6 text-gray-400" />
             <span className="text-sm font-medium text-gray-600">Upload Document</span>
-            <span className="text-xs text-gray-400">PDF/Images (Max 5MB each)</span>
+            <span className="text-xs text-gray-400">PDF/Images (Max 20MB each)</span>
           </div>
         )}
       </div>

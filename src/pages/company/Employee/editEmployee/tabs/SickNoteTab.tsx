@@ -146,10 +146,10 @@ export default function SickNoteTab() {
     const files = Array.from(e.target.files || []);
     if (!eid || files.length === 0) return;
 
-    // Validate file sizes (5MB limit per file)
-    const oversizedFiles = files.filter((f) => f.size > 5 * 1024 * 1024);
+    // Validate file sizes (20MB limit per file)
+    const oversizedFiles = files.filter((f) => f.size > 20 * 1024 * 1024);
     if (oversizedFiles.length > 0) {
-      setUploadError('One or more files exceed the 5MB limit.');
+      setUploadError('One or more files exceed the 20MB limit.');
       return;
     }
 
@@ -327,7 +327,7 @@ export default function SickNoteTab() {
                 <div className="flex items-center justify-between">
                   <Label>Supporting Documents</Label>
                   <span className="text-xs text-gray-400">
-                    Optional (Max 5MB each)
+                    Optional (Max 20MB each)
                   </span>
                 </div>
 

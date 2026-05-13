@@ -236,8 +236,8 @@ const ImmigrationExpiryPage = () => {
       setUploadError('Only PDF, JPEG, or PNG files are allowed.');
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      setUploadError('File must be less than 5MB.');
+    if (file.size > 20 * 1024 * 1024) {
+      setUploadError('File must be less than 20MB.');
       return;
     }
 
@@ -518,7 +518,7 @@ const ImmigrationExpiryPage = () => {
                       Upload Copy
                     </span>
                     <span className="text-xs text-gray-400">
-                      PDF/Image (Max 5MB)
+                      PDF/Image (Max 20MB)
                     </span>
                   </div>
                 )}

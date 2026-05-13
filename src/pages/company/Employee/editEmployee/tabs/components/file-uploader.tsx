@@ -35,7 +35,7 @@ export function FileUploader({
   const [uploadError, setUploadError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const MAX_SIZE = 5 * 1024 * 1024 // 5MB
+  const MAX_SIZE = 20 * 1024 * 1024 // 20MB
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault()

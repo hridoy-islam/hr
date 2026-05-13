@@ -166,8 +166,8 @@ const TrainingDetailsPage: React.FC = () => {
 
     for (const file of newFilesArray) {
      
-      if (file.size > 5 * 1024 * 1024) {
-        setUploadError('Each file must be less than 5MB.');
+      if (file.size > 20 * 1024 * 1024) {
+        setUploadError('Each file must be less than 20MB.');
         return;
       }
     }
@@ -496,7 +496,7 @@ const handleSaveDialog = async () => {
             <div className="flex flex-col items-center gap-1 text-center">
               <Upload className="h-6 w-6 text-gray-400" />
               <span className="text-sm font-medium text-gray-600">Upload Copy</span>
-              <span className="text-xs text-gray-400">PDF/Image (Max 5MB)</span>
+              <span className="text-xs text-gray-400">PDF/Image (Max 20MB)</span>
             </div>
           )}
         </div>
@@ -838,7 +838,7 @@ const handleSaveDialog = async () => {
                       <div className="flex flex-col items-center gap-1 text-center">
                         <Upload className="h-6 w-6 text-gray-400" />
                         <span className="text-sm font-medium text-gray-600">Upload Copy</span>
-                        <span className="text-xs text-gray-400">PDF/Image (Max 5MB)</span>
+                        <span className="text-xs text-gray-400">PDF/Image (Max 20MB)</span>
                       </div>
                     )}
                   </div>

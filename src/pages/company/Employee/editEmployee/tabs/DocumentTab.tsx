@@ -345,9 +345,9 @@ export default function EmployeeDocumentTab() {
     if (!eid) return;
 
     // Validate file sizes
-    const oversizedFiles = files.filter(file => file.size > 5 * 1024 * 1024);
+    const oversizedFiles = files.filter(file => file.size > 20 * 1024 * 1024);
     if (oversizedFiles.length > 0) {
-      setUploadError(`File(s) exceed 5MB limit: ${oversizedFiles.map(f => f.name).join(', ')}`);
+      setUploadError(`File(s) exceed 20MB limit: ${oversizedFiles.map(f => f.name).join(', ')}`);
       return;
     }
 
@@ -681,7 +681,7 @@ export default function EmployeeDocumentTab() {
                             or drag and drop
                           </div>
                           <p className="text-xs text-gray-400">
-                            PDF, DOCX, JPG (Max 5MB each)
+                            PDF, DOCX, JPG (Max 20MB each)
                           </p>
                         </div>
                       )}

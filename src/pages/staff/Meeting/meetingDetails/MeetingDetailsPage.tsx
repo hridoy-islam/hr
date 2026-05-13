@@ -165,8 +165,8 @@ export default function StaffMeetingDetailsPage() {
         );
         return;
       }
-      if (file.size > 5 * 1024 * 1024) {
-        setUploadError(`File too large: ${file.name}. Must be less than 5MB.`);
+      if (file.size > 20 * 1024 * 1024) {
+        setUploadError(`File too large: ${file.name}. Must be less than 20MB.`);
         return;
       }
     }
@@ -568,7 +568,7 @@ export default function StaffMeetingDetailsPage() {
                       Click or drag to upload
                     </span>
                     <span className="text-xs text-gray-500">
-                      PDF, JPG, PNG (Max 5MB)
+                      PDF, JPG, PNG (Max 20MB)
                     </span>
                   </div>
                 )}

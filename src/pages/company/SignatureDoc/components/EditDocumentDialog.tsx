@@ -60,8 +60,8 @@ export function EditDocumentDialog({ editDoc, onClose, onSuccess }: EditDocument
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      toast({ title: 'Error', description: 'File exceeds 5MB limit.', variant: 'destructive' });
+    if (file.size > 20 * 1024 * 1024) {
+      toast({ title: 'Error', description: 'File exceeds 20MB limit.', variant: 'destructive' });
       return;
     }
 
@@ -218,7 +218,7 @@ export function EditDocumentDialog({ editDoc, onClose, onSuccess }: EditDocument
                 <div className="flex flex-col items-center gap-1 text-center">
                   <Upload className="h-8 w-8 text-gray-400" />
                   <span className="text-sm font-medium text-gray-600">Click to Upload Document</span>
-                  <span className="text-xs text-gray-400">Upload Document (Max 5MB)</span>
+                  <span className="text-xs text-gray-400">Upload Document (Max 20MB)</span>
                 </div>
               )}
             </div>

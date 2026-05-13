@@ -178,8 +178,8 @@ const RequestDocumentPage = () => {
     const file = e.target.files?.[0];
     if (!file || !user?._id) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      setUploadError('File must be less than 5MB.');
+    if (file.size > 20 * 1024 * 1024) {
+      setUploadError('File must be less than 20MB.');
       return;
     }
 

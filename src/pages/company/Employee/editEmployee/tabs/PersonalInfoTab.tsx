@@ -112,8 +112,8 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      setUploadError('File size must be less than 5MB');
+    if (file.size > 20 * 1024 * 1024) {
+      setUploadError('File size must be less than 20MB');
       return;
     }
 
@@ -465,7 +465,7 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
                       Click to upload photo
                     </p>
                     <p className="mt-1 text-xs text-gray-500">
-                      JPG, PNG (Max 5MB)
+                      JPG, PNG (Max 20MB)
                     </p>
                   </>
                 )}

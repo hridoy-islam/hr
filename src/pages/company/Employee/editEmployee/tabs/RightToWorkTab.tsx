@@ -242,8 +242,8 @@ function RightToWorkTab() {
         setUploadError(`Invalid file type: ${file.name}. Only PDF, JPEG, or PNG allowed.`);
         return;
       }
-      if (file.size > 5 * 1024 * 1024) {
-        setUploadError(`File too large: ${file.name}. Must be less than 5MB.`);
+      if (file.size > 20 * 1024 * 1024) {
+        setUploadError(`File too large: ${file.name}. Must be less than 20MB.`);
         return;
       }
     }
@@ -591,7 +591,7 @@ function RightToWorkTab() {
                     <span className="text-sm font-medium text-gray-600">
                       Upload Proof
                     </span>
-                    <span className="text-xs text-gray-400">PDF/Images (Max 5MB each)</span>
+                    <span className="text-xs text-gray-400">PDF/Images (Max 20MB each)</span>
                   </div>
                 )}
               </div>
