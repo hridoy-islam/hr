@@ -20,6 +20,13 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 // Icons
 import {
@@ -34,7 +41,8 @@ import {
   Upload,
   X,
   AlertTriangle,
-  Edit
+  Edit,
+  Info
 } from 'lucide-react';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 
@@ -66,6 +74,7 @@ type TEmployeeTraining = {
   status: 'pending' | 'in-progress' | 'completed' | 'expired';
   certificate?: string[] | string;
   completionHistory: TCompletionRecord[];
+  isOptional?: boolean;
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -109,11 +118,13 @@ const TrainingDetailsPage: React.FC = () => {
   // Reassign State
   const [isReassignOpen, setIsReassignOpen] = useState(false);
   const [reassignDate, setReassignDate] = useState<Date | null>(null);
+  const [isReassignOptional, setIsReassignOptional] = useState(false);
 
   // --- Unified Edit & Complete State ---
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<'complete' | 'edit_active' | 'edit_log'>('complete');
   const [editingLogId, setEditingLogId] = useState<string | null>(null);
+  const [isOptionalTraining, setIsOptionalTraining] = useState(false);
 
   const [formData, setFormData] = useState({
     assignedDate: null as Date | null,
@@ -130,6 +141,9 @@ const TrainingDetailsPage: React.FC = () => {
     try {
       const trainingRes = await axiosInstance.get(`/employee-training/${tid}`);
       setTrainingRecord(trainingRes.data.data);
+      // Set initial optional state from fetched data
+      setIsOptionalTraining(trainingRes.data.data.isOptional || false);
+      setIsReassignOptional(trainingRes.data.data.isOptional || false);
     } catch (error) {
       console.error('Error fetching details:', error);
       toast.error('Failed to load training details.');
@@ -214,6 +228,7 @@ const TrainingDetailsPage: React.FC = () => {
     setUploadError(null);
     setIsUploading(false);
     setEditingLogId(null);
+    setIsOptionalTraining(trainingRecord?.isOptional || false);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -226,23 +241,25 @@ const TrainingDetailsPage: React.FC = () => {
     }
 
     try {
-      // FIX: use toDateOnlyISO to preserve the calendar date
       const assignedISO = toDateOnlyISO(reassignDate)!;
 
-      let newExpireDate: string | null = null;
-      if (trainingRecord?.trainingId?.validityDays) {
-        // FIX: add days in UTC so the result date is also timezone-safe
-        newExpireDate = moment
+      const payload: any = {
+        assignedDate: assignedISO,
+        status: 'pending',
+        isOptional: isReassignOptional
+      };
+
+      // Only include expireDate if not optional and validity days exist
+      if (!isReassignOptional && trainingRecord?.trainingId?.validityDays) {
+        const newExpireDate = moment
           .utc([reassignDate.getFullYear(), reassignDate.getMonth(), reassignDate.getDate()])
           .add(trainingRecord.trainingId.validityDays, 'days')
           .toISOString();
+        payload.expireDate = newExpireDate;
+      } else if (isReassignOptional) {
+        // Explicitly set expireDate to null for optional trainings
+        payload.expireDate = null;
       }
-
-      const payload = {
-        assignedDate: assignedISO,
-        expireDate: newExpireDate,
-        status: 'pending'
-      };
 
       await axiosInstance.patch(`/employee-training/${tid}`, payload);
 
@@ -256,9 +273,8 @@ const TrainingDetailsPage: React.FC = () => {
 
   const openCompleteDialog = () => {
     setDialogMode('complete');
+    setIsOptionalTraining(trainingRecord?.isOptional || false);
     setFormData({
-      // FIX: parse ISO dates back to local Date using moment.utc so the
-      // calendar date shown in the picker matches what was stored.
       assignedDate: trainingRecord?.assignedDate
         ? moment.utc(trainingRecord.assignedDate).toDate()
         : null,
@@ -277,6 +293,7 @@ const TrainingDetailsPage: React.FC = () => {
 
   const openActiveEditDialog = () => {
     setDialogMode('edit_active');
+    setIsOptionalTraining(trainingRecord?.isOptional || false);
     setFormData({
       assignedDate: trainingRecord?.assignedDate
         ? moment.utc(trainingRecord.assignedDate).toDate()
@@ -297,6 +314,7 @@ const TrainingDetailsPage: React.FC = () => {
   const openEditLogDialog = (log: TCompletionRecord) => {
     setDialogMode('edit_log');
     setEditingLogId(log._id);
+    setIsOptionalTraining(false); // Logs typically have expiry dates
     setFormData({
       assignedDate: log.assignedDate
         ? moment.utc(log.assignedDate).toDate()
@@ -316,48 +334,51 @@ const TrainingDetailsPage: React.FC = () => {
     setIsDialogOpen(true);
   };
 
-  // Universal Save
-  const handleSaveDialog = async () => {
-    // Only validate assigned and expire dates in edit_log mode
-    if (dialogMode === 'edit_log') {
-      if (!formData.assignedDate) return toast.error('Assigned date is required.');
-      if (!formData.expireDate) return toast.error('Expiry date is required.');
+// Universal Save
+const handleSaveDialog = async () => {
+  if (!formData.assignedDate) {
+    return toast.error('Assigned date is required.');
+  }
+
+  try {
+    const payload: any = {
+      assignedDate: toDateOnlyISO(formData.assignedDate),
+      certificate: formData.certificates.length > 0 ? formData.certificates : undefined
+    };
+
+    if (isOptionalTraining) {
+      payload.expireDate = null;
+      payload.isOptional = true;
+    } else {
+      payload.expireDate = formData.expireDate ? toDateOnlyISO(formData.expireDate) : null;
+      payload.isOptional = false;
     }
 
-    try {
-      // FIX: all dates go through toDateOnlyISO — preserves calendar date in UTC
-      const payload: any = {
-        assignedDate: toDateOnlyISO(formData.assignedDate),
-        expireDate: toDateOnlyISO(formData.expireDate),
-        certificate: formData.certificates
-      };
-
-      if (formData.completedAt) {
-        payload.completedAt = toDateOnlyISO(formData.completedAt);
-      }
-
-      if (dialogMode === 'complete') {
-        payload.status = 'completed';
-      }
-
-      if (dialogMode === 'edit_log' && editingLogId) {
-        await axiosInstance.patch(`/employee-training/${tid}/logs/${editingLogId}`, payload);
-        toast.success('History log updated successfully!');
-      } else {
-        await axiosInstance.patch(`/employee-training/${tid}`, payload);
-        toast.success(
-          dialogMode === 'complete' ? 'Training marked as completed!' : 'Training record updated!'
-        );
-      }
-
-      setIsDialogOpen(false);
-      resetDialogState();
-      fetchTrainingData();
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to process request.');
+    if (formData.completedAt) {
+      payload.completedAt = toDateOnlyISO(formData.completedAt);
     }
-  };
 
+    if (dialogMode === 'complete') {
+      payload.status = 'completed';
+    }
+
+    if (dialogMode === 'edit_log' && editingLogId) {
+      await axiosInstance.patch(`/employee-training/${tid}/logs/${editingLogId}`, payload);
+      toast.success('History log updated successfully!');
+    } else {
+      await axiosInstance.patch(`/employee-training/${tid}`, payload);
+      toast.success(
+        dialogMode === 'complete' ? 'Training marked as completed!' : 'Training record updated!'
+      );
+    }
+
+    setIsDialogOpen(false);
+    resetDialogState();
+    fetchTrainingData();
+  } catch (error: any) {
+    toast.error(error.response?.data?.message || 'Failed to process request.');
+  }
+};
   const handleEmployeeClick = (employeeId: string) => {
     navigate(`/company/${id}/employee/${employeeId}`, {
       state: { activeTab: 'training' }
@@ -395,7 +416,7 @@ const TrainingDetailsPage: React.FC = () => {
 
   const getStatusBadge = () => {
     if (!trainingRecord) return null;
-    const { status, expireDate, trainingId } = trainingRecord;
+    const { status, expireDate, trainingId, isOptional } = trainingRecord;
 
     if (status === 'completed') {
       return (
@@ -405,14 +426,15 @@ const TrainingDetailsPage: React.FC = () => {
       );
     }
 
-    if (!expireDate) {
+    // For optional trainings or those without expiry
+    if (isOptional || !expireDate) {
       return (
         <Badge className="gap-1 border-blue-200 bg-blue-100 px-3 py-1 text-blue-700 hover:bg-blue-200">
-          <Clock className="h-3 w-3" /> Pending
+          <Clock className="h-3 w-3" /> In Progress
         </Badge>
       );
     }
-
+    
     // FIX: compare dates in UTC so "today" isn't shifted by the London default
     const today = moment.utc().startOf('day');
     const expiry = moment.utc(expireDate).startOf('day');
@@ -523,21 +545,23 @@ const TrainingDetailsPage: React.FC = () => {
     isLog: boolean,
     statusElement: React.ReactNode,
     onEdit: () => void,
-    onComplete?: () => void
+    onComplete?: () => void,
+    isOptional?: boolean
   ) => (
     <div className="flex flex-col items-start justify-between gap-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition-colors hover:border-gray-300 md:flex-row md:items-center">
       <div className="grid w-full grid-cols-1 gap-x-2 gap-y-2 sm:grid-cols-2 lg:grid-cols-6">
         <div>
           <span className="text-xs font-semibold uppercase text-black">Assigned Date</span>
           <p className="font-medium text-gray-800">
-            {/* FIX: format using moment.utc so the date isn't shifted by London tz */}
             {data.assignedDate ? moment.utc(data.assignedDate).format('DD MMM, YYYY') : '-'}
           </p>
         </div>
         <div>
           <span className="text-xs font-semibold uppercase text-black">Expiry Date</span>
           <p className="font-medium text-gray-800">
-            {data.expireDate ? moment.utc(data.expireDate).format('DD MMM, YYYY') : '-'}
+            { data.expireDate 
+                ? moment.utc(data.expireDate).format('DD MMM, YYYY') 
+                : '-'}
           </p>
         </div>
         <div>
@@ -585,13 +609,12 @@ const TrainingDetailsPage: React.FC = () => {
 
   const isCompleted = trainingRecord.status === 'completed';
 
-  // FIX: parse minReassignDate in UTC
   const minReassignDate = trainingRecord?.expireDate
     ? moment.utc(trainingRecord.expireDate).toDate()
     : moment.utc().toDate();
 
   const predictedExpiry =
-    reassignDate && trainingRecord.trainingId.validityDays
+    reassignDate && trainingRecord.trainingId.validityDays && !isReassignOptional
       ? moment
           .utc([reassignDate.getFullYear(), reassignDate.getMonth(), reassignDate.getDate()])
           .add(trainingRecord.trainingId.validityDays, 'days')
@@ -619,6 +642,7 @@ const TrainingDetailsPage: React.FC = () => {
                 {trainingRecord.employeeId.firstName} {trainingRecord.employeeId.lastName}
               </h1>
               - <h1>{trainingRecord.trainingId.name}</h1>
+              
             </div>
 
             <div className="flex items-center gap-2">
@@ -650,7 +674,8 @@ const TrainingDetailsPage: React.FC = () => {
                 false,
                 getStatusBadge(),
                 openActiveEditDialog,
-                openCompleteDialog
+                openCompleteDialog,
+                trainingRecord.isOptional
               )}
 
             {sortedCompletionHistory.length > 0 ? (
@@ -661,7 +686,9 @@ const TrainingDetailsPage: React.FC = () => {
                   <Badge className="gap-1 border-green-200 bg-green-100 px-3 py-1 text-green-700 hover:bg-green-200">
                     <CheckCircle className="h-3 w-3" /> Completed
                   </Badge>,
-                  () => openEditLogDialog(log)
+                  () => openEditLogDialog(log),
+                  undefined,
+                  false
                 )
               )
             ) : isCompleted || !trainingRecord.assignedDate ? (
@@ -704,14 +731,63 @@ const TrainingDetailsPage: React.FC = () => {
                 <DatePicker
                   selected={formData.expireDate}
                   onChange={(date) => setFormData({ ...formData, expireDate: date })}
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+                  className={cn(
+                    "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm",
+                   
+                  )}
                   dateFormat="dd-MM-yyyy"
                   showMonthDropdown
                   showYearDropdown
                   preventOpenOnFocus
+                  placeholderText={ "Select expiry date"}
                 />
               </div>
             </div>
+
+            {/* Optional Training Checkbox - Only show in edit_active mode */}
+            {/* Optional Training Checkbox - Only show in edit_active mode */}
+{dialogMode === 'edit_active' && (
+  <div className="flex items-start space-x-3 rounded-lg border border-gray-200 p-4 bg-gray-50/50">
+    <Checkbox
+      id="isOptionalTraining"
+      checked={isOptionalTraining}
+      onCheckedChange={(checked) => {
+        setIsOptionalTraining(checked === true);
+        // Only clear expiry date when checking (making optional)
+        if (checked) {
+          setFormData((prev) => ({ ...prev, expireDate: null }));
+        }
+      }}
+      className="mt-1"
+    />
+    <div className="grid gap-1.5 leading-none">
+      <div className="flex items-center gap-2">
+        <Label
+          htmlFor="isOptionalTraining"
+          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+        >
+          Expiry Date Is Optional
+        </Label>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Info className="h-4 w-4 text-gray-400 cursor-help" />
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="text-xs">
+                Enable this option if the training does not require an expiration date. 
+                The expiry field will be set to null.
+              </p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
+      <p className="text-xs text-gray-500">
+        When enabled, this training will not have an expiration date and can be completed at any time.
+      </p>
+    </div>
+  </div>
+)}
 
             {dialogMode !== 'edit_active' && (
               <div className="flex flex-col space-y-2 pt-2">
@@ -809,18 +885,15 @@ const TrainingDetailsPage: React.FC = () => {
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
               Cancel
             </Button>
-            <Button
-              onClick={handleSaveDialog}
-              className={
-                dialogMode === 'complete' ? 'bg-green-600 text-white hover:bg-green-700' : ''
-              }
-              disabled={
-                isUploading ||
-                (dialogMode === 'edit_log' && (!formData.assignedDate || !formData.expireDate))
-              }
-            >
-              {dialogMode === 'complete' ? 'Confirm Completion' : 'Save Changes'}
-            </Button>
+         <Button
+  onClick={handleSaveDialog}
+  className={
+    dialogMode === 'complete' ? 'bg-green-600 text-white hover:bg-green-700' : ''
+  }
+  disabled={isUploading || !formData.assignedDate}
+>
+  {dialogMode === 'complete' ? 'Confirm Completion' : 'Save Changes'}
+</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -860,13 +933,53 @@ const TrainingDetailsPage: React.FC = () => {
               />
             </div>
 
+            {/* Optional Training Checkbox in Reassign Dialog */}
+            <div className="flex items-start space-x-3 rounded-lg border border-gray-200 p-4 bg-gray-50/50">
+              <Checkbox
+                id="isReassignOptional"
+                checked={isReassignOptional}
+                onCheckedChange={(checked) => {
+                  setIsReassignOptional(checked === true);
+                }}
+                className="mt-1"
+              />
+              <div className="grid gap-1.5 leading-none">
+                <div className="flex items-center gap-2">
+                  <Label
+                    htmlFor="isReassignOptional"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                  >
+                    Expiry Date Is Optional
+                  </Label>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-4 w-4 text-gray-400 cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="text-xs">
+                          Enable this option if the re-assigned training does not require an expiration date.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+                <p className="text-xs text-gray-500">
+                  When enabled, no expiry date will be set for this training cycle.
+                </p>
+              </div>
+            </div>
+
             <div className="space-y-2">
               <Label>Expiry Date</Label>
               <Input
-                value={predictedExpiry}
+                value={isReassignOptional ? 'No Expiry Required' : predictedExpiry}
                 disabled
-                className="cursor-not-allowed bg-gray-100 text-gray-600"
-                placeholder="Select assigned date to see expiry"
+                className={cn(
+                  "cursor-not-allowed",
+                  isReassignOptional ? "bg-gray-50 text-gray-400" : "bg-gray-100 text-gray-600"
+                )}
+                placeholder={isReassignOptional ? "Not applicable" : "Select assigned date to see expiry"}
               />
             </div>
           </div>
