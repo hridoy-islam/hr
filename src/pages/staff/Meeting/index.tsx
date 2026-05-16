@@ -64,7 +64,7 @@ interface MeetingRecord {
 }
 
 export default function StaffMeetingPage() {
-  const { id,eid } = useParams(); // companyId
+  const { id, eid } = useParams(); // companyId
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -78,7 +78,6 @@ export default function StaffMeetingPage() {
   const [entriesPerPage, setEntriesPerPage] = useState(50);
   const [searchTerm, setSearchTerm] = useState('');
 
-
   // Fetch Meetings List
   const fetchMeetings = async (page: number, limit: number, search = '') => {
     try {
@@ -89,7 +88,7 @@ export default function StaffMeetingPage() {
           page,
           limit,
           companyId: id,
-          employeeId:eid,
+          employeeId: eid,
           ...(search ? { searchTerm: search } : {})
         }
       });
@@ -103,50 +102,41 @@ export default function StaffMeetingPage() {
     }
   };
 
-
   useEffect(() => {
     fetchMeetings(currentPage, entriesPerPage);
   }, [currentPage, entriesPerPage]);
-
-
 
   const handleSearch = () => {
     fetchMeetings(currentPage, entriesPerPage, searchTerm);
   };
 
-
-
   return (
-    <div className="space-y-3 rounded-md bg-white p-5 shadow-sm">
+    <div className="space-y-4 rounded-md bg-white p-4 sm:p-5 max-sm:pt-12 shadow-sm">
       {/* Header Section */}
-      <div className="flex items-center justify-between">
-        <div className="flex flex-row items-center gap-4">
-          <h2 className="flex items-center gap-2 text-2xl font-bold text-gray-900">
-            <Users className="h-6 w-6" />
-            Office Meetings
-          </h2>
-          <div className="flex items-center space-x-4">
-            <Input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search meeting title..."
-              className="h-8 min-w-[250px]"
-            />
-            <Button
-              onClick={handleSearch}
-              size="sm"
-              className="min-w-[100px] border-none bg-theme text-white hover:bg-theme/90"
-            >
-              Search
-            </Button>
-          </div>
+      <div className="flex flex-col gap-4 md:flex-row md:items-center ">
+        <h2 className="flex items-center gap-2 text-xl sm:text-2xl font-bold text-gray-900">
+          <Users className="h-5 w-5 sm:h-6 sm:w-6" />
+          Office Meetings
+        </h2>
+        <div className="flex w-full flex-col sm:flex-row items-center gap-3 md:w-auto">
+          <Input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search meeting title..."
+            className="h-10 w-full sm:min-w-[250px]"
+          />
+          <Button
+            onClick={handleSearch}
+            className="h-10 w-full sm:w-auto sm:min-w-[100px] border-none bg-theme text-white hover:bg-theme/90"
+          >
+            Search
+          </Button>
         </div>
-       
       </div>
 
       {/* Table Section */}
-      <div>
+      <div className="w-full">
         {initialLoading ? (
           <div className="flex justify-center py-6">
             <BlinkingDots size="large" color="bg-theme" />
@@ -156,60 +146,62 @@ export default function StaffMeetingPage() {
             No meetings found.
           </div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Meeting Title</TableHead>
-                <TableHead>Employees</TableHead>
-                <TableHead>Next Meeting Date</TableHead>
-                <TableHead className="text-right">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {meetings.map((meeting) => (
-                <TableRow key={meeting._id}>
-                  <TableCell className="font-medium text-gray-900">
-                    {meeting.title}
-                  </TableCell>
-                  <TableCell className="max-w-[300px] truncate">
-                    {meeting.employeeId
-                      ?.map(
-                        (emp) => emp.name || `${emp.firstName}`
-                      )
-                      .join(', ') || 'N/A'}
-                  </TableCell>
-                  <TableCell>
-                    {/* Implemented moment formatting here */}
-                    {meeting.nextMeetingDate
-                      ? moment(meeting.nextMeetingDate).format('DD MMM, YYYY')
-                      : 'N/A'}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      size="sm"
-                      onClick={() => navigate(`${meeting._id}`)}
-                    >
-                      View Details
-                    </Button>
-                  </TableCell>
+          <div className="w-full overflow-x-auto rounded-md border border-gray-100">
+            <Table className="min-w-[600px]">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Meeting Title</TableHead>
+                  <TableHead>Employees</TableHead>
+                  <TableHead>Next Meeting Date</TableHead>
+                  <TableHead className="text-right">Action</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {meetings.map((meeting) => (
+                  <TableRow key={meeting._id}  onClick={() => navigate(`${meeting._id}`)}  className='cursor-pointer'>
+                    <TableCell className="font-medium text-gray-900">
+                      {meeting.title}
+                    </TableCell>
+                    <TableCell className="max-w-[200px] sm:max-w-[300px] truncate">
+                      {meeting.employeeId
+                        ?.map(
+                          (emp) => emp.name || `${emp.firstName}`
+                        )
+                        .join(', ') || 'N/A'}
+                    </TableCell>
+                    <TableCell>
+                      {/* Implemented moment formatting here */}
+                      {meeting.nextMeetingDate
+                        ? moment(meeting.nextMeetingDate).format('DD MMM, YYYY')
+                        : 'N/A'}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        size="sm"
+                        onClick={() => navigate(`${meeting._id}`)}
+                      >
+                        View Details
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         )}
 
         {totalPages > 1 && (
-          <DynamicPagination
-            pageSize={entriesPerPage}
-            setPageSize={setEntriesPerPage}
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={setCurrentPage}
-          />
+          <div className="mt-4">
+            <DynamicPagination
+              pageSize={entriesPerPage}
+              setPageSize={setEntriesPerPage}
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+            />
+          </div>
         )}
       </div>
-
-   
     </div>
   );
 }

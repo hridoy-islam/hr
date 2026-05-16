@@ -124,11 +124,11 @@ const StaffDashboardPage = () => {
   const [userData, setUserData] = useState<any>(null);
   const [shifts, setShifts] = useState<any[]>([]);
   const [notices, setNotices] = useState<Notice[]>([]);
-  
+
   // --- Office Meetings State ---
   const [meetings, setMeetings] = useState<MeetingMins[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  
+
   const [loading, setLoading] = useState(true);
 
   // --- Silent background fetch for Rota Data ---
@@ -156,7 +156,6 @@ const StaffDashboardPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eid]);
 
-
   // Initial Data Fetch
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -170,14 +169,15 @@ const StaffDashboardPage = () => {
           axiosInstance.get(`/hr/notice`, {
             params: { page: 1, limit: 3, userId: eid }
           }),
-          axiosInstance.get(`/company-meeting/unacknowledgement-meeting/${eid}?limit=3`)
+          axiosInstance.get(
+            `/company-meeting/unacknowledgement-meeting/${eid}?limit=3`
+          )
         ]);
 
         setUserData(userRes.data?.data);
         setShifts(rotaRes.data?.data?.result || []);
         setNotices(noticeRes.data?.data?.result || []);
         setMeetings(meetingsRes.data?.data?.data || []);
-
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
       } finally {
@@ -211,8 +211,6 @@ const StaffDashboardPage = () => {
 
     return groupShiftsByMonth(uniqueShifts);
   }, [shifts]);
-
- 
 
   // --- Download QR Code Logic ---
   const downloadQRCode = () => {
@@ -254,7 +252,7 @@ const StaffDashboardPage = () => {
   }
 
   return (
-    <div className="min-h-screen rounded-md bg-white p-6 shadow-sm">
+    <div className="min-h-screen rounded-md bg-white p-6 shadow-sm max-sm:pt-12">
       {/* Header Section */}
       <div className="mb-10 flex flex-col gap-4 border-b border-slate-100 pb-2 sm:flex-row sm:items-end sm:justify-between">
         <h1 className="text-xl font-extrabold tracking-tight md:text-3xl">
@@ -279,74 +277,131 @@ const StaffDashboardPage = () => {
         {/* LEFT COLUMN: Meetings & Shifts            */}
         {/* ========================================= */}
         <div className="contents lg:col-span-2 lg:flex lg:flex-col lg:gap-y-10">
-          {meetings?.length>0 && <>
-          
-           <div className="order-2 lg:order-none">
-            <div className="mb-6 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
-              <div className="flex flex-row items-center gap-3">
-               
-                <div>
-                  <h2 className="text-2xl font-extrabold tracking-tight text-black">
-                    Meetings
-                  </h2>
-                </div>
-              </div>
-             {meetings.length > 1 && (
-              <div className="mt-2 flex justify-end">
-                <Button variant="link" className="text-sm font-semibold text-theme" onClick={() => navigate('meetings')}>
-                  View All Meetings
-                </Button>
-              </div>
-            )}
-            </div>
+          {meetings?.length > 0 && (
+            <>
+              <div className="order-2 w-full lg:order-none">
+               <div className="mb-4 sm:mb-6 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+  <div className="flex flex-row items-center gap-3 justify-between w-full">
+    <div>
+      <h2 className="text-xl font-extrabold tracking-tight text-black sm:text-2xl">
+        Meetings
+      </h2>
+    </div>
+  {meetings.length > 1 && (
+    <div className="flex w-full justify-end ">
+      <Button
+        variant="link"
+        className="whitespace-nowrap text-xs sm:text-sm font-semibold text-theme"
+        onClick={() => navigate('meetings')}
+      >
+        View All Meetings
+      </Button>
+    </div>
+  )}
+  </div>
+</div>
 
-            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-              {meetings.length === 0 ? (
-                <div className="flex flex-col items-center justify-center bg-slate-50 py-10 text-slate-500">
-                  <Users className="mb-2 h-8 w-8 text-slate-300" />
-                  <p className="text-sm font-medium">No pending meetings to acknowledge.</p>
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader className="bg-slate-50/80">
-                    <TableRow>
-                      <TableHead className="font-semibold text-slate-600">Meeting Title</TableHead>
-                      <TableHead className="font-semibold text-slate-600">Next Meeting Date</TableHead>
-                      <TableHead className="text-right font-semibold text-slate-600">Action</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {meetings.map((meeting) => (
-                      <TableRow key={meeting._id} className="hover:bg-slate-50/50">
-                        <TableCell className="font-medium text-slate-900">
-                          {meeting.title}
-                        </TableCell>
-                       
-                        <TableCell className="text-slate-600 whitespace-nowrap">
-                          {meeting.nextMeetingDate
-                            ? moment(meeting.nextMeetingDate).format('DD MMM, YYYY')
-                            : 'N/A'}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            size="sm"
-                            className="bg-theme text-white hover:bg-theme/90 font-medium tracking-wide"
-                            onClick={() => navigate(`meeting/${meeting._id}`)}
+                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                  {meetings.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center bg-slate-50 px-4 py-10 text-slate-500 sm:py-16">
+                      <Users className="mb-2 h-8 w-8 text-slate-300" />
+                      <p className="text-center text-sm font-medium">
+                        No pending meetings to acknowledge.
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Mobile Card View */}
+                      <div className="block sm:hidden">
+                        {meetings.map((meeting) => (
+                          <div
+                            key={meeting._id}
+                            className="border-b border-slate-200 p-4 last:border-b-0 hover:bg-slate-50/50"
                           >
-                            Acknowledge
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </div>
-            
-            
-          </div>
-          </>}
-         
+                            <div className="flex flex-col gap-3">
+                              <div>
+                                <h3 className="text-sm font-medium text-slate-900">
+                                  {meeting.title}
+                                </h3>
+                                <p className="mt-1 text-xs text-slate-500">
+                                  Next Meeting:{' '}
+                                  {meeting.nextMeetingDate
+                                    ? moment(meeting.nextMeetingDate).format(
+                                        'DD MMM, YYYY'
+                                      )
+                                    : 'N/A'}
+                                </p>
+                              </div>
+                              <div className="flex justify-end">
+                                <Button
+                                  size="sm"
+                                  className="w-full bg-theme text-xs font-medium tracking-wide text-white hover:bg-theme/90 sm:w-auto"
+                                  onClick={() =>
+                                    navigate(`meeting/${meeting._id}`)
+                                  }
+                                >
+                                  Acknowledge
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Desktop Table View */}
+                      <div className="hidden sm:block">
+                        <Table>
+                          <TableHeader className="bg-slate-50/80">
+                            <TableRow>
+                              <TableHead className="font-semibold text-slate-600">
+                                Meeting Title
+                              </TableHead>
+                              <TableHead className="font-semibold text-slate-600">
+                                Next Meeting Date
+                              </TableHead>
+                              <TableHead className="text-right font-semibold text-slate-600">
+                                Action
+                              </TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {meetings.map((meeting) => (
+                              <TableRow
+                                key={meeting._id}
+                                className="hover:bg-slate-50/50"
+                              >
+                                <TableCell className="font-medium text-slate-900">
+                                  {meeting.title}
+                                </TableCell>
+                                <TableCell className="whitespace-nowrap text-slate-600">
+                                  {meeting.nextMeetingDate
+                                    ? moment(meeting.nextMeetingDate).format(
+                                        'DD MMM, YYYY'
+                                      )
+                                    : 'N/A'}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <Button
+                                    size="sm"
+                                    className="bg-theme font-medium tracking-wide text-white hover:bg-theme/90"
+                                    onClick={() =>
+                                      navigate(`meeting/${meeting._id}`)
+                                    }
+                                  >
+                                    Acknowledge
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
 
           {/* === 2. UPCOMING SHIFTS === */}
           <div className="order-3 lg:order-none">
@@ -369,7 +424,9 @@ const StaffDashboardPage = () => {
                   <div className="mx-auto mb-4 h-12 w-12 text-slate-400">
                     <Calendar className="h-full w-full opacity-60" />
                   </div>
-                  <h3 className="text-sm font-semibold text-slate-700">No shifts scheduled</h3>
+                  <h3 className="text-sm font-semibold text-slate-700">
+                    No shifts scheduled
+                  </h3>
                   <p className="mt-1 text-sm text-slate-500">
                     You currently have no upcoming shifts assigned.
                   </p>

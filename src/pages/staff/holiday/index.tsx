@@ -344,7 +344,7 @@ const HolidayPage: React.FC = () => {
       </Label>
       <div
         className={cn(
-          'relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-8 transition-all',
+          'relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-6 sm:p-8 transition-all',
           isUploading
             ? 'border-theme bg-theme/5'
             : formErrors.uploadedFiles
@@ -601,10 +601,10 @@ const HolidayPage: React.FC = () => {
     }
   };
 
-const formatHours = (hours: number): string => {
-  if (!hours) return '0 h';
-  return `${hours.toFixed(1)} h`;
-};
+  const formatHours = (hours: number): string => {
+    if (!hours) return '0 h';
+    return `${hours.toFixed(1)} h`;
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -831,14 +831,14 @@ const formatHours = (hours: number): string => {
 
   // ── JSX ──
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="">
-        <div className="grid grid-cols-1 gap-2 lg:grid-cols-3">
+    <div className="min-h-screen bg-gray-50 ">
+      <div className="mx-auto">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:gap-6">
           {/* ── Left: Leave Requests Table ── */}
           <div className="lg:col-span-2">
             <Card className="shadow-sm">
               <CardHeader>
-                <CardTitle className="flex items-center justify-between gap-2">
+                <CardTitle className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
                   <div className="flex flex-row items-center gap-4">
                     <CalendarDays className="h-5 w-5 text-theme" />
                     My Leave Requests
@@ -852,21 +852,21 @@ const formatHours = (hours: number): string => {
                       }
                   }}>
                     <SheetTrigger asChild>
-                      <Button className="">Create Leave Request</Button>
+                      <Button className="w-full sm:w-auto">Create Leave Request</Button>
                     </SheetTrigger>
 
-                    <SheetContent className="overflow-y-auto sm:max-w-[750px] max-h-screen">
-                      <SheetHeader className="mb-2">
+                    <SheetContent className="w-full sm:max-w-[750px] overflow-y-auto max-h-screen">
+                      <SheetHeader className="mb-4">
                         <SheetTitle className="flex items-center gap-2">
                           <CheckCircle className="h-5 w-5 text-theme" />
                           Submit Leave Request
                         </SheetTitle>
                       </SheetHeader>
 
-                      <div className="space-y-2 max-h-screen">
-                        <div className="grid grid-cols-2 items-start gap-2">
+                      <div className="space-y-4 max-h-screen pb-6">
+                        <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2">
                           {/* Holiday Year */}
-                          <div className="">
+                          <div className="w-full">
                             <Label htmlFor="holiday-year" className="mb-1 block">Holiday Year</Label>
                             <ShadcnSelect
                               value={selectedYear}
@@ -877,7 +877,7 @@ const formatHours = (hours: number): string => {
                             >
                               <SelectTrigger
                                 id="holiday-year"
-                                className={`h-[38px] ${
+                                className={`h-[38px] w-full ${
                                   formErrors.holidayYear ? 'border-red-500' : ''
                                 }`}
                               >
@@ -899,7 +899,7 @@ const formatHours = (hours: number): string => {
                           </div>
 
                           {/* Holiday Type */}
-                          <div>
+                          <div className="w-full">
                             <Label htmlFor="type" className="mb-1 block">
                               Holiday Type
                             </Label>
@@ -922,7 +922,7 @@ const formatHours = (hours: number): string => {
                                 );
                               }}
                               placeholder="Select type"
-                              className="react-select-container "
+                              className="react-select-container w-full"
                               classNamePrefix="react-select "
                               styles={{
                                 control: (base) => ({
@@ -949,7 +949,7 @@ const formatHours = (hours: number): string => {
                         </div>
 
                         {/* Date Range Picker */}
-                        <div className="flex flex-col gap-1 py-2">
+                        <div className="flex flex-col gap-1 py-2 w-full">
                           <Label>Leave Period (DD-MM-YYYY)</Label>
                           <DatePicker
                             selectsRange
@@ -1002,7 +1002,7 @@ const formatHours = (hours: number): string => {
                         </div>
 
                         {/* Reason */}
-                        <div>
+                        <div className="w-full">
                           <Label htmlFor="create-reason">Reason</Label>
                           <Textarea
                             id="create-reason"
@@ -1012,7 +1012,7 @@ const formatHours = (hours: number): string => {
                               setReason(e.target.value);
                               clearError('reason');
                             }}
-                            className={`border-gray-300 ${
+                            className={`w-full border-gray-300 ${
                               formErrors.reason ? 'border-red-500' : ''
                             }`}
                           />
@@ -1025,14 +1025,14 @@ const formatHours = (hours: number): string => {
 
                         {/* 🚀 Conditional Render based on Selected Type */}
                         {selectedType && (
-                          <div className="space-y-1">
+                          <div className="space-y-4">
                             {(selectedType === 'holiday') &&
                               leaveDays.length > 0 && (
                                 <>
                                   <Label className="block w-full pt-2 text-sm font-semibold text-gray-700">
                                     Daily Duration Breakdown
                                   </Label>
-                                  <div className="grid max-h-72 grid-cols-2 gap-3 overflow-y-auto rounded-lg border border-gray-200 bg-gray-50/50 p-3 sm:grid-cols-5">
+                                  <div className="grid max-h-72 grid-cols-2 gap-3 overflow-y-auto rounded-lg border border-gray-200 bg-gray-50/50 p-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
                                     {leaveDays.map((day, idx) => (
                                       <div
                                         key={idx}
@@ -1051,7 +1051,7 @@ const formatHours = (hours: number): string => {
                                             step="0.01"
                                             min="0"
                                             max="24"
-                                            className="h-8 w-24 text-center border-orange-600 text-sm"
+                                            className="h-8 w-full max-w-[100px] text-center border-orange-600 text-sm"
                                             value={day.duration}
                                             onChange={(e) =>
                                               handleDayDurationChange(
@@ -1068,11 +1068,9 @@ const formatHours = (hours: number): string => {
                               )}
 
                             <div
-                              className={`grid grid-cols-2
-                                 
-                               mt-4 gap-4`}
+                              className="grid grid-cols-1 gap-4 sm:grid-cols-2 mt-4"
                             >
-                              <div className="space-y-1">
+                              <div className="space-y-1 w-full">
                                 <Label htmlFor="duration-days">
                                   {selectedType === 'holiday'
                                     ? 'Holiday Duration (Days)'
@@ -1086,7 +1084,7 @@ const formatHours = (hours: number): string => {
                                   value={calculatedDays}
                                   onChange={handleDaysChange}
                                   placeholder="e.g. 2"
-                                  className={`bg-white ${
+                                  className={`w-full bg-white ${
                                     formErrors.totalDays ? 'border-red-500' : ''
                                   }`}
                                 />
@@ -1098,7 +1096,7 @@ const formatHours = (hours: number): string => {
                               </div>
 
                               {selectedType === 'holiday' && (
-                                <div className="space-y-1">
+                                <div className="space-y-1 w-full">
                                   <Label htmlFor="duration-hours">
                                     Duration (Hours)
                                   </Label>
@@ -1110,7 +1108,7 @@ const formatHours = (hours: number): string => {
                                     value={calculatedHours}
                                     onChange={handleHoursChange}
                                     placeholder="e.g. 16"
-                                    className={`bg-white ${
+                                    className={`w-full bg-white ${
                                       formErrors.totalHours ? 'border-red-500' : ''
                                     }`}
                                   />
@@ -1130,7 +1128,7 @@ const formatHours = (hours: number): string => {
 
                         <Button
                           onClick={handleSubmitRequest}
-                          className="mt-4 w-full bg-theme text-white hover:bg-theme/90"
+                          className="mt-6 w-full bg-theme text-white hover:bg-theme/90"
                           disabled={isSubmitting || isUploading}
                         >
                           <Calendar className="mr-2 h-4 w-4" />
@@ -1142,16 +1140,16 @@ const formatHours = (hours: number): string => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="flex flex-row items-center justify-between">
-                  <div className="mb-4 flex items-center justify-start gap-4">
-                    <span className="font-semibold text-gray-700">
+                <div className="flex flex-col items-start justify-between sm:flex-row sm:items-center">
+                  <div className="mb-4 flex flex-col items-start justify-start gap-2 sm:flex-row sm:items-center sm:gap-4 w-full">
+                    <span className="font-semibold text-gray-700 whitespace-nowrap">
                       Holiday Year:
                     </span>
                     <ShadcnSelect
                       value={selectedYear}
                       onValueChange={setSelectedYear}
                     >
-                      <SelectTrigger className="w-48">
+                      <SelectTrigger className="w-full sm:w-48">
                         <SelectValue placeholder="Select year" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1197,8 +1195,8 @@ const formatHours = (hours: number): string => {
                     </div>
                   </div>
 
-                  <div className="overflow-x-auto">
-                    <Table>
+                  <div className="overflow-x-auto w-full">
+                    <Table className="min-w-[600px]">
                       <TableHeader>
                         <TableRow>
                           <TableHead>Status</TableHead>
@@ -1269,7 +1267,7 @@ const formatHours = (hours: number): string => {
                   {allowanceStatsList.map(({ label, value, color }) => (
                     <div
                       key={label}
-                      className="flex items-center justify-between border-b border-gray-300 py-2"
+                      className="flex items-center justify-between border-b border-gray-300 py-2 text-sm sm:text-base"
                     >
                       <span
                         className={`max-w-[60%] text-gray-600 ${label === 'Balance Remaining' ? 'font-bold text-gray-900' : ''}`}
@@ -1282,9 +1280,9 @@ const formatHours = (hours: number): string => {
                     </div>
                   ))}
 
-                  <div className="mt-4 flex items-center justify-between rounded-md border-b border-gray-300 bg-gray-50 px-2 py-2">
-                    <span className="font-medium text-gray-700">
-                      Hours Per Day (Standard)
+                  <div className="mt-4 flex flex-col sm:flex-row items-start sm:items-center justify-between rounded-md border-b border-gray-300 bg-gray-50 px-3 py-3 gap-2">
+                    <span className="font-medium text-gray-700 text-sm sm:text-base">
+                      Hours Per Day
                     </span>
                     <span className="font-bold text-gray-900">
                       {leaveAllowance.hoursPerDay} h

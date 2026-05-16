@@ -145,9 +145,7 @@ const pdfStyles = StyleSheet.create({
   page: { padding: 30, fontSize: 10, fontFamily: 'Helvetica', color: '#000' },
   metaDataContainer: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10, paddingBottom: 5 },
   metaCol: { flexDirection: 'column' },
-  // Added metaRow to keep the label and value inline
   metaRow: { flexDirection: 'row', alignItems: 'baseline', marginBottom: 6 },
-  // Added a slight margin to the right of the label so it doesn't touch the value
   metaLabel: { fontSize: 11, fontWeight: 'bold', color: '#000', marginRight: 4 },
   metaValue: { fontSize: 11, fontWeight: 'medium', color: '#000' },
   table: { display: 'flex', width: 'auto', borderStyle: 'solid', borderWidth: 1, borderRightWidth: 0, borderBottomWidth: 0, borderColor: '#000' },
@@ -164,7 +162,7 @@ const pdfStyles = StyleSheet.create({
   totalValue: { fontSize: 12, fontWeight: 'bold', color: '#000' }
 });
 
-const formatDisplayDate = (date: any) => {
+const formatDisplayDatePDF = (date: any) => {
   if (!date) return '...';
   const d = new Date(date);
   return d
@@ -185,7 +183,6 @@ const AttendanceReportPDF = ({ data, user, startDate, endDate, totalDisplay }: a
         
        <View style={pdfStyles.metaDataContainer}>
           <View style={pdfStyles.metaCol}>
-            {/* Inline Employee Name */}
             <View style={pdfStyles.metaRow}>
               <Text style={pdfStyles.metaLabel}>Employee:</Text>
               <Text style={pdfStyles.metaValue}>{user?.firstName} {user?.lastName}</Text>
@@ -195,7 +192,6 @@ const AttendanceReportPDF = ({ data, user, startDate, endDate, totalDisplay }: a
               <Text style={pdfStyles.metaValue}>{user?.email}</Text>
             </View>
             
-            {/* Inline Company Name */}
             <View style={pdfStyles.metaRow}>
               <Text style={pdfStyles.metaLabel}>Company:</Text>
               <Text style={pdfStyles.metaValue}>{companyName}</Text>
@@ -203,11 +199,10 @@ const AttendanceReportPDF = ({ data, user, startDate, endDate, totalDisplay }: a
           </View>
           
           <View style={pdfStyles.metaCol}>
-            {/* Inline Period */}
             <View style={pdfStyles.metaRow}>
               <Text style={pdfStyles.metaLabel}>Period:</Text>
               <Text style={pdfStyles.metaValue}>
-                {startDate ? formatDisplayDate(startDate) : '...'} - {endDate ? formatDisplayDate(endDate) : '...'}
+                {startDate ? formatDisplayDatePDF(startDate) : '...'} - {endDate ? formatDisplayDatePDF(endDate) : '...'}
               </Text>
             </View>
           </View>
@@ -309,6 +304,7 @@ const AttendanceReportPDF = ({ data, user, startDate, endDate, totalDisplay }: a
     </Document>
   );
 };
+
 // --- Main Page Component ---
 const StaffAttendancePage = () => {
   const { id, eid: staffId } = useParams();
@@ -410,14 +406,14 @@ const StaffAttendancePage = () => {
   const totalApprovedDisplay = `${totalHours.toString().padStart(2, '0')}:${totalMins.toString().padStart(2, '0')}`;
 
   return (
-    <div className="space-y-4 rounded-md bg-white shadow-sm">
+    <div className="space-y-4 rounded-md bg-white shadow-sm ">
       <div className="shadow-none">
         <div className="flex flex-col items-start justify-between gap-4 rounded-t-md border-b border-slate-100 bg-gradient-to-r from-theme/5 to-transparent p-4 md:flex-row md:items-center">
           <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-theme ">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-theme ">
               <Calendar className="h-6 w-6 text-white" />
             </div>
-            <h1 className="text-2xl font-bold text-black">
+            <h1 className="text-xl sm:text-2xl font-bold text-black break-words">
               {userData
                 ? `${userData.firstName} ${userData.lastName}'s Attendance`
                 : 'Attendance Record'}
@@ -427,9 +423,9 @@ const StaffAttendancePage = () => {
       </div>
 
       <Card className="shadow-none">
-        <CardContent className="p-4 shadow-none">
-          <div className="-mt-5 flex flex-col justify-between gap-4 md:flex-row md:items-end">
-            <div className="text-lg font-semibold text-gray-800">
+        <CardContent className="p-0 sm:p-4 shadow-none">
+          <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
+            <div className="text-base sm:text-lg font-semibold text-gray-800">
               <span className="mb-1 block text-sm text-gray-500">
                 Showing period:
               </span>
@@ -437,9 +433,9 @@ const StaffAttendancePage = () => {
               {endDate && <span> - {formatDisplayDate(endDate)}</span>}
             </div>
 
-            <div className="flex flex-wrap items-end gap-3">
+            <div className="flex w-full flex-col sm:flex-row flex-wrap items-start md:items-end gap-3 md:w-auto">
               <div className="w-full sm:w-auto">
-                <label className="mb-2 block text-xs font-semibold uppercase tracking-wider">
+                <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-gray-600">
                   Date Range (DD-MM-YYYY)
                 </label>
                 <div className="relative w-full sm:w-64">
@@ -461,32 +457,34 @@ const StaffAttendancePage = () => {
                 </div>
               </div>
 
-              <div className="flex gap-2">
-                <Button
-                  onClick={() => fetchAttendance(currentPage, entriesPerPage)}
-                  disabled={isLoading}
-                  className="h-10"
-                >
-                  {isLoading ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Search className="mr-2 h-4 w-4" />
-                  )}
-                  Search
-                </Button>
+              <div className="flex w-full flex-col sm:flex-row gap-2 sm:w-auto">
+                <div className="flex w-full gap-2 sm:w-auto">
+                  <Button
+                    onClick={() => fetchAttendance(currentPage, entriesPerPage)}
+                    disabled={isLoading}
+                    className="h-10 flex-1 sm:flex-none"
+                  >
+                    {isLoading ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Search className="mr-2 h-4 w-4" />
+                    )}
+                    Search
+                  </Button>
 
-                <Button
-                  variant="outline"
-                  onClick={handleReset}
-                  title="Reset Filters"
-                  className="h-10 px-3"
-                >
-                  Reset
-                </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleReset}
+                    title="Reset Filters"
+                    className="h-10 px-3 flex-1 sm:flex-none"
+                  >
+                    Reset
+                  </Button>
+                </div>
 
                 {/* --- GENERATE PDF BUTTON --- */}
                 {attendanceData.length > 0 && userData && (
-                  <Button variant="default" className="h-10 px-3 bg-green-600 hover:bg-green-700 text-white shadow-sm" asChild>
+                  <Button variant="default" className="h-10 px-3 bg-green-600 hover:bg-green-700 text-white shadow-sm w-full sm:w-auto" asChild>
                     <PDFDownloadLink
                       document={
                         <AttendanceReportPDF 
@@ -498,7 +496,7 @@ const StaffAttendancePage = () => {
                         />
                       }
                       fileName={`${userData.firstName}_Attendance_Report.pdf`}
-                      style={{ textDecoration: 'none', display: 'flex', alignItems: 'center' }}
+                      style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                     >
                       {({ loading }) => (
                         <>
@@ -513,7 +511,7 @@ const StaffAttendancePage = () => {
             </div>
           </div>
 
-          <div className="mt-4">
+          <div className="mt-6 w-full">
             <TableSection
               data={attendanceData}
               loading={isLoading}
@@ -560,14 +558,14 @@ const TableSection = ({
   }
   if (!data || data.length === 0) {
     return (
-      <div className="flex flex-col items-center py-12 text-center">
+      <div className="flex flex-col items-center py-12 text-center px-4">
         <div className="mb-4 rounded-full bg-gray-50 p-4">
           <Search className="h-8 w-8 text-gray-400" />
         </div>
         <h3 className="text-lg font-semibold text-gray-900">
           No records found
         </h3>
-        <p className="max-w-[250px] text-sm text-gray-500">
+        <p className="max-w-[250px] text-sm text-gray-500 mt-1">
           Try adjusting your filters or date range.
         </p>
       </div>
@@ -575,118 +573,113 @@ const TableSection = ({
   }
 
   return (
-    <div className="space-y-2">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Shift Name</TableHead>
-            <TableHead>Department</TableHead>
-            <TableHead className="w-[12%]">Start Date</TableHead>
-            <TableHead className="w-[12%]">Start Time</TableHead>
-            <TableHead className="w-[12%]">End Date</TableHead>
-            <TableHead className="w-[12%]">End Time</TableHead>
-            {/* <TableHead className="w-[10%]">Duration</TableHead> */}
-            <TableHead className="w-[12%]">Duration</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {data.map((record: any) => {
-            const departmentName =
-              record.rotaId?.departmentId?.departmentName || '--';
-            const shiftName = record.rotaId?.shiftName || '';
-            const rotaStartTime = record.rotaId?.startTime || '';
-            const rotaEndTime = record.rotaId?.endTime || '';
+    <div className="space-y-2 w-full">
+      <div className="w-full overflow-x-auto rounded-md border border-gray-200">
+        <Table className="min-w-[800px]">
+          <TableHeader className="bg-gray-50/50">
+            <TableRow>
+              <TableHead className="py-3">Shift Name</TableHead>
+              <TableHead className="py-3">Department</TableHead>
+              <TableHead className="w-[12%] py-3">Start Date</TableHead>
+              <TableHead className="w-[12%] py-3">Start Time</TableHead>
+              <TableHead className="w-[12%] py-3">End Date</TableHead>
+              <TableHead className="w-[12%] py-3">End Time</TableHead>
+              <TableHead className="w-[12%] py-3">Duration</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {data.map((record: any) => {
+              const departmentName =
+                record.rotaId?.departmentId?.departmentName || '--';
+              const shiftName = record.rotaId?.shiftName || '';
+              const rotaStartTime = record.rotaId?.startTime || '';
+              const rotaEndTime = record.rotaId?.endTime || '';
 
-            const rStartDate = record.clockInDate || record.date || '';
-            const rEndDate = record.clockOutDate || record.date || '';
+              const rStartDate = record.clockInDate || record.date || '';
+              const rEndDate = record.clockOutDate || record.date || '';
 
-            const firstLog = record.attendanceLogs?.[0];
-            const rStartTime = firstLog?.clockIn || record.clockIn || '--';
-            const rEndTime = firstLog?.clockOut || record.clockOut || '--';
+              const firstLog = record.attendanceLogs?.[0];
+              const rStartTime = firstLog?.clockIn || record.clockIn || '--';
+              const rEndTime = firstLog?.clockOut || record.clockOut || '--';
 
-            const displayTime = (t: string) => {
-              if (!t || t === '--') return '--';
-              if (t.includes('T')) return moment(t).format('HH:mm');
-              if (t.length >= 5) return t.substring(0, 5);
-              return t;
-            };
+              const displayTime = (t: string) => {
+                if (!t || t === '--') return '--';
+                if (t.includes('T')) return moment(t).format('HH:mm');
+                if (t.length >= 5) return t.substring(0, 5);
+                return t;
+              };
 
-            const displayDate = (d: string) =>
-              d ? moment(d).format('DD-MM-YYYY') : '--';
+              const displayDate = (d: string) =>
+                d ? moment(d).format('DD-MM-YYYY') : '--';
 
-            const dCalc = calculateDuration(rStartDate, rStartTime, rEndDate, rEndTime);
-            const appCalc = calculateApprovedDuration(rStartDate, rStartTime, rEndDate, rEndTime, rotaStartTime, rotaEndTime);
+              const appCalc = calculateApprovedDuration(rStartDate, rStartTime, rEndDate, rEndTime, rotaStartTime, rotaEndTime);
 
-            let shiftDurationDisplay = '';
-            if (rotaStartTime && rotaEndTime) {
-              const rStart = moment(rotaStartTime, 'HH:mm');
-              const rEnd = moment(rotaEndTime, 'HH:mm');
-              if (rEnd.isBefore(rStart)) rEnd.add(1, 'day');
+              let shiftDurationDisplay = '';
+              if (rotaStartTime && rotaEndTime) {
+                const rStart = moment(rotaStartTime, 'HH:mm');
+                const rEnd = moment(rotaEndTime, 'HH:mm');
+                if (rEnd.isBefore(rStart)) rEnd.add(1, 'day');
 
-              const diffMins = rEnd.diff(rStart, 'minutes');
-              if (diffMins > 0) {
-                const hrs = Math.floor(diffMins / 60);
-                const mins = diffMins % 60;
-                shiftDurationDisplay =
-                  mins === 0
-                    ? `(${hrs.toString().padStart(2, '0')}h)`
-                    : `(${hrs.toString().padStart(2, '0')}h ${mins.toString().padStart(2, '0')}m)`;
+                const diffMins = rEnd.diff(rStart, 'minutes');
+                if (diffMins > 0) {
+                  const hrs = Math.floor(diffMins / 60);
+                  const mins = diffMins % 60;
+                  shiftDurationDisplay =
+                    mins === 0
+                      ? `(${hrs.toString().padStart(2, '0')}h)`
+                      : `(${hrs.toString().padStart(2, '0')}h ${mins.toString().padStart(2, '0')}m)`;
+                }
               }
-            }
 
-            return (
-              <TableRow key={record._id}>
-                <TableCell className="text-sm font-medium">
-                  <div className="flex flex-col whitespace-nowrap">
-                    <span className="text-sm font-bold text-gray-900">
-                      {shiftName
-                        ? shiftName
-                        : rotaStartTime && rotaEndTime
-                          ? `${rotaStartTime} - ${rotaEndTime} ${shiftDurationDisplay}`
-                          : '--'}
-                    </span>
-                    {shiftName && rotaStartTime && rotaEndTime && (
-                      <span className="mt-0.5 text-xs font-semibold tracking-wide text-gray-800">
-                        {rotaStartTime} - {rotaEndTime}{' '}
-                        <span className="font-medium text-gray-500">
-                          {shiftDurationDisplay}
-                        </span>
+              return (
+                <TableRow key={record._id} className="hover:bg-gray-50/50">
+                  <TableCell className="py-3 text-sm font-medium">
+                    <div className="flex flex-col whitespace-nowrap">
+                      <span className="text-sm font-bold text-gray-900">
+                        {shiftName
+                          ? shiftName
+                          : rotaStartTime && rotaEndTime
+                            ? `${rotaStartTime} - ${rotaEndTime} ${shiftDurationDisplay}`
+                            : '--'}
                       </span>
-                    )}
-                  </div>
-                </TableCell>
-                <TableCell className="text-sm">{departmentName}</TableCell>
-                <TableCell className="text-sm">{displayDate(rStartDate)}</TableCell>
-                <TableCell className="font-mono text-sm">{displayTime(rStartTime)}</TableCell>
-                <TableCell className="text-sm">{displayDate(rEndDate)}</TableCell>
-                <TableCell className="font-mono text-sm">{displayTime(rEndTime)}</TableCell>
-                {/* <TableCell className="text-sm">
-                  <div className="flex items-center gap-1 font-mono text-sm ">
-                    {dCalc.display}
-                  </div>
-                </TableCell> */}
-                <TableCell className="text-sm">
-                  <div className="flex items-center gap-1 font-mono text-sm font-semibold text-black">
-                    {appCalc.display}
-                  </div>
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-        
-        <TableFooter className="bg-transparent hover:bg-transparent border-none">
-          <TableRow className="hover:bg-transparent border-0">
-            <TableCell colSpan={5} className="border-0"></TableCell>
-            <TableCell colSpan={2} className="p-0 pt-4">
-              <div className="flex items-center text-lg font-bold justify-start gap-4 bg-white px-4 py-3">
-                <span className="text-sm font-semibold">Total Hours:</span>
-                <span className="text-base font-bold">{totalApprovedDisplay}</span>
-              </div>
-            </TableCell>
-          </TableRow>
-        </TableFooter>
-      </Table>
+                      {shiftName && rotaStartTime && rotaEndTime && (
+                        <span className="mt-0.5 text-xs font-semibold tracking-wide text-gray-800">
+                          {rotaStartTime} - {rotaEndTime}{' '}
+                          <span className="font-medium text-gray-500">
+                            {shiftDurationDisplay}
+                          </span>
+                        </span>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell className="py-3 text-sm">{departmentName}</TableCell>
+                  <TableCell className="py-3 text-sm whitespace-nowrap">{displayDate(rStartDate)}</TableCell>
+                  <TableCell className="py-3 font-mono text-sm">{displayTime(rStartTime)}</TableCell>
+                  <TableCell className="py-3 text-sm whitespace-nowrap">{displayDate(rEndDate)}</TableCell>
+                  <TableCell className="py-3 font-mono text-sm">{displayTime(rEndTime)}</TableCell>
+                  <TableCell className="py-3 text-sm">
+                    <div className="flex items-center gap-1 font-mono text-sm font-semibold text-black">
+                      {appCalc.display}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+          
+          <TableFooter className="bg-gray-50 border-t border-gray-200">
+            <TableRow className="hover:bg-gray-50 border-0">
+              <TableCell colSpan={5} className="border-0"></TableCell>
+              <TableCell colSpan={2} className="p-0">
+                <div className="flex items-center text-lg font-bold justify-end sm:justify-start gap-4 px-4 py-4 w-full">
+                  <span className="text-sm font-semibold text-gray-700">Total Hours:</span>
+                  <span className="text-base font-bold text-black">{totalApprovedDisplay}</span>
+                </div>
+              </TableCell>
+            </TableRow>
+          </TableFooter>
+        </Table>
+      </div>
 
       <div className="mt-4 flex flex-col gap-2">
         {data.length > 50 && (
