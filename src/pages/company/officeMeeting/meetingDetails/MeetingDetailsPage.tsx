@@ -81,7 +81,6 @@ export default function MeetingDetailsPage() {
   const { mid: id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-
   const [meeting, setMeeting] = useState<MeetingMins | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -335,19 +334,18 @@ export default function MeetingDetailsPage() {
   }
 
   return (
-    <div className="h-[97vh] space-y-6 rounded-md bg-white p-5 shadow-sm">
+    <div className="min-h-screen space-y-4 rounded-md bg-white p-3 shadow-sm sm:h-[97vh] sm:space-y-6 sm:p-5  max-sm:pt-12">
       {/* Header Area */}
-      <div className="flex flex-row items-center justify-between ">
-        <div className="flex flex-row gap-2 space-x-3">
-          <h1 className="text-lg font-semibold text-gray-900 max-w-[65%]">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2 sm:space-x-3">
+          <h1 className="text-base font-semibold text-gray-900 sm:text-lg">
             {meeting?.title || ''}
           </h1>
           <div className="flex items-center gap-2 whitespace-nowrap text-gray-900">
-            <span className="text-sm font-medium text-gray-600 sm:text-lg">
+            <span className="text-xs font-medium text-gray-600 sm:text-lg">
               Next Meeting:
             </span>
-
-            <span className="text-sm font-semibold text-gray-900 sm:text-lg">
+            <span className="text-xs font-semibold text-gray-900 sm:text-lg">
               {meeting?.nextMeetingDate
                 ? moment(meeting.nextMeetingDate).format('DD MMM, YYYY')
                 : 'Not Scheduled'}
@@ -359,52 +357,52 @@ export default function MeetingDetailsPage() {
             size="sm"
             variant={'outline'}
             onClick={() => setUploadDialogOpen(true)}
-            className="rounded-md"
+            className="rounded-md text-xs sm:text-sm"
           >
-            <Upload className="mr-2 h-4 w-4" />
-            Upload Meeting Minutes
+            <Upload className="mr-1 h-3 w-3 sm:mr-2 sm:h-4 sm:w-4" />
+            <span className=" ">Upload Meeting Minutes</span>
           </Button>
-          <Button size="sm" onClick={() => navigate(-1)}>
-            <ArrowLeft className="mr-2 h-4 w-4" /> Back
+          <Button size="sm" onClick={() => navigate(-1)} className="text-xs sm:text-sm">
+            <ArrowLeft className="mr-1 h-3 w-3 sm:mr-2 sm:h-4 sm:w-4" /> Back
           </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-12">
+      <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-12">
         {/* Main Page Employee List */}
-        <div className="h-[85vh] overflow-y-auto rounded-xl border border-gray-200 bg-white p-3 shadow-sm md:col-span-5">
+        <div className="max-h-[40vh] overflow-y-auto rounded-xl border border-gray-200 bg-white p-3 shadow-sm sm:max-h-none md:col-span-5 md:h-[85vh]">
           <div className="mb-4 flex items-center gap-2 border-b border-gray-100 pb-4">
-            <Users2 className="h-5 w-5 " />
-            <h2 className="text-xl font-bold text-gray-900">Employee List</h2>
+            <Users2 className="h-4 w-4 sm:h-5 sm:w-5" />
+            <h2 className="text-lg font-bold text-gray-900 sm:text-xl">Employee List</h2>
           </div>
           {meeting?.employeeId && meeting.employeeId.length > 0 ? (
-            <ul className="space-y-3 px-2">
+            <ul className="space-y-2 px-1 sm:space-y-3 sm:px-2">
               {meeting.employeeId.map((emp) => (
                 <li
                   key={emp._id}
-                  className="flex items-center gap-3 rounded-lg border border-gray-100 bg-gray-50/50 p-3 shadow-sm transition-colors hover:bg-gray-50"
+                  className="flex items-center gap-3 rounded-lg border border-gray-100 bg-gray-50/50 p-2.5 shadow-sm transition-colors hover:bg-gray-50 sm:p-3"
                 >
                   <div className="flex flex-col">
-                    <span className="text-sm font-medium">
+                    <span className="text-xs font-medium sm:text-sm">
                       {emp.name || `${emp.firstName} ${emp.lastName}`}
                     </span>
-                    <span className="text-xs">
+                    <span className="text-[11px] sm:text-xs">
                       {emp.designationId?.map((d) => d.title).join(', ')}
-                    </span>{' '}
+                    </span>
                   </div>
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="ml-2 italic text-gray-500">No employees assigned.</p>
+            <p className="ml-2 italic text-gray-500 text-sm">No employees assigned.</p>
           )}
         </div>
 
         {/* Main Page Activity Timeline */}
-        <div className="h-[85vh] overflow-y-auto rounded-xl border border-gray-200 bg-white p-3 shadow-sm md:col-span-7">
-          <div className="mb-8 flex items-center gap-2 border-b border-gray-100 pb-4">
-            <Clock className="h-5 w-5 " />
-            <h2 className="text-xl font-bold text-gray-900">
+        <div className="max-h-[50vh] overflow-y-auto rounded-xl border border-gray-200 bg-white p-3 shadow-sm sm:max-h-none md:col-span-7 md:h-[85vh]">
+          <div className="mb-6 flex items-center gap-2 border-b border-gray-100 pb-4 sm:mb-8">
+            <Clock className="h-4 w-4 sm:h-5 sm:w-5" />
+            <h2 className="text-lg font-bold text-gray-900 sm:text-xl">
               Activity Timeline
             </h2>
           </div>
@@ -412,9 +410,9 @@ export default function MeetingDetailsPage() {
           <div className="relative pl-4">
             <div className="absolute bottom-0 left-[23px] top-2 w-[2px] bg-gray-100" />
 
-            <div className="space-y-5">
+            <div className="space-y-4 sm:space-y-5">
               {meeting?.logs?.length === 0 ? (
-                <p className="ml-10 italic text-gray-500">
+                <p className="ml-10 italic text-gray-500 text-sm">
                   No activities recorded yet.
                 </p>
               ) : (
@@ -432,7 +430,7 @@ export default function MeetingDetailsPage() {
                       <div className="flex flex-col items-center">
                         <div
                           className={cn(
-                            ' flex h-[22px] w-[22px] items-center justify-center rounded-full border-[3px] bg-white',
+                            'flex h-[22px] w-[22px] items-center justify-center rounded-full border-[3px] bg-white',
                             isLatest ? 'border-theme' : 'border-gray-300'
                           )}
                         >
@@ -443,13 +441,13 @@ export default function MeetingDetailsPage() {
                       </div>
 
                       <div className="flex-1 pb-0">
-                        <div className="flex items-center gap-3">
-                          <span className=" px-2.5  text-sm font-semibold text-black">
+                        <div className="flex flex-wrap items-center gap-1.5 sm:gap-3">
+                          <span className="px-2 text-xs font-semibold text-black sm:text-sm">
                             {moment(log.date).format('DD MMM, YYYY')}
                           </span>
                           <p
                             className={cn(
-                              'text-[15px] font-semibold text-black',
+                              'text-sm font-semibold text-black sm:text-[15px]',
                               canClick &&
                                 'cursor-pointer text-theme hover:underline'
                             )}
@@ -474,15 +472,15 @@ export default function MeetingDetailsPage() {
 
       {/* General Upload Dialog */}
       <Dialog open={uploadDialogOpen} onOpenChange={handleDialogChange}>
-        <DialogContent className="max-w-5xl sm:rounded-xl">
+        <DialogContent className="max-w-5xl sm:rounded-xl w-[95vw] max-h-[90vh] overflow-y-auto">
           <DialogHeader className="border-b border-gray-100 pb-4">
-            <DialogTitle className="text-xl font-bold">
+            <DialogTitle className="text-lg font-bold sm:text-xl">
               Upload Meeting Minutes
             </DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-6 py-4">
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          <div className="space-y-4 py-4 sm:space-y-6">
+            <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2">
               {/* Date Input */}
               <div className="flex flex-col space-y-2">
                 <Label className="text-sm font-semibold text-gray-700">
@@ -527,7 +525,7 @@ export default function MeetingDetailsPage() {
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
                   placeholder="Enter any notes or descriptions here..."
-                  className="min-h-[100px] border-gray-300 focus:border-theme focus:ring-theme"
+                  className="min-h-[80px] border-gray-300 focus:border-theme focus:ring-theme sm:min-h-[100px]"
                 />
               </div>
             </div>
@@ -538,7 +536,7 @@ export default function MeetingDetailsPage() {
               </Label>
               <div
                 className={cn(
-                  'relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-8 transition-all',
+                  'relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-6 transition-all sm:p-8',
                   isUploading
                     ? 'border-theme bg-theme/5'
                     : formErrors.uploadedFiles
@@ -583,9 +581,7 @@ export default function MeetingDetailsPage() {
                     >
                       Click or drag to upload
                     </span>
-                    <span className="text-xs text-gray-500">
-                      (Max 20MB)
-                    </span>
+                    <span className="text-xs text-gray-500">(Max 20MB)</span>
                   </div>
                 )}
               </div>
@@ -606,7 +602,7 @@ export default function MeetingDetailsPage() {
               {/* Uploaded files list */}
               {uploadedFiles.length > 0 && (
                 <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50/50 p-2">
-                  <ul className="max-h-[140px] space-y-2 overflow-y-auto pr-1">
+                  <ul className="max-h-[120px] space-y-2 overflow-y-auto pr-1 sm:max-h-[140px]">
                     {uploadedFiles.map((file, index) => (
                       <li
                         key={index}
@@ -633,12 +629,12 @@ export default function MeetingDetailsPage() {
             </div>
           </div>
 
-          <DialogFooter className="gap-2 border-t border-gray-100 pt-4 sm:justify-end">
-            <Button variant="outline" onClick={() => handleDialogChange(false)}>
+          <DialogFooter className="flex-col gap-2 border-t border-gray-100 pt-4 sm:flex-row sm:justify-end">
+            <Button variant="outline" onClick={() => handleDialogChange(false)} className="w-full sm:w-auto">
               Cancel
             </Button>
             <Button
-              className="min-w-[120px] bg-theme text-white hover:bg-theme/90"
+              className="w-full min-w-[120px] bg-theme text-white hover:bg-theme/90 sm:w-auto"
               onClick={handleUploadSubmit}
               disabled={isSubmitting || isUploading}
             >
@@ -654,21 +650,21 @@ export default function MeetingDetailsPage() {
 
       {/* View Documents Dialog (Activity Timeline Log) */}
       <Dialog open={viewDocsDialogOpen} onOpenChange={setViewDocsDialogOpen}>
-        <DialogContent className="max-w-5xl sm:rounded-xl border-gray-100 max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-5xl sm:rounded-xl border-gray-100 max-h-[90vh] overflow-y-auto w-[95vw]">
           <DialogHeader className="border-b border-gray-100 pb-4">
-            <DialogTitle className="flex items-center gap-2 text-xl font-bold">
-              <FileText className="h-5 w-5 text-theme" />
-              {meeting?.title}
-              <span className="font-bold">
+            <DialogTitle className="flex flex-wrap items-center gap-2 text-lg font-bold sm:text-xl">
+              <FileText className="h-4 w-4 text-theme sm:h-5 sm:w-5" />
+              <span className="font-bold text-sm sm:text-base break-all">{meeting?.title}</span>
+              <span className="font-bold text-sm sm:text-base">
                 {selectedLog?.date &&
                   ` - ${moment(selectedLog.date).format('DD MMMM, YYYY')}`}
               </span>
             </DialogTitle>
           </DialogHeader>
 
-          <div className="grid grid-cols-1 gap-6 py-4 md:grid-cols-12">
+          <div className="grid grid-cols-1 gap-4 py-4 sm:gap-6 md:grid-cols-12">
             {/* Left side: Notes and Files */}
-            <div className="space-y-6 md:col-span-8">
+            <div className="space-y-4 sm:space-y-6 md:col-span-8">
               {/* Note Display */}
               {selectedLog?.note && (
                 <p className="text-sm font-medium text-gray-700">
@@ -679,26 +675,26 @@ export default function MeetingDetailsPage() {
               {/* Files Display */}
               <div>
                 <Label className="mb-3 block text-sm font-semibold text-gray-900">
-                  Uploaded Files
+                  Files
                 </Label>
                 {selectedLog?.documents && selectedLog.documents.length > 0 ? (
-                  <ul className="space-y-2.5">
+                  <ul className="space-y-2 sm:space-y-2.5">
                     {selectedLog.documents.map((docUrl, idx) => {
                       const fileName =
                         docUrl.split('/').pop() || `Document ${idx + 1}`;
                       return (
                         <li
                           key={idx}
-                          className="group flex items-center gap-3 rounded-lg border border-gray-200 bg-white p-3 shadow-sm transition-all hover:border-theme/30 hover:shadow-md"
+                          className="group flex items-center gap-3 rounded-lg border border-gray-200 bg-white p-2.5 shadow-sm transition-all hover:border-theme/30 hover:shadow-md sm:p-3"
                         >
-                          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-theme/10">
-                            <FileText className="h-4 w-4 flex-shrink-0 text-theme" />
+                          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-theme/10">
+                            <FileText className="h-4 w-4 text-theme" />
                           </div>
                           <a
                             href={docUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex-1 truncate text-sm font-medium text-gray-700 group-hover:text-theme"
+                            className="flex-1 truncate text-xs font-medium text-gray-700 group-hover:text-theme sm:text-sm"
                           >
                             {fileName}
                           </a>
@@ -707,7 +703,7 @@ export default function MeetingDetailsPage() {
                     })}
                   </ul>
                 ) : (
-                  <div className="rounded-lg border border-gray-100 bg-gray-50 p-6 text-center">
+                  <div className="rounded-lg border border-gray-100 bg-gray-50 p-4 text-center sm:p-6">
                     <p className="text-sm italic text-gray-500">
                       No documents found for this log.
                     </p>
@@ -715,7 +711,7 @@ export default function MeetingDetailsPage() {
                 )}
 
                 {/* Inline Upload for Specific Log with Staging/Confirmation */}
-                <div className="mt-6 border-t border-gray-100 pt-4">
+                <div className="mt-4 border-t border-gray-100 pt-4 sm:mt-6">
                   <Label className="mb-3 block text-sm font-semibold text-gray-900">
                     Add Documents
                   </Label>
@@ -728,12 +724,12 @@ export default function MeetingDetailsPage() {
                       className="hidden"
                       disabled={isLogUploading}
                     />
-                    
-                    <Button 
-                      variant="outline" 
+
+                    <Button
+                      variant="outline"
                       onClick={() => logFileInputRef.current?.click()}
                       disabled={isLogUploading}
-                      className="w-fit"
+                      className="w-full sm:w-fit"
                     >
                       <Upload className="mr-2 h-4 w-4" />
                       Select Documents
@@ -750,7 +746,7 @@ export default function MeetingDetailsPage() {
                             >
                               <div className="flex items-center gap-2 overflow-hidden">
                                 <FileText className="h-4 w-4 flex-shrink-0 text-theme" />
-                                <span className="truncate font-medium text-gray-700">
+                                <span className="truncate font-medium text-gray-700 text-xs sm:text-sm">
                                   {file.name}
                                 </span>
                               </div>
@@ -765,12 +761,12 @@ export default function MeetingDetailsPage() {
                             </li>
                           ))}
                         </ul>
-                        
+
                         <div className="mt-4 flex justify-end">
                           <Button
                             onClick={handleConfirmLogUpload}
                             disabled={isLogUploading}
-                            className="bg-theme text-white hover:bg-theme/90"
+                            className="w-full bg-theme text-white hover:bg-theme/90 sm:w-auto"
                           >
                             {isLogUploading ? (
                               <div className="flex items-center gap-2">
@@ -788,60 +784,61 @@ export default function MeetingDetailsPage() {
                 </div>
               </div>
             </div>
+{user.role !== 'employee' && (  <div className="space-y-4 md:col-span-4 md:border-l md:border-gray-100 md:pl-6">
+              {/* Mobile: horizontal divider instead of vertical */}
+              <div className="border-t border-gray-100 pt-4 md:border-t-0 md:pt-0">
+                <Label className="mb-3 block text-sm font-semibold text-gray-900">
+                  Acknowledgement
+                </Label>
+                {meeting?.employeeId && meeting.employeeId.length > 0 ? (
+                  <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-1 sm:gap-2.5 md:gap-3 md:space-y-0">
+                    {[...meeting.employeeId]
+                      .sort((a, b) => {
+                        const aAcknowledged = selectedLog?.Acknowledgement?.includes(a._id) ? 1 : 0;
+                        const bAcknowledged = selectedLog?.Acknowledgement?.includes(b._id) ? 1 : 0;
+                        return bAcknowledged - aAcknowledged;
+                      })
+                      .map((emp) => {
+                        const hasAcknowledged = selectedLog?.Acknowledgement?.includes(emp._id);
 
-            {/* Right side: Employee List and Acknowledgement */}
-             <div className="space-y-4 md:col-span-4 md:border-l md:border-gray-100 md:pl-6">
-        <Label className="block text-sm font-semibold text-gray-900">
-          Acknowledgement
-        </Label>
-        {meeting?.employeeId && meeting.employeeId.length > 0 ? (
-          <ul className="space-y-3">
-            {[...meeting.employeeId]
-              .sort((a, b) => {
-                const aAcknowledged = selectedLog?.Acknowledgement?.includes(a._id) ? 1 : 0;
-                const bAcknowledged = selectedLog?.Acknowledgement?.includes(b._id) ? 1 : 0;
-                return bAcknowledged - aAcknowledged;
-              })
-              .map((emp) => {
-                const hasAcknowledged = selectedLog?.Acknowledgement?.includes(emp._id);
-                
-                return (
-                  <li
-                    key={emp._id}
-                    className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-2 shadow-sm transition hover:shadow-md ${
-                      hasAcknowledged 
-                        ? 'border-green-200 bg-green-50/50' 
-                        : 'border-gray-100 bg-white'
-                    }`}
-                  >
-                    <div className="shrink-0">
-                      {hasAcknowledged ? (
-                        <CheckCircle2 className="h-5 w-5 text-green-500" />
-                      ) : (
-                        <XCircle className="h-5 w-5 text-red-500" />
-                      )}
-                    </div>
+                        return (
+                          <li
+                            key={emp._id}
+                            className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-2 shadow-sm transition hover:shadow-md ${
+                              hasAcknowledged
+                                ? 'border-green-200 bg-green-50/50'
+                                : 'border-gray-100 bg-white'
+                            }`}
+                          >
+                            <div className="shrink-0">
+                              {hasAcknowledged ? (
+                                <CheckCircle2 className="h-4 w-4 text-green-500 sm:h-5 sm:w-5" />
+                              ) : (
+                                <XCircle className="h-4 w-4 text-red-500 sm:h-5 sm:w-5" />
+                              )}
+                            </div>
 
-                    <div className="flex min-w-0 flex-1 flex-col">
-                      <span className="truncate text-sm font-semibold text-gray-800">
-                        {emp.name ||
-                          `${emp.firstName || ""} ${emp.lastName || ""}`.trim()}
-                      </span>
-
-                      <span className=" text-xs text-gray-500">
-                        {emp.designationId?.map((d) => d.title).join(", ") || "No designation"}
-                      </span>
-                    </div>
-                  </li>
-                );
-              })}
-          </ul>
-        ) : (
-          <p className="text-sm italic text-gray-500">
-            No attendees listed.
-          </p>
-        )}
-      </div>
+                            <div className="flex min-w-0 flex-1 flex-col">
+                              <span className="truncate text-xs font-semibold text-gray-800 sm:text-sm">
+                                {emp.name ||
+                                  `${emp.firstName || ''} ${emp.lastName || ''}`.trim()}
+                              </span>
+                              <span className="text-[11px] text-gray-500 sm:text-xs">
+                                {emp.designationId?.map((d) => d.title).join(', ') || 'No designation'}
+                              </span>
+                            </div>
+                          </li>
+                        );
+                      })}
+                  </ul>
+                ) : (
+                  <p className="text-sm italic text-gray-500">
+                    No attendees listed.
+                  </p>
+                )}
+              </div>
+            </div>)}
+          
           </div>
         </DialogContent>
       </Dialog>

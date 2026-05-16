@@ -319,38 +319,41 @@ export default function OfficeMeetingPage() {
   return (
     <div className="space-y-3 rounded-md bg-white p-5 shadow-sm">
       {/* Header Section */}
-      <div className="flex items-center justify-between">
-        <div className="flex flex-row items-center gap-4">
-          <h2 className="flex items-center gap-2 text-2xl font-bold text-gray-900">
-            <Users className="h-6 w-6" />
-            Office Meetings
-          </h2>
-          <div className="flex items-center space-x-4">
-            <Input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search meeting title..."
-              className="h-8 min-w-[250px]"
-            />
-            <Button
-              onClick={handleSearch}
-              size="sm"
-              className="min-w-[100px] border-none bg-theme text-white hover:bg-theme/90"
-            >
-              Search
-            </Button>
-          </div>
-        </div>
-        <Button
-          className="bg-theme text-white hover:bg-theme/90"
-          size="sm"
-          onClick={() => setDialogOpen(true)}
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Create Meeting
-        </Button>
-      </div>
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+  <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-4">
+    <h2 className="flex items-center gap-2 text-2xl font-bold text-gray-900">
+      <Users className="h-6 w-6" />
+      Office Meetings
+    </h2>
+
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+      <Input
+        type="text"
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+        placeholder="Search meeting title..."
+        className="h-9 w-full min-w-0 sm:min-w-[250px]"
+      />
+
+      <Button
+        onClick={handleSearch}
+        size="sm"
+        className="w-full h-9 sm:w-auto min-w-[100px] border-none bg-theme text-white hover:bg-theme/90"
+      >
+        Search
+      </Button>
+    </div>
+  </div>
+
+  <Button
+    className="w-full md:w-auto bg-theme text-white hover:bg-theme/90"
+    size="sm"
+    onClick={() => setDialogOpen(true)}
+  >
+    <Plus className="mr-2 h-4 w-4" />
+    Create Meeting
+  </Button>
+</div>
 
       {/* Table Section */}
       <div>
