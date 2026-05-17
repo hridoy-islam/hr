@@ -115,6 +115,10 @@ import OfficeMeetingPage from '@/pages/company/officeMeeting';
 import MeetingDetailsPage from '@/pages/company/officeMeeting/meetingDetails/MeetingDetailsPage';
 import StaffMeetingPage from '@/pages/staff/Meeting';
 import StaffMeetingDetailsPage from '@/pages/staff/Meeting/meetingDetails/MeetingDetailsPage';
+import CompanyPolicyPage from '@/pages/company/companyPolicy';
+import PolicyDetails from '@/pages/company/companyPolicy/policyDetails';
+import HealthAndSafetyPage from '@/pages/company/healthAndSafety';
+import HealthAndSafetyDetails from '@/pages/company/healthAndSafety/healthAndSafetyDetails';
 
 const SignInPage = lazy(() => import('@/pages/auth/signin'));
 
@@ -343,7 +347,11 @@ export default function AppRouter() {
         { path: 'docusign-details', element: <CompanyDocusignDetailsPage /> },
         { path: 'missed-attendance', element: <MissingAttendancePage /> },
         { path: 'company-meeting', element: <OfficeMeetingPage /> },
-        { path: 'company-meeting/:mid', element: <MeetingDetailsPage /> }
+        { path: 'company-meeting/:mid', element: <MeetingDetailsPage /> },
+        { path: 'company-policy', element: <CompanyPolicyPage /> },
+        { path: 'company-policy/:pid', element: <PolicyDetails /> },
+        { path: 'health-and-safety', element: <HealthAndSafetyPage /> },
+        { path: 'health-and-safety/:hid', element: <HealthAndSafetyDetails /> },
       ]
     }
   ];

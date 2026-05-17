@@ -12,7 +12,9 @@ import {
   UserPlus,
   AlertTriangle,
   FolderOpen,
-  CalendarDays
+  CalendarDays,
+  Shield, // <-- Added for Company Policy
+  Activity // <-- Added for Health & Safety
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import axiosInstance from '@/lib/axios';
@@ -23,7 +25,7 @@ import { useCompanyAccess } from '@/hooks/use-company-access';
 const CompanyDashboardPage = () => {
   const [loadingEmployees, setLoadingEmployees] = useState(true);
   const [totalEmployees, setTotalEmployees] = useState(0);
-const { hasAccess } = useCompanyAccess();
+  const { hasAccess } = useCompanyAccess();
   const navigate = useNavigate();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const user = useSelector((state: any) => state.auth.user);
@@ -66,7 +68,9 @@ const { hasAccess } = useCompanyAccess();
       refetchStatus();
     }
   }, [id, refetchStatus]);
-const canViewEmployeeData = hasAccess('employee');
+  
+  const canViewEmployeeData = hasAccess('employee');
+  
   // Helper to generate sub-text based on count
   const getSubText = (count: number) =>
     count > 0 ? `${count} Pending Action(s)` : 'All Valid';
@@ -203,33 +207,57 @@ const canViewEmployeeData = hasAccess('employee');
       functional: true,
       isWarning: status.qa > 0
     },
-    // --- NEW CARD: EMPLOYEE DOCUMENTS ---
     {
       title: 'REQUIRED DOCUMENTS',
       main: loadingStats ? '...' : status.employeeDocument,
       sub: getSubText(status.employeeDocument),
       icon: <FolderOpen className="h-6 w-6" />,
-      gradient: 'from-sky-600 to-sky-800', // Distinct Sky Blue
+      gradient: 'from-sky-600 to-sky-800', 
       onClick: () => navigate(`/company/${id}/required-employee-documents`),
       functional: true,
       isWarning: status.employeeDocument > 0
-    },{
-      title: 'COMPANY MEETING',
-      main: loadingStats ? '...' : status.meeting,
-      sub: getSubText(status.meeting),
-      icon: <CalendarDays className="h-6 w-6" />, 
-      gradient: 'from-amber-600 to-amber-800', 
-      onClick: () => navigate(`/company/${id}/company-meeting`), 
+    },
+    // {
+    //   title: 'COMPANY MEETING',
+    //   main: loadingStats ? '...' : status.meeting,
+    //   sub: getSubText(status.meeting),
+    //   icon: <CalendarDays className="h-6 w-6" />, 
+    //   gradient: 'from-amber-600 to-amber-800', 
+    //   onClick: () => navigate(`/company/${id}/company-meeting`), 
+    //   functional: true,
+    //   isWarning: status.meeting > 0
+    // },
+    // --- NEW CARD: COMPANY POLICY ---
+    {
+      title: 'COMPANY POLICY',
+      main: loadingStats ? '...' : status.policy,
+      sub: getSubText(status.policy),
+      icon: <Shield className="h-6 w-6" />, 
+      gradient: 'from-slate-600 to-slate-800', 
+      onClick: () => navigate(`/company/${id}/company-policy`), 
       functional: true,
-      isWarning: status.meeting > 0
+      isWarning: status.policy > 0
+    },
+    // --- NEW CARD: HEALTH & SAFETY ---
+    {
+      title: 'HEALTH & SAFETY',
+      main: loadingStats ? '...' : status.healthAndSafety,
+      sub: getSubText(status.healthAndSafety),
+      icon: <Activity className="h-6 w-6" />, 
+      gradient: 'from-fuchsia-600 to-fuchsia-800', 
+      onClick: () => navigate(`/company/${id}/health-and-safety`), 
+      functional: true,
+      isWarning: status.healthAndSafety > 0
     }
   ];
-if (!canViewEmployeeData) {
+
+  if (!canViewEmployeeData) {
     return (
       <div >
       </div>
     );
   }
+
   return (
     <div className="">
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4">

@@ -25,7 +25,7 @@ import {
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 import { useParams } from 'react-router-dom';
 
-// Interface for the form data — now includes ALL fields from the schema
+// Interface for the form data
 interface ScheduleCheckValues {
   dbsCheckDate: number;
   rtwCheckDate: number;
@@ -37,7 +37,9 @@ interface ScheduleCheckValues {
   supervisionCheckDate: number;
   disciplinaryCheckDate: number;
   qaCheckDate: number; 
-  meetingCheckDate: number; // ← added
+  meetingCheckDate: number;
+  policyCheckDate: number; // ← added
+  healthAndSafetyCheckDate: number; // ← added
   spotCheckDuration: number;
   supervisionDuration: number;
   qaCheckDuration: number; 
@@ -46,7 +48,7 @@ interface ScheduleCheckValues {
 export default function CompanyScheduleCheckPage() {
   const { user } = useSelector((state: any) => state.auth);
   const { toast } = useToast();
-  const {id} = useParams()
+  const { id } = useParams();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [existingId, setExistingId] = useState<string | null>(null);
@@ -63,7 +65,9 @@ export default function CompanyScheduleCheckPage() {
       supervisionCheckDate: 0,
       disciplinaryCheckDate: 0,
       qaCheckDate: 0, 
-      meetingCheckDate: 0, // ← added (will fallback to 0 or API data)
+      meetingCheckDate: 0,
+      policyCheckDate: 0, // ← added
+      healthAndSafetyCheckDate: 0, // ← added
       spotCheckDuration: 0,
       supervisionDuration: 0,
       qaCheckDuration: 0 
@@ -95,7 +99,9 @@ export default function CompanyScheduleCheckPage() {
             supervisionCheckDate: data.supervisionCheckDate || 0,
             disciplinaryCheckDate: data.disciplinaryCheckDate || 0,
             qaCheckDate: data.qaCheckDate || 0, 
-            meetingCheckDate: data.meetingCheckDate || 0, // ← added
+            meetingCheckDate: data.meetingCheckDate || 0,
+            policyCheckDate: data.policyCheckDate || 0, // ← added
+            healthAndSafetyCheckDate: data.healthAndSafetyCheckDate || 0, // ← added
             spotCheckDuration: data.spotCheckDuration || 0,
             supervisionDuration: data.supervisionDuration || 0,
             qaCheckDuration: data.qaDuration || 0 
@@ -369,6 +375,50 @@ export default function CompanyScheduleCheckPage() {
                         <Input
                           type="number"
                           placeholder="e.g. 3"
+                          {...field}
+                          value={field.value === 0 ? '' : field.value}
+                          onChange={(e) => field.onChange(Number(e.target.value))}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Company Policy */}
+                <FormField
+                  control={form.control}
+                  name="policyCheckDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Company Policy Reminder (Days)</FormLabel>
+                      <FormDescription>{reminderDesc}</FormDescription>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="e.g. 30"
+                          {...field}
+                          value={field.value === 0 ? '' : field.value}
+                          onChange={(e) => field.onChange(Number(e.target.value))}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Health and Safety */}
+                <FormField
+                  control={form.control}
+                  name="healthAndSafetyCheckDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Health & Safety Reminder (Days)</FormLabel>
+                      <FormDescription>{reminderDesc}</FormDescription>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="e.g. 30"
                           {...field}
                           value={field.value === 0 ? '' : field.value}
                           onChange={(e) => field.onChange(Number(e.target.value))}

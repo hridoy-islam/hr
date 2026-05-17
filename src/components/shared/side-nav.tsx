@@ -55,7 +55,9 @@ import {
   FileSymlink,
   PenLine,
   CalendarX2,
-  CalendarDays
+  CalendarDays,
+  FileClock,
+  Heart
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Link, useNavigate, useLocation, useParams } from 'react-router-dom';
@@ -279,6 +281,20 @@ const navItems = [
     href: 'company-meeting',
     roles: ['company', 'companyAdmin'],
     badgeKey: 'meeting'
+  },
+  {
+    icon: Heart,
+    label: 'Health and Safety',
+    href: 'health-and-safety',
+    roles: ['company', 'companyAdmin'],
+    badgeKey: 'healthAndSafety'
+  },
+  {
+    icon: FileClock,
+    label: 'Company Policy',
+    href: 'company-policy',
+    roles: ['company', 'companyAdmin'],
+    badgeKey: 'policy'
   },
   {
     icon: Users2,
