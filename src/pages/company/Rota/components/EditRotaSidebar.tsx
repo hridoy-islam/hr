@@ -199,7 +199,7 @@ export default function EditRotaSidebar({
   }, [watchLeaveType, form, isLeaveGenerated]);
 
   const onSubmit = async (values: FormValues) => {
-    if (isLeaveGenerated) return; // Hard block for AL/DO submissions just in case
+    if (isLeaveGenerated) return; // Hard block for AL/S submissions just in case
     
     try {
       const baseRota = Array.isArray(rota) ? rota[0] : rota;
@@ -270,7 +270,7 @@ export default function EditRotaSidebar({
   };
 
   const handleDeleteSlot = async (index: number, rotaId?: string) => {
-    if (isLeaveGenerated) return; 
+    // 🚀 Check removed: Deletion is allowed even if isLeaveGenerated
 
     if (!rotaId) {
       remove(index);
@@ -288,7 +288,7 @@ export default function EditRotaSidebar({
   };
 
   const handleDeleteAll = async () => {
-    if (isLeaveGenerated) return;
+    // 🚀 Check removed: Deletion is allowed even if isLeaveGenerated
 
     try {
       const existingRotas = fields.filter((f) => f._id);
@@ -383,14 +383,14 @@ export default function EditRotaSidebar({
               <div className="mx-5 mt-3 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3">
                 <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
                 <p className="text-xs font-medium leading-relaxed text-amber-800">
-  This shift was generated from an approved Leave Request (
-  {watchLeaveType === 'AL'
-    ? 'Annual Leave'
-    : watchLeaveType === 'S'
-    && 'Sick Leave'
-    }
-  ). It cannot be edited or deleted from the Rota.
-</p>
+                  This shift was generated from an approved Leave Request (
+                  {watchLeaveType === 'AL'
+                    ? 'Annual Leave'
+                    : watchLeaveType === 'S'
+                    ? 'Sick Leave'
+                    : ''}
+                  ). It cannot be edited.
+                </p>
               </div>
             )}
 
@@ -486,60 +486,59 @@ export default function EditRotaSidebar({
                             isLeaveGenerated ? 'bg-gray-100/50 border-gray-200' : 'bg-gray-50/50 border-gray-100'
                           }`}
                         >
-                          {!isLeaveGenerated && isStandard && (
-                            <div className="absolute right-4 top-4 flex justify-between">
-                              {fields.length > 1 &&
-                                (slot._id ? (
-                                  <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                      <button
-                                        type="button"
-                                        className="text-gray-400 transition-colors hover:text-red-600"
-                                        title="Delete this slot"
+                          {/* 🚀 Show slot delete button for all shift types (if more than 1 field exists) */}
+                          <div className="absolute right-4 top-4 flex justify-between">
+                            {fields.length > 1 &&
+                              (slot._id ? (
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <button
+                                      type="button"
+                                      className="text-gray-400 transition-colors hover:text-red-600"
+                                      title="Delete this slot"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>
+                                        Delete shift slot?
+                                      </AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        This action cannot be undone. This
+                                        specific shift slot will be permanently
+                                        deleted from the database.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>
+                                        Cancel
+                                      </AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={() =>
+                                          handleDeleteSlot(index, slot._id)
+                                        }
+                                        className="bg-red-600 text-white hover:bg-red-700"
                                       >
-                                        <Trash2 className="h-4 w-4" />
-                                      </button>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                      <AlertDialogHeader>
-                                        <AlertDialogTitle>
-                                          Delete shift slot?
-                                        </AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                          This action cannot be undone. This
-                                          specific shift slot will be permanently
-                                          deleted from the database.
-                                        </AlertDialogDescription>
-                                      </AlertDialogHeader>
-                                      <AlertDialogFooter>
-                                        <AlertDialogCancel>
-                                          Cancel
-                                        </AlertDialogCancel>
-                                        <AlertDialogAction
-                                          onClick={() =>
-                                            handleDeleteSlot(index, slot._id)
-                                          }
-                                          className="bg-red-600 text-white hover:bg-red-700"
-                                        >
-                                          Delete
-                                        </AlertDialogAction>
-                                      </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                  </AlertDialog>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      handleDeleteSlot(index, slot._id)
-                                    }
-                                    className="text-gray-400 transition-colors hover:text-red-600"
-                                    title="Remove this slot"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </button>
-                                ))}
-                            </div>
-                          )}
+                                        Delete
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleDeleteSlot(index, slot._id)
+                                  }
+                                  className="text-gray-400 transition-colors hover:text-red-600"
+                                  title="Remove this slot"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              ))}
+                          </div>
 
                           <div className="flex gap-4 pr-6">
                             <div className="flex-1">
@@ -853,8 +852,8 @@ export default function EditRotaSidebar({
             </Tabs>
 
             <div className="flex items-center justify-between border-t border-gray-100 bg-gray-50 p-5">
-              {fields.some((f) => !f._id) || isLeaveGenerated ? (
-                <div /> // Hidden for AL/DO
+              {fields.some((f) => !f._id) ? (
+                <div /> 
               ) : (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
