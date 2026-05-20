@@ -223,7 +223,7 @@ export default function Department() {
           </Table>
         )}
 
-        {department.length > 300 && (
+        {totalPages > 1 && (
           <DynamicPagination
             pageSize={entriesPerPage}
             setPageSize={setEntriesPerPage}

@@ -32,7 +32,7 @@ export default function CompanyNoticeBoard() {
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [entriesPerPage, setEntriesPerPage] = useState(10);
+  const [entriesPerPage, setEntriesPerPage] = useState(100);
 
   // Date picker
   const [dateRange, setDateRange] = useState<(Date | null)[]>([null, null]);
@@ -54,7 +54,9 @@ export default function CompanyNoticeBoard() {
         const [deptRes, desigRes, userRes] = await Promise.all([
           axiosInstance.get(`/hr/department?companyId=${companyId}&limit=all`),
           axiosInstance.get(`/hr/designation?companyId=${companyId}&limit=all`),
-          axiosInstance.get(`/users?company=${companyId}&limit=all&status=active`)
+          axiosInstance.get(
+            `/users?company=${companyId}&limit=all&status=active`
+          )
         ]);
         setDepartments(deptRes.data.data.result);
         setDesignations(desigRes.data.data.result);
@@ -77,19 +79,24 @@ export default function CompanyNoticeBoard() {
   ) => {
     try {
       setInitialLoading(true);
-      const response = await axiosInstance.get(`/hr/notice?companyId=${companyId}`, {
-        params: {
-          page,
-          limit: entries,
-          ...(startStr && { startDate: startStr }),
-          ...(endStr && { endDate: endStr }),
-          ...(departmentIds?.length && { department: departmentIds.join(',') }),
-          ...(designationIds?.length && {
-            designation: designationIds.join(',')
-          }),
-          ...(userIds?.length && { users: userIds.join(',') })
+      const response = await axiosInstance.get(
+        `/hr/notice?companyId=${companyId}`,
+        {
+          params: {
+            page,
+            limit: entries,
+            ...(startStr && { startDate: startStr }),
+            ...(endStr && { endDate: endStr }),
+            ...(departmentIds?.length && {
+              department: departmentIds.join(',')
+            }),
+            ...(designationIds?.length && {
+              designation: designationIds.join(',')
+            }),
+            ...(userIds?.length && { users: userIds.join(',') })
+          }
         }
-      });
+      );
       setNotice(response.data.data.result);
       setTotalPages(response.data.data.meta.totalPage);
     } catch (error) {
@@ -152,12 +159,16 @@ export default function CompanyNoticeBoard() {
   };
 
   const handleSearch = () => {
-    const formattedStart = startDate
-      ? moment(startDate).format('YYYY-MM-DD')
-      : undefined;
-    const formattedEnd = endDate
-      ? moment(endDate).format('YYYY-MM-DD')
-      : undefined;
+    const formatDateString = (date: Date | null) => {
+      if (!date) return undefined;
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
+    const formattedStart = formatDateString(startDate);
+    const formattedEnd = formatDateString(endDate);
 
     fetchData(
       currentPage,
@@ -279,6 +290,7 @@ export default function CompanyNoticeBoard() {
               portalId="root-portal"
               isClearable={true}
               placeholderText="Select Date Range"
+              wrapperClassName="w-full"
               className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
             />
           </div>
@@ -299,7 +311,7 @@ export default function CompanyNoticeBoard() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Notice Type</TableHead>
-                  <TableHead>Notice Description</TableHead>
+                  <TableHead className="w-[30%]">Notice Description</TableHead>
                   <TableHead>Notice Date</TableHead>
                   <TableHead>Notice By</TableHead>
                   <TableHead>Department</TableHead>
@@ -323,7 +335,7 @@ export default function CompanyNoticeBoard() {
                     </TableCell>
                     <TableCell>
                       {n.noticeBy?.firstName || n.noticeBy?.lastName
-                        ? `${n.noticeBy?.firstName ?? ""} ${n.noticeBy?.lastName ?? ""}`.trim()
+                        ? `${n.noticeBy?.firstName ?? ''} ${n.noticeBy?.lastName ?? ''}`.trim()
                         : n.noticeBy?.name}
                     </TableCell>
                     <TableCell>
@@ -340,33 +352,34 @@ export default function CompanyNoticeBoard() {
                         ?.map((u: any) => `${u.firstName} ${u.lastName}`)
                         .join(', ') || '-'}
                     </TableCell>
-                  <TableCell>
-  {n.documents && n.documents.length > 0 ? (
-    n.documents.length === 1 ? (
-      <Button
-      size={'sm'}
-        onClick={() => window.open(n.documents[0], "_blank")}
-      >
-        Document
-      </Button>
-    ) : (
-      <div className="flex flex-wrap gap-2">
-        {n.documents.map((docUrl: string, idx: number) => (
-          <Button
-                size={'sm'}
-
-            key={idx}
-            onClick={() => window.open(docUrl, "_blank")}
-          >
-            Document {idx + 1}
-          </Button>
-        ))}
-      </div>
-    )
-  ) : (
-    "-"
-  )}
-</TableCell>
+                    <TableCell>
+                      {n.documents && n.documents.length > 0 ? (
+                        n.documents.length === 1 ? (
+                          <Button
+                            size={'sm'}
+                            onClick={() =>
+                              window.open(n.documents[0], '_blank')
+                            }
+                          >
+                            Document
+                          </Button>
+                        ) : (
+                          <div className="flex flex-wrap gap-2">
+                            {n.documents.map((docUrl: string, idx: number) => (
+                              <Button
+                                size={'sm'}
+                                key={idx}
+                                onClick={() => window.open(docUrl, '_blank')}
+                              >
+                                Document {idx + 1}
+                              </Button>
+                            ))}
+                          </div>
+                        )
+                      ) : (
+                        '-'
+                      )}
+                    </TableCell>
                     <TableCell className="text-center">
                       <Button
                         variant="ghost"
@@ -382,7 +395,7 @@ export default function CompanyNoticeBoard() {
               </TableBody>
             </Table>
           )}
-          {notice.length > 9 && (
+          {length > 1 && (
             <DynamicPagination
               pageSize={entriesPerPage}
               setPageSize={setEntriesPerPage}

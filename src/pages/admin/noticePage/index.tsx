@@ -325,7 +325,7 @@ export default function AdminNoticeBoard() {
           </Table>
         )}
         
-        {notice.length > 40 && (
+        {totalPages > 1 && (
           <DynamicPagination
             pageSize={entriesPerPage}
             setPageSize={setEntriesPerPage}

@@ -202,7 +202,7 @@ export default function StaffNoticeBoard() {
               </Card>
             ))}
 
-            {notices.length > 16 && (
+            {totalPages > 1 && (
               <div className="mt-8 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                 <DynamicPagination
                   pageSize={entriesPerPage}

@@ -202,7 +202,7 @@ const {id} = useParams()
             </Table>
           )}
         </div>
-        {emailConfigs.length > 50 && (
+        {totalPages > 1 && (
           <>
             <DynamicPagination
               pageSize={entriesPerPage}

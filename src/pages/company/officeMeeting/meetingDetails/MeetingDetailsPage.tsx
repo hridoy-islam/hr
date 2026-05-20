@@ -210,8 +210,8 @@ export default function MeetingDetailsPage() {
     );
   };
 
-  // --- Submit Update ---
- const handleUploadSubmit = async () => {
+// --- Submit Update ---
+const handleUploadSubmit = async () => {
   const validationResult = uploadFormSchema.safeParse({
     nextMeetingDate: nextMeetingDate || undefined,
     note,
@@ -240,9 +240,15 @@ export default function MeetingDetailsPage() {
       updatedBy: user?._id
     };
 
-    // ✅ only add if exists
+    // ✅ Fix timezone shifting by forcing UTC midnight of the selected calendar day
     if (nextMeetingDate) {
-      payload.nextMeetingDate = nextMeetingDate;
+      payload.nextMeetingDate = new Date(
+        Date.UTC(
+          nextMeetingDate.getFullYear(),
+          nextMeetingDate.getMonth(),
+          nextMeetingDate.getDate()
+        )
+      );
     }
 
     await axiosInstance.patch(`/company-meeting/${id}`, payload);

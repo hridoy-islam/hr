@@ -174,43 +174,43 @@ export default function OfficeMeetingPage() {
 
   // --- File Upload Handlers ---
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
-  const files = Array.from(event.target.files || []);
-  if (!files.length) return;
+    const files = Array.from(event.target.files || []);
+    if (!files.length) return;
 
-  for (const file of files) {
-    if (file.size > 20 * 1024 * 1024) {
-      setUploadError(`File too large: ${file.name}. Must be less than 20MB.`);
-      return;
+    for (const file of files) {
+      if (file.size > 20 * 1024 * 1024) {
+        setUploadError(`File too large: ${file.name}. Must be less than 20MB.`);
+        return;
+      }
     }
-  }
 
-  setIsUploading(true);
-  setUploadError(null);
-  setFormErrors((prev) => ({ ...prev, uploadedFiles: undefined }));
+    setIsUploading(true);
+    setUploadError(null);
+    setFormErrors((prev) => ({ ...prev, uploadedFiles: undefined }));
 
-  try {
-    const uploadPromises = files.map(async (file) => {
-      const formData = new FormData();
-      formData.append('entityId', user?._id || id || '');
-      formData.append('file_type', 'document');
-      formData.append('file', file);
+    try {
+      const uploadPromises = files.map(async (file) => {
+        const formData = new FormData();
+        formData.append('entityId', user?._id || id || '');
+        formData.append('file_type', 'document');
+        formData.append('file', file);
 
-      const res = await axiosInstance.post('/documents', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+        const res = await axiosInstance.post('/documents', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+
+        return { name: file.name, url: res.data?.data?.fileUrl };
       });
 
-      return { name: file.name, url: res.data?.data?.fileUrl };
-    });
-
-    const uploadedResults = await Promise.all(uploadPromises);
-    setUploadedFiles((prev) => [...prev, ...uploadedResults]);
-  } catch (err) {
-    setUploadError('Failed to upload one or more documents.');
-  } finally {
-    setIsUploading(false);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  }
-};
+      const uploadedResults = await Promise.all(uploadPromises);
+      setUploadedFiles((prev) => [...prev, ...uploadedResults]);
+    } catch (err) {
+      setUploadError('Failed to upload one or more documents.');
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
 
   const handleRemoveFile = (indexToRemove: number) => {
     setUploadedFiles((prev) => prev.filter((_, index) => index !== indexToRemove));
@@ -220,9 +220,15 @@ export default function OfficeMeetingPage() {
   const handleCreateMeeting = async () => {
     setFormErrors({});
 
+    // Timezone-safe date adjustment: Force a Date object that aligns with UTC midnight
+    // so that Axios serialization (.toISOString()) accurately preserves the chosen day.
+    const utcSafeDate = meetingDate
+      ? new Date(Date.UTC(meetingDate.getFullYear(), meetingDate.getMonth(), meetingDate.getDate()))
+      : null;
+
     const rawPayload = {
       title: meetingTitle,
-      nextMeetingDate: meetingDate,
+      nextMeetingDate: utcSafeDate,
       employeeId: selectedEmployeeIds,
       companyId: id || '',
       documents: uploadedFiles.map(file => file.url) // Injecting uploaded document URLs
@@ -320,40 +326,40 @@ export default function OfficeMeetingPage() {
     <div className="space-y-3 rounded-md bg-white p-5 shadow-sm">
       {/* Header Section */}
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-  <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-4">
-    <h2 className="flex items-center gap-2 text-2xl font-bold text-gray-900">
-      <Users className="h-6 w-6" />
-      Office Meetings
-    </h2>
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-4">
+          <h2 className="flex items-center gap-2 text-2xl font-bold text-gray-900">
+            <Users className="h-6 w-6" />
+            Office Meetings
+          </h2>
 
-    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-      <Input
-        type="text"
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
-        placeholder="Search meeting title..."
-        className="h-9 w-full min-w-0 sm:min-w-[250px]"
-      />
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <Input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search meeting title..."
+              className="h-9 w-full min-w-0 sm:min-w-[250px]"
+            />
 
-      <Button
-        onClick={handleSearch}
-        size="sm"
-        className="w-full h-9 sm:w-auto min-w-[100px] border-none bg-theme text-white hover:bg-theme/90"
-      >
-        Search
-      </Button>
-    </div>
-  </div>
+            <Button
+              onClick={handleSearch}
+              size="sm"
+              className="w-full h-9 sm:w-auto min-w-[100px] border-none bg-theme text-white hover:bg-theme/90"
+            >
+              Search
+            </Button>
+          </div>
+        </div>
 
-  <Button
-    className="w-full md:w-auto bg-theme text-white hover:bg-theme/90"
-    size="sm"
-    onClick={() => setDialogOpen(true)}
-  >
-    <Plus className="mr-2 h-4 w-4" />
-    Create Meeting
-  </Button>
-</div>
+        <Button
+          className="w-full md:w-auto bg-theme text-white hover:bg-theme/90"
+          size="sm"
+          onClick={() => setDialogOpen(true)}
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          Create Meeting
+        </Button>
+      </div>
 
       {/* Table Section */}
       <div>
@@ -388,7 +394,7 @@ export default function OfficeMeetingPage() {
                   </TableCell>
                   <TableCell>
                     {meeting.nextMeetingDate
-                      ? moment(meeting.nextMeetingDate).format('DD MMM, YYYY')
+                      ? moment.utc(meeting.nextMeetingDate).format('DD MMM, YYYY')
                       : 'N/A'}
                   </TableCell>
                   <TableCell className="text-right">
@@ -445,290 +451,290 @@ export default function OfficeMeetingPage() {
 
       {/* Create Meeting Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-  <DialogContent className="flex max-h-[95vh] max-w-6xl flex-col overflow-y-auto p-4 sm:p-6 md:p-8">
-    <DialogHeader className="mb-4">
-      <DialogTitle className="text-xl sm:text-2xl font-bold">
-        Create New Meeting
-      </DialogTitle>
-    </DialogHeader>
-    
-    <div className="flex-1 overflow-y-auto">
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-        
-        {/* Column 1: Inputs & File Upload */}
-        <div className="mt-2 flex flex-col space-y-6">
+        <DialogContent className="flex max-h-[95vh] max-w-6xl flex-col overflow-y-auto p-4 sm:p-6 md:p-8">
+          <DialogHeader className="mb-4">
+            <DialogTitle className="text-xl sm:text-2xl font-bold">
+              Create New Meeting
+            </DialogTitle>
+          </DialogHeader>
           
-          {/* Meeting Title */}
-          <div className="space-y-1">
-            <label className="text-sm font-semibold">Meeting Title</label>
-            <Input
-              className={`h-11 sm:h-12 rounded-lg border transition-colors ${
-                formErrors.title ? 'border-red-500 focus-visible:ring-red-500' : 'border-gray-200'
-              }`}
-              value={meetingTitle}
-              onChange={(e) => {
-                setMeetingTitle(e.target.value);
-                if (formErrors.title) setFormErrors((prev) => ({ ...prev, title: '' }));
-              }}
-              placeholder="e.g., Monthly Team Sync Meeting"
-            />
-            {formErrors.title && (
-              <p className="mt-1.5 text-xs font-medium text-red-500">{formErrors.title}</p>
-            )}
-          </div>
-
-          {/* Meeting Date */}
-          <div className="flex flex-col space-y-1">
-            <label className="text-sm font-semibold">Meeting Date</label>
-            <div className="relative">
-              <DatePicker
-                selected={meetingDate}
-                onChange={(date: Date | null) => {
-                  setMeetingDate(date);
-                  if (formErrors.nextMeetingDate)
-                    setFormErrors((prev) => ({ ...prev, nextMeetingDate: '' }));
-                }}
-                dateFormat="dd-MM-yyyy"
-                className={`flex h-11 sm:h-12 w-full rounded-lg border px-3 py-2 text-sm transition-colors focus-visible:outline-none ${
-                  formErrors.nextMeetingDate ? 'border-red-500 focus-visible:ring-red-500' : 'border-gray-300'
-                }`}
-                wrapperClassName="w-full"
-                placeholderText="Select date"
-                showMonthDropdown
-                showYearDropdown
-                dropdownMode="select"
-              />
-            </div>
-            {formErrors.nextMeetingDate && (
-              <p className="mt-1.5 text-xs font-medium text-red-500">
-                {formErrors.nextMeetingDate}
-              </p>
-            )}
-          </div>
-
-          {/* Attachments Section */}
-          <div className="space-y-2">
-            <Label className="text-sm font-semibold text-gray-700">
-              Attachments <span className="text-gray-400 font-normal">(Optional)</span>
-            </Label>
-            <div
-              className={cn(
-                'relative flex flex-col items-center justify-center rounded-xl border-2 h-[90px] border-dashed p-4 sm:p-6 transition-all',
-                isUploading
-                  ? 'border-theme bg-theme/5'
-                  : formErrors.uploadedFiles
-                  ? 'border-red-500 bg-red-50 hover:bg-red-100/50'
-                  : 'border-gray-300 bg-gray-50 hover:border-gray-400 hover:bg-gray-100/80'
-              )}
-            >
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                onChange={handleFileSelect}
-                className="absolute inset-0 z-10 cursor-pointer opacity-0"
-                disabled={isUploading}
-              />
-              {isUploading ? (
-                <div className="flex flex-col items-center gap-3">
-                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-theme border-t-transparent"></div>
-                  <p className="text-sm font-medium text-theme">Uploading files...</p>
+          <div className="flex-1 overflow-y-auto">
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+              
+              {/* Column 1: Inputs & File Upload */}
+              <div className="mt-2 flex flex-col space-y-6">
+                
+                {/* Meeting Title */}
+                <div className="space-y-1">
+                  <label className="text-sm font-semibold">Meeting Title</label>
+                  <Input
+                    className={`h-11 sm:h-12 rounded-lg border transition-colors ${
+                      formErrors.title ? 'border-red-500 focus-visible:ring-red-500' : 'border-gray-200'
+                    }`}
+                    value={meetingTitle}
+                    onChange={(e) => {
+                      setMeetingTitle(e.target.value);
+                      if (formErrors.title) setFormErrors((prev) => ({ ...prev, title: '' }));
+                    }}
+                    placeholder="e.g., Monthly Team Sync Meeting"
+                  />
+                  {formErrors.title && (
+                    <p className="mt-1.5 text-xs font-medium text-red-500">{formErrors.title}</p>
+                  )}
                 </div>
-              ) : (
-                <div className="pointer-events-none flex flex-col items-center gap-1 text-center">
-                  <div className=" flex h-5 w-10 items-center justify-center ">
-                    <Upload
-                      className={cn(
-                        'h-5 w-5',
-                        formErrors.uploadedFiles ? 'text-red-500' : 'text-gray-500'
-                      )}
+
+                {/* Meeting Date */}
+                <div className="flex flex-col space-y-1">
+                  <label className="text-sm font-semibold">Meeting Date</label>
+                  <div className="relative">
+                    <DatePicker
+                      selected={meetingDate}
+                      onChange={(date: Date | null) => {
+                        setMeetingDate(date);
+                        if (formErrors.nextMeetingDate)
+                          setFormErrors((prev) => ({ ...prev, nextMeetingDate: '' }));
+                      }}
+                      dateFormat="dd-MM-yyyy"
+                      className={`flex h-11 sm:h-12 w-full rounded-lg border px-3 py-2 text-sm transition-colors focus-visible:outline-none ${
+                        formErrors.nextMeetingDate ? 'border-red-500 focus-visible:ring-red-500' : 'border-gray-300'
+                      }`}
+                      wrapperClassName="w-full"
+                      placeholderText="Select date"
+                      showMonthDropdown
+                      showYearDropdown
+                      dropdownMode="select"
                     />
                   </div>
-                  <span
+                  {formErrors.nextMeetingDate && (
+                    <p className="mt-1.5 text-xs font-medium text-red-500">
+                      {formErrors.nextMeetingDate}
+                    </p>
+                  )}
+                </div>
+
+                {/* Attachments Section */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold text-gray-700">
+                    Attachments <span className="text-gray-400 font-normal">(Optional)</span>
+                  </Label>
+                  <div
                     className={cn(
-                      'text-sm font-semibold',
-                      formErrors.uploadedFiles ? 'text-red-600' : 'text-gray-700'
+                      'relative flex flex-col items-center justify-center rounded-xl border-2 h-[90px] border-dashed p-4 sm:p-6 transition-all',
+                      isUploading
+                        ? 'border-theme bg-theme/5'
+                        : formErrors.uploadedFiles
+                        ? 'border-red-500 bg-red-50 hover:bg-red-100/50'
+                        : 'border-gray-300 bg-gray-50 hover:border-gray-400 hover:bg-gray-100/80'
                     )}
                   >
-                    Click or drag to upload
-                  </span>
-                  <span className="text-xs text-gray-500"> (Max 20MB)</span>
-                </div>
-              )}
-            </div>
-
-            {formErrors.uploadedFiles && !isUploading && (
-              <p className="text-xs font-medium text-red-500">{formErrors.uploadedFiles}</p>
-            )}
-
-            {uploadError && (
-              <p className="mt-2 flex items-center gap-1 text-sm font-medium text-red-500">
-                <span className="h-1 w-1 rounded-full bg-red-500"></span> {uploadError}
-              </p>
-            )}
-
-            {uploadedFiles.length > 0 && (
-              <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50/50 p-2">
-                <ul className="max-h-[140px] space-y-2 overflow-y-auto pr-1">
-                  {uploadedFiles.map((file, index) => (
-                    <li
-                      key={index}
-                      className="flex items-center justify-between rounded-md border border-gray-200 bg-white px-2 sm:px-3 py-2 text-sm shadow-sm"
-                    >
-                      <div className="flex items-center gap-2 overflow-hidden">
-                        <FileText className="h-4 w-4 flex-shrink-0 text-theme" />
-                        <span className="truncate font-medium text-gray-700 max-w-[150px] sm:max-w-[200px]">
-                          {file.name}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveFile(index)}
-                        className="ml-3 text-gray-400 transition-colors hover:text-red-500"
-                      >
-                        &times;
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Column 2: Recipients Selection */}
-        <div
-          className={`flex h-[400px] sm:h-[480px]  flex-col overflow-hidden rounded-lg border bg-white shadow-sm transition-colors ${
-            formErrors.employeeId ? 'border-red-400' : 'border-gray-200'
-          }`}
-        >
-          <div className="border-b border-gray-100 bg-gray-50/50 p-3">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Search employee..."
-                className="h-9 bg-white pl-9 text-sm"
-                value={employeeSearch}
-                onChange={(e) => setEmployeeSearch(e.target.value)}
-              />
-            </div>
-          </div>
-
-          {formErrors.employeeId && (
-            <div className="border-b border-red-100 bg-red-50 px-3 py-2">
-              <p className="text-xs font-medium text-red-600">{formErrors.employeeId}</p>
-            </div>
-          )}
-
-          <div className="flex items-center space-x-3 border-b border-gray-100 p-3">
-            <Checkbox
-              id="select-all"
-              checked={isAllSelected}
-              onCheckedChange={toggleSelectAll}
-            />
-            <label htmlFor="select-all" className="cursor-pointer text-sm font-semibold">
-              Select All Employees
-            </label>
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-2">
-            {filteredEmployees.length === 0 ? (
-              <p className="mt-4 text-center text-sm text-gray-500">No employees found.</p>
-            ) : (
-              <div className="space-y-1">
-                {filteredEmployees.map((emp) => (
-                  <div
-                    key={emp._id}
-                    className={`flex cursor-pointer items-start sm:items-center space-x-3 rounded-md p-2 transition-colors hover:bg-gray-50 ${
-                      selectedEmployeeIds.includes(emp._id) ? 'bg-gray-50' : ''
-                    }`}
-                    onClick={() => toggleEmployeeSelect(emp._id)}
-                  >
-                    <Checkbox
-                      className="mt-0.5 sm:mt-0"
-                      checked={selectedEmployeeIds.includes(emp._id)}
-                      onCheckedChange={() => toggleEmployeeSelect(emp._id)}
-                      onClick={(e) => e.stopPropagation()}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      multiple
+                      onChange={handleFileSelect}
+                      className="absolute inset-0 z-10 cursor-pointer opacity-0"
+                      disabled={isUploading}
                     />
-                    <div className="flex flex-col flex-1">
-                      <span className="text-sm font-medium">
-                        {emp.name || `${emp.firstName} ${emp.lastName}`}
-                      </span>
-                      <span className="text-xs text-gray-500 line-clamp-2">
-                        {emp.designationId?.map((d) => d.title).join(', ')}
-                      </span>
-                    </div>
+                    {isUploading ? (
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="h-6 w-6 animate-spin rounded-full border-2 border-theme border-t-transparent"></div>
+                        <p className="text-sm font-medium text-theme">Uploading files...</p>
+                      </div>
+                    ) : (
+                      <div className="pointer-events-none flex flex-col items-center gap-1 text-center">
+                        <div className=" flex h-5 w-10 items-center justify-center ">
+                          <Upload
+                            className={cn(
+                              'h-5 w-5',
+                              formErrors.uploadedFiles ? 'text-red-500' : 'text-gray-500'
+                            )}
+                          />
+                        </div>
+                        <span
+                          className={cn(
+                            'text-sm font-semibold',
+                            formErrors.uploadedFiles ? 'text-red-600' : 'text-gray-700'
+                          )}
+                        >
+                          Click or drag to upload
+                        </span>
+                        <span className="text-xs text-gray-500"> (Max 20MB)</span>
+                      </div>
+                    )}
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
 
-        {/* Column 3: Selected Recipients */}
-        <div className="flex h-[400px] sm:h-[480px]  flex-col overflow-hidden rounded-lg border border-blue-200 bg-white shadow-sm">
-          <div className="border-b border-blue-100 bg-blue-50 p-3">
-            <h3 className="text-sm font-semibold text-blue-600">
-              Selected ({selectedEmployeeIds.length})
-            </h3>
-          </div>
+                  {formErrors.uploadedFiles && !isUploading && (
+                    <p className="text-xs font-medium text-red-500">{formErrors.uploadedFiles}</p>
+                  )}
 
-          <div className="flex-1 overflow-y-auto bg-gray-50/30 p-3 sm:p-4">
-            {selectedEmployeesData.length === 0 ? (
-              <div className="flex h-full items-center justify-center">
-                <p className="text-sm italic text-gray-400">No recipients selected.</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {selectedEmployeesData.map((emp) => (
-                  <div
-                    key={emp._id}
-                    className="flex items-start sm:items-center justify-between rounded-md border border-gray-100 bg-white p-2 sm:p-3 shadow-sm"
-                  >
-                    <div className="flex flex-col flex-1 mr-2">
-                      <span className="text-sm font-medium text-gray-700 break-words">
-                        {emp.name || `${emp.firstName} ${emp.lastName}`}
-                      </span>
-                      <span className="text-xs text-gray-500 line-clamp-2">
-                        {emp.designationId?.map((d) => d.title).join(', ')}
-                      </span>
+                  {uploadError && (
+                    <p className="mt-2 flex items-center gap-1 text-sm font-medium text-red-500">
+                      <span className="h-1 w-1 rounded-full bg-red-500"></span> {uploadError}
+                    </p>
+                  )}
+
+                  {uploadedFiles.length > 0 && (
+                    <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50/50 p-2">
+                      <ul className="max-h-[140px] space-y-2 overflow-y-auto pr-1">
+                        {uploadedFiles.map((file, index) => (
+                          <li
+                            key={index}
+                            className="flex items-center justify-between rounded-md border border-gray-200 bg-white px-2 sm:px-3 py-2 text-sm shadow-sm"
+                          >
+                            <div className="flex items-center gap-2 overflow-hidden">
+                              <FileText className="h-4 w-4 flex-shrink-0 text-theme" />
+                              <span className="truncate font-medium text-gray-700 max-w-[150px] sm:max-w-[200px]">
+                                {file.name}
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveFile(index)}
+                              className="ml-3 text-gray-400 transition-colors hover:text-red-500"
+                            >
+                              &times;
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 shrink-0 text-gray-400 hover:text-red-500"
-                      onClick={() => toggleEmployeeSelect(emp._id)}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
+                  )}
+                </div>
               </div>
-            )}
+
+              {/* Column 2: Recipients Selection */}
+              <div
+                className={`flex h-[400px] sm:h-[480px]  flex-col overflow-hidden rounded-lg border bg-white shadow-sm transition-colors ${
+                  formErrors.employeeId ? 'border-red-400' : 'border-gray-200'
+                }`}
+              >
+                <div className="border-b border-gray-100 bg-gray-50/50 p-3">
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Search employee..."
+                      className="h-9 bg-white pl-9 text-sm"
+                      value={employeeSearch}
+                      onChange={(e) => setEmployeeSearch(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {formErrors.employeeId && (
+                  <div className="border-b border-red-100 bg-red-50 px-3 py-2">
+                    <p className="text-xs font-medium text-red-600">{formErrors.employeeId}</p>
+                  </div>
+                )}
+
+                <div className="flex items-center space-x-3 border-b border-gray-100 p-3">
+                  <Checkbox
+                    id="select-all"
+                    checked={isAllSelected}
+                    onCheckedChange={toggleSelectAll}
+                  />
+                  <label htmlFor="select-all" className="cursor-pointer text-sm font-semibold">
+                    Select All Employees
+                  </label>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-2">
+                  {filteredEmployees.length === 0 ? (
+                    <p className="mt-4 text-center text-sm text-gray-500">No employees found.</p>
+                  ) : (
+                    <div className="space-y-1">
+                      {filteredEmployees.map((emp) => (
+                        <div
+                          key={emp._id}
+                          className={`flex cursor-pointer items-start sm:items-center space-x-3 rounded-md p-2 transition-colors hover:bg-gray-50 ${
+                            selectedEmployeeIds.includes(emp._id) ? 'bg-gray-50' : ''
+                          }`}
+                          onClick={() => toggleEmployeeSelect(emp._id)}
+                        >
+                          <Checkbox
+                            className="mt-0.5 sm:mt-0"
+                            checked={selectedEmployeeIds.includes(emp._id)}
+                            onCheckedChange={() => toggleEmployeeSelect(emp._id)}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                          <div className="flex flex-col flex-1">
+                            <span className="text-sm font-medium">
+                              {emp.name || `${emp.firstName} ${emp.lastName}`}
+                            </span>
+                            <span className="text-xs text-gray-500 line-clamp-2">
+                              {emp.designationId?.map((d) => d.title).join(', ')}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Column 3: Selected Recipients */}
+              <div className="flex h-[400px] sm:h-[480px]  flex-col overflow-hidden rounded-lg border border-blue-200 bg-white shadow-sm">
+                <div className="border-b border-blue-100 bg-blue-50 p-3">
+                  <h3 className="text-sm font-semibold text-blue-600">
+                    Selected ({selectedEmployeeIds.length})
+                  </h3>
+                </div>
+
+                <div className="flex-1 overflow-y-auto bg-gray-50/30 p-3 sm:p-4">
+                  {selectedEmployeesData.length === 0 ? (
+                    <div className="flex h-full items-center justify-center">
+                      <p className="text-sm italic text-gray-400">No recipients selected.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {selectedEmployeesData.map((emp) => (
+                        <div
+                          key={emp._id}
+                          className="flex items-start sm:items-center justify-between rounded-md border border-gray-100 bg-white p-2 sm:p-3 shadow-sm"
+                        >
+                          <div className="flex flex-col flex-1 mr-2">
+                            <span className="text-sm font-medium text-gray-700 break-words">
+                              {emp.name || `${emp.firstName} ${emp.lastName}`}
+                            </span>
+                            <span className="text-xs text-gray-500 line-clamp-2">
+                              {emp.designationId?.map((d) => d.title).join(', ')}
+                            </span>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 shrink-0 text-gray-400 hover:text-red-500"
+                            onClick={() => toggleEmployeeSelect(emp._id)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+            </div>
           </div>
-        </div>
-        
-      </div>
-    </div>
-    
-    <DialogFooter className="mt-auto pt-4 border-t border-gray-100 flex-col sm:flex-row gap-2 sm:gap-0">
-      <Button 
-        variant="outline" 
-        onClick={() => setDialogOpen(false)}
-        className="w-full sm:w-auto order-2 sm:order-1"
-      >
-        Cancel
-      </Button>
-      <Button
-        className="w-full sm:w-auto min-w-[120px] bg-theme text-white hover:bg-theme/90 order-1 sm:order-2"
-        onClick={handleCreateMeeting}
-        disabled={isSubmitting || isUploading}
-      >
-        {isSubmitting ? <BlinkingDots size="small" /> : 'Create Meeting'}
-      </Button>
-    </DialogFooter>
-  </DialogContent>
-</Dialog>
+          
+          <DialogFooter className="mt-auto pt-4 border-t border-gray-100 flex-col sm:flex-row gap-2 sm:gap-0">
+            <Button 
+              variant="outline" 
+              onClick={() => setDialogOpen(false)}
+              className="w-full sm:w-auto order-2 sm:order-1"
+            >
+              Cancel
+            </Button>
+            <Button
+              className="w-full sm:w-auto min-w-[120px] bg-theme text-white hover:bg-theme/90 order-1 sm:order-2"
+              onClick={handleCreateMeeting}
+              disabled={isSubmitting || isUploading}
+            >
+              {isSubmitting ? <BlinkingDots size="small" /> : 'Create Meeting'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

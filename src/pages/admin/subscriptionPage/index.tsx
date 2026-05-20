@@ -299,7 +299,7 @@ export default function SubscriptionPlanPage() {
               </TableBody>
             </Table>
 
-            {plans.length > 40 && (
+            {totalPages > 1 && (
               <div className="pt-4">
                 <DynamicPagination
                   pageSize={entriesPerPage}

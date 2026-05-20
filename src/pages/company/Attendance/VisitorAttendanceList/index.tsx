@@ -863,7 +863,7 @@ const TableSection = ({
           </div>
         )}
 
-        {data.length > 60 && (
+        {totalPages > 1 && (
           <DynamicPagination
             pageSize={entriesPerPage}
             setPageSize={setEntriesPerPage}

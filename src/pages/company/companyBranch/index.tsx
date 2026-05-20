@@ -217,7 +217,7 @@ export default function CompanyBranch() {
           </Table>
         )}
 
-        {branches.length > 50 && (
+        {totalPages > 1 && (
           <DynamicPagination
             pageSize={entriesPerPage}
             setPageSize={setEntriesPerPage}

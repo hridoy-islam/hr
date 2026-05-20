@@ -716,7 +716,7 @@ function StaffRequestDocumentPage() {
           </TableBody>
         </Table>
 
-        {documents.length > 30 && (
+        {totalPages > 1 && (
           <DynamicPagination
             pageSize={entriesPerPage}
             setPageSize={setEntriesPerPage}
