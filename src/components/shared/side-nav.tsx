@@ -219,14 +219,14 @@ const navItems = [
     badgeKey: 'immigration',
     accessKey: 'employee'
   },
-  {
-    icon: FileCheck,
-    label: 'Induction',
-    href: 'expiry/induction',
-    roles: ['company', 'companyAdmin'],
-    badgeKey: 'induction',
-    accessKey: 'employee'
-  },
+  // {
+  //   icon: FileCheck,
+  //   label: 'Induction',
+  //   href: 'expiry/induction',
+  //   roles: ['company', 'companyAdmin'],
+  //   badgeKey: 'induction',
+  //   accessKey: 'employee'
+  // },
   {
     icon: FileCheck,
     label: 'Disciplinary',
