@@ -273,9 +273,6 @@ const PublishRotaModal: React.FC<PublishRotaModalProps> = ({
 
   if (!isOpen) return null;
 
-
-  
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
       <div className="relative w-full max-w-7xl rounded-2xl bg-white p-6 shadow-2xl">
@@ -958,6 +955,45 @@ export default function CompanyRota() {
   const [appliedStart, appliedEnd] = appliedRange;
   const isCustomRange = !!(appliedStart && appliedEnd);
 
+  // --- START NEW FIX --- 
+  // Helper to safely convert JS Date to Moment without timezone shifting
+  const dateToMoment = useCallback((date: Date | null) => {
+    if (!date) return null;
+    return moment(
+      `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`,
+      'YYYY-MM-DD'
+    );
+  }, []);
+
+  const safeStart = useMemo(() => dateToMoment(appliedStart), [appliedStart, dateToMoment]);
+  const safeEnd = useMemo(() => dateToMoment(appliedEnd), [appliedEnd, dateToMoment]);
+
+  // Check if a single day is currently selected
+  const isSingleDay = safeStart && safeEnd && safeStart.isSame(safeEnd, 'day');
+  
+  // Determine which button should be active
+  const isPreviousActive = isSingleDay && safeStart.isSame(moment().subtract(1, 'day'), 'day');
+  const isTodayActive = isSingleDay && safeStart.isSame(moment(), 'day');
+  const isTomorrowActive = isSingleDay && safeStart.isSame(moment().add(1, 'day'), 'day');
+
+  const daysArray = useMemo(() => {
+    if (isCustomRange && safeStart && safeEnd) {
+      const days = [];
+      let current = safeStart.clone();
+      const end = safeEnd.clone();
+      while (current.isSameOrBefore(end, 'day')) {
+        days.push(current.clone());
+        current.add(1, 'day');
+      }
+      return days;
+    }
+    const count = currentDate.daysInMonth();
+    return Array.from({ length: count }, (_, i) =>
+      currentDate.clone().date(i + 1)
+    );
+  }, [currentDate, isCustomRange, safeStart, safeEnd]);
+  // --- END NEW FIX ---
+
   const tableWrapperRef = useRef<HTMLDivElement>(null);
   const topScrollWrapperRef = useRef<HTMLDivElement>(null);
   const topScrollInnerRef = useRef<HTMLDivElement>(null);
@@ -1319,31 +1355,6 @@ export default function CompanyRota() {
     [toast]
   );
 
-  // Check if a single day is currently selected
-  const isSingleDay = moment(appliedStart).isSame(appliedEnd, 'day');
-  
-  // Determine which button should be active
-  const isPreviousActive = isSingleDay && moment(appliedStart).isSame(moment().subtract(1, 'day'), 'day');
-  const isTodayActive = isSingleDay && moment(appliedStart).isSame(moment(), 'day');
-  const isTomorrowActive = isSingleDay && moment(appliedStart).isSame(moment().add(1, 'day'), 'day');
-
-  const daysArray = useMemo(() => {
-    if (isCustomRange && appliedStart && appliedEnd) {
-      const days = [];
-      let current = moment(appliedStart).clone();
-      const end = moment(appliedEnd);
-      while (current.isSameOrBefore(end, 'day')) {
-        days.push(current.clone());
-        current.add(1, 'day');
-      }
-      return days;
-    }
-    const count = currentDate.daysInMonth();
-    return Array.from({ length: count }, (_, i) =>
-      currentDate.clone().date(i + 1)
-    );
-  }, [currentDate, isCustomRange, appliedStart, appliedEnd]);
-
   const prevMonth = () => setCurrentDate((d) => d.clone().subtract(1, 'month'));
   const nextMonth = () => setCurrentDate((d) => d.clone().add(1, 'month'));
 
@@ -1438,7 +1449,6 @@ export default function CompanyRota() {
   };
 
   // 1. Sync the scrollbar widths
-  // 1. Sync the scrollbar widths
   useEffect(() => {
     const syncScrollWidth = () => {
       if (tableWrapperRef.current && topScrollInnerRef.current) {
@@ -1512,9 +1522,11 @@ export default function CompanyRota() {
                     className="flex items-center gap-2 px-3 py-1 text-xs font-semibold text-theme transition-all hover:text-blue-900"
                   >
                     <CalendarRange className="h-3.5 w-3.5 flex-shrink-0" />
-                    {moment(appliedStart).isSame(moment(appliedEnd), 'day')
-                      ? moment(appliedStart).format('DD MMM YYYY')
-                      : `${moment(appliedStart).format('DD MMM YYYY')} → ${moment(appliedEnd).format('DD MMM YYYY')}`}
+                    {/* --- START NEW FIX --- */}
+                    {safeStart && safeEnd && safeStart.isSame(safeEnd, 'day')
+                      ? safeStart.format('DD MMM YYYY')
+                      : `${safeStart?.format('DD MMM YYYY')} → ${safeEnd?.format('DD MMM YYYY')}`}
+                    {/* --- END NEW FIX --- */}
                   </button>
                   <button
                     onClick={clearRange}

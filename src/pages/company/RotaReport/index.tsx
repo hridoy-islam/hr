@@ -102,6 +102,15 @@ const formatDuration = (totalMinutes: number): string => {
   return `${hours}:${mins}`;
 };
 
+// Timezone-safe helper to parse DatePicker date objects without shifting days
+const getSafeMomentFromDate = (date: Date | null) => {
+  if (!date) return moment();
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return moment(`${y}-${m}-${d}`, 'YYYY-MM-DD');
+};
+
 // ─── ShiftBlock ───────────────────────────────────────────────────────────────
 const ShiftBlock = ({
   text,
@@ -650,11 +659,11 @@ export default function CompanyRotaReport() {
       setUsers(fetchedUsers);
 
       const startDate = isCustomRange
-        ? moment(appliedStart).format('YYYY-MM-DD')
+        ? getSafeMomentFromDate(appliedStart).format('YYYY-MM-DD')
         : currentDate.clone().startOf('month').format('YYYY-MM-DD');
 
       const endDate = isCustomRange
-        ? moment(appliedEnd).format('YYYY-MM-DD')
+        ? getSafeMomentFromDate(appliedEnd).format('YYYY-MM-DD')
         : currentDate.clone().endOf('month').format('YYYY-MM-DD');
 
       const rotaRes = await axiosInstance.get(
@@ -904,7 +913,7 @@ export default function CompanyRotaReport() {
           typeof rota.departmentId === 'object'
             ? rota.departmentId._id
             : rota.departmentId;
-        const dateKey = moment(rota.startDate).format('YYYY-MM-DD');
+        const dateKey = moment.utc(rota.startDate).format('YYYY-MM-DD');
 
         // Populate array map per day
         if (!map[empId]) map[empId] = {};
@@ -934,8 +943,8 @@ export default function CompanyRotaReport() {
   const daysArray = useMemo(() => {
     if (isCustomRange && appliedStart && appliedEnd) {
       const days = [];
-      let current = moment(appliedStart).clone();
-      const end = moment(appliedEnd);
+      let current = getSafeMomentFromDate(appliedStart).clone();
+      const end = getSafeMomentFromDate(appliedEnd);
       while (current.isSameOrBefore(end, 'day')) {
         days.push(current.clone());
         current.add(1, 'day');
@@ -1002,9 +1011,9 @@ export default function CompanyRotaReport() {
                   className="flex items-center gap-2 px-3 py-1 text-xs font-semibold text-theme transition-all hover:text-blue-900"
                 >
                   <CalendarRange className="h-3.5 w-3.5 flex-shrink-0" />
-                  {moment(appliedStart).format('DD MMM YYYY')}
+                  {getSafeMomentFromDate(appliedStart).format('DD MMM YYYY')}
                   {' → '}
-                  {moment(appliedEnd).format('DD MMM YYYY')}
+                  {getSafeMomentFromDate(appliedEnd).format('DD MMM YYYY')}
                 </button>
                 <button
                   onClick={clearRange}
