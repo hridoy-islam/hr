@@ -149,6 +149,15 @@ const getNormalizedDates = (leave: Leave) => {
   };
 };
 
+// Timezone-safe helper to parse DatePicker date objects without shifting days
+const getSafeMomentFromDate = (date: Date | null) => {
+  if (!date) return moment();
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return moment(`${y}-${m}-${d}`, 'YYYY-MM-DD');
+};
+
 // Main Component
 export default function CompanyLeaveCalendarPage() {
   const { id: companyId } = useParams();
@@ -201,12 +210,12 @@ export default function CompanyLeaveCalendarPage() {
       try {
         const fromDateStr =
           isCustomRange && appliedStart
-            ? moment(appliedStart).format('YYYY-MM-DD')
+            ? getSafeMomentFromDate(appliedStart).format('YYYY-MM-DD')
             : currentDate.clone().startOf('month').format('YYYY-MM-DD');
 
         const toDateStr =
           isCustomRange && appliedEnd
-            ? moment(appliedEnd).format('YYYY-MM-DD')
+            ? getSafeMomentFromDate(appliedEnd).format('YYYY-MM-DD')
             : currentDate.clone().endOf('month').format('YYYY-MM-DD');
 
         const leaveRes = await axiosInstance.get(`/hr/leave`, {
@@ -245,8 +254,8 @@ export default function CompanyLeaveCalendarPage() {
   const daysArray = useMemo(() => {
     if (isCustomRange && appliedStart && appliedEnd) {
       const days = [];
-      let current = moment(appliedStart).clone();
-      const end = moment(appliedEnd);
+      let current = getSafeMomentFromDate(appliedStart).clone();
+      const end = getSafeMomentFromDate(appliedEnd);
       while (current.isSameOrBefore(end, 'day')) {
         days.push(current.clone());
         current.add(1, 'day');
@@ -436,9 +445,9 @@ export default function CompanyLeaveCalendarPage() {
                   className="flex items-center gap-2 px-2 py-1 text-xs font-semibold text-theme hover:text-blue-900"
                 >
                   <CalendarRange className="h-4 w-4" />
-                  {moment(appliedStart).isSame(moment(appliedEnd), 'day')
-                    ? moment(appliedStart).format('DD MMM YYYY')
-                    : `${moment(appliedStart).format('DD MMM')} - ${moment(appliedEnd).format('DD MMM YYYY')}`}
+                  {getSafeMomentFromDate(appliedStart).isSame(getSafeMomentFromDate(appliedEnd), 'day')
+                    ? getSafeMomentFromDate(appliedStart).format('DD MMM YYYY')
+                    : `${getSafeMomentFromDate(appliedStart).format('DD MMM')} - ${getSafeMomentFromDate(appliedEnd).format('DD MMM YYYY')}`}
                 </button>
                 <button
                   onClick={clearRange}
