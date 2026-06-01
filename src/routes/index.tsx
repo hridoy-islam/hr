@@ -119,6 +119,7 @@ import CompanyPolicyPage from '@/pages/company/companyPolicy';
 import PolicyDetails from '@/pages/company/companyPolicy/policyDetails';
 import HealthAndSafetyPage from '@/pages/company/healthAndSafety';
 import HealthAndSafetyDetails from '@/pages/company/healthAndSafety/healthAndSafetyDetails';
+import CompanyPlannedRota from '@/pages/company/planned-Rota';
 
 const SignInPage = lazy(() => import('@/pages/auth/signin'));
 
@@ -415,6 +416,34 @@ export default function AppRouter() {
     }
   ];
 
+
+  const plannedrotaRoutes = [
+    {
+      path: '/company/:id/planned-rota',
+      element: (
+        <ProtectedRoute>
+          <RoleGuard allowedRoles={['admin', 'company']}>
+            <ScheduleStatusProvider>
+              <RotaLayout />
+            </ScheduleStatusProvider>
+          </RoleGuard>
+        </ProtectedRoute>
+      ),
+      children: [
+        {
+          index: true,
+          element: (
+            <Suspense>
+              <CompanyPlannedRota />
+            </Suspense>
+          )
+        },
+   
+      ]
+    }
+  ];
+
+  
   const attendanceroutes = [
     {
       path: '/company/:id/employee-attendance',
@@ -484,7 +513,8 @@ export default function AppRouter() {
     ...rotaRoutes,
     ...StaffRoutes,
     ...attendanceroutes,
-    ...leaveRoutes
+    ...leaveRoutes,
+    ...plannedrotaRoutes
   ]);
 
   return routes;

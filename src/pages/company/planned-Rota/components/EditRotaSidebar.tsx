@@ -248,12 +248,12 @@ export default function EditRotaSidebar({
             ...payload,
             actionUserId: user?._id
           };
-          return axiosInstance.patch(`/rota/${slot._id}`, patchPayload);
+          return axiosInstance.patch(`/planned-rota/${slot._id}`, patchPayload);
         } else {
           payload.employeeId = employee?._id;
           payload.companyId = baseRota?.companyId;
           payload.departmentId = baseRota?.departmentId;
-          return axiosInstance.post(`/rota`, payload);
+          return axiosInstance.post(`/planned-rota`, payload);
         }
       });
 
@@ -276,7 +276,7 @@ export default function EditRotaSidebar({
       return;
     }
     try {
-      await axiosInstance.delete(`/rota/${rotaId}`);
+      await axiosInstance.delete(`/planned-rota/${rotaId}`);
       toast({ title: 'Shift deleted successfully' });
       remove(index);
       if (onDeleteSuccess) onDeleteSuccess(rotaId);
@@ -292,7 +292,7 @@ export default function EditRotaSidebar({
     try {
       const existingRotas = fields.filter((f) => f._id);
       const promises = existingRotas.map((f) =>
-        axiosInstance.delete(`/rota/${f._id}`)
+        axiosInstance.delete(`/planned-rota/${f._id}`)
       );
       await Promise.all(promises);
       toast({ title: 'All shifts deleted successfully' });

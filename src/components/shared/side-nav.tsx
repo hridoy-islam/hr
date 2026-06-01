@@ -142,12 +142,21 @@ const navItems = [
 
   // --- Company / Company Admin Specific ---
   {
+    icon: CalendarRange  ,
+    label: 'Planned Rota',
+    href: 'planned-rota',
+    roles: ['company'],
+    accessKey: 'plannedRota'
+  },
+  {
     icon: CalendarClock,
     label: 'Rota',
     href: 'rota',
     roles: ['company', 'companyAdmin'],
     accessKey: 'rota'
   },
+    
+  
   {
     icon: DoorOpen,
     label: 'Vacancy',
