@@ -150,7 +150,7 @@ const navItems = [
   },
   {
     icon: CalendarClock,
-    label: 'Rota',
+    label: 'Actual Rota',
     href: 'rota',
     roles: ['company', 'companyAdmin'],
     accessKey: 'rota'

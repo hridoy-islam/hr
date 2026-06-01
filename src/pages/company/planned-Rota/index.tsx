@@ -134,11 +134,11 @@ const ShiftBlock = ({
   const title = leaveType || shiftName || '';
   const isTheme = colors === 'theme';
   const allSlots: TimeSlot[] = [];
-  if (!leaveType) {
+
+ if (!leaveType || leaveType === 'AL') {
     allSlots.push({ startTime, endTime });
     if (extraSlots) allSlots.push(...extraSlots);
   }
-
   return (
     <div
       style={
@@ -166,6 +166,7 @@ const ShiftBlock = ({
       {title && (
         <span className="text-md w-full truncate text-center font-bold uppercase leading-tight tracking-widest">
           {title}
+          
         </span>
       )}
 
@@ -174,14 +175,26 @@ const ShiftBlock = ({
         (slot, i) => {
           const slotMins = calculateDurationMinutes(slot.startTime, slot.endTime);
           const slotDuration = slotMins > 0 ? formatDuration(slotMins) : null;
+          const isAL = leaveType === 'AL';
+          
           return slot.startTime && slot.endTime ? (
             <span
               key={i}
               className="mt-0.5 w-full truncate text-center text-xs font-semibold leading-tight tracking-wide opacity-90"
             >
-              {slot.startTime}–{slot.endTime}
-              {slotDuration && (
-                <span className="ml-1 opacity-80">({slotDuration})</span>
+              {isAL ? (
+                // For AL: show only duration
+                slotDuration && (
+                  <span className="opacity-80">{slotDuration}</span>
+                )
+              ) : (
+                // For regular shifts: show time range and duration
+                <>
+                  {slot.startTime}–{slot.endTime}
+                  {slotDuration && (
+                    <span className="ml-1 opacity-80">({slotDuration})</span>
+                  )}
+                </>
               )}
             </span>
           ) : null;
@@ -1230,7 +1243,7 @@ const { rotaMap, employeeTotalDuration } = useMemo(() => {
     map[empId][dateKey].push(rota);
 
     // Only calculate total duration for published rotas
-    if (rota.status === 'publish') {
+    if (rota.status === 'publish' ) {
       const mins = calculateDurationMinutes(rota.startTime, rota.endTime);
       if (!empTotals[deptId]) empTotals[deptId] = {};
       empTotals[deptId][empId] = (empTotals[deptId][empId] || 0) + mins;
@@ -1570,7 +1583,7 @@ const { rotaMap, employeeTotalDuration } = useMemo(() => {
           {/* --- FIRST LINE: Title, Date Picker, Action Buttons --- */}
           <div className="flex flex-none items-center justify-between">
             <div className="flex items-center gap-3">
-              <h1 className="text-lg font-bold">Staff Planned Rota</h1>
+              <h1 className="text-lg font-bold">Planned Rota</h1>
             </div>
 
             {/* Center Date Picker Navigation */}

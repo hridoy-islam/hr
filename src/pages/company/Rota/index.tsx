@@ -1510,7 +1510,7 @@ export default function CompanyRota() {
           {/* --- FIRST LINE: Title, Date Picker, Action Buttons --- */}
           <div className="flex flex-none items-center justify-between">
             <div className="flex items-center gap-3">
-              <h1 className="text-lg font-bold">Staff Rota</h1>
+              <h1 className="text-lg font-bold">Actual Rota</h1>
             </div>
 
             {/* Center Date Picker Navigation */}
@@ -1627,7 +1627,7 @@ export default function CompanyRota() {
                 <MoveLeft className="h-4 w-4" /> Back
               </Button>
 
-              <div className="flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5">
+              {/* <div className="flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5">
                 <span className="text-xs font-semibold text-amber-700">
                   Pending Rota
                 </span>
@@ -1667,7 +1667,7 @@ export default function CompanyRota() {
                 className="h-9 gap-2"
               >
                 <Plus className="h-4 w-4" /> Add Rota
-              </Button>
+              </Button> */}
             </div>
           </div>
 
@@ -1849,7 +1849,7 @@ export default function CompanyRota() {
         )}
 
         {/* Dialogs */}
-        <CreateRotaDialog
+        {/* <CreateRotaDialog
           isOpen={isCreateOpen}
           onClose={() => setIsCreateOpen(false)}
           employee={selectedContext.employee}
@@ -1860,7 +1860,7 @@ export default function CompanyRota() {
           departments={departments}
           preselectedDepartmentId={selectedContext.departmentId}
           publishedDates={publishedDates}
-        />
+        /> */}
         <EditRotaSidebar
           isOpen={isEditOpen}
           onClose={() => setIsEditOpen(false)}
