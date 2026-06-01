@@ -1397,25 +1397,46 @@ export default function CompanyRota() {
     setIsCustomMode(false);
   };
 
-  const handleAddRotaSuccess = (newRota: any) => {
-    if (Array.isArray(newRota)) setRotas((p) => [...p, ...newRota]);
-    else setRotas((p) => [...p, newRota]);
+    const handleAddRotaSuccess = (newRota: any) => {
+   const normalize = (r: any) => ({
+    ...r,
+     status: r.status ?? 'pending',
+    employeeId: typeof r.employeeId === 'object' ? r.employeeId?._id : r.employeeId,
+    departmentId: typeof r.departmentId === 'object' ? r.departmentId?._id : r.departmentId,
+  });
+
+  if (Array.isArray(newRota)) {
+    setRotas((p) => [...p, ...newRota.map(normalize)]);
+  } else {
+    setRotas((p) => [...p, normalize(newRota)]);
+  }
   };
 
-  const handleUpdateRotaSuccess = (updatedRota: any) => {
-    setRotas((prev) => {
-      const updatedArray = Array.isArray(updatedRota)
-        ? updatedRota
-        : [updatedRota];
-      let newRotas = [...prev];
-      updatedArray.forEach((updatedItem) => {
-        const index = newRotas.findIndex((r) => r._id === updatedItem._id);
-        if (index !== -1) newRotas[index] = updatedItem;
-        else newRotas.push(updatedItem);
-      });
-      return newRotas;
+const handleUpdateRotaSuccess = (updatedRota: any) => {
+  setRotas((prev) => {
+    const updatedArray = Array.isArray(updatedRota) ? updatedRota : [updatedRota];
+
+    const normalize = (r: any) => ({
+      ...r,
+      employeeId: typeof r.employeeId === 'object' ? r.employeeId?._id : r.employeeId,
+      departmentId: typeof r.departmentId === 'object' ? r.departmentId?._id : r.departmentId,
+      status: r.status ?? 'pending',
     });
-  };
+
+    const existingIds = new Set(prev.map((r) => r._id));
+
+    const toUpdate = updatedArray.filter((r: any) => existingIds.has(r._id));
+    const toAdd = updatedArray.filter((r: any) => !existingIds.has(r._id));
+
+    const updatedIds = new Set(toUpdate.map((r: any) => r._id));
+
+    const withUpdates = prev.map((r) =>
+      updatedIds.has(r._id) ? normalize({ ...r, ...toUpdate.find((u: any) => u._id === r._id) }) : r
+    );
+
+    return [...withUpdates, ...toAdd.map(normalize)];
+  });
+};
 
   const handleDeleteRotaSuccess = (deletedRotaId: string) =>
     setRotas((p) => p.filter((r) => r._id !== deletedRotaId));

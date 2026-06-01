@@ -52,11 +52,11 @@ const formSchema = z
     note: z.string().optional(),
     slots: z.array(slotSchema),
     byNotice: z.boolean().default(false),
-    byEmail: z.boolean().default(false), 
+    byEmail: z.boolean().default(false)
   })
   .superRefine((data, ctx) => {
     const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
-    // Only validate time strictly if it's a standard working shift and not an AL/DO 
+    // Only validate time strictly if it's a standard working shift and not an AL/DO
     if (!data.leaveType && !['AL', 'DO'].includes(data.leaveType || '')) {
       data.slots.forEach((slot, index) => {
         if (!slot.startTime) {
@@ -132,9 +132,9 @@ export default function EditRotaSidebar({
 
   const watchLeaveType = form.watch('leaveType');
   const isStandard = !watchLeaveType;
-  
-  // 🚀 Lock UI if the shift is an auto-generated AL or DO 
-  const isLeaveGenerated = watchLeaveType === 'AL'  || watchLeaveType === 'S';
+
+  // 🚀 Lock UI if the shift is an auto-generated AL or DO
+  const isLeaveGenerated = watchLeaveType === 'AL' || watchLeaveType === 'S';
 
   // Collect all history entries across all rota slots, sorted latest first
   const allHistory = (() => {
@@ -147,7 +147,7 @@ export default function EditRotaSidebar({
         r.history.forEach((h: any) => {
           // Create a unique key using the message and timestamp
           const uniqueKey = `${h.message}`;
-          
+
           if (!seen.has(uniqueKey)) {
             seen.add(uniqueKey);
             entries.push({
@@ -159,7 +159,7 @@ export default function EditRotaSidebar({
         });
       }
     });
-    
+
     return entries.sort(
       (a, b) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -176,8 +176,8 @@ export default function EditRotaSidebar({
         leaveType: first.leaveType || '',
         shiftName: first.shiftName || '',
         color: first.color || '#2196f3',
-        byNotice: first.byNotice || false, 
-        byEmail: first.byEmail || false,   
+        byNotice: first.byNotice || false,
+        byEmail: first.byEmail || false,
         note: first.note || '',
         slots: rotaArray.map((r: any) => ({
           _id: r._id,
@@ -199,8 +199,8 @@ export default function EditRotaSidebar({
   }, [watchLeaveType, form, isLeaveGenerated]);
 
   const onSubmit = async (values: FormValues) => {
-    if (isLeaveGenerated) return; // Hard block for AL/S submissions just in case
-    
+    if (isLeaveGenerated) return;
+
     try {
       const baseRota = Array.isArray(rota) ? rota[0] : rota;
 
@@ -219,14 +219,12 @@ export default function EditRotaSidebar({
             .format('YYYY-MM-DD');
         }
 
-        const isPublished = publishedDates?.has(startDateStr);
-
         const payload: any = {
           startDate: startDateStr,
           endDate: endDateStr,
           note: values.note || '',
-          byNotice: values.byNotice, 
-          byEmail: values.byEmail,
+          byNotice: values.byNotice,
+          byEmail: values.byEmail
         };
 
         if (!isStandard) {
@@ -244,21 +242,41 @@ export default function EditRotaSidebar({
         }
 
         if (slot._id) {
-          const patchPayload = {
+          const res = await axiosInstance.patch(`/rota/${slot._id}`, {
             ...payload,
             actionUserId: user?._id
+          });
+          // Merge server response over the original rota to preserve all fields
+          const serverData = res.data?.data;
+          const originalRota = (Array.isArray(rota) ? rota : [rota]).find(
+            (r: any) => r._id === slot._id
+          );
+          return {
+            ...originalRota, // keep original fields (employeeId, departmentId as strings, etc.)
+            ...payload, // apply our changes
+            ...(serverData || {}), // server wins if it returns data
+            _id: slot._id // always keep the ID
           };
-          return axiosInstance.patch(`/rota/${slot._id}`, patchPayload);
         } else {
           payload.employeeId = employee?._id;
           payload.companyId = baseRota?.companyId;
           payload.departmentId = baseRota?.departmentId;
-          return axiosInstance.post(`/rota`, payload);
+          const res = await axiosInstance.post(`/rota`, payload);
+          const serverData = res.data?.data;
+          // Normalize: keep employeeId/departmentId as plain strings
+          return {
+            ...(serverData || payload),
+            employeeId: employee?._id,
+            departmentId:
+              typeof baseRota?.departmentId === 'object'
+                ? baseRota?.departmentId?._id
+                : baseRota?.departmentId,
+            status: 'pending'
+          };
         }
       });
 
-      const responses = await Promise.all(promises);
-      const updated = responses.map((res) => res.data.data);
+      const updated = await Promise.all(promises);
       toast({ title: 'Shifts saved successfully' });
       if (onSuccess) onSuccess(updated);
       onClose();
@@ -316,7 +334,7 @@ export default function EditRotaSidebar({
 
   if (!isOpen || !employee) return null;
 
- const leaveOptions = [
+  const leaveOptions = [
     { id: 'DO', label: 'Day Off (DO)' },
     // { id: 'AL', label: 'Annual Leave (AL)' },
     // { id: 'S', label: 'Sick (S)' },
@@ -386,8 +404,8 @@ export default function EditRotaSidebar({
                   {watchLeaveType === 'AL'
                     ? 'Annual Leave'
                     : watchLeaveType === 'S'
-                    ? 'Sick Leave'
-                    : ''}
+                      ? 'Sick Leave'
+                      : ''}
                   ). It cannot be edited.
                 </p>
               </div>
@@ -396,7 +414,7 @@ export default function EditRotaSidebar({
             {/* --- Tabs: conditionally show History tab --- */}
             <Tabs
               defaultValue="details"
-              className="flex flex-1 flex-col overflow-hidden mt-2"
+              className="mt-2 flex flex-1 flex-col overflow-hidden"
             >
               <TabsList
                 className={`mx-5 grid w-[calc(100%-40px)] bg-gray-100 ${
@@ -439,16 +457,15 @@ export default function EditRotaSidebar({
                 </div>
 
                 {/* 🚀 AL Display: Show ONLY Duration in Hours */}
-                {watchLeaveType === 'AL'  ? (
+                {watchLeaveType === 'AL' ? (
                   <div className="space-y-4">
                     <h3 className="text-sm font-bold">Leave Duration</h3>
-                    
-                      <Input
-                        readOnly
-                        value={`${fields.length * 8}`} // Assuming standard 8 hours per day
-                        className="mt-2 w-32 h-10 cursor-not-allowed bg-gray-100 text-gray-500 font-medium"
-                      />
-                  
+
+                    <Input
+                      readOnly
+                      value={`${fields.length * 8}`} // Assuming standard 8 hours per day
+                      className="mt-2 h-10 w-32 cursor-not-allowed bg-gray-100 font-medium text-gray-500"
+                    />
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -482,7 +499,9 @@ export default function EditRotaSidebar({
                         <div
                           key={slot.id}
                           className={`relative space-y-4 rounded-lg border p-4 ${
-                            isLeaveGenerated ? 'bg-gray-100/50 border-gray-200' : 'bg-gray-50/50 border-gray-100'
+                            isLeaveGenerated
+                              ? 'border-gray-200 bg-gray-100/50'
+                              : 'border-gray-100 bg-gray-50/50'
                           }`}
                         >
                           {/* 🚀 Show slot delete button for all shift types (if more than 1 field exists) */}
@@ -559,7 +578,9 @@ export default function EditRotaSidebar({
                                           disabled={isLeaveGenerated}
                                           dateFormat="dd-MM-yyyy"
                                           className={`flex h-10 w-full rounded-md border border-gray-200 px-3 py-2 pl-10 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-950 ${
-                                            isLeaveGenerated ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'bg-white'
+                                            isLeaveGenerated
+                                              ? 'cursor-not-allowed bg-gray-100 text-gray-500'
+                                              : 'bg-white'
                                           }`}
                                           wrapperClassName="w-full"
                                         />
@@ -611,10 +632,14 @@ export default function EditRotaSidebar({
                                       <FormControl>
                                         <Input
                                           {...field}
-                                          placeholder={isLeaveGenerated && !field.value ? '--:--' : '09:00'}
+                                          placeholder={
+                                            isLeaveGenerated && !field.value
+                                              ? '--:--'
+                                              : '09:00'
+                                          }
                                           maxLength={5}
                                           disabled={isLeaveGenerated}
-                                          className={`font-mono ${isLeaveGenerated ? 'bg-gray-100 cursor-not-allowed text-gray-500' : ''}`}
+                                          className={`font-mono ${isLeaveGenerated ? 'cursor-not-allowed bg-gray-100 text-gray-500' : ''}`}
                                           onChange={(e) => {
                                             let val = e.target.value
                                               .replace(/[^0-9:]/g, '')
@@ -653,10 +678,14 @@ export default function EditRotaSidebar({
                                       <FormControl>
                                         <Input
                                           {...field}
-                                          placeholder={isLeaveGenerated && !field.value ? '--:--' : '17:00'}
+                                          placeholder={
+                                            isLeaveGenerated && !field.value
+                                              ? '--:--'
+                                              : '17:00'
+                                          }
                                           maxLength={5}
                                           disabled={isLeaveGenerated}
-                                          className={`font-mono ${isLeaveGenerated ? 'bg-gray-100 cursor-not-allowed text-gray-500' : ''}`}
+                                          className={`font-mono ${isLeaveGenerated ? 'cursor-not-allowed bg-gray-100 text-gray-500' : ''}`}
                                           onChange={(e) => {
                                             let val = e.target.value
                                               .replace(/[^0-9:]/g, '')
@@ -751,9 +780,11 @@ export default function EditRotaSidebar({
 
                 <div className="space-y-3 border-t border-gray-100 pt-4">
                   <label className="text-xs font-bold uppercase text-gray-900">
-                     Send Notification
+                    Send Notification
                   </label>
-                  <div className={`flex gap-6 rounded-md border p-4 ${isLeaveGenerated ? 'bg-gray-100/50 border-gray-200' : 'bg-gray-50/50 border-gray-100'}`}>
+                  <div
+                    className={`flex gap-6 rounded-md border p-4 ${isLeaveGenerated ? 'border-gray-200 bg-gray-100/50' : 'border-gray-100 bg-gray-50/50'}`}
+                  >
                     <FormField
                       control={form.control}
                       name="byEmail"
@@ -766,7 +797,9 @@ export default function EditRotaSidebar({
                               disabled={isLeaveGenerated}
                             />
                           </FormControl>
-                          <FormLabel className={`text-sm font-medium leading-none ${isLeaveGenerated ? 'text-gray-400' : 'cursor-pointer'}`}>
+                          <FormLabel
+                            className={`text-sm font-medium leading-none ${isLeaveGenerated ? 'text-gray-400' : 'cursor-pointer'}`}
+                          >
                             By Email
                           </FormLabel>
                         </FormItem>
@@ -784,7 +817,9 @@ export default function EditRotaSidebar({
                               disabled={isLeaveGenerated}
                             />
                           </FormControl>
-                          <FormLabel className={`text-sm font-medium leading-none ${isLeaveGenerated ? 'text-gray-400' : 'cursor-pointer'}`}>
+                          <FormLabel
+                            className={`text-sm font-medium leading-none ${isLeaveGenerated ? 'text-gray-400' : 'cursor-pointer'}`}
+                          >
                             By Notice
                           </FormLabel>
                         </FormItem>
@@ -812,11 +847,11 @@ export default function EditRotaSidebar({
                           </div>
                           <div className="pb-2">
                             <p className="text-sm font-medium text-gray-800">
-                              {item.message}{' '}{moment(item.createdAt).format(
+                              {item.message}{' '}
+                              {moment(item.createdAt).format(
                                 'hh:mm A, DD MMM YYYY'
                               )}
                             </p>
-                           
                           </div>
                         </div>
                       ))}
@@ -840,19 +875,18 @@ export default function EditRotaSidebar({
                           {...field}
                           disabled={isLeaveGenerated}
                           placeholder="Specific instructions..."
-                          className={`min-h-[150px] resize-none ${isLeaveGenerated ? 'bg-gray-100 cursor-not-allowed' : 'bg-gray-50'}`}
+                          className={`min-h-[150px] resize-none ${isLeaveGenerated ? 'cursor-not-allowed bg-gray-100' : 'bg-gray-50'}`}
                         />
                       </FormControl>
                     </FormItem>
                   )}
                 />
               </TabsContent>
-
             </Tabs>
 
             <div className="flex items-center justify-between border-t border-gray-100 bg-gray-50 p-5">
               {fields.some((f) => !f._id) ? (
-                <div /> 
+                <div />
               ) : (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
