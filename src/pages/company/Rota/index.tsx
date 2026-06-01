@@ -1647,7 +1647,13 @@ const handleUpdateRotaSuccess = (updatedRota: any) => {
               >
                 <MoveLeft className="h-4 w-4" /> Back
               </Button>
-
+<Button
+                onClick={() => navigate('report')}
+                variant="outline"
+                className="h-9 gap-2 border-none bg-purple-800 text-white hover:bg-purple-700"
+              >
+                <File className="h-4 w-4" /> Report
+              </Button>
               {/* <div className="flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5">
                 <span className="text-xs font-semibold text-amber-700">
                   Pending Rota
