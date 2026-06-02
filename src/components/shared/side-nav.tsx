@@ -57,7 +57,8 @@ import {
   CalendarX2,
   CalendarDays,
   FileClock,
-  Heart
+  Heart,
+  CalendarMinus2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Link, useNavigate, useLocation, useParams } from 'react-router-dom';
@@ -153,6 +154,13 @@ const navItems = [
     label: 'Actual Rota',
     href: 'rota',
     roles: ['company', 'companyAdmin'],
+    accessKey: 'rota'
+  },
+  {
+    icon: CalendarMinus2  ,
+    label: 'Planned vs. Actual Rota Report',
+    href: 'rota/planned-vs-actual',
+    roles: ['company'],
     accessKey: 'rota'
   },
     

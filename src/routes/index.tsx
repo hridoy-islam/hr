@@ -120,6 +120,7 @@ import PolicyDetails from '@/pages/company/companyPolicy/policyDetails';
 import HealthAndSafetyPage from '@/pages/company/healthAndSafety';
 import HealthAndSafetyDetails from '@/pages/company/healthAndSafety/healthAndSafetyDetails';
 import CompanyPlannedRota from '@/pages/company/planned-Rota';
+import CompanyPlannedVsActualRotaReport from '@/pages/company/plannedVsActualRotaReport';
 
 const SignInPage = lazy(() => import('@/pages/auth/signin'));
 
@@ -410,6 +411,7 @@ export default function AppRouter() {
             </Suspense>
           )
         },
+        { path: 'planned-vs-actual', element: <CompanyPlannedVsActualRotaReport /> },
         { path: 'report', element: <CompanyRotaReport /> },
         { path: 'missing-shift', element: <MissingAttendanceCalendarPage /> }
       ]
