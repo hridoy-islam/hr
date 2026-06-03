@@ -1355,9 +1355,15 @@ const submitDobSearch = async () => {
                       >
                         <div className="flex items-center gap-3">
                           <p className="text-sm font-medium text-slate-800">
-                            {item.name || `${item.firstName} ${item.lastName}`}
-                          </p>
+                            {item.name || `${item.firstName} ${item.lastName}`} 
+                          </p>{item.latestAttendance?.isOnBreak && ( // ← was item.isOnBreak
+        <span className="ml-1 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
+          On Break
+        </span>
+      )}
                         </div>
+
+                       
                         <div className="rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">
                           Active
                         </div>
