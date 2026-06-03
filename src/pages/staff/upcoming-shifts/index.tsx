@@ -169,8 +169,7 @@ return (
               </h2>
               <div className="flex flex-col gap-3">
                 {monthShifts.map((shift, index) => {
-                  const isLeave = !shift.startTime && !shift.endTime;
-
+const isLeave = shift.leaveType !== undefined && shift.leaveType !== "";
                   return (
                     <div
                       key={shift._id || index}
