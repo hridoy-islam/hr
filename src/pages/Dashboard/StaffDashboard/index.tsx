@@ -485,9 +485,7 @@ const StaffDashboardPage = () => {
                                     </div>
 
                                     <div className="col-span-2 flex h-full items-center pt-2 lg:col-span-4 lg:pl-6 lg:pt-0">
-                                      <span className="inline-flex items-center rounded-full border border-amber-200/60 bg-amber-50 px-3 py-1 text-sm font-medium text-amber-700">
-                                        Leave / Day Off
-                                      </span>
+                                     
                                     </div>
                                   </div>
                                 ) : (
