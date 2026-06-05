@@ -11,11 +11,11 @@ import {
   CheckCircle,
   AlertCircle,
   Pencil,
-  Eye,
   Camera,
   X,
   RefreshCw,
-  Check
+  Check,
+  Download
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -116,16 +116,23 @@ export default function EmployeeDocumentTab() {
 
   // --- State ---
   const [documents, setDocuments] = useState<TEmployeeDocument[]>([]);
-  const [complianceStatus, setComplianceStatus] = useState<TComplianceStatus | null>(null);
+  const [complianceStatus, setComplianceStatus] =
+    useState<TComplianceStatus | null>(null);
   const [userData, setUserData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Dialog State
+  // Upload/Edit Dialog State
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingDoc, setEditingDoc] = useState<TEmployeeDocument | null>(null);
 
+  // Preview Dialog State
+  const [isPreviewDialogOpen, setIsPreviewDialogOpen] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
   // Form State
-  const [selectedOption, setSelectedOption] = useState<SelectOption | null>(null);
+  const [selectedOption, setSelectedOption] = useState<SelectOption | null>(
+    null
+  );
   const [customDocTitle, setCustomDocTitle] = useState('');
   const [note, setNote] = useState('');
 
@@ -143,7 +150,9 @@ export default function EmployeeDocumentTab() {
 
   // Image Preview State (Captured but not yet accepted)
   const [capturedImageFile, setCapturedImageFile] = useState<File | null>(null);
-  const [capturedImagePreview, setCapturedImagePreview] = useState<string | null>(null);
+  const [capturedImagePreview, setCapturedImagePreview] = useState<
+    string | null
+  >(null);
 
   // --- Data Fetching ---
   const fetchData = async () => {
@@ -187,22 +196,30 @@ export default function EmployeeDocumentTab() {
   // --- Computed Options for React Select ---
   const selectOptions = useMemo(() => {
     const uploadedTitles = documents.map((d) => d.documentTitle.trim());
-
-    const referenceCount = uploadedTitles.filter((t) => t === 'Reference').length;
+    const referenceCount = uploadedTitles.filter(
+      (t) => t === 'Reference'
+    ).length;
 
     let dynamicRequiredList = [...REQUIRED_DOCUMENTS_LIST];
 
     if (userData?.noRtwCheck) {
       dynamicRequiredList = dynamicRequiredList.filter(
-        (req) => !["Immigration Status", "Right to Work", "Passport", "Ni number/Driving licence"].includes(req)
+        (req) =>
+          ![
+            'Immigration Status',
+            'Right to Work',
+            'Passport',
+            'Ni number/Driving licence'
+          ].includes(req)
       );
     } else if (userData?.isBritish) {
       dynamicRequiredList = dynamicRequiredList.filter(
-        (req) => !["Immigration Status", "Right to Work", "Passport"].includes(req)
+        (req) =>
+          !['Immigration Status', 'Right to Work', 'Passport'].includes(req)
       );
     } else {
       dynamicRequiredList = dynamicRequiredList.filter(
-        (req) => req !== "Ni number/Driving licence"
+        (req) => req !== 'Ni number/Driving licence'
       );
     }
 
@@ -259,8 +276,10 @@ export default function EmployeeDocumentTab() {
         }
       }, 100);
     } catch (err) {
-      console.error("Camera access denied:", err);
-      setUploadError("Camera access denied. Please check your browser permissions.");
+      console.error('Camera access denied:', err);
+      setUploadError(
+        'Camera access denied. Please check your browser permissions.'
+      );
     }
   };
 
@@ -281,14 +300,20 @@ export default function EmployeeDocumentTab() {
       const context = canvas.getContext('2d');
       context?.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-      canvas.toBlob((blob) => {
-        if (blob) {
-          const file = new File([blob], `capture-${Date.now()}.jpg`, { type: 'image/jpeg' });
-          setCapturedImageFile(file);
-          setCapturedImagePreview(URL.createObjectURL(blob));
-          stopCamera();
-        }
-      }, 'image/jpeg', 0.9);
+      canvas.toBlob(
+        (blob) => {
+          if (blob) {
+            const file = new File([blob], `capture-${Date.now()}.jpg`, {
+              type: 'image/jpeg'
+            });
+            setCapturedImageFile(file);
+            setCapturedImagePreview(URL.createObjectURL(blob));
+            stopCamera();
+          }
+        },
+        'image/jpeg',
+        0.9
+      );
     }
   };
 
@@ -321,7 +346,10 @@ export default function EmployeeDocumentTab() {
 
   const handleOpenEdit = (doc: TEmployeeDocument) => {
     setEditingDoc(doc);
-    const isStandard = [...REQUIRED_DOCUMENTS_LIST, ...OPTIONAL_DOCUMENTS_LIST].includes(doc.documentTitle);
+    const isStandard = [
+      ...REQUIRED_DOCUMENTS_LIST,
+      ...OPTIONAL_DOCUMENTS_LIST
+    ].includes(doc.documentTitle);
 
     if (isStandard) {
       setSelectedOption({ label: doc.documentTitle, value: doc.documentTitle });
@@ -341,13 +369,111 @@ export default function EmployeeDocumentTab() {
     setIsDialogOpen(true);
   };
 
+  const handleViewDocument = (url: string) => {
+    setPreviewUrl(url);
+    setIsPreviewDialogOpen(true);
+  };
+
+  // Robust Force Download Mechanism
+  const handleForceDownload = async (url: string) => {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Network response was not ok');
+
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+
+      let fileName = url.split('/').pop() || 'document_download';
+      fileName = fileName.split('?')[0];
+
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+
+      link.parentNode?.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error(
+        'Blob fetch failed, falling back to direct anchor download',
+        error
+      );
+      const fallbackLink = document.createElement('a');
+      fallbackLink.href = url;
+      fallbackLink.setAttribute('download', '');
+      fallbackLink.setAttribute('target', '_blank');
+      document.body.appendChild(fallbackLink);
+      fallbackLink.click();
+      document.body.removeChild(fallbackLink);
+    }
+  };
+
+  // Helper to render appropriate viewer inside dialog
+  const renderPreviewContent = () => {
+    if (!previewUrl) return null;
+
+    const lowerUrl = previewUrl.toLowerCase();
+    const isImage = lowerUrl.match(/\.(jpeg|jpg|gif|png|webp)(\?.*)?$/) != null;
+    const isPdf = lowerUrl.match(/\.(pdf)(\?.*)?$/) != null;
+    const isWord = lowerUrl.match(/\.(docx|doc)(\?.*)?$/) != null;
+    if (isImage) {
+      return (
+        <img
+          src={previewUrl}
+          alt="Document Preview"
+          className="max-h-full max-w-full rounded-md object-contain shadow-sm"
+        />
+      );
+    }
+
+    if (isPdf) {
+      return (
+        <iframe
+          src={`${previewUrl}#toolbar=0&navpanes=0&scrollbar=0`}
+          className="h-full w-full rounded-md border-0 shadow-sm"
+          title="PDF Preview"
+        />
+      );
+    }
+    if (isWord) {
+      // Encodes the document's cloud URL into Microsoft's official high-fidelity web viewer iframe format
+      const officeViewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(previewUrl)}`;
+      return (
+        <iframe
+          src={officeViewerUrl}
+          className="h-full w-full rounded-md border-0 shadow-sm"
+          title="Word Document Preview"
+        />
+      );
+    }
+    return (
+      <div className="flex flex-col items-center justify-center rounded-lg border border-gray-200 bg-white p-8 text-center shadow-sm">
+        <FileText className="mb-4 h-16 w-16 text-gray-400" />
+        <h3 className="text-lg font-medium text-gray-900">
+          Preview not available
+        </h3>
+        <p className="mb-6 mt-2 text-sm text-gray-500">
+          This file format cannot be safely previewed in the browser.
+        </p>
+        <Button
+          onClick={() => handleForceDownload(previewUrl)}
+          className="bg-theme hover:bg-theme/90"
+        >
+          <Download className="mr-2 h-4 w-4" /> Download to View
+        </Button>
+      </div>
+    );
+  };
+
   const uploadMultipleFiles = async (files: File[]) => {
     if (!eid) return;
 
-    // Validate file sizes
-    const oversizedFiles = files.filter(file => file.size > 20 * 1024 * 1024);
+    const oversizedFiles = files.filter((file) => file.size > 20 * 1024 * 1024);
     if (oversizedFiles.length > 0) {
-      setUploadError(`File(s) exceed 20MB limit: ${oversizedFiles.map(f => f.name).join(', ')}`);
+      setUploadError(
+        `File(s) exceed 20MB limit: ${oversizedFiles.map((f) => f.name).join(', ')}`
+      );
       return;
     }
 
@@ -394,8 +520,8 @@ export default function EmployeeDocumentTab() {
   };
 
   const removeUploadedFile = (index: number) => {
-    setUploadedDocUrls(prev => prev.filter((_, i) => i !== index));
-    setFilesToUpload(prev => prev.filter((_, i) => i !== index));
+    setUploadedDocUrls((prev) => prev.filter((_, i) => i !== index));
+    setFilesToUpload((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -407,7 +533,9 @@ export default function EmployeeDocumentTab() {
     }
 
     if (!eid || uploadedDocUrls.length === 0 || !finalTitle) {
-      setUploadError('Please complete all fields and upload at least one file.');
+      setUploadError(
+        'Please complete all fields and upload at least one file.'
+      );
       return;
     }
 
@@ -421,7 +549,10 @@ export default function EmployeeDocumentTab() {
       };
 
       if (editingDoc) {
-        await axiosInstance.patch(`/employee-documents/${editingDoc._id}`, payload);
+        await axiosInstance.patch(
+          `/employee-documents/${editingDoc._id}`,
+          payload
+        );
       } else {
         await axiosInstance.post('/employee-documents', payload);
       }
@@ -460,7 +591,11 @@ export default function EmployeeDocumentTab() {
     option: (base: any, state: any) => ({
       ...base,
       fontSize: '0.875rem',
-      backgroundColor: state.isSelected ? '#0f172a' : state.isFocused ? '#f3f4f6' : 'white',
+      backgroundColor: state.isSelected
+        ? '#0f172a'
+        : state.isFocused
+          ? '#f3f4f6'
+          : 'white',
       color: state.isSelected ? 'white' : '#1f2937'
     }),
     groupHeading: (base: any) => ({
@@ -532,7 +667,9 @@ export default function EmployeeDocumentTab() {
               <div className="space-y-2">
                 <Label htmlFor="doc-note">
                   Note{' '}
-                  <span className="text-xs font-normal text-gray-400">(Optional)</span>
+                  <span className="text-xs font-normal text-gray-400">
+                    (Optional)
+                  </span>
                 </Label>
                 <Textarea
                   id="doc-note"
@@ -569,18 +706,19 @@ export default function EmployeeDocumentTab() {
                   className="hidden"
                   multiple
                   accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                  disabled={isUploading || isCameraOpen || !!capturedImagePreview}
+                  disabled={
+                    isUploading || isCameraOpen || !!capturedImagePreview
+                  }
                 />
 
                 {/* --- CAMERA / PREVIEW / DRAG & DROP AREA --- */}
                 {isCameraOpen ? (
-                  // State 1: Camera is ON
                   <div className="relative flex flex-col items-center justify-center overflow-hidden rounded-lg bg-black text-center shadow-inner">
                     <video
                       ref={videoRef}
                       autoPlay
                       playsInline
-                      className="w-full h-auto max-h-[350px] object-cover"
+                      className="h-auto max-h-[350px] w-full object-cover"
                     />
                     <canvas ref={canvasRef} className="hidden" />
                     <div className="absolute bottom-4 flex gap-3">
@@ -594,7 +732,7 @@ export default function EmployeeDocumentTab() {
                       </Button>
                       <Button
                         type="button"
-                        className="bg-white text-black hover:bg-gray-200 font-semibold"
+                        className="bg-white font-semibold text-black hover:bg-gray-200"
                         size="sm"
                         onClick={capturePhoto}
                       >
@@ -603,12 +741,11 @@ export default function EmployeeDocumentTab() {
                     </div>
                   </div>
                 ) : capturedImagePreview ? (
-                  // State 2: Photo captured, awaiting approval
                   <div className="relative flex flex-col items-center justify-center overflow-hidden rounded-lg bg-gray-900 p-2 text-center shadow-inner">
                     <img
                       src={capturedImagePreview}
                       alt="Captured Preview"
-                      className="w-full h-auto max-h-[350px] rounded-md object-contain"
+                      className="h-auto max-h-[350px] w-full rounded-md object-contain"
                     />
                     <div className="absolute bottom-4 flex gap-3">
                       <Button
@@ -616,13 +753,13 @@ export default function EmployeeDocumentTab() {
                         variant="secondary"
                         size="sm"
                         onClick={retakePhoto}
-                        className="bg-white/90 text-gray-900 hover:bg-white backdrop-blur-sm"
+                        className="bg-white/90 text-gray-900 backdrop-blur-sm hover:bg-white"
                       >
                         <RefreshCw className="mr-2 h-4 w-4" /> Retake
                       </Button>
                       <Button
                         type="button"
-                        className="bg-theme text-white hover:bg-theme/90 shadow-md"
+                        className="bg-theme text-white shadow-md hover:bg-theme/90"
                         size="sm"
                         onClick={acceptPhoto}
                       >
@@ -631,10 +768,11 @@ export default function EmployeeDocumentTab() {
                     </div>
                   </div>
                 ) : (
-                  // State 3: Default Upload View
                   <div className="space-y-3">
                     <div
-                      onClick={() => !isUploading && fileInputRef.current?.click()}
+                      onClick={() =>
+                        !isUploading && fileInputRef.current?.click()
+                      }
                       className={`relative flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 text-center transition-colors
                         ${
                           isUploading
@@ -687,7 +825,6 @@ export default function EmployeeDocumentTab() {
                       )}
                     </div>
 
-                    {/* Show list of uploaded files */}
                     {uploadedDocUrls.length > 0 && (
                       <div className="space-y-2">
                         <Label className="text-sm font-medium text-gray-700">
@@ -695,7 +832,10 @@ export default function EmployeeDocumentTab() {
                         </Label>
                         <div className="max-h-40 space-y-1 overflow-y-auto">
                           {filesToUpload.map((file, index) => (
-                            <div key={index} className="flex items-center justify-between rounded-lg bg-gray-50 p-2 text-xs">
+                            <div
+                              key={index}
+                              className="flex items-center justify-between rounded-lg bg-gray-50 p-2 text-xs"
+                            >
                               <div className="flex items-center gap-2 truncate">
                                 <FileText className="h-3 w-3 flex-shrink-0 text-gray-400" />
                                 <span className="truncate">{file.name}</span>
@@ -709,26 +849,41 @@ export default function EmployeeDocumentTab() {
                               </button>
                             </div>
                           ))}
-                          {/* Show existing URLs with actual file names */}
-                          {editingDoc && uploadedDocUrls.slice(filesToUpload.length).map((url, index) => {
-                            const fileName = url.split('/').pop() || `Existing file ${index + 1}`;
-                            
-                            return (
-                              <div key={`existing-${index}`} className="flex items-center justify-between rounded-lg bg-gray-50 p-2 text-xs">
-                                <div className="flex items-center gap-2 truncate">
-                                  <FileText className="h-3 w-3 flex-shrink-0 text-gray-400" />
-                                  <span className="truncate" title={fileName}>{fileName}</span>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => removeUploadedFile(filesToUpload.length + index)}
-                                  className="ml-2 flex-shrink-0 text-gray-400 hover:text-red-500"
-                                >
-                                  <X className="h-3 w-3" />
-                                </button>
-                              </div>
-                            );
-                          })}
+                          {editingDoc &&
+                            uploadedDocUrls
+                              .slice(filesToUpload.length)
+                              .map((url, index) => {
+                                const fileName =
+                                  url.split('/').pop() ||
+                                  `Existing file ${index + 1}`;
+                                return (
+                                  <div
+                                    key={`existing-${index}`}
+                                    className="flex items-center justify-between rounded-lg bg-gray-50 p-2 text-xs"
+                                  >
+                                    <div className="flex items-center gap-2 truncate">
+                                      <FileText className="h-3 w-3 flex-shrink-0 text-gray-400" />
+                                      <span
+                                        className="truncate"
+                                        title={fileName}
+                                      >
+                                        {fileName}
+                                      </span>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        removeUploadedFile(
+                                          filesToUpload.length + index
+                                        )
+                                      }
+                                      className="ml-2 flex-shrink-0 text-gray-400 hover:text-red-500"
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </button>
+                                  </div>
+                                );
+                              })}
                         </div>
                         <Button
                           type="button"
@@ -752,7 +907,7 @@ export default function EmployeeDocumentTab() {
                 )}
               </div>
 
-              <DialogFooter className='flex gap-2'>
+              <DialogFooter className="flex gap-2">
                 <Button
                   type="button"
                   className="border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
@@ -764,7 +919,11 @@ export default function EmployeeDocumentTab() {
                 <Button
                   type="submit"
                   className="bg-theme text-white hover:bg-theme/90"
-                  disabled={isSubmitting || uploadedDocUrls.length === 0 || !selectedOption}
+                  disabled={
+                    isSubmitting ||
+                    uploadedDocUrls.length === 0 ||
+                    !selectedOption
+                  }
                 >
                   {isSubmitting ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -877,7 +1036,6 @@ export default function EmployeeDocumentTab() {
                           <span className="font-medium text-gray-900">
                             {doc.documentTitle}
                           </span>
-                         
                         </div>
                       </div>
                     </TableCell>
@@ -895,13 +1053,15 @@ export default function EmployeeDocumentTab() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        {/* View button - shows Document or Document 1, Document 2, etc. */}
-                        {doc.documentUrl && doc.documentUrl.length > 0 && (
-                          doc.documentUrl.length === 1 ? (
+                        {doc.documentUrl &&
+                          doc.documentUrl.length > 0 &&
+                          (doc.documentUrl.length === 1 ? (
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => window.open(doc.documentUrl[0], '_blank')}
+                              onClick={() =>
+                                handleViewDocument(doc.documentUrl[0])
+                              }
                               title="View Document"
                               className="text-xs"
                             >
@@ -913,15 +1073,14 @@ export default function EmployeeDocumentTab() {
                                 key={idx}
                                 variant="outline"
                                 size="sm"
-                                onClick={() => window.open(url, '_blank')}
+                                onClick={() => handleViewDocument(url)}
                                 title={`View Document ${idx + 1}`}
                                 className="text-xs"
                               >
                                 Document {idx + 1}
                               </Button>
                             ))
-                          )
-                        )}
+                          ))}
                         <Button
                           size="icon"
                           onClick={() => handleOpenEdit(doc)}
@@ -946,6 +1105,43 @@ export default function EmployeeDocumentTab() {
           </Table>
         )}
       </div>
+
+      {/* 4. Preview Document Dialog */}
+      <Dialog open={isPreviewDialogOpen} onOpenChange={setIsPreviewDialogOpen}>
+        <DialogContent className="flex h-[85vh] max-w-4xl flex-col gap-0 overflow-hidden p-0 sm:rounded-xl">
+          <div className="z-10 flex items-center justify-between border-b bg-white px-6 py-4">
+            <div>
+              <DialogTitle className="text-lg font-semibold text-gray-900">
+                Document Preview
+              </DialogTitle>
+              <DialogDescription className="mt-1 max-w-sm truncate text-xs text-gray-500">
+                {previewUrl?.split('/').pop()?.split('?')[0] ||
+                  'Unknown Document'}
+              </DialogDescription>
+            </div>
+            <div className="flex items-center gap-3">
+              <Button
+                onClick={() => previewUrl && handleForceDownload(previewUrl)}
+                className="bg-theme text-white shadow-sm hover:bg-theme/90"
+                size="sm"
+              >
+                <Download className="mr-2 h-4 w-4" /> Download
+              </Button>
+              <Button
+                size="sm"
+                variant={'outline'}
+                onClick={() => setIsPreviewDialogOpen(false)}
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+
+          <div className="relative flex flex-1 flex-col items-center justify-center overflow-auto bg-gray-100 p-4">
+            {renderPreviewContent()}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

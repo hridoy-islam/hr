@@ -16,7 +16,8 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogFooter
+  DialogFooter,
+  DialogDescription
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -42,7 +43,8 @@ import {
   X,
   AlertTriangle,
   Edit,
-  Info
+  Info,
+  Download
 } from 'lucide-react';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 
@@ -136,6 +138,10 @@ const TrainingDetailsPage: React.FC = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
+  // Preview Dialog State
+  const [isPreviewDialogOpen, setIsPreviewDialogOpen] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
   const fetchTrainingData = async () => {
     setLoading(true);
     try {
@@ -165,7 +171,6 @@ const TrainingDetailsPage: React.FC = () => {
     const newFilesArray = Array.from(files);
 
     for (const file of newFilesArray) {
-     
       if (file.size > 20 * 1024 * 1024) {
         setUploadError('Each file must be less than 20MB.');
         return;
@@ -232,8 +237,97 @@ const TrainingDetailsPage: React.FC = () => {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  // --- Action Handlers ---
+  // --- Preview & Download Logic ---
+  const handleViewDocument = (url: string) => {
+    setPreviewUrl(url);
+    setIsPreviewDialogOpen(true);
+  };
 
+  const handleForceDownload = async (url: string) => {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("Network response was not ok");
+      
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+
+      let fileName = url.split('/').pop() || 'document_download';
+      fileName = fileName.split('?')[0];
+
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+      
+      link.parentNode?.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error('Blob fetch failed, falling back to direct anchor download', error);
+      const fallbackLink = document.createElement('a');
+      fallbackLink.href = url;
+      fallbackLink.setAttribute('download', '');
+      fallbackLink.setAttribute('target', '_blank');
+      document.body.appendChild(fallbackLink);
+      fallbackLink.click();
+      document.body.removeChild(fallbackLink);
+    }
+  };
+
+  const renderPreviewContent = () => {
+    if (!previewUrl) return null;
+
+    const lowerUrl = previewUrl.toLowerCase();
+    const isImage = lowerUrl.match(/\.(jpeg|jpg|gif|png|webp)(\?.*)?$/) != null;
+    const isPdf = lowerUrl.match(/\.(pdf)(\?.*)?$/) != null;
+    const isWord = lowerUrl.match(/\.(docx|doc)(\?.*)?$/) != null;
+
+    if (isImage) {
+      return (
+        <img 
+          src={previewUrl} 
+          alt="Document Preview" 
+          className="max-h-full max-w-full object-contain rounded-md shadow-sm" 
+        />
+      );
+    }
+
+    if (isWord) {
+      const officeViewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(previewUrl)}`;
+      return (
+        <iframe 
+          src={officeViewerUrl} 
+          className="w-full h-full border-0 rounded-md shadow-sm" 
+          title="Word Document Preview" 
+        />
+      );
+    }
+
+    if (isPdf) {
+      return (
+        <iframe 
+          src={`${previewUrl}#toolbar=0&navpanes=0&scrollbar=0`} 
+          className="w-full h-full border-0 rounded-md shadow-sm" 
+          title="PDF Preview" 
+        />
+      );
+    }
+
+    return (
+      <div className="flex flex-col items-center justify-center text-center p-8 bg-white rounded-lg shadow-sm border border-gray-200">
+        <FileText className="h-16 w-16 text-gray-400 mb-4" />
+        <h3 className="text-lg font-medium text-gray-900">Preview not available</h3>
+        <p className="text-sm text-gray-500 mt-2 mb-6">
+          This file format cannot be safely previewed in the browser.
+        </p>
+        <Button onClick={() => handleForceDownload(previewUrl)} className="bg-theme hover:bg-theme/90 text-white">
+          <Download className="mr-2 h-4 w-4" /> Download to View
+        </Button>
+      </div>
+    );
+  };
+
+  // --- Action Handlers ---
   const handleReassign = async () => {
     if (!reassignDate) {
       toast.error('Please select a start date.');
@@ -249,7 +343,6 @@ const TrainingDetailsPage: React.FC = () => {
         isOptional: isReassignOptional
       };
 
-      // Only include expireDate if not optional and validity days exist
       if (!isReassignOptional && trainingRecord?.trainingId?.validityDays) {
         const newExpireDate = moment
           .utc([reassignDate.getFullYear(), reassignDate.getMonth(), reassignDate.getDate()])
@@ -257,7 +350,6 @@ const TrainingDetailsPage: React.FC = () => {
           .toISOString();
         payload.expireDate = newExpireDate;
       } else if (isReassignOptional) {
-        // Explicitly set expireDate to null for optional trainings
         payload.expireDate = null;
       }
 
@@ -314,7 +406,7 @@ const TrainingDetailsPage: React.FC = () => {
   const openEditLogDialog = (log: TCompletionRecord) => {
     setDialogMode('edit_log');
     setEditingLogId(log._id);
-    setIsOptionalTraining(false); // Logs typically have expiry dates
+    setIsOptionalTraining(false);
     setFormData({
       assignedDate: log.assignedDate
         ? moment.utc(log.assignedDate).toDate()
@@ -334,51 +426,51 @@ const TrainingDetailsPage: React.FC = () => {
     setIsDialogOpen(true);
   };
 
-// Universal Save
-const handleSaveDialog = async () => {
-  if (!formData.assignedDate) {
-    return toast.error('Assigned date is required.');
-  }
-
-  try {
-    const payload: any = {
-      assignedDate: toDateOnlyISO(formData.assignedDate),
-      certificate: formData.certificates.length > 0 ? formData.certificates : undefined
-    };
-
-    if (isOptionalTraining) {
-      payload.expireDate = null;
-      payload.isOptional = true;
-    } else {
-      payload.expireDate = formData.expireDate ? toDateOnlyISO(formData.expireDate) : null;
-      payload.isOptional = false;
+  const handleSaveDialog = async () => {
+    if (!formData.assignedDate) {
+      return toast.error('Assigned date is required.');
     }
 
-    if (formData.completedAt) {
-      payload.completedAt = toDateOnlyISO(formData.completedAt);
-    }
+    try {
+      const payload: any = {
+        assignedDate: toDateOnlyISO(formData.assignedDate),
+        certificate: formData.certificates.length > 0 ? formData.certificates : undefined
+      };
 
-    if (dialogMode === 'complete') {
-      payload.status = 'completed';
-    }
+      if (isOptionalTraining) {
+        payload.expireDate = null;
+        payload.isOptional = true;
+      } else {
+        payload.expireDate = formData.expireDate ? toDateOnlyISO(formData.expireDate) : null;
+        payload.isOptional = false;
+      }
 
-    if (dialogMode === 'edit_log' && editingLogId) {
-      await axiosInstance.patch(`/employee-training/${tid}/logs/${editingLogId}`, payload);
-      toast.success('History log updated successfully!');
-    } else {
-      await axiosInstance.patch(`/employee-training/${tid}`, payload);
-      toast.success(
-        dialogMode === 'complete' ? 'Training marked as completed!' : 'Training record updated!'
-      );
-    }
+      if (formData.completedAt) {
+        payload.completedAt = toDateOnlyISO(formData.completedAt);
+      }
 
-    setIsDialogOpen(false);
-    resetDialogState();
-    fetchTrainingData();
-  } catch (error: any) {
-    toast.error(error.response?.data?.message || 'Failed to process request.');
-  }
-};
+      if (dialogMode === 'complete') {
+        payload.status = 'completed';
+      }
+
+      if (dialogMode === 'edit_log' && editingLogId) {
+        await axiosInstance.patch(`/employee-training/${tid}/logs/${editingLogId}`, payload);
+        toast.success('History log updated successfully!');
+      } else {
+        await axiosInstance.patch(`/employee-training/${tid}`, payload);
+        toast.success(
+          dialogMode === 'complete' ? 'Training marked as completed!' : 'Training record updated!'
+        );
+      }
+
+      setIsDialogOpen(false);
+      resetDialogState();
+      fetchTrainingData();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to process request.');
+    }
+  };
+
   const handleEmployeeClick = (employeeId: string) => {
     navigate(`/company/${id}/employee/${employeeId}`, {
       state: { activeTab: 'training' }
@@ -397,17 +489,16 @@ const handleSaveDialog = async () => {
         {certArray.map((certLink, index) => {
           const fileName = getFileNameFromUrl(certLink);
           return (
-            <a
+            <button
               key={index}
-              href={certLink}
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-800 hover:underline"
+              type="button"
+              onClick={() => handleViewDocument(certLink)}
+              className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-800 hover:underline text-left bg-transparent border-0 p-0 cursor-pointer"
               title={fileName}
             >
               <FileText className="h-4 w-4 flex-shrink-0" />
               <span className="truncate max-w-[200px]">{fileName}</span>
-            </a>
+            </button>
           );
         })}
       </div>
@@ -426,7 +517,6 @@ const handleSaveDialog = async () => {
       );
     }
 
-    // For optional trainings or those without expiry
     if (isOptional || !expireDate) {
       return (
         <Badge className="gap-1 border-blue-200 bg-blue-100 px-3 py-1 text-blue-700 hover:bg-blue-200">
@@ -435,7 +525,6 @@ const handleSaveDialog = async () => {
       );
     }
     
-    // FIX: compare dates in UTC so "today" isn't shifted by the London default
     const today = moment.utc().startOf('day');
     const expiry = moment.utc(expireDate).startOf('day');
     const reminderDays = trainingId.reminderBeforeDays || 30;
@@ -502,8 +591,6 @@ const handleSaveDialog = async () => {
         </div>
         {uploadError && <p className="text-xs text-red-500">{uploadError}</p>}
       </div>
-
-      
     </>
   );
 
@@ -600,381 +687,413 @@ const handleSaveDialog = async () => {
       : [];
 
   return (
-  <div className="space-y-4 max-sm:pt-8">
-    <Card className="shadow-none">
-      <CardHeader>
-        <div className="flex flex-col md:flex-row items-start justify-between gap-3">
-          <div className="flex flex-row gap-1 font-semibold text-black sm:flex-row sm:items-center sm:gap-2">
-            <h1>
-              {trainingRecord.employeeId.firstName} {trainingRecord.employeeId.lastName}
-            </h1>
-            <span className=" inline">-</span>
-            <h1>{trainingRecord.trainingId.name}</h1>
-          </div>
+    <div className="space-y-4 max-sm:pt-8">
+      <Card className="shadow-none">
+        <CardHeader>
+          <div className="flex flex-col md:flex-row items-start justify-between gap-3">
+            <div className="flex flex-row gap-1 font-semibold text-black sm:flex-row sm:items-center sm:gap-2">
+              <h1>
+                {trainingRecord.employeeId.firstName} {trainingRecord.employeeId.lastName}
+              </h1>
+              <span className=" inline">-</span>
+              <h1>{trainingRecord.trainingId.name}</h1>
+            </div>
 
-          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-            <Button
-              onClick={() => handleEmployeeClick(trainingRecord?.employeeId?._id)}
-              variant="outline"
-              size="sm"
-              className="flex-1 sm:flex-none"
-            >
-              <ArrowLeft className="mr-2 h-4 w-4" /> Back to List
-            </Button>
-            {isCompleted ? (
+            <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
               <Button
-                onClick={() => setIsReassignOpen(true)}
+                onClick={() => handleEmployeeClick(trainingRecord?.employeeId?._id)}
+                variant="outline"
                 size="sm"
                 className="flex-1 sm:flex-none"
               >
-                <RotateCcw className="mr-2 h-4 w-4" /> Re-assign Course
+                <ArrowLeft className="mr-2 h-4 w-4" /> Back to List
               </Button>
+              {isCompleted ? (
+                <Button
+                  onClick={() => setIsReassignOpen(true)}
+                  size="sm"
+                  className="flex-1 sm:flex-none"
+                >
+                  <RotateCcw className="mr-2 h-4 w-4" /> Re-assign Course
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        </CardHeader>
+
+        <CardContent className="space-y-4">
+          <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold">
+            Training History
+          </h3>
+
+          <div className="space-y-4">
+            {!isCompleted &&
+              trainingRecord.assignedDate &&
+              renderTrainingRow(
+                trainingRecord,
+                false,
+                getStatusBadge(),
+                openActiveEditDialog,
+                openCompleteDialog,
+                trainingRecord.isOptional
+              )}
+
+            {sortedCompletionHistory.length > 0 ? (
+              sortedCompletionHistory.map((log) =>
+                renderTrainingRow(
+                  log,
+                  true,
+                  <Badge className="gap-1 border-green-200 bg-green-100 px-3 py-1 text-green-700 hover:bg-green-200">
+                    <CheckCircle className="h-3 w-3" /> Completed
+                  </Badge>,
+                  () => openEditLogDialog(log),
+                  undefined,
+                  false
+                )
+              )
+            ) : isCompleted || !trainingRecord.assignedDate ? (
+              <div className="rounded-lg border bg-gray-50 p-8 text-center italic text-black">
+                No previous history logs available.
+              </div>
             ) : null}
           </div>
-        </div>
-      </CardHeader>
+        </CardContent>
+      </Card>
 
-      <CardContent className="space-y-4">
-        <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold">
-          Training History
-        </h3>
-
-        <div className="space-y-4">
-          {!isCompleted &&
-            trainingRecord.assignedDate &&
-            renderTrainingRow(
-              trainingRecord,
-              false,
-              getStatusBadge(),
-              openActiveEditDialog,
-              openCompleteDialog,
-              trainingRecord.isOptional
-            )}
-
-          {sortedCompletionHistory.length > 0 ? (
-            sortedCompletionHistory.map((log) =>
-              renderTrainingRow(
-                log,
-                true,
-                <Badge className="gap-1 border-green-200 bg-green-100 px-3 py-1 text-green-700 hover:bg-green-200">
-                  <CheckCircle className="h-3 w-3" /> Completed
-                </Badge>,
-                () => openEditLogDialog(log),
-                undefined,
-                false
-              )
-            )
-          ) : isCompleted || !trainingRecord.assignedDate ? (
-            <div className="rounded-lg border bg-gray-50 p-8 text-center italic text-black">
-              No previous history logs available.
-            </div>
-          ) : null}
-        </div>
-      </CardContent>
-    </Card>
-
-    {/* --- UNIFIED DIALOG (COMPLETE / EDIT ACTIVE / EDIT LOG) --- */}
-    <Dialog
-      open={isDialogOpen}
-      onOpenChange={(open) => {
-        if (!open) resetDialogState();
-        setIsDialogOpen(open);
-      }}
-    >
-      <DialogContent className="max-h-[90vh] w-full overflow-y-auto sm:max-w-2xl lg:max-w-6xl">
-        <DialogHeader>
-          <DialogTitle>{dialogTitleMap[dialogMode]}</DialogTitle>
-        </DialogHeader>
-        <div className="flex flex-col gap-6 py-4 lg:flex-row">
-          {/* Left Column - Form Fields */}
-          <div className="flex-1 space-y-4">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="flex flex-col space-y-2">
-                <Label>Assigned Date</Label>
-                <DatePicker
-                  selected={formData.assignedDate}
-                  onChange={(date) => setFormData({ ...formData, assignedDate: date })}
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-                  dateFormat="dd-MM-yyyy"
-                  showMonthDropdown
-                  showYearDropdown
-                  preventOpenOnFocus
-                />
-              </div>
-              <div className="flex flex-col space-y-2">
-                <Label>Expiry Date</Label>
-                <DatePicker
-                  selected={formData.expireDate}
-                  onChange={(date) => setFormData({ ...formData, expireDate: date })}
-                  className={cn(
-                    'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm'
-                  )}
-                  dateFormat="dd-MM-yyyy"
-                  showMonthDropdown
-                  showYearDropdown
-                  preventOpenOnFocus
-                  placeholderText="Select expiry date"
-                />
-              </div>
-            </div>
-
-            {/* Optional Training Checkbox - Only show in edit_active mode */}
-            {dialogMode === 'edit_active' && (
-              <div className="flex items-start space-x-3 rounded-lg border border-gray-200 bg-gray-50/50 p-4">
-                <Checkbox
-                  id="isOptionalTraining"
-                  checked={isOptionalTraining}
-                  onCheckedChange={(checked) => {
-                    setIsOptionalTraining(checked === true);
-                    if (checked) {
-                      setFormData((prev) => ({ ...prev, expireDate: null }));
-                    }
-                  }}
-                  className="mt-1"
-                />
-                <div className="grid gap-1.5 leading-none">
-                  <div className="flex items-center gap-2">
-                    <Label
-                      htmlFor="isOptionalTraining"
-                      className="cursor-pointer text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                    >
-                      Expiry Date Is Optional
-                    </Label>
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Info className="h-4 w-4 cursor-help text-gray-400" />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p className="text-xs">
-                            Enable this option if the training does not require an expiration date.
-                            The expiry field will be set to null.
-                          </p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </div>
-                  <p className="text-xs text-gray-500">
-                    When enabled, this training will not have an expiration date and can be
-                    completed at any time.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {dialogMode !== 'edit_active' && (
-              <div className="flex flex-col space-y-2 pt-2">
-                <Label className="mb-1">Completion Date</Label>
-                <DatePicker
-                  selected={formData.completedAt}
-                  onChange={(date) => setFormData({ ...formData, completedAt: date })}
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-                  dateFormat="dd-MM-yyyy"
-                  placeholderText="Select completion date"
-                  showMonthDropdown
-                  showYearDropdown
-                  preventOpenOnFocus
-                />
-              </div>
-            )}
-
-            {dialogMode === 'edit_log' ? (
-              <div className="space-y-2 pt-2">
-                <Label>Certificate(s)</Label>
-                <div
-                  className={cn(
-                    'relative flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 transition-colors',
-                    isUploading
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-300 bg-gray-50 hover:bg-gray-100'
-                  )}
-                >
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    multiple
-                    onChange={handleFileSelect}
-                    className="absolute inset-0 z-0 cursor-pointer opacity-0"
-                    disabled={isUploading}
+      {/* --- UNIFIED DIALOG (COMPLETE / EDIT ACTIVE / EDIT LOG) --- */}
+      <Dialog
+        open={isDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) resetDialogState();
+          setIsDialogOpen(open);
+        }}
+      >
+        <DialogContent className="max-h-[90vh] w-full overflow-y-auto sm:max-w-2xl lg:max-w-6xl">
+          <DialogHeader>
+            <DialogTitle>{dialogTitleMap[dialogMode]}</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-6 py-4 lg:flex-row">
+            {/* Left Column - Form Fields */}
+            <div className="flex-1 space-y-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="flex flex-col space-y-2">
+                  <Label>Assigned Date</Label>
+                  <DatePicker
+                    selected={formData.assignedDate}
+                    onChange={(date) => setFormData({ ...formData, assignedDate: date })}
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+                    dateFormat="dd-MM-yyyy"
+                    showMonthDropdown
+                    showYearDropdown
+                    preventOpenOnFocus
                   />
-                  {isUploading ? (
-                    <div className="flex flex-col items-center gap-2">
-                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-theme border-t-transparent"></div>
-                      <p className="text-xs text-theme">Uploading...</p>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center gap-1 text-center">
-                      <Upload className="h-6 w-6 text-gray-400" />
-                      <span className="text-sm font-medium text-gray-600">Upload Copy</span>
-                      <span className="text-xs text-gray-400">PDF/Image (Max 20MB)</span>
-                    </div>
-                  )}
                 </div>
-                {uploadError && <p className="text-xs text-red-500">{uploadError}</p>}
+                <div className="flex flex-col space-y-2">
+                  <Label>Expiry Date</Label>
+                  <DatePicker
+                    selected={formData.expireDate}
+                    onChange={(date) => setFormData({ ...formData, expireDate: date })}
+                    className={cn(
+                      'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm'
+                    )}
+                    dateFormat="dd-MM-yyyy"
+                    showMonthDropdown
+                    showYearDropdown
+                    preventOpenOnFocus
+                    placeholderText="Select expiry date"
+                  />
+                </div>
               </div>
-            ) : (
-              renderUploadUI()
-            )}
-          </div>
 
-          {/* Right Column - Attached Documents */}
-          <div className="w-full lg:w-80 lg:flex-shrink-0">
-            <div className="lg:sticky lg:top-0">
-              <p className="mb-3 text-sm font-medium text-gray-700">Attached Documents:</p>
-              {formData.certificates.length > 0 ? (
-                <div className="max-h-60 space-y-2 overflow-y-auto pr-1 lg:max-h-[400px]">
-                  {formData.certificates.map((url, index) => (
-                    <div
-                      key={index}
-                      className="flex w-full items-center justify-between rounded border border-green-200 bg-white p-2"
-                    >
-                      <div className="flex items-center gap-2 overflow-hidden">
-                        <FileText className="h-5 w-5 flex-shrink-0 text-green-600" />
-                        <p
-                          className="max-w-[150px] truncate text-xs text-gray-600"
-                          title={getFileNameFromUrl(url)}
-                        >
-                          {getFileNameFromUrl(url)}
-                        </p>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleRemoveFile(index)}
-                        className="h-7 w-7 hover:bg-red-50 hover:text-red-600"
+              {/* Optional Training Checkbox - Only show in edit_active mode */}
+              {dialogMode === 'edit_active' && (
+                <div className="flex items-start space-x-3 rounded-lg border border-gray-200 bg-gray-50/50 p-4">
+                  <Checkbox
+                    id="isOptionalTraining"
+                    checked={isOptionalTraining}
+                    onCheckedChange={(checked) => {
+                      setIsOptionalTraining(checked === true);
+                      if (checked) {
+                        setFormData((prev) => ({ ...prev, expireDate: null }));
+                      }
+                    }}
+                    className="mt-1"
+                  />
+                  <div className="grid gap-1.5 leading-none">
+                    <div className="flex items-center gap-2">
+                      <Label
+                        htmlFor="isOptionalTraining"
+                        className="cursor-pointer text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                       >
-                        <X className="h-4 w-4" />
-                      </Button>
+                        Expiry Date Is Optional
+                      </Label>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-4 w-4 cursor-help text-gray-400" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="text-xs">
+                              Enable this option if the training does not require an expiration date.
+                              The expiry field will be set to null.
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     </div>
-                  ))}
+                    <p className="text-xs text-gray-500">
+                      When enabled, this training will not have an expiration date and can be
+                      completed at any time.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {dialogMode !== 'edit_active' && (
+                <div className="flex flex-col space-y-2 pt-2">
+                  <Label className="mb-1">Completion Date</Label>
+                  <DatePicker
+                    selected={formData.completedAt}
+                    onChange={(date) => setFormData({ ...formData, completedAt: date })}
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+                    dateFormat="dd-MM-yyyy"
+                    placeholderText="Select completion date"
+                    showMonthDropdown
+                    showYearDropdown
+                    preventOpenOnFocus
+                  />
+                </div>
+              )}
+
+              {dialogMode === 'edit_log' ? (
+                <div className="space-y-2 pt-2">
+                  <Label>Certificate(s)</Label>
+                  <div
+                    className={cn(
+                      'relative flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 transition-colors',
+                      isUploading
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-300 bg-gray-50 hover:bg-gray-100'
+                    )}
+                  >
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      multiple
+                      onChange={handleFileSelect}
+                      className="absolute inset-0 z-0 cursor-pointer opacity-0"
+                      disabled={isUploading}
+                    />
+                    {isUploading ? (
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="h-5 w-5 animate-spin rounded-full border-2 border-theme border-t-transparent"></div>
+                        <p className="text-xs text-theme">Uploading...</p>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-1 text-center">
+                        <Upload className="h-6 w-6 text-gray-400" />
+                        <span className="text-sm font-medium text-gray-600">Upload Copy</span>
+                        <span className="text-xs text-gray-400">PDF/Image (Max 20MB)</span>
+                      </div>
+                    )}
+                  </div>
+                  {uploadError && <p className="text-xs text-red-500">{uploadError}</p>}
                 </div>
               ) : (
-                <div className="py-8 text-center">
-                  <p className="text-sm text-gray-500">No documents attached</p>
-                </div>
+                renderUploadUI()
               )}
             </div>
-          </div>
-        </div>
 
-        <DialogFooter className="flex-col gap-2 sm:flex-row">
-          <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-            Cancel
-          </Button>
-          <Button
-            onClick={handleSaveDialog}
-            className={
-              dialogMode === 'complete' ? 'bg-green-600 text-white hover:bg-green-700' : ''
-            }
-            disabled={isUploading || !formData.assignedDate}
-          >
-            {dialogMode === 'complete' ? 'Confirm Completion' : 'Save Changes'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-
-    {/* --- RE-ASSIGN DIALOG --- */}
-    <Dialog
-      open={isReassignOpen}
-      onOpenChange={(open) => {
-        if (!open) setReassignDate(null);
-        setIsReassignOpen(open);
-      }}
-    >
-      <DialogContent className="w-full sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Re-assign Course</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 py-4">
-          <p className="text-sm text-gray-600">
-            Start a new training cycle for{' '}
-            <span className="font-semibold">{trainingRecord.employeeId.firstName}</span>.
-          </p>
-
-          <div className="flex flex-col space-y-2">
-            <Label className="mb-1">
-              New Assigned Date <span className="text-red-500">*</span>
-            </Label>
-            <DatePicker
-              selected={reassignDate}
-              onChange={(date) => setReassignDate(date)}
-              minDate={minReassignDate}
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-              dateFormat="dd-MM-yyyy"
-              placeholderText="Select start date"
-              showMonthDropdown
-              showYearDropdown
-              preventOpenOnFocus
-            />
-          </div>
-
-          {/* Optional Training Checkbox in Reassign Dialog */}
-          <div className="flex items-start space-x-3 rounded-lg border border-gray-200 bg-gray-50/50 p-4">
-            <Checkbox
-              id="isReassignOptional"
-              checked={isReassignOptional}
-              onCheckedChange={(checked) => {
-                setIsReassignOptional(checked === true);
-              }}
-              className="mt-1"
-            />
-            <div className="grid gap-1.5 leading-none">
-              <div className="flex items-center gap-2">
-                <Label
-                  htmlFor="isReassignOptional"
-                  className="cursor-pointer text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                >
-                  Expiry Date Is Optional
-                </Label>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Info className="h-4 w-4 cursor-help text-gray-400" />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p className="text-xs">
-                        Enable this option if the re-assigned training does not require an
-                        expiration date.
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+            {/* Right Column - Attached Documents */}
+            <div className="w-full lg:w-80 lg:flex-shrink-0">
+              <div className="lg:sticky lg:top-0">
+                <p className="mb-3 text-sm font-medium text-gray-700">Attached Documents:</p>
+                {formData.certificates.length > 0 ? (
+                  <div className="max-h-60 space-y-2 overflow-y-auto pr-1 lg:max-h-[400px]">
+                    {formData.certificates.map((url, index) => (
+                      <div
+                        key={index}
+                        className="flex w-full items-center justify-between rounded border border-green-200 bg-white p-2"
+                      >
+                        <div className="flex items-center gap-2 overflow-hidden">
+                          <FileText className="h-5 w-5 flex-shrink-0 text-green-600" />
+                          <button
+                            type="button"
+                            onClick={() => handleViewDocument(url)}
+                            className="max-w-[150px] truncate text-xs text-gray-600 font-medium hover:text-blue-600 hover:underline text-left bg-transparent border-0 p-0 cursor-pointer"
+                            title={getFileNameFromUrl(url)}
+                          >
+                            {getFileNameFromUrl(url)}
+                          </button>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleRemoveFile(index)}
+                          className="h-7 w-7 hover:bg-red-50 hover:text-red-600"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="py-8 text-center">
+                    <p className="text-sm text-gray-500">No documents attached</p>
+                  </div>
+                )}
               </div>
-              <p className="text-xs text-gray-500">
-                When enabled, no expiry date will be set for this training cycle.
-              </p>
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label>Expiry Date</Label>
-            <Input
-              value={isReassignOptional ? 'No Expiry Required' : predictedExpiry}
-              disabled
-              className={cn(
-                'cursor-not-allowed',
-                isReassignOptional ? 'bg-gray-50 text-gray-400' : 'bg-gray-100 text-gray-600'
-              )}
-              placeholder={
-                isReassignOptional ? 'Not applicable' : 'Select assigned date to see expiry'
+          <DialogFooter className="flex-col gap-2 sm:flex-row">
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveDialog}
+              className={
+                dialogMode === 'complete' ? 'bg-green-600 text-white hover:bg-green-700' : ''
               }
-            />
+              disabled={isUploading || !formData.assignedDate}
+            >
+              {dialogMode === 'complete' ? 'Confirm Completion' : 'Save Changes'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* --- RE-ASSIGN DIALOG --- */}
+      <Dialog
+        open={isReassignOpen}
+        onOpenChange={(open) => {
+          if (!open) setReassignDate(null);
+          setIsReassignOpen(open);
+        }}
+      >
+        <DialogContent className="w-full sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Re-assign Course</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-gray-600">
+              Start a new training cycle for{' '}
+              <span className="font-semibold">{trainingRecord.employeeId.firstName}</span>.
+            </p>
+
+            <div className="flex flex-col space-y-2">
+              <Label className="mb-1">
+                New Assigned Date <span className="text-red-500">*</span>
+              </Label>
+              <DatePicker
+                selected={reassignDate}
+                onChange={(date) => setReassignDate(date)}
+                minDate={minReassignDate}
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+                dateFormat="dd-MM-yyyy"
+                placeholderText="Select start date"
+                showMonthDropdown
+                showYearDropdown
+                preventOpenOnFocus
+              />
+            </div>
+
+            {/* Optional Training Checkbox in Reassign Dialog */}
+            <div className="flex items-start space-x-3 rounded-lg border border-gray-200 bg-gray-50/50 p-4">
+              <Checkbox
+                id="isReassignOptional"
+                checked={isReassignOptional}
+                onCheckedChange={(checked) => {
+                  setIsReassignOptional(checked === true);
+                }}
+                className="mt-1"
+              />
+              <div className="grid gap-1.5 leading-none">
+                <div className="flex items-center gap-2">
+                  <Label
+                    htmlFor="isReassignOptional"
+                    className="cursor-pointer text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    Expiry Date Is Optional
+                  </Label>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-4 w-4 cursor-help text-gray-400" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="text-xs">
+                          Enable this option if the re-assigned training does not require an
+                          expiration date.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+                <p className="text-xs text-gray-500">
+                  When enabled, no expiry date will be set for this training cycle.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Expiry Date</Label>
+              <Input
+                value={isReassignOptional ? 'No Expiry Required' : predictedExpiry}
+                disabled
+                className={cn(
+                  'cursor-not-allowed',
+                  isReassignOptional ? 'bg-gray-50 text-gray-400' : 'bg-gray-100 text-gray-600'
+                )}
+                placeholder={
+                  isReassignOptional ? 'Not applicable' : 'Select assigned date to see expiry'
+                }
+              />
+            </div>
           </div>
-        </div>
-        <DialogFooter className="flex-col gap-2 sm:flex-row">
-          <Button variant="outline" onClick={() => setIsReassignOpen(false)}>
-            Cancel
-          </Button>
-          <Button onClick={handleReassign} disabled={!reassignDate}>
-            Confirm Re-assign
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  </div>
-);
+          <DialogFooter className="flex-col gap-2 sm:flex-row">
+            <Button variant="outline" onClick={() => setIsReassignOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleReassign} disabled={!reassignDate}>
+              Confirm Re-assign
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* --- PREVIEW DIALOG --- */}
+      <Dialog open={isPreviewDialogOpen} onOpenChange={setIsPreviewDialogOpen}>
+        <DialogContent className="max-w-4xl h-[85vh] flex flex-col p-0 gap-0 overflow-hidden sm:rounded-xl">
+          <div className="flex items-center justify-between border-b px-6 py-4 bg-white z-10">
+            <div>
+              <DialogTitle className="text-lg font-semibold text-gray-900">Document Preview</DialogTitle>
+              <DialogDescription className="mt-1 text-xs text-gray-500 truncate max-w-sm">
+                {previewUrl?.split('/').pop()?.split('?')[0] || 'Unknown Document'}
+              </DialogDescription>
+            </div>
+            <div className="flex items-center gap-3">
+              <Button
+                onClick={() => previewUrl && handleForceDownload(previewUrl)}
+                className="bg-theme text-white hover:bg-theme/90 shadow-sm"
+                size="sm"
+              >
+                <Download className="mr-2 h-4 w-4" /> Download
+              </Button>
+              <Button size="sm" variant={'outline'} onClick={() => setIsPreviewDialogOpen(false)}>
+                Close
+              </Button>
+            </div>
+          </div>
+          
+          <div className="flex-1 bg-gray-100 p-4 flex flex-col items-center justify-center overflow-auto relative">
+            {renderPreviewContent()}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
 };
 
 export default TrainingDetailsPage;

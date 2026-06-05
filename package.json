@@ -60,6 +60,7 @@
     "clsx": "^2.1.0",
     "cmdk": "^1.0.0",
     "date-fns": "^3.6.0",
+    "docx-preview": "^0.3.7",
     "embla-carousel-react": "^8.0.0",
     "filepond-plugin-file-validate-size": "^2.2.8",
     "firebase": "^11.0.2",

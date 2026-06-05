@@ -14,13 +14,15 @@ import {
   Pencil,
   X,
   Calendar,
-  CalendarIcon
+  CalendarIcon,
+  Download, // Added for preview actions
+  Eye
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
+  DialogDescription, // Added for snippet layout context
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -85,6 +87,10 @@ export default function SickNoteTab() {
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
 
+  // Preview Dialog State
+  const [isPreviewDialogOpen, setIsPreviewDialogOpen] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
   // File Upload State (Multiple)
   const [uploadedDocs, setUploadedDocs] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -138,6 +144,43 @@ export default function SickNoteTab() {
     setUploadedDocs(record.documents || []);
     setUploadError(null);
     setIsDialogOpen(true);
+  };
+
+  const handleViewDocument = (url: string) => {
+    setPreviewUrl(url);
+    setIsPreviewDialogOpen(true);
+  };
+
+  // Robust Force Download Mechanism
+  const handleForceDownload = async (url: string) => {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("Network response was not ok");
+      
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+
+      let fileName = url.split('/').pop() || 'document_download';
+      fileName = fileName.split('?')[0];
+
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+      
+      link.parentNode?.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error('Blob fetch failed, falling back to direct anchor download', error);
+      const fallbackLink = document.createElement('a');
+      fallbackLink.href = url;
+      fallbackLink.setAttribute('download', '');
+      fallbackLink.setAttribute('target', '_blank');
+      document.body.appendChild(fallbackLink);
+      fallbackLink.click();
+      document.body.removeChild(fallbackLink);
+    }
   };
 
   const handleMultipleFilesUpload = async (
@@ -228,6 +271,61 @@ export default function SickNoteTab() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // Helper to render appropriate viewer inside dialog
+  const renderPreviewContent = () => {
+    if (!previewUrl) return null;
+
+    const lowerUrl = previewUrl.toLowerCase();
+    const isImage = lowerUrl.match(/\.(jpeg|jpg|gif|png|webp)(\?.*)?$/) != null;
+    const isPdf = lowerUrl.match(/\.(pdf)(\?.*)?$/) != null;
+    const isWord = lowerUrl.match(/\.(docx|doc)(\?.*)?$/) != null;
+
+    if (isImage) {
+      return (
+        <img 
+          src={previewUrl} 
+          alt="Document Preview" 
+          className="max-h-full max-w-full object-contain rounded-md shadow-sm" 
+        />
+      );
+    }
+
+    if (isWord) {
+      // Encodes the document's cloud URL into Microsoft's official high-fidelity web viewer iframe format
+      const officeViewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(previewUrl)}`;
+      return (
+        <iframe 
+          src={officeViewerUrl} 
+          className="w-full h-full border-0 rounded-md shadow-sm" 
+          title="Word Document Preview" 
+        />
+      );
+    }
+
+    if (isPdf) {
+      return (
+        <iframe 
+          src={`${previewUrl}#toolbar=0&navpanes=0&scrollbar=0`} 
+          className="w-full h-full border-0 rounded-md shadow-sm" 
+          title="PDF Preview" 
+        />
+      );
+    }
+
+    return (
+      <div className="flex flex-col items-center justify-center text-center p-8 bg-white rounded-lg shadow-sm border border-gray-200">
+        <FileText className="h-16 w-16 text-gray-400 mb-4" />
+        <h3 className="text-lg font-medium text-gray-900">Preview not available</h3>
+        <p className="text-sm text-gray-500 mt-2 mb-6">
+          This file format cannot be safely previewed in the browser.
+        </p>
+        <Button onClick={() => handleForceDownload(previewUrl)} className="bg-theme hover:bg-theme/90 text-white">
+          <Download className="mr-2 h-4 w-4" /> Download to View
+        </Button>
+      </div>
+    );
   };
 
   return (
@@ -379,15 +477,14 @@ export default function SickNoteTab() {
                           className="flex items-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-1.5 shadow-sm"
                         >
                           <FileText className="h-4 w-4 shrink-0 text-emerald-600" />
-                          <a
-                            href={docUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="max-w-[150px] truncate text-xs font-medium text-gray-700 hover:underline"
+                          <button
+                            type="button"
+                            onClick={() => handleViewDocument(docUrl)}
+                            className="max-w-[150px] truncate text-xs font-medium text-gray-700 hover:underline text-left"
                             title={getFileNameFromUrl(docUrl)}
                           >
                             {getFileNameFromUrl(docUrl)}
-                          </a>
+                          </button>
                           <button
                             type="button"
                             onClick={(e) => {
@@ -502,19 +599,18 @@ export default function SickNoteTab() {
                     {noteRecord.documents && noteRecord.documents.length > 0 ? (
                       <div className="flex flex-wrap gap-2">
                         {noteRecord.documents.map((docUrl, index) => (
-                          <a
+                          <button
                             key={index}
-                            href={docUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex max-w-[150px] items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100"
+                            type="button"
+                            onClick={() => handleViewDocument(docUrl)}
+                            className="inline-flex max-w-[150px] items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100 text-left"
                             title={getFileNameFromUrl(docUrl)}
                           >
                             <FileText className="h-3 w-3 shrink-0" />
                             <span className="truncate">
                               {getFileNameFromUrl(docUrl)}
                             </span>
-                          </a>
+                          </button>
                         ))}
                       </div>
                     ) : (
@@ -551,6 +647,36 @@ export default function SickNoteTab() {
           </div>
         )}
       </div>
+
+      {/* Document Preview Dialog Component */}
+      <Dialog open={isPreviewDialogOpen} onOpenChange={setIsPreviewDialogOpen}>
+        <DialogContent className="max-w-4xl h-[85vh] flex flex-col p-0 gap-0 overflow-hidden sm:rounded-xl">
+          <div className="flex items-center justify-between border-b px-6 py-4 bg-white z-10">
+            <div>
+              <DialogTitle className="text-lg font-semibold text-gray-900">Document Preview</DialogTitle>
+              <DialogDescription className="mt-1 text-xs text-gray-500 truncate max-w-sm">
+                {previewUrl?.split('/').pop()?.split('?')[0] || 'Unknown Document'}
+              </DialogDescription>
+            </div>
+            <div className="flex items-center gap-3">
+              <Button
+                onClick={() => previewUrl && handleForceDownload(previewUrl)}
+                className="bg-theme text-white hover:bg-theme/90 shadow-sm"
+                size="sm"
+              >
+                <Download className="mr-2 h-4 w-4" /> Download
+              </Button>
+              <Button size="sm" variant={'outline'} onClick={() => setIsPreviewDialogOpen(false)}>
+                Close
+              </Button>
+            </div>
+          </div>
+          
+          <div className="flex-1 bg-gray-100 p-4 flex flex-col items-center justify-center overflow-auto relative">
+            {renderPreviewContent()}
+          </div>
+        </DialogContent>
+      </Dialog> 
     </div>
   );
 }
