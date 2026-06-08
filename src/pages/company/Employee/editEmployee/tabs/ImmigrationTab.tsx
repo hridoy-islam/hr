@@ -1,6 +1,6 @@
 import type React from 'react';
 import { useEffect, useState, useRef } from 'react';
-import { Calendar, FileText, Upload, X, Eye, History, AlertCircle, Download } from 'lucide-react';
+import { Calendar, FileText, Upload, X, Eye, History, AlertCircle, Download, Pen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
@@ -88,6 +88,16 @@ function ImmigrationTab() {
   // Preview Dialog State
   const [isPreviewDialogOpen, setIsPreviewDialogOpen] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  // Log Edit State
+  const [showEditLogModal, setShowEditLogModal] = useState(false);
+  const [editingLog, setEditingLog] = useState<HistoryEntry | null>(null);
+  const [editLogFiles, setEditLogFiles] = useState<UploadedFile[]>([]);
+  const [editLogRemovedUrls, setEditLogRemovedUrls] = useState<string[]>([]);
+  const [isEditLogSubmitting, setIsEditLogSubmitting] = useState(false);
+  const [showRemoveWarning, setShowRemoveWarning] = useState(false);
+  const [pendingRemoveIndex, setPendingRemoveIndex] = useState<{ type: 'existing' | 'new'; index: number } | null>(null);
+  const editFileInputRef = useRef<HTMLInputElement>(null);
 
   const handleViewDocument = (url: string) => {
     setPreviewUrl(url);
@@ -287,6 +297,110 @@ function ImmigrationTab() {
     }
   }, [currentCheckDate, checkInterval, userData]);
 
+  const openEditLogModal = (entry: HistoryEntry) => {
+    setEditingLog(entry);
+    setEditLogFiles([]);
+    setEditLogRemovedUrls([]);
+    setShowEditLogModal(true);
+  };
+
+  const handleEditLogFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    if (!files.length) return;
+
+    for (const file of files) {
+      if (file.size > 20 * 1024 * 1024) {
+        setUploadError(`File too large: ${file.name}. Must be less than 20MB.`);
+        return;
+      }
+    }
+
+    setIsUploading(true);
+    setUploadError(null);
+
+    try {
+      const uploadPromises = files.map(async (file) => {
+        const formData = new FormData();
+        formData.append('entityId', user._id);
+        formData.append('file_type', 'document');
+        formData.append('file', file);
+
+        const res = await axiosInstance.post('/documents', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        return { name: file.name, url: res.data?.data?.fileUrl };
+      });
+
+      const results = await Promise.all(uploadPromises);
+      setEditLogFiles((prev) => [...prev, ...results]);
+    } catch {
+      setUploadError('Failed to upload one or more documents.');
+    } finally {
+      setIsUploading(false);
+      if (editFileInputRef.current) editFileInputRef.current.value = '';
+    }
+  };
+
+  const requestRemoveDocument = (type: 'existing' | 'new', index: number) => {
+    setPendingRemoveIndex({ type, index });
+    setShowRemoveWarning(true);
+  };
+
+  const confirmRemoveDocument = () => {
+    if (!pendingRemoveIndex) return;
+
+    if (pendingRemoveIndex.type === 'existing' && editingLog) {
+      const existingDocs = Array.isArray(editingLog.document)
+        ? editingLog.document
+        : editingLog.document
+        ? [editingLog.document]
+        : [];
+      const urlToRemove = existingDocs[pendingRemoveIndex.index];
+      setEditLogRemovedUrls((prev) => [...prev, urlToRemove]);
+      setEditingLog({
+        ...editingLog,
+        document: existingDocs.filter((_, i) => i !== pendingRemoveIndex.index)
+      });
+    } else if (pendingRemoveIndex.type === 'new') {
+      setEditLogFiles((prev) => prev.filter((_, i) => i !== pendingRemoveIndex.index));
+    }
+
+    setShowRemoveWarning(false);
+    setPendingRemoveIndex(null);
+  };
+
+  const handleSubmitEditLog = async () => {
+    if (!immigrationId || !editingLog) return;
+
+    setIsEditLogSubmitting(true);
+
+    const existingDocs = Array.isArray(editingLog.document)
+      ? editingLog.document
+      : editingLog.document
+      ? [editingLog.document]
+      : [];
+
+    const finalDocuments = [...existingDocs, ...editLogFiles.map((f) => f.url)];
+
+    try {
+      await axiosInstance.patch(`/immigration/${immigrationId}/logs/${editingLog._id}`, {
+        document: finalDocuments
+      });
+
+      await fetchImmigrationData();
+      toast({ title: 'Log document updated successfully!', className: 'bg-theme text-white' });
+      setShowEditLogModal(false);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (err: any) {
+      toast({
+        title: err.response?.data?.message || 'Update failed.',
+        className: 'bg-destructive text-white'
+      });
+    } finally {
+      setIsEditLogSubmitting(false);
+    }
+  };
+
   const getStatusBadge = () => {
     switch (complianceStatus) {
       case 'no-check-required':
@@ -380,8 +494,13 @@ function ImmigrationTab() {
       updatedBy: user._id,
       document: uploadedFiles.map(f => f.url), // Array of URLs
       title: uploadedFiles.map(f => f.name).join(', ') || 'Immigration Status Check Updated',
-      nextCheckDate: moment(newCheckDate).toISOString()
-    };
+nextCheckDate: new Date(
+  Date.UTC(
+    newCheckDate!.getFullYear(),
+    newCheckDate!.getMonth(),
+    newCheckDate!.getDate()
+  )
+).toISOString(),    };
 
     if (!immigrationId && eid) {
       payload.employeeId = eid;
@@ -479,7 +598,7 @@ function ImmigrationTab() {
                   <TableRow>
                     <TableHead>Activity</TableHead>
                     <TableHead>Updated By</TableHead>
-                    <TableHead className="text-right">Document(s)</TableHead>
+                    <TableHead className="text-right">Actions / Document(s)</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -524,7 +643,10 @@ function ImmigrationTab() {
                           </TableCell>
 
                           <TableCell className="text-right">
-                            <div className="flex flex-col items-end gap-1">
+                            <div className="flex items-center justify-end gap-2">
+                              {/* Edit Action Button */}
+                            
+                              <div className="flex flex-col items-end gap-1">
                               {/* Handle array formats */}
                               {Array.isArray(entry.document) && entry.document.length > 0 ? (
                                 entry.document.map((docUrl, idx) => (
@@ -552,6 +674,15 @@ function ImmigrationTab() {
                               ) : (
                                 <span className="text-gray-300">-</span>
                               )}
+                              </div>
+                                <Button
+                                variant="outline"
+                                size="icon"
+                                onClick={() => openEditLogModal(entry)}
+                              >
+                                <Pen className="h-4 w-4" />
+                              </Button>
+
                             </div>
                           </TableCell>
                         </TableRow>
@@ -589,7 +720,7 @@ function ImmigrationTab() {
             {/* Date Input */}
             <div className="flex flex-col space-y-2">
               <Label className="text-sm font-medium text-gray-700">
-                New Next Check Date <span className="text-red-500">*</span>
+                New Next Check Date (DD-MM-YYYY)<span className="text-red-500">*</span>
               </Label>
               <DatePicker
                 selected={newCheckDate}
@@ -606,6 +737,14 @@ function ImmigrationTab() {
                     : new Date()
                 }
                 preventOpenOnFocus
+                
+ onKeyDown={(e) => {
+    const input = e.target as HTMLInputElement;
+    const allowed = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'];
+    if (allowed.includes(e.key)) return;
+    if (!/[\d-]/.test(e.key)) { e.preventDefault(); return; }
+    if (input.value.length >= 10) e.preventDefault();
+  }}
               />
             </div>
 
@@ -695,6 +834,139 @@ function ImmigrationTab() {
               }
             >
               {isSubmitting ? 'Saving...' : 'Update'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Log Document Dialog */}
+      <Dialog open={showEditLogModal} onOpenChange={setShowEditLogModal}>
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Edit Log Document</DialogTitle>
+            <DialogDescription className="text-sm ">
+              {editingLog?.title}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-5 py-4">
+            {/* Existing Documents */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-gray-700">Current Documents</Label>
+              {(() => {
+                const existingDocs = Array.isArray(editingLog?.document)
+                  ? editingLog!.document
+                  : editingLog?.document
+                  ? [editingLog.document]
+                  : [];
+
+                return existingDocs.length > 0 ? (
+                  <div className="space-y-2">
+                    {existingDocs.map((docUrl, idx) => (
+                      <div key={idx} className="flex items-center justify-between rounded-md border border-gray-200 bg-gray-50 p-2">
+                        <div className="flex items-center gap-2 overflow-hidden">
+                          <FileText className="h-4 w-4 flex-shrink-0 text-gray-500" />
+                          <span className="truncate text-xs text-gray-700" title={docUrl}>
+                            {decodeURIComponent(docUrl.split('/').pop()?.split('?')[0] || `Document ${idx + 1}`)}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleViewDocument(docUrl)}>
+                            <Eye className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-7 w-7 hover:bg-red-100 hover:text-red-600" onClick={() => requestRemoveDocument('existing', idx)}>
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs italic text-gray-400">No documents attached.</p>
+                );
+              })()}
+            </div>
+
+            {/* Newly Uploaded Documents */}
+            {editLogFiles.length > 0 && (
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-gray-700">New Documents</Label>
+                <div className="space-y-2">
+                  {editLogFiles.map((file, idx) => (
+                    <div key={idx} className="flex items-center justify-between rounded-md border border-green-200 bg-green-50 p-2">
+                      <div className="flex items-center gap-2 overflow-hidden">
+                        <FileText className="h-4 w-4 flex-shrink-0 text-green-600" />
+                        <span className="truncate text-xs font-medium text-green-700">{file.name}</span>
+                      </div>
+                      <Button size="icon" variant="ghost" className="h-7 w-7 flex-shrink-0 hover:bg-red-100 hover:text-red-600" onClick={() => requestRemoveDocument('new', idx)}>
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Upload Zone */}
+            <div
+              className={cn(
+                'relative flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-5 transition-colors',
+                isUploading ? 'border-blue-500 bg-blue-50' : 'border-gray-300 bg-gray-50 hover:bg-gray-100'
+              )}
+            >
+              <input
+                ref={editFileInputRef}
+                type="file"
+                multiple
+                onChange={handleEditLogFileSelect}
+                className="absolute inset-0 cursor-pointer opacity-0"
+                disabled={isUploading}
+              />
+              {isUploading ? (
+                <div className="flex flex-col items-center gap-2">
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+                  <p className="text-xs text-blue-600">Uploading...</p>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-1 text-center">
+                  <Upload className="h-6 w-6 text-gray-400" />
+                  <span className="text-sm font-medium text-gray-600">Add Documents</span>
+                  <span className="text-xs text-gray-400">PDF/Images (Max 20MB each)</span>
+                </div>
+              )}
+            </div>
+
+            {uploadError && <p className="text-xs text-red-500">{uploadError}</p>}
+          </div>
+
+          <DialogFooter className="gap-2 sm:justify-end">
+            <Button variant="outline" onClick={() => setShowEditLogModal(false)} disabled={isEditLogSubmitting || isUploading}>
+              Cancel
+            </Button>
+            <Button className="bg-theme hover:bg-theme/90 text-white" onClick={handleSubmitEditLog} disabled={isEditLogSubmitting || isUploading}>
+              {isEditLogSubmitting ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Remove Warning Dialog */}
+      <Dialog open={showRemoveWarning} onOpenChange={setShowRemoveWarning}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertCircle className="h-5 w-5" /> Remove Document?
+            </DialogTitle>
+            <DialogDescription className="text-sm text-gray-600 pt-1">
+              This document will be permanently removed and <span className="font-semibold text-gray-800">cannot be retrieved</span> once saved. Are you sure you want to continue?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:justify-end pt-2">
+            <Button variant="outline" onClick={() => { setShowRemoveWarning(false); setPendingRemoveIndex(null); }}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmRemoveDocument}>
+              Yes, Remove
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -1,4 +1,4 @@
-import type React from 'react';
+import React from 'react';
 import { useEffect, useState, useRef } from 'react';
 import {
   Calendar,
@@ -8,7 +8,8 @@ import {
   Eye,
   History,
   AlertCircle,
-  Download // Imported for the download features in the preview modal
+  Download, // Imported for the download features in the preview modal
+  Pen
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import DatePicker from 'react-datepicker';
@@ -99,13 +100,23 @@ function RightToWorkTab() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
+  const [showEditLogModal, setShowEditLogModal] = useState(false);
+  const [editingLog, setEditingLog] = useState<HistoryEntry | null>(null);
+  const [editLogFiles, setEditLogFiles] = useState<UploadedFile[]>([]);
+  const [editLogRemovedUrls, setEditLogRemovedUrls] = useState<string[]>([]);
+  const [isEditLogSubmitting, setIsEditLogSubmitting] = useState(false);
+  const [showRemoveWarning, setShowRemoveWarning] = useState(false);
+  const [pendingRemoveIndex, setPendingRemoveIndex] = useState<{
+    type: 'existing' | 'new';
+    index: number;
+  } | null>(null);
+  const editFileInputRef = useRef<HTMLInputElement>(null);
+
   // 1. Fetch Schedule Settings
   const fetchScheduleSettings = async () => {
     if (!id) return;
     try {
-      const res = await axiosInstance.get(
-        `/schedule-check?companyId=${id}`
-      );
+      const res = await axiosInstance.get(`/schedule-check?companyId=${id}`);
       const result = res.data?.data?.result;
       if (result && result.length > 0) {
         setCheckInterval(result[0].rtwCheckDate || 30);
@@ -163,8 +174,8 @@ function RightToWorkTab() {
     const loadData = async () => {
       setIsLoading(true);
       await Promise.all([
-        fetchScheduleSettings(), 
-        fetchRTWData(), 
+        fetchScheduleSettings(),
+        fetchRTWData(),
         fetchUserData()
       ]);
       setIsLoading(false);
@@ -204,6 +215,119 @@ function RightToWorkTab() {
     }
   }, [currentCheckDate, checkInterval, userData]);
 
+  const openEditLogModal = (entry: HistoryEntry) => {
+    setEditingLog(entry);
+    setEditLogFiles([]);
+    setEditLogRemovedUrls([]);
+    setShowEditLogModal(true);
+  };
+
+  const handleEditLogFileSelect = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const files = Array.from(event.target.files || []);
+    if (!files.length) return;
+
+    for (const file of files) {
+      if (file.size > 20 * 1024 * 1024) {
+        setUploadError(`File too large: ${file.name}. Must be less than 20MB.`);
+        return;
+      }
+    }
+
+    setIsUploading(true);
+    setUploadError(null);
+
+    try {
+      const uploadPromises = files.map(async (file) => {
+        const formData = new FormData();
+        formData.append('entityId', user._id);
+        formData.append('file_type', 'document');
+        formData.append('file', file);
+
+        const res = await axiosInstance.post('/documents', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        return { name: file.name, url: res.data?.data?.fileUrl };
+      });
+
+      const results = await Promise.all(uploadPromises);
+      setEditLogFiles((prev) => [...prev, ...results]);
+    } catch {
+      setUploadError('Failed to upload one or more documents.');
+    } finally {
+      setIsUploading(false);
+      if (editFileInputRef.current) editFileInputRef.current.value = '';
+    }
+  };
+
+  const requestRemoveDocument = (type: 'existing' | 'new', index: number) => {
+    setPendingRemoveIndex({ type, index });
+    setShowRemoveWarning(true);
+  };
+
+  const confirmRemoveDocument = () => {
+    if (!pendingRemoveIndex) return;
+
+    if (pendingRemoveIndex.type === 'existing' && editingLog) {
+      const existingDocs = Array.isArray(editingLog.document)
+        ? editingLog.document
+        : editingLog.document
+          ? [editingLog.document]
+          : [];
+      const urlToRemove = existingDocs[pendingRemoveIndex.index];
+      setEditLogRemovedUrls((prev) => [...prev, urlToRemove]);
+      setEditingLog({
+        ...editingLog,
+        document: existingDocs.filter((_, i) => i !== pendingRemoveIndex.index)
+      });
+    } else if (pendingRemoveIndex.type === 'new') {
+      setEditLogFiles((prev) =>
+        prev.filter((_, i) => i !== pendingRemoveIndex.index)
+      );
+    }
+
+    setShowRemoveWarning(false);
+    setPendingRemoveIndex(null);
+  };
+
+  const handleSubmitEditLog = async () => {
+    if (!rtwId || !editingLog) return;
+
+    setIsEditLogSubmitting(true);
+
+    const existingDocs = Array.isArray(editingLog.document)
+      ? editingLog.document
+      : editingLog.document
+        ? [editingLog.document]
+        : [];
+
+    const finalDocuments = [...existingDocs, ...editLogFiles.map((f) => f.url)];
+
+    try {
+      await axiosInstance.patch(
+        `/hr/right-to-work/${rtwId}/logs/${editingLog._id}`,
+        {
+          document: finalDocuments
+        }
+      );
+
+      await fetchRTWData();
+      toast({
+        title: 'Log document updated successfully!',
+        className: 'bg-theme text-white'
+      });
+      setShowEditLogModal(false);
+    } catch (err: any) {
+      toast({
+        title: err.response?.data?.message || 'Update failed.',
+        className: 'bg-destructive text-white'
+      });
+    } finally {
+      setIsEditLogSubmitting(false);
+    }
+  };
+
   const getStatusBadge = () => {
     switch (complianceStatus) {
       case 'no-check-required':
@@ -236,12 +360,14 @@ function RightToWorkTab() {
   };
 
   // File Upload Logic
-  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const files = Array.from(event.target.files || []);
     if (!files.length || !eid) return;
 
     const validTypes = ['application/pdf', 'image/jpeg', 'image/png'];
-    
+
     // Validate all files first
     for (const file of files) {
       if (file.size > 20 * 1024 * 1024) {
@@ -277,7 +403,9 @@ function RightToWorkTab() {
   };
 
   const handleRemoveFile = (indexToRemove: number) => {
-    setUploadedFiles((prev) => prev.filter((_, index) => index !== indexToRemove));
+    setUploadedFiles((prev) =>
+      prev.filter((_, index) => index !== indexToRemove)
+    );
   };
 
   const openUpdateModal = () => {
@@ -297,8 +425,8 @@ function RightToWorkTab() {
   const handleForceDownload = async (url: string) => {
     try {
       const response = await fetch(url);
-      if (!response.ok) throw new Error("Network response was not ok");
-      
+      if (!response.ok) throw new Error('Network response was not ok');
+
       const blob = await response.blob();
       const blobUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -310,11 +438,14 @@ function RightToWorkTab() {
       link.setAttribute('download', fileName);
       document.body.appendChild(link);
       link.click();
-      
+
       link.parentNode?.removeChild(link);
       window.URL.revokeObjectURL(blobUrl);
     } catch (error) {
-      console.error('Blob fetch failed, falling back to direct anchor download', error);
+      console.error(
+        'Blob fetch failed, falling back to direct anchor download',
+        error
+      );
       const fallbackLink = document.createElement('a');
       fallbackLink.href = url;
       fallbackLink.setAttribute('download', '');
@@ -336,10 +467,10 @@ function RightToWorkTab() {
 
     if (isImage) {
       return (
-        <img 
-          src={previewUrl} 
-          alt="Document Preview" 
-          className="max-h-full max-w-full object-contain rounded-md shadow-sm" 
+        <img
+          src={previewUrl}
+          alt="Document Preview"
+          className="max-h-full max-w-full rounded-md object-contain shadow-sm"
         />
       );
     }
@@ -348,32 +479,37 @@ function RightToWorkTab() {
       // Encodes the document's cloud URL into Microsoft's official high-fidelity web viewer iframe format
       const officeViewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(previewUrl)}`;
       return (
-        <iframe 
-          src={officeViewerUrl} 
-          className="w-full h-full border-0 rounded-md shadow-sm" 
-          title="Word Document Preview" 
+        <iframe
+          src={officeViewerUrl}
+          className="h-full w-full rounded-md border-0 shadow-sm"
+          title="Word Document Preview"
         />
       );
     }
 
     if (isPdf) {
       return (
-        <iframe 
-          src={`${previewUrl}#toolbar=0&navpanes=0&scrollbar=0`} 
-          className="w-full h-full border-0 rounded-md shadow-sm" 
-          title="PDF Preview" 
+        <iframe
+          src={`${previewUrl}#toolbar=0&navpanes=0&scrollbar=0`}
+          className="h-full w-full rounded-md border-0 shadow-sm"
+          title="PDF Preview"
         />
       );
     }
 
     return (
-      <div className="flex flex-col items-center justify-center text-center p-8 bg-white rounded-lg shadow-sm border border-gray-200">
-        <FileText className="h-16 w-16 text-gray-400 mb-4" />
-        <h3 className="text-lg font-medium text-gray-900">Preview not available</h3>
-        <p className="text-sm text-gray-500 mt-2 mb-6">
+      <div className="flex flex-col items-center justify-center rounded-lg border border-gray-200 bg-white p-8 text-center shadow-sm">
+        <FileText className="mb-4 h-16 w-16 text-gray-400" />
+        <h3 className="text-lg font-medium text-gray-900">
+          Preview not available
+        </h3>
+        <p className="mb-6 mt-2 text-sm text-gray-500">
           This file format cannot be safely previewed in the browser.
         </p>
-        <Button onClick={() => handleForceDownload(previewUrl)} className="bg-theme hover:bg-theme/90 text-white">
+        <Button
+          onClick={() => handleForceDownload(previewUrl)}
+          className="bg-theme text-white hover:bg-theme/90"
+        >
           <Download className="mr-2 h-4 w-4" /> Download to View
         </Button>
       </div>
@@ -391,7 +527,13 @@ function RightToWorkTab() {
       updatedBy: user._id,
       document: uploadedFiles.map((f) => f.url),
       title: 'Right to Work Check',
-      nextCheckDate: moment(newCheckDate).toISOString()
+      nextCheckDate: new Date(
+        Date.UTC(
+          newCheckDate!.getFullYear(),
+          newCheckDate!.getMonth(),
+          newCheckDate!.getDate()
+        )
+      ).toISOString()
     };
 
     if (!rtwId && eid) {
@@ -410,7 +552,7 @@ function RightToWorkTab() {
         className: 'bg-theme text-white'
       });
       setShowUpdateModal(false);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       console.error(err);
       toast({
@@ -430,6 +572,43 @@ function RightToWorkTab() {
     );
   }
 
+  const MaskedDateInput = React.forwardRef<
+    HTMLInputElement,
+    React.InputHTMLAttributes<HTMLInputElement>
+  >(({ value, onChange, onClick, onFocus, onBlur, placeholder }, ref) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      let raw = e.target.value.replace(/[^\d]/g, '').slice(0, 8);
+      let masked = raw;
+
+      if (raw.length > 2) masked = raw.slice(0, 2) + '-' + raw.slice(2);
+      if (raw.length > 4)
+        masked = raw.slice(0, 2) + '-' + raw.slice(2, 4) + '-' + raw.slice(4);
+
+      const syntheticEvent = {
+        ...e,
+        target: { ...e.target, value: masked }
+      } as React.ChangeEvent<HTMLInputElement>;
+
+      onChange?.(syntheticEvent);
+    };
+
+    return (
+      <input
+        ref={ref}
+        value={value}
+        onChange={handleChange}
+        onClick={onClick}
+        onFocus={onFocus}
+        onBlur={onBlur}
+        placeholder={placeholder ?? 'dd-mm-yyyy'}
+        maxLength={10}
+        className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+      />
+    );
+  });
+
+  MaskedDateInput.displayName = 'MaskedDateInput';
+
   return (
     <div className=" ">
       <div className="grid grid-cols-1 gap-2 lg:grid-cols-3">
@@ -437,7 +616,7 @@ function RightToWorkTab() {
         <div className="lg:col-span-1">
           <div className="h-auto rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
             <h2 className="mb-6 flex items-center gap-2 text-xl font-semibold text-gray-900">
-              <Calendar className="text-theme h-5 w-5" />
+              <Calendar className="h-5 w-5 text-theme" />
               RTW Status
             </h2>
 
@@ -448,11 +627,11 @@ function RightToWorkTab() {
                   RTW Next Check Date
                 </Label>
                 <div className="text-2xl font-bold text-gray-900">
-                  {userData?.noRtwCheck 
-                    ? 'N/A' 
+                  {userData?.noRtwCheck
+                    ? 'N/A'
                     : currentCheckDate
-                    ? moment(currentCheckDate).format('DD MMMM YYYY')
-                    : 'Not Set'}
+                      ? moment(currentCheckDate).format('DD MMMM YYYY')
+                      : 'Not Set'}
                 </div>
 
                 <div className="pt-1">{getStatusBadge()}</div>
@@ -464,13 +643,15 @@ function RightToWorkTab() {
                   onClick={openUpdateModal}
                   disabled={userData?.noRtwCheck}
                   className={cn(
-                    "w-full text-white",
-                    userData?.noRtwCheck 
-                      ? "bg-gray-300 hover:bg-gray-300 cursor-not-allowed" 
-                      : "bg-theme hover:bg-theme/90"
+                    'w-full text-white',
+                    userData?.noRtwCheck
+                      ? 'cursor-not-allowed bg-gray-300 hover:bg-gray-300'
+                      : 'bg-theme hover:bg-theme/90'
                   )}
                 >
-                  {userData?.noRtwCheck ? 'Update Not Required' : 'Update Next Check Date'}
+                  {userData?.noRtwCheck
+                    ? 'Update Not Required'
+                    : 'Update Next Check Date'}
                 </Button>
               </div>
             </div>
@@ -481,7 +662,7 @@ function RightToWorkTab() {
         <div className="lg:col-span-2">
           <div className=" rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
             <h2 className="mb-6 flex items-center gap-2 text-xl font-semibold text-gray-900">
-              <History className="text-theme h-5 w-5" />
+              <History className="h-5 w-5 text-theme" />
               History Log
             </h2>
 
@@ -538,7 +719,8 @@ function RightToWorkTab() {
                           <TableCell className="text-right">
                             <div className="flex flex-col items-end gap-1">
                               {/* Handle array format */}
-                              {Array.isArray(entry.document) && entry.document.length > 0 ? (
+                              {Array.isArray(entry.document) &&
+                              entry.document.length > 0 ? (
                                 entry.document.map((docUrl, idx) => (
                                   <Button
                                     key={idx}
@@ -547,16 +729,19 @@ function RightToWorkTab() {
                                     onClick={() => handleViewDocument(docUrl)}
                                   >
                                     <Eye className="mr-2 h-4 w-4" />
-                                    Document {entry.document!.length > 1 ? idx + 1 : ''}
+                                    Document{' '}
+                                    {entry.document!.length > 1 ? idx + 1 : ''}
                                   </Button>
                                 ))
-                              ) 
-                              /* Handle legacy string format fallback */
-                              : entry.document && typeof entry.document === 'string' ? (
+                              ) : /* Handle legacy string format fallback */
+                              entry.document &&
+                                typeof entry.document === 'string' ? (
                                 <Button
                                   size="sm"
                                   className="h-8"
-                                  onClick={() => handleViewDocument(entry.document as string)}
+                                  onClick={() =>
+                                    handleViewDocument(entry.document as string)
+                                  }
                                 >
                                   <Eye className="mr-2 h-4 w-4" />
                                   Document
@@ -565,6 +750,15 @@ function RightToWorkTab() {
                                 <span className="text-gray-300">-</span>
                               )}
                             </div>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              size={'icon'}
+                              variant={'outline'}
+                              onClick={() => openEditLogModal(entry)}
+                            >
+                              <Pen className="h-4 w-4" />
+                            </Button>
                           </TableCell>
                         </TableRow>
                       ))
@@ -601,7 +795,8 @@ function RightToWorkTab() {
             {/* Date Input */}
             <div className="flex flex-col space-y-2">
               <Label className="text-sm font-medium text-gray-700">
-                New Next Check Date <span className="text-red-500">*</span>
+                New Next Check Date (DD-MM-YYYY)
+                <span className="text-red-500">*</span>
               </Label>
               <DatePicker
                 selected={newCheckDate}
@@ -611,13 +806,29 @@ function RightToWorkTab() {
                 placeholderText="Select date..."
                 showMonthDropdown
                 showYearDropdown
-                dropdownMode='select'
+                dropdownMode="select"
                 minDate={
                   currentCheckDate && moment(currentCheckDate).isValid()
                     ? new Date(currentCheckDate)
                     : new Date()
                 }
                 preventOpenOnFocus
+                onKeyDown={(e) => {
+                  const input = e.target as HTMLInputElement;
+                  const allowed = [
+                    'Backspace',
+                    'Delete',
+                    'ArrowLeft',
+                    'ArrowRight',
+                    'Tab'
+                  ];
+                  if (allowed.includes(e.key)) return;
+                  if (!/[\d-]/.test(e.key)) {
+                    e.preventDefault();
+                    return;
+                  }
+                  if (input.value.length >= 10) e.preventDefault();
+                }}
               />
             </div>
 
@@ -629,12 +840,18 @@ function RightToWorkTab() {
 
               {/* Uploaded Files List */}
               {uploadedFiles.length > 0 && (
-                <div className="space-y-2 max-h-32 overflow-y-auto pr-1">
+                <div className="max-h-32 space-y-2 overflow-y-auto pr-1">
                   {uploadedFiles.map((file, index) => (
-                    <div key={index} className="flex w-full items-center justify-between rounded-md border border-green-200 bg-green-50 p-2">
+                    <div
+                      key={index}
+                      className="flex w-full items-center justify-between rounded-md border border-green-200 bg-green-50 p-2"
+                    >
                       <div className="flex items-center gap-2 overflow-hidden">
                         <FileText className="h-5 w-5 flex-shrink-0 text-green-600" />
-                        <p className="truncate text-xs font-medium text-green-700" title={file.name}>
+                        <p
+                          className="truncate text-xs font-medium text-green-700"
+                          title={file.name}
+                        >
                           {file.name}
                         </p>
                       </div>
@@ -680,11 +897,13 @@ function RightToWorkTab() {
                     <span className="text-sm font-medium text-gray-600">
                       Upload Proof
                     </span>
-                    <span className="text-xs text-gray-400">PDF/Images (Max 20MB each)</span>
+                    <span className="text-xs text-gray-400">
+                      PDF/Images (Max 20MB each)
+                    </span>
                   </div>
                 )}
               </div>
-              
+
               {uploadError && (
                 <p className="text-xs text-red-500">{uploadError}</p>
               )}
@@ -700,10 +919,13 @@ function RightToWorkTab() {
               Cancel
             </Button>
             <Button
-              className="bg-theme hover:bg-theme/90 text-white"
+              className="bg-theme text-white hover:bg-theme/90"
               onClick={handleSubmitUpdate}
               disabled={
-                isSubmitting || isUploading || uploadedFiles.length === 0 || !newCheckDate
+                isSubmitting ||
+                isUploading ||
+                uploadedFiles.length === 0 ||
+                !newCheckDate
               }
             >
               {isSubmitting ? 'Saving...' : 'Update'}
@@ -714,33 +936,237 @@ function RightToWorkTab() {
 
       {/* Document Preview Dialog */}
       <Dialog open={isPreviewDialogOpen} onOpenChange={setIsPreviewDialogOpen}>
-        <DialogContent className="max-w-4xl h-[85vh] flex flex-col p-0 gap-0 overflow-hidden sm:rounded-xl">
-          <div className="flex items-center justify-between border-b px-6 py-4 bg-white z-10">
+        <DialogContent className="flex h-[85vh] max-w-4xl flex-col gap-0 overflow-hidden p-0 sm:rounded-xl">
+          <div className="z-10 flex items-center justify-between border-b bg-white px-6 py-4">
             <div>
-              <DialogTitle className="text-lg font-semibold text-gray-900">Document Preview</DialogTitle>
-              <DialogDescription className="mt-1 text-xs text-gray-500 truncate max-w-sm">
-                {previewUrl?.split('/').pop()?.split('?')[0] || 'Unknown Document'}
+              <DialogTitle className="text-lg font-semibold text-gray-900">
+                Document Preview
+              </DialogTitle>
+              <DialogDescription className="mt-1 max-w-sm truncate text-xs text-gray-500">
+                {previewUrl?.split('/').pop()?.split('?')[0] ||
+                  'Unknown Document'}
               </DialogDescription>
             </div>
             <div className="flex items-center gap-3">
               <Button
                 onClick={() => previewUrl && handleForceDownload(previewUrl)}
-                className="bg-theme text-white hover:bg-theme/90 shadow-sm"
+                className="bg-theme text-white shadow-sm hover:bg-theme/90"
                 size="sm"
               >
                 <Download className="mr-2 h-4 w-4" /> Download
               </Button>
-              <Button size="sm" variant={'outline'} onClick={()=> setIsPreviewDialogOpen(false)}>
+              <Button
+                size="sm"
+                variant={'outline'}
+                onClick={() => setIsPreviewDialogOpen(false)}
+              >
                 Close
               </Button>
             </div>
           </div>
-          
-          <div className="flex-1 bg-gray-100 p-4 flex flex-col items-center justify-center overflow-auto relative">
+
+          <div className="relative flex flex-1 flex-col items-center justify-center overflow-auto bg-gray-100 p-4">
             {renderPreviewContent()}
           </div>
         </DialogContent>
-      </Dialog> 
+      </Dialog>
+
+      {/* Edit Log Document Dialog */}
+      <Dialog open={showEditLogModal} onOpenChange={setShowEditLogModal}>
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Edit Log Document</DialogTitle>
+            <DialogDescription className="text-sm ">
+              {editingLog?.title}
+              {/* &mdash; {editingLog?.date ? moment(editingLog.date).format('DD MMM YYYY') : ''} */}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-5 py-4">
+            {/* Existing Documents */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-gray-700">
+                Current Documents
+              </Label>
+              {(() => {
+                const existingDocs = Array.isArray(editingLog?.document)
+                  ? editingLog!.document
+                  : editingLog?.document
+                    ? [editingLog.document]
+                    : [];
+
+                return existingDocs.length > 0 ? (
+                  <div className="space-y-2">
+                    {existingDocs.map((docUrl, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between rounded-md border border-gray-200 bg-gray-50 p-2"
+                      >
+                        <div className="flex items-center gap-2 overflow-hidden">
+                          <FileText className="h-4 w-4 flex-shrink-0 text-gray-500" />
+                          <span
+                            className="truncate text-xs text-gray-700"
+                            title={docUrl}
+                          >
+                            {decodeURIComponent(
+                              docUrl.split('/').pop()?.split('?')[0] ||
+                                `Document ${idx + 1}`
+                            )}
+                          </span>
+                        </div>
+                        <div className="flex flex-shrink-0 items-center gap-1">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7"
+                            onClick={() => handleViewDocument(docUrl)}
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7 hover:bg-red-100 hover:text-red-600"
+                            onClick={() =>
+                              requestRemoveDocument('existing', idx)
+                            }
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs italic text-gray-400">
+                    No documents attached.
+                  </p>
+                );
+              })()}
+            </div>
+
+            {/* Newly Uploaded Documents */}
+            {editLogFiles.length > 0 && (
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-gray-700">
+                  New Documents
+                </Label>
+                <div className="space-y-2">
+                  {editLogFiles.map((file, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center justify-between rounded-md border border-green-200 bg-green-50 p-2"
+                    >
+                      <div className="flex items-center gap-2 overflow-hidden">
+                        <FileText className="h-4 w-4 flex-shrink-0 text-green-600" />
+                        <span className="truncate text-xs font-medium text-green-700">
+                          {file.name}
+                        </span>
+                      </div>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7 flex-shrink-0 hover:bg-red-100 hover:text-red-600"
+                        onClick={() => requestRemoveDocument('new', idx)}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Upload Zone */}
+            <div
+              className={cn(
+                'relative flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-5 transition-colors',
+                isUploading
+                  ? 'border-blue-500 bg-blue-50'
+                  : 'border-gray-300 bg-gray-50 hover:bg-gray-100'
+              )}
+            >
+              <input
+                ref={editFileInputRef}
+                type="file"
+                multiple
+                onChange={handleEditLogFileSelect}
+                className="absolute inset-0 cursor-pointer opacity-0"
+                disabled={isUploading}
+              />
+              {isUploading ? (
+                <div className="flex flex-col items-center gap-2">
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+                  <p className="text-xs text-blue-600">Uploading...</p>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-1 text-center">
+                  <Upload className="h-6 w-6 text-gray-400" />
+                  <span className="text-sm font-medium text-gray-600">
+                    Add Documents
+                  </span>
+                  <span className="text-xs text-gray-400">
+                    PDF/Images (Max 20MB each)
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {uploadError && (
+              <p className="text-xs text-red-500">{uploadError}</p>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2 sm:justify-end">
+            <Button
+              variant="outline"
+              onClick={() => setShowEditLogModal(false)}
+              disabled={isEditLogSubmitting || isUploading}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="bg-theme text-white hover:bg-theme/90"
+              onClick={handleSubmitEditLog}
+              disabled={isEditLogSubmitting || isUploading}
+            >
+              {isEditLogSubmitting ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Remove Warning Dialog */}
+      <Dialog open={showRemoveWarning} onOpenChange={setShowRemoveWarning}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertCircle className="h-5 w-5" /> Remove Document?
+            </DialogTitle>
+            <DialogDescription className="pt-1 text-sm text-gray-600">
+              This document will be permanently removed and{' '}
+              <span className="font-semibold text-gray-800">
+                cannot be retrieved
+              </span>{' '}
+              once saved. Are you sure you want to continue?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 pt-2 sm:justify-end">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowRemoveWarning(false);
+                setPendingRemoveIndex(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmRemoveDocument}>
+              Yes, Remove
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

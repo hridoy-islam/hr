@@ -10,7 +10,8 @@ import {
   CheckCircle2,
   Clock,
   ShieldAlert,
-  Download // Added Download icon for preview container actions
+  Download,
+  Pen
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import DatePicker from 'react-datepicker';
@@ -96,6 +97,16 @@ function DisciplinaryTab() {
   // Preview Dialog State
   const [isPreviewDialogOpen, setIsPreviewDialogOpen] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  // Edit Log States
+  const [showEditLogModal, setShowEditLogModal] = useState(false);
+  const [editingLog, setEditingLog] = useState<LogEntry | null>(null);
+  const [editLogFiles, setEditLogFiles] = useState<UploadedFile[]>([]);
+  const [editLogRemovedUrls, setEditLogRemovedUrls] = useState<string[]>([]);
+  const [isEditLogSubmitting, setIsEditLogSubmitting] = useState(false);
+  const [showRemoveWarning, setShowRemoveWarning] = useState(false);
+  const [pendingRemoveIndex, setPendingRemoveIndex] = useState<{ type: 'existing' | 'new'; index: number } | null>(null);
+  const editFileInputRef = useRef<HTMLInputElement>(null);
 
   // Form Inputs
   const [inputDate, setInputDate] = useState<Date | null>(null);
@@ -356,8 +367,13 @@ function DisciplinaryTab() {
 
     try {
       const payload = {
-        issueDeadline: moment(inputDate).toISOString(),
-        note: inputNote, // Optional
+issueDeadline: new Date(
+  Date.UTC(
+    inputDate!.getFullYear(),
+    inputDate!.getMonth(),
+    inputDate!.getDate()
+  )
+).toISOString(),        note: inputNote, // Optional
         document: uploadedFiles.length > 0 ? uploadedFiles.map(f => f.url) : undefined, // Optional
         updatedBy: user._id,
       };
@@ -393,8 +409,13 @@ function DisciplinaryTab() {
     try {
       await axiosInstance.patch(`/disciplinary/${disciplinaryId}`, {
         action: 'extendDate',
-        extendDeadline: moment(inputDate).toISOString(),
-        note: inputNote,
+extendDeadline: new Date(
+  Date.UTC(
+    inputDate!.getFullYear(),
+    inputDate!.getMonth(),
+    inputDate!.getDate()
+  )
+).toISOString(),        note: inputNote,
         document: uploadedFiles.length > 0 ? uploadedFiles.map(f => f.url) : undefined,
         updatedBy: user._id
       });
@@ -431,6 +452,110 @@ function DisciplinaryTab() {
       toast({ title: error.response?.data?.message || 'Failed to resolve', className: 'bg-destructive text-white' });
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // Log Edit Functions
+  const openEditLogModal = (entry: LogEntry) => {
+    setEditingLog(entry);
+    setEditLogFiles([]);
+    setEditLogRemovedUrls([]);
+    setShowEditLogModal(true);
+  };
+
+  const handleEditLogFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    if (!files.length) return;
+
+    for (const file of files) {
+      if (file.size > 20 * 1024 * 1024) {
+        setUploadError(`File too large: ${file.name}. Must be less than 20MB.`);
+        return;
+      }
+    }
+
+    setIsUploading(true);
+    setUploadError(null);
+
+    try {
+      const uploadPromises = files.map(async (file) => {
+        const formData = new FormData();
+        formData.append('entityId', user._id);
+        formData.append('file_type', 'document');
+        formData.append('file', file);
+
+        const res = await axiosInstance.post('/documents', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        return { name: file.name, url: res.data?.data?.fileUrl };
+      });
+
+      const results = await Promise.all(uploadPromises);
+      setEditLogFiles((prev) => [...prev, ...results]);
+    } catch {
+      setUploadError('Failed to upload one or more documents.');
+    } finally {
+      setIsUploading(false);
+      if (editFileInputRef.current) editFileInputRef.current.value = '';
+    }
+  };
+
+  const requestRemoveDocument = (type: 'existing' | 'new', index: number) => {
+    setPendingRemoveIndex({ type, index });
+    setShowRemoveWarning(true);
+  };
+
+  const confirmRemoveDocument = () => {
+    if (!pendingRemoveIndex) return;
+
+    if (pendingRemoveIndex.type === 'existing' && editingLog) {
+      const existingDocs = Array.isArray(editingLog.document)
+        ? editingLog.document
+        : editingLog.document
+        ? [editingLog.document]
+        : [];
+      const urlToRemove = existingDocs[pendingRemoveIndex.index];
+      setEditLogRemovedUrls((prev) => [...prev, urlToRemove]);
+      setEditingLog({
+        ...editingLog,
+        document: existingDocs.filter((_, i) => i !== pendingRemoveIndex.index)
+      });
+    } else if (pendingRemoveIndex.type === 'new') {
+      setEditLogFiles((prev) => prev.filter((_, i) => i !== pendingRemoveIndex.index));
+    }
+
+    setShowRemoveWarning(false);
+    setPendingRemoveIndex(null);
+  };
+
+  const handleSubmitEditLog = async () => {
+    if (!disciplinaryId || !editingLog || !editingLog._id) return;
+
+    setIsEditLogSubmitting(true);
+
+    const existingDocs = Array.isArray(editingLog.document)
+      ? editingLog.document
+      : editingLog.document
+      ? [editingLog.document]
+      : [];
+
+    const finalDocuments = [...existingDocs, ...editLogFiles.map((f) => f.url)];
+
+    try {
+      await axiosInstance.patch(`/disciplinary/${disciplinaryId}/logs/${editingLog._id}`, {
+        document: finalDocuments
+      });
+
+      await fetchDisciplinaryData();
+      toast({ title: 'Log document updated successfully!', className: 'bg-theme text-white' });
+      setShowEditLogModal(false);
+    } catch (err: any) {
+      toast({
+        title: err.response?.data?.message || 'Update failed.',
+        className: 'bg-destructive text-white'
+      });
+    } finally {
+      setIsEditLogSubmitting(false);
     }
   };
 
@@ -521,12 +646,13 @@ function DisciplinaryTab() {
                     <TableHead>Updated By</TableHead>
                     <TableHead >Note</TableHead>
                     <TableHead className="text-right">Document(s)</TableHead>
+                    <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {history.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={4} className="py-8 text-center italic text-gray-500">
+                      <TableCell colSpan={5} className="py-8 text-center italic text-gray-500">
                         No history records found.
                       </TableCell>
                     </TableRow>
@@ -555,36 +681,44 @@ function DisciplinaryTab() {
                               {entry.note || '-'}
                             </p>
                           </TableCell>
+                         <TableCell className="text-right">
+  <div className="flex flex-col items-end gap-1">
+    {Array.isArray(entry.document) ? (
+      entry.document.filter(doc => doc?.trim()).length > 0 ? (
+        entry.document
+          .filter(doc => doc?.trim())
+          .map((docUrl, idx, filteredDocs) => (
+            <Button
+              key={idx}
+              size="sm"
+              className="h-8"
+              onClick={() => handleViewDocument(docUrl)}
+            >
+              <Eye className="mr-2 h-4 w-4" />
+              Document {filteredDocs.length > 1 ? idx + 1 : ""}
+            </Button>
+          ))
+      ) : (
+        <span className="text-gray-300">-</span>
+      )
+    ) : typeof entry.document === "string" && entry.document.trim() ? (
+      <Button
+        size="sm"
+        className="h-8"
+        onClick={() => handleViewDocument(entry.document)}
+      >
+        <Eye className="mr-2 h-4 w-4" />
+        View
+      </Button>
+    ) : (
+      <span className="text-gray-300">-</span>
+    )}
+  </div>
+</TableCell>
                           <TableCell className="text-right">
-                            <div className="flex flex-col items-end gap-1">
-                              {/* Handle array format */}
-                              {Array.isArray(entry.document) && entry.document.length > 0 ? (
-                                entry.document.map((docUrl, idx) => (
-                                  <Button
-                                    key={idx}
-                                    size="sm"
-                                    className="h-8"
-                                    onClick={() => handleViewDocument(docUrl)}
-                                  >
-                                    <Eye className="mr-2 h-4 w-4" />
-                                    Document {entry.document!.length > 1 ? idx + 1 : ''}
-                                  </Button>
-                                ))
-                              ) 
-                              /* Handle legacy string format fallback */
-                              : entry.document && typeof entry.document === 'string' ? (
-                                <Button
-                                  size="sm"
-                                  className="h-8"
-                                  onClick={() => handleViewDocument(entry.document as string)}
-                                >
-                                  <Eye className="mr-2 h-4 w-4" />
-                                  View
-                                </Button>
-                              ) : (
-                                <span className="text-gray-300">-</span>
-                              )}
-                            </div>
+                            <Button size={'icon'} variant={'outline'} onClick={() => openEditLogModal(entry)}>
+                              <Pen className='w-4 h-4' />
+                            </Button>
                           </TableCell>
                         </TableRow>
                       ))
@@ -610,7 +744,7 @@ function DisciplinaryTab() {
             <div className="grid grid-cols-1 gap-4">
                 <div className="flex flex-col space-y-2">
                 <Label className="text-sm font-medium text-gray-700">
-                    Resolution Deadline <span className="text-red-500">*</span>
+                    Resolution Deadline (DD-MM-YYYY)<span className="text-red-500">*</span>
                 </Label>
                 <DatePicker
                     selected={inputDate}
@@ -623,6 +757,14 @@ function DisciplinaryTab() {
                     showYearDropdown
                     dropdownMode='select'
                     preventOpenOnFocus
+                    
+ onKeyDown={(e) => {
+    const input = e.target as HTMLInputElement;
+    const allowed = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'];
+    if (allowed.includes(e.key)) return;
+    if (!/[\d-]/.test(e.key)) { e.preventDefault(); return; }
+    if (input.value.length >= 10) e.preventDefault();
+  }}
                 />
                 </div>
 
@@ -735,7 +877,7 @@ function DisciplinaryTab() {
             
             <div className="flex flex-col space-y-2">
               <Label className="text-sm font-medium text-gray-700">
-                New Deadline <span className="text-red-500">*</span>
+                New Deadline (DD-MM-YYYY)<span className="text-red-500">*</span>
               </Label>
               <DatePicker
                 selected={inputDate}
@@ -748,6 +890,13 @@ function DisciplinaryTab() {
                 showMonthDropdown
                 dropdownMode='select'
                 preventOpenOnFocus
+                 onKeyDown={(e) => {
+    const input = e.target as HTMLInputElement;
+    const allowed = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'];
+    if (allowed.includes(e.key)) return;
+    if (!/[\d-]/.test(e.key)) { e.preventDefault(); return; }
+    if (input.value.length >= 10) e.preventDefault();
+  }}
               />
             </div>
 
@@ -948,6 +1097,149 @@ function DisciplinaryTab() {
               disabled={isSubmitting || isUploading}
             >
               {isSubmitting ? 'Saving...' : 'Confirm Resolution'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Log Dialog */}
+     <Dialog open={showEditLogModal} onOpenChange={setShowEditLogModal}>
+  <DialogContent className="sm:max-w-2xl">
+    <DialogHeader>
+      <DialogTitle>Edit Log Document</DialogTitle>
+      <DialogDescription>
+        {editingLog?.title}
+      </DialogDescription>
+    </DialogHeader>
+
+    <div className="space-y-6 py-4">
+      {/* Existing Documents */}
+      <div className="space-y-3">
+        <Label className="text-sm font-medium text-gray-700">Current Documents</Label>
+        {(() => {
+          const existingDocs = editingLog 
+            ? (Array.isArray(editingLog.document) 
+                ? editingLog.document.filter(doc => doc && typeof doc === 'string' && doc.trim() !== '')
+                : editingLog.document && typeof editingLog.document === 'string' && editingLog.document.trim() !== ''
+                  ? [editingLog.document]
+                  : [])
+            : [];
+          
+          return existingDocs.length > 0 ? (
+            <div className="space-y-2">
+              {existingDocs.map((docUrl, idx) => (
+                <div key={idx} className="flex items-center justify-between rounded-md border border-gray-200 bg-gray-50 p-2">
+                  <div className="flex items-center gap-2 overflow-hidden">
+                    <FileText className="h-4 w-4 flex-shrink-0 text-gray-500" />
+                    <span className="truncate text-xs text-gray-700" title={docUrl}>
+                      {decodeURIComponent(docUrl.split('/').pop()?.split('?')[0] || `Document ${idx + 1}`)}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleViewDocument(docUrl)}>
+                      <Eye className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button size="icon" variant="ghost" className="h-7 w-7 hover:bg-red-100 hover:text-red-600" onClick={() => requestRemoveDocument('existing', idx)}>
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs italic text-gray-400">No documents attached.</p>
+          );
+        })()}
+      </div>
+
+      {/* Newly Uploaded Documents */}
+      {editLogFiles.length > 0 && (
+        <div className="space-y-2">
+          <Label className="text-sm font-medium text-gray-700">New Documents to Add</Label>
+          <div className="max-h-32 overflow-y-auto pr-1 space-y-2">
+            {editLogFiles.map((file, index) => (
+              <div key={`new-${index}`} className="flex w-full items-center justify-between rounded-md border border-green-200 bg-green-50 p-2">
+                <div className="flex items-center gap-2 overflow-hidden">
+                  <FileText className="h-5 w-5 flex-shrink-0 text-green-600" />
+                  <p className="truncate text-xs font-medium text-green-700" title={file.name}>
+                    {file.name}
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => requestRemoveDocument('new', index)}
+                  className="h-8 w-8 flex-shrink-0 hover:bg-red-100 hover:text-red-600"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Upload Dropzone */}
+      <div className="space-y-2">
+        <div
+          className={cn(
+            'relative flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-4 transition-colors',
+            isUploading ? 'border-blue-500 bg-blue-50' : 'border-gray-300 bg-gray-50 hover:bg-gray-100'
+          )}
+        >
+          <input
+            ref={editFileInputRef}
+            type="file"
+            multiple
+            onChange={handleEditLogFileSelect}
+            className="absolute inset-0 cursor-pointer opacity-0"
+            disabled={isUploading}
+          />
+          {isUploading ? (
+            <div className="flex flex-col items-center gap-2">
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent"></div>
+              <p className="text-xs text-blue-600">Uploading...</p>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-1 text-center">
+              <Upload className="h-5 w-5 text-gray-400" />
+              <span className="text-sm font-medium text-gray-600">Add Documents</span>
+              <span className="text-xs text-gray-400">PDF/Images (Max 20MB)</span>
+            </div>
+          )}
+        </div>
+        {uploadError && <p className="text-xs text-red-500">{uploadError}</p>}
+      </div>
+    </div>
+
+    <DialogFooter className="gap-2 sm:justify-end">
+      <Button variant="outline" onClick={() => setShowEditLogModal(false)} disabled={isEditLogSubmitting || isUploading}>
+        Cancel
+      </Button>
+      <Button className="bg-theme hover:bg-theme/90 text-white" onClick={handleSubmitEditLog} disabled={isEditLogSubmitting || isUploading}>
+        {isEditLogSubmitting ? 'Saving...' : 'Save Changes'}
+      </Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
+
+      {/* Remove Warning Dialog */}
+      <Dialog open={showRemoveWarning} onOpenChange={setShowRemoveWarning}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="h-5 w-5" /> Remove Document?
+            </DialogTitle>
+            <DialogDescription className="text-sm text-gray-600 pt-1">
+              This document will be permanently removed and <span className="font-semibold text-gray-800">cannot be retrieved</span> once saved. Are you sure you want to continue?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:justify-end pt-2">
+            <Button variant="outline" onClick={() => { setShowRemoveWarning(false); setPendingRemoveIndex(null); }}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmRemoveDocument}>
+              Yes, Remove
             </Button>
           </DialogFooter>
         </DialogContent>
