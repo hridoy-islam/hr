@@ -483,11 +483,11 @@ const DbsExpiryPage = () => {
                   showMonthDropdown
                   dropdownMode="select"
                   // LOGIC APPLIED: Min date = Previous Expiry Date
-                  minDate={
-                    selectedEmployee?.dbsExpiry
-                      ? new Date(selectedEmployee.dbsExpiry)
-                      : undefined
-                  }
+                  // minDate={
+                  //   selectedEmployee?.dbsExpiry
+                  //     ? new Date(selectedEmployee.dbsExpiry)
+                  //     : undefined
+                  // }
                   className="w-full rounded-md border border-gray-300 p-2.5 outline-none focus:border-transparent focus:ring-2 focus:ring-theme"
                   preventOpenOnFocus
                 />
@@ -514,7 +514,7 @@ const DbsExpiryPage = () => {
                   showYearDropdown
                   showMonthDropdown
                   dropdownMode="select"
-                  minDate={newDateOfIssue || undefined}
+                  // minDate={newDateOfIssue || undefined}
                   className="w-full rounded-md border border-gray-300 p-2.5 outline-none focus:border-transparent focus:ring-2 focus:ring-theme"
                   preventOpenOnFocus
                 />

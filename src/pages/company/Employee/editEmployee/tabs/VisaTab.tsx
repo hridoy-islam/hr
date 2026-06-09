@@ -770,9 +770,9 @@ function VisaTab() {
                 showYearDropdown
                 preventOpenOnFocus
                 dropdownMode="select"
-                minDate={
-                  currentExpiryDate ? new Date(currentExpiryDate) : undefined
-                }
+                // minDate={
+                //   currentExpiryDate ? new Date(currentExpiryDate) : undefined
+                // }
                     onKeyDown={(e) => {
     const input = e.target as HTMLInputElement;
     const allowed = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'];
@@ -802,7 +802,7 @@ function VisaTab() {
                 placeholderText="Select expiry date..."
                 showMonthDropdown
                 showYearDropdown
-                minDate={newStartDate || undefined}
+                // minDate={newStartDate || undefined}
                 preventOpenOnFocus
                 dropdownMode="select"
                     onKeyDown={(e) => {

@@ -731,11 +731,11 @@ nextCheckDate: new Date(
                 showMonthDropdown
                 showYearDropdown
                 dropdownMode='select'
-                minDate={
-                  currentCheckDate && moment(currentCheckDate).isValid()
-                    ? new Date(currentCheckDate)
-                    : new Date()
-                }
+                // minDate={
+                //   currentCheckDate && moment(currentCheckDate).isValid()
+                //     ? new Date(currentCheckDate)
+                //     : new Date()
+                // }
                 preventOpenOnFocus
                 
  onKeyDown={(e) => {

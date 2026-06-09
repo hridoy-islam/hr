@@ -466,7 +466,7 @@ const { status, loading: loadingStats, refetchStatus } = useScheduleStatus();
                 showYearDropdown
                 showMonthDropdown
                 dropdownMode="select"
-                minDate={new Date()}
+                // minDate={new Date()}
                 className="focus:ring-theme w-full rounded-md border border-gray-300 p-2.5 outline-none focus:border-transparent focus:ring-2"
                 preventOpenOnFocus
               />

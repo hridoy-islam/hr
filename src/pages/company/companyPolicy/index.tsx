@@ -589,7 +589,7 @@ export default function CompanyPolicyPage() {
                     showMonthDropdown
                     showYearDropdown
                     dropdownMode="select"
-                    minDate={startDate || undefined}
+                    // minDate={startDate || undefined}
                     popperProps={{ strategy: 'fixed' }}
                     popperClassName="z-[9999]"
                     isClearable

@@ -241,8 +241,8 @@ const user = useSelector((state: any) => state.auth.user);
                       todayButton="Today"
                       placeholderText="Pick a date"
                       preventOpenOnFocus
-                      minDate={new Date(selectedYear, 0, 1)}
-                      maxDate={new Date(selectedYear, 11, 31)}
+                      // minDate={new Date(selectedYear, 0, 1)}
+                      // maxDate={new Date(selectedYear, 11, 31)}
                     />
                   </div>
                 </div>

@@ -448,7 +448,7 @@ const RtwExpiryPage = () => {
                 showYearDropdown
                 showMonthDropdown
                 dropdownMode="select"
-                minDate={new Date()} // Check date cannot be in the past
+                // minDate={new Date()} // Check date cannot be in the past
                 className="w-full rounded-md border border-gray-300 p-2.5 outline-none focus:border-transparent focus:ring-2 focus:ring-theme"
                 preventOpenOnFocus
               />

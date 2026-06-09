@@ -464,11 +464,11 @@ const VisaExpiryPage = () => {
                   showMonthDropdown
                   dropdownMode="select"
                   // Suggestion: New start date usually after previous expiry
-                  minDate={
-                    selectedEmployee?.visaExpiry
-                      ? new Date(selectedEmployee.visaExpiry)
-                      : undefined
-                  }
+                  // minDate={
+                  //   selectedEmployee?.visaExpiry
+                  //     ? new Date(selectedEmployee.visaExpiry)
+                  //     : undefined
+                  // }
                  
                   className="focus:ring-theme w-full rounded-md border border-gray-300 p-2.5 outline-none focus:border-transparent focus:ring-2"
                   preventOpenOnFocus
@@ -497,7 +497,7 @@ const VisaExpiryPage = () => {
                   showMonthDropdown
                   dropdownMode="select"
                   // Expiry must be after start date
-                  minDate={newStartDate || undefined}
+                  // minDate={newStartDate || undefined}
                   className="focus:ring-theme w-full rounded-md border border-gray-300 p-2.5 outline-none focus:border-transparent focus:ring-2"
                   preventOpenOnFocus
                 />

@@ -760,11 +760,11 @@ passportExpiryDate: new Date(
                   showMonthDropdown
                   showYearDropdown
                   dropdownMode="select"
-                  minDate={
-                    currentExpiryDate && moment(currentExpiryDate).isValid()
-                      ? new Date(currentExpiryDate)
-                      : new Date()
-                  }
+                  // minDate={
+                  //   currentExpiryDate && moment(currentExpiryDate).isValid()
+                  //     ? new Date(currentExpiryDate)
+                  //     : new Date()
+                  // }
                   onKeyDown={(e) => {
     const input = e.target as HTMLInputElement;
     const allowed = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'];

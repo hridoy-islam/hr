@@ -989,7 +989,7 @@ const TrainingDetailsPage: React.FC = () => {
               <DatePicker
                 selected={reassignDate}
                 onChange={(date) => setReassignDate(date)}
-                minDate={minReassignDate}
+                // minDate={minReassignDate}
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
                 dateFormat="dd-MM-yyyy"
                 placeholderText="Select start date"

@@ -1684,11 +1684,11 @@ const TableSection = ({
                         className={datePickerClass}
                         placeholderText="End Date"
                         portalId="root"
-                        minDate={
-                          editForm.startDate
-                            ? moment(editForm.startDate).toDate()
-                            : null
-                        }
+                        // minDate={
+                        //   editForm.startDate
+                        //     ? moment(editForm.startDate).toDate()
+                        //     : null
+                        // }
                       />
                     </div>
                   ) : (

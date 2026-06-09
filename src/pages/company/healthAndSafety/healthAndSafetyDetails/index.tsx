@@ -657,7 +657,7 @@ function HealthAndSafetyDetails() {
                   showMonthDropdown
                   showYearDropdown
                   dropdownMode="select"
-                  minDate={newStartDate || undefined}
+                  // minDate={newStartDate || undefined}
                 />
               </div>
             </div>

@@ -289,7 +289,7 @@ export function GeneralInformation({
                       <DatePicker
                         selected={field.value ?? null}
                         onChange={(date: Date | null) => field.onChange(date)}
-                        minDate={new Date()} // Prevent future dates
+                        // minDate={new Date()} // Prevent future dates
                         dateFormat="dd-MM-yyyy"
                         placeholderText="Select check date"
                         className={`h-9 w-full rounded-sm border border-gray-300 px-3 py-1 focus:border-theme focus:ring-2 focus:ring-theme ${isNoRtwCheck ? 'cursor-not-allowed bg-gray-100 opacity-60' : ''}`}

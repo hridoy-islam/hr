@@ -807,11 +807,11 @@ function RightToWorkTab() {
                 showMonthDropdown
                 showYearDropdown
                 dropdownMode="select"
-                minDate={
-                  currentCheckDate && moment(currentCheckDate).isValid()
-                    ? new Date(currentCheckDate)
-                    : new Date()
-                }
+                // minDate={
+                //   currentCheckDate && moment(currentCheckDate).isValid()
+                //     ? new Date(currentCheckDate)
+                //     : new Date()
+                // }
                 preventOpenOnFocus
                 onKeyDown={(e) => {
                   const input = e.target as HTMLInputElement;

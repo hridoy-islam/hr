@@ -579,7 +579,7 @@ export default function HealthAndSafetyPage() {
                     showYearDropdown
                     isClearable
                     dropdownMode="select"
-                    minDate={startDate || undefined}
+                    // minDate={startDate || undefined}
                     popperProps={{ strategy: 'fixed' }}
                     popperClassName="z-[9999]"
                   />

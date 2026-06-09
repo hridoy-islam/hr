@@ -773,9 +773,9 @@ expiryDate: new Date(
                   showMonthDropdown
                   showYearDropdown
                   dropdownMode="select"
-                  minDate={
-                    currentExpiryDate ? new Date(currentExpiryDate) : undefined
-                  }
+                  // minDate={
+                  //   currentExpiryDate ? new Date(currentExpiryDate) : undefined
+                  // }
                    onKeyDown={(e) => {
     const input = e.target as HTMLInputElement;
     const allowed = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'];
@@ -805,7 +805,7 @@ expiryDate: new Date(
                   placeholderText="Select date..."
                   showMonthDropdown
                   showYearDropdown
-                  minDate={newDateOfIssue || undefined}
+                  // minDate={newDateOfIssue || undefined}
                   dropdownMode="select"
                    onKeyDown={(e) => {
     const input = e.target as HTMLInputElement;

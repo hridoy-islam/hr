@@ -453,7 +453,7 @@ const CompanyPayRoll = () => {
                 showYearDropdown
                 dropdownMode="select"
                 preventOpenOnFocus
-                minDate={payloadFromDate ?? undefined}
+                // minDate={payloadFromDate ?? undefined}
                 className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-theme"
               />
             </div>

@@ -752,7 +752,7 @@ extendDeadline: new Date(
                     dateFormat="dd-MM-yyyy"
                     className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-theme focus:outline-none focus:ring-2 focus:ring-theme"
                     placeholderText="Select deadline..."
-                    minDate={new Date()}
+                    // minDate={new Date()}
                     showMonthDropdown
                     showYearDropdown
                     dropdownMode='select'
@@ -885,7 +885,7 @@ extendDeadline: new Date(
                 dateFormat="dd-MM-yyyy"
                 className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-theme focus:outline-none focus:ring-2 focus:ring-theme"
                 placeholderText="Select new date..."
-                minDate={activeIssue?.issueDeadline ? new Date(activeIssue.issueDeadline) : new Date()}
+                // minDate={activeIssue?.issueDeadline ? new Date(activeIssue.issueDeadline) : new Date()}
                 showYearDropdown
                 showMonthDropdown
                 dropdownMode='select'

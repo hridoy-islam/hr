@@ -509,11 +509,11 @@ const handleUploadSubmit = async () => {
                       : 'border-gray-300 focus:border-theme focus:ring-1 focus:ring-theme'
                   )}
                   placeholderText="Select schedule..."
-                  minDate={
-                    meeting?.nextMeetingDate
-                      ? new Date(meeting.nextMeetingDate)
-                      : new Date()
-                  }
+                  // minDate={
+                  //   meeting?.nextMeetingDate
+                  //     ? new Date(meeting.nextMeetingDate)
+                  //     : new Date()
+                  // }
                   preventOpenOnFocus
                 />
                 {formErrors.nextMeetingDate && (

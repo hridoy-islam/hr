@@ -445,7 +445,7 @@ export default function BulkAssignDialog({
                       selected={endDate}
                       onChange={setEndDate}
                       dateFormat="dd-MM-yyyy"
-                      minDate={startDate || undefined}
+                      // minDate={startDate || undefined}
                       className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 pl-10 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-theme"
                       placeholderText="Select end date"
                       wrapperClassName="w-full"
