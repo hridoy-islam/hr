@@ -734,7 +734,7 @@ export default function CompanyAuditPage() {
       <div className="flex-1  py-4 sm:py-6">
         {isLoading ? (
           <div className="flex items-center justify-center py-32">
-            <BlinkingDots/>
+            <BlinkingDots color="bg-theme"/>
           </div>
         ) : items.length === 0 ? (
           <EmptyState />
@@ -805,7 +805,7 @@ export default function CompanyAuditPage() {
               disabled={!folderName.trim() || isCreatingFolder}
             >
               {isCreatingFolder ? (
-                <BlinkingDots/>
+                <BlinkingDots color="bg-theme"/>
               ) : (
                 <Plus className="mr-2 h-4 w-4" />
               )}
@@ -882,7 +882,7 @@ export default function CompanyAuditPage() {
               >
                 {isUploading ? (
                   <>
-                    <BlinkingDots/>
+                    <BlinkingDots color="bg-theme"/>
                     <p className="text-sm text-gray-500">Processing... {uploadProgress}%</p>
                     <div className="h-1.5 w-full max-w-xs overflow-hidden rounded-full bg-gray-200">
                       <div
