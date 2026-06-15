@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Users, Pen, Plus, Trash2 } from 'lucide-react';
+import { Users, Pen, Plus, Trash2, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -21,7 +21,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 import { Input } from '@/components/ui/input';
 import { DynamicPagination } from '@/components/shared/DynamicPagination';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { ServiceUserDialog } from './Components/ServiceUserDialog';
 
 export default function ServiceUserPage() {
@@ -30,15 +30,15 @@ export default function ServiceUserPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<any>();
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
-  
+
   const [initialLoading, setInitialLoading] = useState(true);
   const { toast } = useToast();
-  
+
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [entriesPerPage, setEntriesPerPage] = useState(500);
   const [searchTerm, setSearchTerm] = useState('');
-
+  const navigate = useNavigate();
   const { id } = useParams(); // Acts as the companyId
 
   const fetchData = async (page: number, limit: number, search = '') => {
@@ -110,7 +110,9 @@ export default function ServiceUserPage() {
   const confirmDelete = async () => {
     if (!deletingUserId) return;
     try {
-      const response = await axiosInstance.delete(`/serviceuser/${deletingUserId}`);
+      const response = await axiosInstance.delete(
+        `/serviceuser/${deletingUserId}`
+      );
       if (response.data && response.data.success === true) {
         toast({
           title: 'Service user deleted successfully',
@@ -142,6 +144,10 @@ export default function ServiceUserPage() {
   const handleDeleteClick = (userId: string) => {
     setDeletingUserId(userId);
     setDeleteDialogOpen(true);
+  };
+
+  const handleView = (selectedServiceUser: any) => {
+    navigate(`${selectedServiceUser._id}`);
   };
 
   return (
@@ -202,18 +208,40 @@ export default function ServiceUserPage() {
             <TableBody>
               {serviceUsers.map((user) => (
                 <TableRow key={user._id}>
-                  <TableCell className="font-medium text-gray-900">
+                  <TableCell
+                    className="cursor-pointer font-medium text-gray-900 hover:text-theme"
+                    onClick={() => navigate(`${user._id}`)}
+                  >
                     {user.name}
                   </TableCell>
-                  <TableCell>{user.room}</TableCell>
-                  <TableCell>{user.phone || '-'}</TableCell>
-                  <TableCell>{user.email || '-'}</TableCell>
+                  <TableCell
+                    className="cursor-pointer"
+                    onClick={() => navigate(`${user._id}`)}
+                  >
+                    {user.room}
+                  </TableCell>
+                  <TableCell
+                    className="cursor-pointer"
+                    onClick={() => navigate(`${user._id}`)}
+                  >
+                    {user.phone || '-'}
+                  </TableCell>
+                  <TableCell
+                    className="cursor-pointer"
+                    onClick={() => navigate(`${user._id}`)}
+                  >
+                    {user.email || '-'}
+                  </TableCell>
                   <TableCell className="text-right">
                     <div className="flex flex-row items-center justify-end gap-2">
                       <Button
                         size="icon"
-                        onClick={() => handleEdit(user)}
+                        onClick={() => navigate(`${user._id}`)}
+                        variant={'outline'}
                       >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button size="icon" onClick={() => handleEdit(user)}>
                         <Pen className="h-4 w-4" />
                       </Button>
                       <Button
@@ -259,7 +287,8 @@ export default function ServiceUserPage() {
           <DialogHeader>
             <DialogTitle>Confirm Deletion</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete this service user? This action cannot be undone.
+              Are you sure you want to delete this service user? This action
+              cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <div className="flex justify-end space-x-2 pt-4">
@@ -270,11 +299,7 @@ export default function ServiceUserPage() {
             >
               Cancel
             </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              onClick={confirmDelete}
-            >
+            <Button type="button" variant="destructive" onClick={confirmDelete}>
               Delete
             </Button>
           </div>

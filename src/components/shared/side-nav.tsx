@@ -58,7 +58,8 @@ import {
   CalendarDays,
   FileClock,
   Heart,
-  CalendarMinus2
+  CalendarMinus2,
+  File
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Link, useNavigate, useLocation, useParams } from 'react-router-dom';
@@ -317,6 +318,13 @@ const navItems = [
     icon: Users2,
     label: 'Service User',
     href: 'service-user',
+    roles: ['company', 'companyAdmin'],
+    accessKey: 'serviceUser'
+  },
+  {
+    icon: File,
+    label: 'Audit',
+    href: 'audit',
     roles: ['company', 'companyAdmin'],
     accessKey: 'serviceUser'
   },

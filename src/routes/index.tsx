@@ -121,6 +121,8 @@ import HealthAndSafetyPage from '@/pages/company/healthAndSafety';
 import HealthAndSafetyDetails from '@/pages/company/healthAndSafety/healthAndSafetyDetails';
 import CompanyPlannedRota from '@/pages/company/planned-Rota';
 import CompanyPlannedVsActualRotaReport from '@/pages/company/plannedVsActualRotaReport';
+import ServiceUserDetailsPage from '@/pages/company/serviceUser/serviceUserDetails';
+import CompanyAuditPage from '@/pages/company/auditPage';
 
 const SignInPage = lazy(() => import('@/pages/auth/signin'));
 
@@ -335,6 +337,7 @@ export default function AppRouter() {
         { path: 'leave-approval/leave-report', element: <LeaveReportPage /> },
         { path: 'attendance-account', element: <AttendanceAccountPage /> },
         { path: 'service-user', element: <ServiceUserPage /> },
+        { path: 'service-user/:sid', element: <ServiceUserDetailsPage /> },
         { path: 'signature-document', element: <SignatureDoc /> },
         {
           path: 'signature-document/details',
@@ -444,6 +447,31 @@ export default function AppRouter() {
       ]
     }
   ];
+  const auditRoutes = [
+    {
+      path: '/company/:id/audit',
+      element: (
+        <ProtectedRoute>
+          <RoleGuard allowedRoles={['admin', 'company']}>
+            <ScheduleStatusProvider>
+              <HrLayout />
+            </ScheduleStatusProvider>
+          </RoleGuard>
+        </ProtectedRoute>
+      ),
+      children: [
+        {
+          index: true,
+          element: (
+            <Suspense>
+              <CompanyAuditPage />
+            </Suspense>
+          )
+        },
+   
+      ]
+    }
+  ];
 
   
   const attendanceroutes = [
@@ -516,7 +544,8 @@ export default function AppRouter() {
     ...StaffRoutes,
     ...attendanceroutes,
     ...leaveRoutes,
-    ...plannedrotaRoutes
+    ...plannedrotaRoutes,
+    ...auditRoutes
   ]);
 
   return routes;
