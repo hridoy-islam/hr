@@ -23,7 +23,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import axiosInstance from '@/lib/axios';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { MoveLeft } from 'lucide-react';
 import { useSelector } from 'react-redux';
 
@@ -49,7 +49,7 @@ export default function TimeOnlyPickerForm() {
 
   const navigate = useNavigate();
   const user = useSelector((state: any) => state.auth.user);
-
+  const {id} = useParams()
   const [openDialog, setOpenDialog] = useState<'start' | 'end' | null>(null);
   const [tempTime, setTempTime] = useState({ hour: 9, minute: 0 });
 
@@ -83,7 +83,7 @@ export default function TimeOnlyPickerForm() {
         name: data.name,
         startTime: data.startTime,
         endTime: data.endTime,
-        companyId: user?._id
+        companyId: id
       };
 
       const response = await axiosInstance.post('/hr/shift', payload);
