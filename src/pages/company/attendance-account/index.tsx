@@ -39,7 +39,7 @@ export default function AttendanceAccountPage() {
           page,
           limit,
           role: 'attendance',
-          companyId:id,
+          company:id,
           ...(search ? { searchTerm: search } : {})
         }
       });
