@@ -15,6 +15,7 @@ import { BlinkingDots } from '@/components/shared/blinking-dots';
 import { Input } from '@/components/ui/input';
 import { DynamicPagination } from '@/components/shared/DynamicPagination';
 import { AttendanceDialog } from './components/AttendanceDialog';
+import { useParams } from 'react-router-dom';
 
 export default function AttendanceAccountPage() {
   const [attendees, setAttendees] = useState<any[]>([]);
@@ -22,6 +23,7 @@ export default function AttendanceAccountPage() {
   const [editingUser, setEditingUser] = useState<any>();
   const [initialLoading, setInitialLoading] = useState(true);
   const { toast } = useToast();
+  const {id}= useParams();
 
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -37,6 +39,7 @@ export default function AttendanceAccountPage() {
           page,
           limit,
           role: 'attendance',
+          companyId:id,
           ...(search ? { searchTerm: search } : {})
         }
       });
