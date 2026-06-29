@@ -98,6 +98,7 @@ function ImmigrationTab() {
   const [showRemoveWarning, setShowRemoveWarning] = useState(false);
   const [pendingRemoveIndex, setPendingRemoveIndex] = useState<{ type: 'existing' | 'new'; index: number } | null>(null);
   const editFileInputRef = useRef<HTMLInputElement>(null);
+  const[leaverData,setLeaverData] = useState([]);
 
   const handleViewDocument = (url: string) => {
     setPreviewUrl(url);
@@ -250,6 +251,21 @@ function ImmigrationTab() {
     }
   };
 
+    const fetchLeaverData = async () => {
+    if (!eid) return;
+    try {
+      const leaverData = await axiosInstance.get(`/leaver?companyId=${id}&userId=${eid}`)
+        setLeaverData(leaverData.data.data.result);
+    } catch (err) {
+      console.error('Error fetching Appraisal data:', err);
+      toast({
+        title: 'Failed to load leaver data.',
+        className: 'bg-destructive text-white'
+      });
+    }
+  };
+
+
   // Initial Data Load
   useEffect(() => {
     const loadData = async () => {
@@ -257,7 +273,8 @@ function ImmigrationTab() {
       await Promise.all([
         fetchScheduleSettings(), 
         fetchImmigrationData(),
-        fetchUserData()
+        fetchUserData(),
+        fetchLeaverData()
       ]);
       setIsLoading(false);
     };
@@ -268,7 +285,7 @@ function ImmigrationTab() {
   // 4. Status Calculation (Using Days Logic exactly like Passport/Visa)
   useEffect(() => {
     // 1. Check override flag first
-    if (userData?.noRtwCheck) {
+    if (userData?.noRtwCheck || leaverData.length > 0) {
       setComplianceStatus('no-check-required');
       return;
     }
@@ -555,7 +572,7 @@ nextCheckDate: new Date(
                   Next Check Date
                 </Label>
                 <div className="text-2xl font-bold text-gray-900">
-                  {userData?.noRtwCheck 
+                  {userData?.noRtwCheck  || leaverData.length > 0
                     ? 'N/A' 
                     : currentCheckDate
                     ? moment(currentCheckDate).format('DD MMMM YYYY')
@@ -569,15 +586,15 @@ nextCheckDate: new Date(
               <div className="border-t border-gray-100 pt-4">
                 <Button
                   onClick={openUpdateModal}
-                  disabled={userData?.noRtwCheck}
+                  disabled={userData?.noRtwCheck || leaverData.length > 0}
                   className={cn(
                     "w-full text-white",
-                    userData?.noRtwCheck 
+                    userData?.noRtwCheck  || leaverData.length > 0
                       ? "bg-gray-300 hover:bg-gray-300 cursor-not-allowed" 
                       : "bg-theme hover:bg-theme/90"
                   )}
                 >
-                  {userData?.noRtwCheck ? 'Update Not Required' : 'Update Next Check Date'}
+                  {userData?.noRtwCheck || leaverData.length > 0 ? 'Update Not Required' : 'Update Next Check Date'}
                 </Button>
               </div>
             </div>

@@ -120,6 +120,7 @@ function InductionTab() {
     index: number;
   } | null>(null);
   const editFileInputRef = useRef<HTMLInputElement>(null);
+  const[leaverData,setLeaverData] = useState([]);
 
   const handleViewDocument = (url: string) => {
     setPreviewUrl(url);
@@ -245,11 +246,24 @@ function InductionTab() {
       console.error('Error fetching Induction data:', err);
     }
   };
-
+  const fetchLeaverData = async () => {
+    if (!eid) return;
+    try {
+      const leaverData = await axiosInstance.get(`/leaver?companyId=${id}&userId=${eid}`)
+        setLeaverData(leaverData.data.data.result);
+    } catch (err) {
+      console.error('Error fetching Appraisal data:', err);
+      toast({
+        title: 'Failed to load leaver data.',
+        className: 'bg-destructive text-white'
+      });
+    }
+  };
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
       await fetchInductionData();
+      await fetchLeaverData();
       setIsLoading(false);
     };
     loadData();
@@ -654,7 +668,7 @@ function InductionTab() {
               <div className="space-y-3 border-t border-gray-100 pt-6">
                 {/* 1. Schedule Button (ONLY SHOW IF NOT SCHEDULED) */}
                 {!currentInductionDate && (
-                  <Button onClick={handleOpenSchedule} className="w-full">
+                  <Button onClick={handleOpenSchedule} disabled={leaverData.length > 0} className="w-full">
                     <Calendar className="mr-2 h-4 w-4" />
                     Set Induction Date
                   </Button>
@@ -664,6 +678,7 @@ function InductionTab() {
                 {currentInductionDate && !noPromotion && (
                   <Button
                     onClick={handleOpenPromotion}
+                    disabled={leaverData.length > 0}
                     className="w-full bg-theme text-white hover:bg-theme/90"
                   >
                     <TrendingUp className="mr-2 h-4 w-4" />

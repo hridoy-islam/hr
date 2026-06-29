@@ -117,6 +117,7 @@ function VisaTab() {
     index: number;
   } | null>(null);
   const editFileInputRef = useRef<HTMLInputElement>(null);
+  const[leaverData,setLeaverData] = useState([]);
 
   const handleViewDocument = (url: string) => {
     setPreviewUrl(url);
@@ -243,6 +244,23 @@ function VisaTab() {
     }
   };
 
+
+    const fetchLeaverData = async () => {
+    if (!eid) return;
+    try {
+      const leaverData = await axiosInstance.get(`/leaver?companyId=${id}&userId=${eid}`)
+        setLeaverData(leaverData.data.data.result);
+    } catch (err) {
+      console.error('Error fetching Appraisal data:', err);
+      toast({
+        title: 'Failed to load leaver data.',
+        className: 'bg-destructive text-white'
+      });
+    }
+  };
+
+
+
   // 3. Fetch Visa Data
   const fetchVisaData = async () => {
     if (!eid) return;
@@ -278,7 +296,8 @@ function VisaTab() {
       await Promise.all([
         fetchScheduleSettings(),
         fetchVisaData(),
-        fetchUserData()
+        fetchUserData(),
+        fetchLeaverData()
       ]);
       setIsLoading(false);
     };
@@ -287,7 +306,7 @@ function VisaTab() {
 
   // 4. Status Calculation
   useEffect(() => {
-    if (userData?.noRtwCheck) {
+    if (userData?.noRtwCheck || leaverData.length > 0) {
       setComplianceStatus('no-check-required');
       return;
     }
@@ -559,7 +578,7 @@ function VisaTab() {
                     Visa Start Date
                   </Label>
                   <div className="text-lg font-semibold text-gray-900">
-                    {userData?.noRtwCheck
+                    {userData?.noRtwCheck || leaverData.length > 0
                       ? 'N/A'
                       : currentStartDate
                         ? moment(currentStartDate).format('DD MMMM YYYY')
@@ -572,7 +591,7 @@ function VisaTab() {
                     Visa Expiry Date
                   </Label>
                   <div className="text-lg font-semibold text-gray-900">
-                    {userData?.noRtwCheck
+                    {userData?.noRtwCheck || leaverData.length > 0
                       ? 'N/A'
                       : currentExpiryDate
                         ? moment(currentExpiryDate).format('DD MMMM YYYY')
@@ -610,15 +629,15 @@ function VisaTab() {
               <div className="border-t border-gray-100 pt-4">
                 <Button
                   onClick={openUpdateModal}
-                  disabled={userData?.noRtwCheck}
+                  disabled={userData?.noRtwCheck || leaverData.length > 0}
                   className={cn(
                     'w-full text-white',
-                    userData?.noRtwCheck
+                    userData?.noRtwCheck || leaverData.length > 0
                       ? 'cursor-not-allowed bg-gray-300 hover:bg-gray-300'
                       : 'bg-theme hover:bg-theme/90'
                   )}
                 >
-                  {userData?.noRtwCheck
+                  {userData?.noRtwCheck || leaverData.length > 0
                     ? 'Update Not Required'
                     : currentExpiryDate
                       ? 'Renew / Update Visa'

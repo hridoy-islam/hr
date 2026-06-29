@@ -111,6 +111,7 @@ function RightToWorkTab() {
     index: number;
   } | null>(null);
   const editFileInputRef = useRef<HTMLInputElement>(null);
+  const [leaverData, setLeaverData] = useState([]);
 
   // 1. Fetch Schedule Settings
   const fetchScheduleSettings = async () => {
@@ -134,6 +135,22 @@ function RightToWorkTab() {
       setUserData(res.data?.data || null);
     } catch (err) {
       console.error('Error fetching user data:', err);
+    }
+  };
+
+  const fetchLeaverData = async () => {
+    if (!eid) return;
+    try {
+      const leaverData = await axiosInstance.get(
+        `/leaver?companyId=${id}&userId=${eid}`
+      );
+      setLeaverData(leaverData.data.data.result);
+    } catch (err) {
+      console.error('Error fetching Appraisal data:', err);
+      toast({
+        title: 'Failed to load leaver data.',
+        className: 'bg-destructive text-white'
+      });
     }
   };
 
@@ -176,7 +193,8 @@ function RightToWorkTab() {
       await Promise.all([
         fetchScheduleSettings(),
         fetchRTWData(),
-        fetchUserData()
+        fetchUserData(),
+        fetchLeaverData()
       ]);
       setIsLoading(false);
     };
@@ -627,21 +645,24 @@ function RightToWorkTab() {
                   RTW Next Check Date
                 </Label>
                 <div className="text-2xl font-bold text-gray-900">
-                  {userData?.noRtwCheck
+                  {userData?.noRtwCheck || leaverData.length > 0
                     ? 'N/A'
                     : currentCheckDate
                       ? moment(currentCheckDate).format('DD MMMM YYYY')
                       : 'Not Set'}
                 </div>
 
-                <div className="pt-1">{getStatusBadge()}</div>
+                {!userData?.noRtwCheck ||
+                  leaverData.length === 0 && (
+                    <div className="pt-1">{getStatusBadge()}</div>
+                  )}
               </div>
 
               {/* Action Button */}
               <div className="border-t border-gray-100 pt-4">
                 <Button
                   onClick={openUpdateModal}
-                  disabled={userData?.noRtwCheck}
+                  disabled={userData?.noRtwCheck || leaverData.length > 0}
                   className={cn(
                     'w-full text-white',
                     userData?.noRtwCheck
@@ -649,7 +670,7 @@ function RightToWorkTab() {
                       : 'bg-theme hover:bg-theme/90'
                   )}
                 >
-                  {userData?.noRtwCheck
+                  {userData?.noRtwCheck || leaverData.length > 0
                     ? 'Update Not Required'
                     : 'Update Next Check Date'}
                 </Button>

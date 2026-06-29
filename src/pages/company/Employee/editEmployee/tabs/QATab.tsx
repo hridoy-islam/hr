@@ -127,6 +127,7 @@ function QACheckTab() {
     setPreviewUrl(url);
     setIsPreviewDialogOpen(true);
   };
+  const[leaverData,setLeaverData] = useState([]);
 
   // Robust Force Download Mechanism
   const handleForceDownload = async (url: string) => {
@@ -239,6 +240,21 @@ function QACheckTab() {
     }
   };
 
+
+    const fetchLeaverData = async () => {
+    if (!eid) return;
+    try {
+      const leaverData = await axiosInstance.get(`/leaver?companyId=${id}&userId=${eid}`)
+        setLeaverData(leaverData.data.data.result);
+    } catch (err) {
+      console.error('Error fetching Appraisal data:', err);
+      toast({
+        title: 'Failed to load leaver data.',
+        className: 'bg-destructive text-white'
+      });
+    }
+  };
+
   const fetchQACheckData = async () => {
     if (!eid) return;
     try {
@@ -267,7 +283,7 @@ function QACheckTab() {
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
-      await Promise.all([fetchSettings(), fetchQACheckData()]);
+      await Promise.all([fetchSettings(), fetchQACheckData(),fetchLeaverData()]);
       setIsLoading(false);
     };
     loadData();
@@ -276,7 +292,7 @@ function QACheckTab() {
   // --- Status Logic ---
 
   useEffect(() => {
-    if (!scheduledDate) {
+    if (!scheduledDate || leaverData.length > 0) {
       setComplianceStatus('not-scheduled');
       return;
     }
@@ -759,6 +775,7 @@ function QACheckTab() {
                   <div className="space-y-3">
                     <Button
                       onClick={handleOpenComplete}
+                      disabled={leaverData.length > 0}
                       className="w-full bg-green-600 text-white hover:bg-green-700"
                     >
                       <CheckCircle2 className="mr-2 h-4 w-4" />
@@ -768,6 +785,8 @@ function QACheckTab() {
                 ) : (
                   <Button
                     onClick={handleOpenSchedule}
+                                          disabled={leaverData.length > 0}
+
                     className="w-full bg-theme text-white hover:bg-theme/90"
                   >
                     <CalendarClock className="mr-2 h-4 w-4" />

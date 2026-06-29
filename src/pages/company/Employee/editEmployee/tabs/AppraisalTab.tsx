@@ -110,7 +110,7 @@ function AppraisalTab() {
     index: number;
   } | null>(null);
   const editFileInputRef = useRef<HTMLInputElement>(null);
-
+  const[leaverData,setLeaverData] = useState([]);
   const handleViewDocument = (url: string) => {
     setPreviewUrl(url);
     setIsPreviewDialogOpen(true);
@@ -252,6 +252,8 @@ function AppraisalTab() {
 
         // Set history
         setHistory(record.logs || []);
+
+
       } else {
         setAppraisalId(null);
         setCurrentCheckDate(null);
@@ -265,6 +267,19 @@ function AppraisalTab() {
       });
     }
   };
+  const fetchLeaverData = async () => {
+    if (!eid) return;
+    try {
+      const leaverData = await axiosInstance.get(`/leaver?companyId=${id}&userId=${eid}`)
+        setLeaverData(leaverData.data.data.result);
+    } catch (err) {
+      console.error('Error fetching Appraisal data:', err);
+      toast({
+        title: 'Failed to load leaver data.',
+        className: 'bg-destructive text-white'
+      });
+    }
+  };
 
   // Initial Data Load
   useEffect(() => {
@@ -273,7 +288,8 @@ function AppraisalTab() {
       await Promise.all([
         fetchScheduleSettings(),
         fetchAppraisalData(),
-        fetchUserData()
+        fetchUserData(),
+        fetchLeaverData()
       ]);
       setIsLoading(false);
     };
@@ -284,7 +300,7 @@ function AppraisalTab() {
   // 4. Status Calculation (Using Days Logic exactly like Passport)
   useEffect(() => {
     // 1. Check override flag first
-    if (userData?.noRtwCheck) {
+    if (userData?.noRtwCheck || leaverData.length > 0) {
       setComplianceStatus('no-check-required');
       return;
     }
@@ -589,7 +605,7 @@ function AppraisalTab() {
                   Next Appraisal Date
                 </Label>
                 <div className="text-2xl font-bold text-gray-900">
-                  {userData?.noRtwCheck
+                  {userData?.noRtwCheck || leaverData.length > 0
                     ? 'N/A'
                     : currentCheckDate
                       ? moment(currentCheckDate).format('DD MMMM YYYY')
@@ -603,15 +619,15 @@ function AppraisalTab() {
               <div className="border-t border-gray-100 pt-4">
                 <Button
                   onClick={openUpdateModal}
-                  disabled={userData?.noRtwCheck}
+                  disabled={userData?.noRtwCheck || leaverData.length > 0}
                   className={cn(
                     'w-full text-white',
-                    userData?.noRtwCheck
+                    userData?.noRtwCheck || leaverData.length > 0
                       ? 'cursor-not-allowed bg-gray-300 hover:bg-gray-300'
                       : 'bg-theme hover:bg-theme/90'
                   )}
                 >
-                  {userData?.noRtwCheck
+                  {userData?.noRtwCheck || leaverData.length > 0
                     ? 'Update Not Required'
                     : 'Update Next Appraisal Date'}
                 </Button>

@@ -79,6 +79,7 @@ function DbsTab() {
   const [currentDisclosureNum, setCurrentDisclosureNum] = useState<string | null>(null);
   const [currentDbsDocUrl, setCurrentDbsDocUrl] = useState<string[] | string | null>(null);
   const [history, setHistory] = useState<LogEntry[]>([]);
+  const[leaverData,setLeaverData] = useState([]);
 
   // Modal & Form State
   const [showUpdateModal, setShowUpdateModal] = useState(false);
@@ -246,11 +247,25 @@ function DbsTab() {
     }
   };
 
+    const fetchLeaverData = async () => {
+    if (!eid) return;
+    try {
+      const leaverData = await axiosInstance.get(`/leaver?companyId=${id}&userId=${eid}`)
+        setLeaverData(leaverData.data.data.result);
+    } catch (err) {
+      console.error('Error fetching Appraisal data:', err);
+      toast({
+        title: 'Failed to load leaver data.',
+        className: 'bg-destructive text-white'
+      });
+    }
+  };
+
   // Initial Data Load
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
-      await Promise.all([fetchDbsData(), fetchScheduleSettings()]);
+      await Promise.all([fetchDbsData(), fetchScheduleSettings(),fetchLeaverData()]);
       setIsLoading(false);
     };
     loadData();
@@ -561,21 +576,23 @@ expiryDate: new Date(
               </div>
 
               {/* Expiry Date */}
-              <div className="space-y-1">
-                <Label className="text-xs font-medium uppercase tracking-wide text-gray-500">
-                  Expiry Date
-                </Label>
-                <div className="text-lg font-bold text-gray-900">
-                  {currentExpiryDate
-                    ? moment(currentExpiryDate).format('DD MMMM YYYY')
-                    : 'Not Set'}
-                </div>
-              </div>
+             <div className="space-y-1">
+  <Label className="text-xs font-medium uppercase tracking-wide text-gray-500">
+    Expiry Date
+  </Label>
+  <div className="text-lg font-bold text-gray-900">
+    {leaverData.length > 0
+      ? 'N/A'
+      : currentExpiryDate
+        ? moment(currentExpiryDate).format('DD MMMM YYYY')
+        : 'Not Set'}
+  </div>
+</div>
 
               {/* Status Badge */}
               {complianceStatus && (
                 <div>
-                  <Badge
+                  {leaverData.length === 0 &&  <Badge
                     className={cn(
                       'px-3 py-1 text-sm',
                       complianceStatus === 'active'
@@ -590,48 +607,50 @@ expiryDate: new Date(
                       : complianceStatus === 'expiring-soon'
                         ? 'Expiring Soon'
                         : 'Expired'}
-                  </Badge>
+                  </Badge>}
+                 
                 </div>
               )}
 
-              {/* Action Buttons */}
-              <div className="space-y-3 border-t border-gray-100 pt-6">
-                {currentDbsDocUrl && (
-                  <div className="flex flex-col gap-2">
-                    {/* Handle array format */}
-                    {Array.isArray(currentDbsDocUrl) ? (
-                      currentDbsDocUrl.map((docUrl, idx) => (
-                        <Button
-                          key={idx}
-                          variant="outline"
-                          className="w-full"
-                          onClick={() => handleViewDocument(docUrl)}
-                        >
-                          <Eye className="mr-2 h-4 w-4" />
-                          View Certificate {currentDbsDocUrl.length > 1 ? idx + 1 : ''}
-                        </Button>
-                      ))
-                    ) : (
-                      /* Handle legacy string format fallback */
-                      <Button
-                        variant="outline"
-                        className="w-full"
-                        onClick={() => handleViewDocument(currentDbsDocUrl)}
-                      >
-                        <Eye className="mr-2 h-4 w-4" />
-                        View Certificate
-                      </Button>
-                    )}
-                  </div>
-                )}
+             {/* Action Buttons */}
+<div className="space-y-3 border-t border-gray-100 pt-6">
+  {currentDbsDocUrl && (
+    <div className="flex flex-col gap-2">
+      {/* Handle array format */}
+      {Array.isArray(currentDbsDocUrl) ? (
+        currentDbsDocUrl.map((docUrl, idx) => (
+          <Button
+            key={idx}
+            variant="outline"
+            className="w-full"
+            onClick={() => handleViewDocument(docUrl)}
+          >
+            <Eye className="mr-2 h-4 w-4" />
+            View Certificate {currentDbsDocUrl.length > 1 ? idx + 1 : ''}
+          </Button>
+        ))
+      ) : (
+        /* Handle legacy string format fallback */
+        <Button
+          variant="outline"
+          className="w-full"
+          onClick={() => handleViewDocument(currentDbsDocUrl)}
+        >
+          <Eye className="mr-2 h-4 w-4" />
+          View Certificate
+        </Button>
+      )}
+    </div>
+  )}
 
-                <Button
-                  onClick={openUpdateModal}
-                  className="w-full bg-theme text-white hover:bg-theme/90"
-                >
-                  {currentExpiryDate ? 'Update / Renew DBS' : 'Add DBS Details'}
-                </Button>
-              </div>
+  <Button
+    onClick={openUpdateModal}
+    className="w-full bg-theme text-white hover:bg-theme/90"
+    disabled={leaverData.length > 0}
+  >
+    {currentExpiryDate ? 'Update / Renew DBS' : 'Add DBS Details'}
+  </Button>
+</div>
             </div>
           </div>
         </div>

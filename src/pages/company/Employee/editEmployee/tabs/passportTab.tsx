@@ -106,6 +106,7 @@ function PassportTab() {
   const [showRemoveWarning, setShowRemoveWarning] = useState(false);
   const [pendingRemoveIndex, setPendingRemoveIndex] = useState<{ type: 'existing' | 'new'; index: number } | null>(null);
   const editFileInputRef = useRef<HTMLInputElement>(null);
+  const[leaverData,setLeaverData] = useState([]);
 
   // 1. Fetch Schedule Settings
   const fetchScheduleSettings = async () => {
@@ -133,6 +134,22 @@ function PassportTab() {
       console.error('Error fetching user data:', err);
     }
   };
+
+
+    const fetchLeaverData = async () => {
+    if (!eid) return;
+    try {
+      const leaverData = await axiosInstance.get(`/leaver?companyId=${id}&userId=${eid}`)
+        setLeaverData(leaverData.data.data.result);
+    } catch (err) {
+      console.error('Error fetching Appraisal data:', err);
+      toast({
+        title: 'Failed to load leaver data.',
+        className: 'bg-destructive text-white'
+      });
+    }
+  };
+
 
   // 3. Fetch Passport Data
   const fetchPassportData = async () => {
@@ -169,7 +186,8 @@ function PassportTab() {
       await Promise.all([
         fetchPassportData(), 
         fetchScheduleSettings(),
-        fetchUserData()
+        fetchUserData(),
+        fetchLeaverData()
       ]);
       setIsLoading(false);
     };
@@ -179,7 +197,7 @@ function PassportTab() {
   // 4. Status Calculation (Days Logic)
   useEffect(() => {
     // 1. Check override flag first
-    if (userData?.noRtwCheck) {
+    if (userData?.noRtwCheck || leaverData.length > 0) {
       setComplianceStatus('no-check-required');
       return;
     }
@@ -563,7 +581,7 @@ passportExpiryDate: new Date(
                   Passport Number
                 </Label>
                 <div className="text-lg font-semibold text-gray-900">
-                  {userData?.noRtwCheck 
+                  {userData?.noRtwCheck  || leaverData.length > 0
                     ? 'N/A' 
                     : currentPassportNumber || 'Not Set'}
                 </div>
@@ -575,7 +593,7 @@ passportExpiryDate: new Date(
                   Expiry Date
                 </Label>
                 <div className="text-lg font-bold text-gray-900">
-                  {userData?.noRtwCheck 
+                  {userData?.noRtwCheck  || leaverData.length > 0
                     ? 'N/A'
                     : currentExpiryDate
                     ? moment(currentExpiryDate).format('DD MMMM YYYY')
@@ -590,15 +608,15 @@ passportExpiryDate: new Date(
               <div className="border-t border-gray-100 pt-6 space-y-3">
                 <Button
                   onClick={openUpdateModal}
-                  disabled={userData?.noRtwCheck}
+                  disabled={userData?.noRtwCheck || leaverData.length > 0}
                   className={cn(
                     "w-full text-white",
-                    userData?.noRtwCheck 
+                    userData?.noRtwCheck  || leaverData.length > 0
                       ? "bg-gray-300 hover:bg-gray-300 cursor-not-allowed" 
                       : "bg-theme hover:bg-theme/90"
                   )}
                 >
-                  {userData?.noRtwCheck 
+                  {userData?.noRtwCheck  || leaverData.length > 0
                     ? 'Update Not Required' 
                     : currentExpiryDate 
                       ? 'Update / Renew Passport' 

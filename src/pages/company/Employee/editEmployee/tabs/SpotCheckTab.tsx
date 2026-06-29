@@ -118,6 +118,7 @@ function SpotCheckTab() {
   const [showRemoveWarning, setShowRemoveWarning] = useState(false);
   const [pendingRemoveIndex, setPendingRemoveIndex] = useState<{ type: 'existing' | 'new'; index: number } | null>(null);
   const editFileInputRef = useRef<HTMLInputElement>(null);
+  const[leaverData,setLeaverData] = useState([]);
 
   const handleViewDocument = (url: string) => {
     setPreviewUrl(url);
@@ -250,11 +251,24 @@ function SpotCheckTab() {
       console.error('Error fetching Spot Check data:', err);
     }
   };
+  const fetchLeaverData = async () => {
+    if (!eid) return;
+    try {
+      const leaverData = await axiosInstance.get(`/leaver?companyId=${id}&userId=${eid}`)
+        setLeaverData(leaverData.data.data.result);
+    } catch (err) {
+      console.error('Error fetching Appraisal data:', err);
+      toast({
+        title: 'Failed to load leaver data.',
+        className: 'bg-destructive text-white'
+      });
+    }
+  };
 
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
-      await Promise.all([fetchSettings(), fetchSpotCheckData()]);
+      await Promise.all([fetchSettings(), fetchSpotCheckData(),fetchLeaverData()]);
       setIsLoading(false);
     };
     loadData();
@@ -264,7 +278,7 @@ function SpotCheckTab() {
 
   useEffect(() => {
     // 1. If no schedule exists at all
-    if (!scheduledDate) {
+    if (!scheduledDate || leaverData.length > 0) {
       setComplianceStatus('not-scheduled');
       return;
     }
@@ -679,13 +693,13 @@ function SpotCheckTab() {
               <div className="border-t border-gray-100 pt-6 space-y-3">
                 {showCompleteButton ? (
                    <div className="space-y-3">
-                     <Button onClick={handleOpenComplete} className="w-full bg-green-600 text-white hover:bg-green-700">
+                     <Button onClick={handleOpenComplete} disabled={leaverData.length > 0}  className="w-full bg-green-600 text-white hover:bg-green-700">
                        <CheckCircle2 className="mr-2 h-4 w-4" />
                        Complete Check
                      </Button>
                    </div>
                 ) : (
-                  <Button onClick={handleOpenSchedule} className="w-full bg-theme text-white hover:bg-theme/90">
+                  <Button onClick={handleOpenSchedule} disabled={leaverData.length > 0} className="w-full bg-theme text-white hover:bg-theme/90">
                     <CalendarClock className="mr-2 h-4 w-4" />
                     {scheduledDate ? 'Update Spot Date' : 'Create First Spot Date'}
                   </Button>

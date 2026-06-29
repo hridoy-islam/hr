@@ -285,8 +285,13 @@ const LeaverTab: React.FC<SettingsTabProps> = ({
         approvedBy: user?._id,
         leavingReason: validatedData.leavingReason.value,
         dissmissalReason: validatedData.dissmissalReason.value,
-        terminationDate: validatedData.terminationDate.toISOString(),
-        note: validatedData.note,
+terminationDate: new Date(
+  Date.UTC(
+    validatedData.terminationDate.getFullYear(),
+    validatedData.terminationDate.getMonth(),
+    validatedData.terminationDate.getDate()
+  )
+).toISOString(),        note: validatedData.note,
         documents: uploadedFiles.map((f) => f.url)
       };
 
