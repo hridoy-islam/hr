@@ -232,7 +232,7 @@ const EditEmployee = () => {
     },
     {
       id: 'supervision',
-      label: 'Super Vision Check',
+      label: 'Supervision Check',
       component: (
         <SupervisionTab
           formData={formData}
