@@ -10,7 +10,9 @@ import {
   Eye,
   CheckCircle2,
   Download,
-  Pen
+  Pen,
+  Lock,
+  LockOpen
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import DatePicker from 'react-datepicker';
@@ -48,9 +50,12 @@ interface LogEntry {
   _id?: string;
   title: string;
   date: string;
-  document?: string[] | string; // Updated to support array or legacy string
+  document?: string[] | string;
   note?: string;
   updatedBy: string | { firstName: string; lastName: string; name?: string };
+  createdAt?: string;
+  scheduledDate?: string;
+  completionDate?: string;
 }
 
 interface QACheckData {
@@ -60,6 +65,7 @@ interface QACheckData {
   completionDate?: string;
   QACheckNote?: string;
   logs?: LogEntry[];
+  isClosed?: boolean;
 }
 
 interface UploadedFile {
@@ -87,6 +93,7 @@ function QACheckTab() {
   const [scheduledDate, setScheduledDate] = useState<string | null>(null);
   const [completionDate, setCompletionDate] = useState<string | null>(null);
   const [savedNote, setSavedNote] = useState<string>('');
+  const [isClosed, setIsClosed] = useState(false);
   const [history, setHistory] = useState<LogEntry[]>([]);
 
   // Settings & Status (Using qaCheckDate from ScheduleCheck model)
@@ -116,12 +123,18 @@ function QACheckTab() {
   const [editLogFiles, setEditLogFiles] = useState<UploadedFile[]>([]);
   const [editLogRemovedUrls, setEditLogRemovedUrls] = useState<string[]>([]);
   const [isEditLogSubmitting, setIsEditLogSubmitting] = useState(false);
+  const [editCreatedAt, setEditCreatedAt] = useState<Date | null>(null);
+  const [editScheduledDate, setEditScheduledDate] = useState<Date | null>(null);
+  const [editCompletionDate, setEditCompletionDate] = useState<Date | null>(null);
+  const [editNote, setEditNote] = useState('');
   const [showRemoveWarning, setShowRemoveWarning] = useState(false);
   const [pendingRemoveIndex, setPendingRemoveIndex] = useState<{
     type: 'existing' | 'new';
     index: number;
   } | null>(null);
   const editFileInputRef = useRef<HTMLInputElement>(null);
+  const [showToggleConfirm, setShowToggleConfirm] = useState(false);
+  const [isToggling, setIsToggling] = useState(false);
 
   const handleViewDocument = (url: string) => {
     setPreviewUrl(url);
@@ -267,6 +280,7 @@ function QACheckTab() {
         setScheduledDate(data.scheduledDate);
         setCompletionDate(data.completionDate || null);
         setSavedNote(data.QACheckNote || '');
+        setIsClosed(data.isClosed || false);
         setHistory(data.logs || []);
       } else {
         setQaCheckId(null);
@@ -297,13 +311,13 @@ function QACheckTab() {
       return;
     }
 
-    const isCycleOpen =
-      !completionDate || moment(scheduledDate).isAfter(moment(completionDate));
+    // const isCycleOpen =
+    //   !completionDate || moment(scheduledDate).isAfter(moment(completionDate));
 
-    if (!isCycleOpen) {
-      setComplianceStatus('completed');
-      return;
-    }
+    // if (!isCycleOpen) {
+    //   setComplianceStatus('completed');
+    //   return;
+    // }
 
     const now = moment().startOf('day');
     const target = moment(scheduledDate).startOf('day');
@@ -402,7 +416,7 @@ function QACheckTab() {
   };
 
   const handleOpenSchedule = () => {
-    setInputDate(null);
+    setInputDate(scheduledDate ? new Date(moment.utc(scheduledDate).year(), moment.utc(scheduledDate).month(), moment.utc(scheduledDate).date()) : null);
     setInputNote('');
     setUploadedFiles([]);
     setUploadError(null);
@@ -498,13 +512,43 @@ function QACheckTab() {
     }
   };
 
+  const handleToggleClose = async () => {
+    if (!qaCheckId) return;
+    setIsToggling(true);
+    try {
+      await axiosInstance.patch(`/qa/${qaCheckId}`, {
+        isClosed: !isClosed,
+        updatedBy: user._id,
+      });
+      await fetchQACheckData();
+      toast({
+        title: isClosed ? 'QA Check reopened successfully!' : 'QA Check closed successfully!',
+        className: 'bg-theme text-white'
+      });
+      setShowToggleConfirm(false);
+    } catch (err: any) {
+      toast({
+        title: err.response?.data?.message || 'Toggle failed.',
+        className: 'bg-destructive text-white'
+      });
+    } finally {
+      setIsToggling(false);
+    }
+  };
+
   // Log Edit Functions
   const openEditLogModal = (entry: LogEntry) => {
     setEditingLog(entry);
     setEditLogFiles([]);
     setEditLogRemovedUrls([]);
+    setEditCreatedAt(entry.createdAt ? new Date(moment.utc(entry.createdAt).year(), moment.utc(entry.createdAt).month(), moment.utc(entry.createdAt).date()) : entry.date ? new Date(moment.utc(entry.date).year(), moment.utc(entry.date).month(), moment.utc(entry.date).date()) : null);
+    setEditScheduledDate(entry.scheduledDate ? new Date(moment.utc(entry.scheduledDate).year(), moment.utc(entry.scheduledDate).month(), moment.utc(entry.scheduledDate).date()) : null);
+    setEditCompletionDate(entry.completionDate ? new Date(moment.utc(entry.completionDate).year(), moment.utc(entry.completionDate).month(), moment.utc(entry.completionDate).date()) : null);
+    setEditNote(entry.note || '');
     setShowEditLogModal(true);
   };
+
+
 
   const handleEditLogFileSelect = async (
     event: React.ChangeEvent<HTMLInputElement>
@@ -590,8 +634,21 @@ function QACheckTab() {
 
     try {
       await axiosInstance.patch(`/qa/${qaCheckId}/logs/${editingLog._id}`, {
-        document: finalDocuments
-      });
+        document: finalDocuments,
+        scheduledDate: editScheduledDate ? new Date(Date.UTC(editScheduledDate.getFullYear(), editScheduledDate.getMonth(), editScheduledDate.getDate())).toISOString() : null,
+        completionDate: editCompletionDate ? new Date(Date.UTC(editCompletionDate.getFullYear(), editCompletionDate.getMonth(), editCompletionDate.getDate())).toISOString() : null,
+        note: editNote,
+date: editCreatedAt 
+  ? new Date(Date.UTC(
+      editCreatedAt.getFullYear(), 
+      editCreatedAt.getMonth(), 
+      editCreatedAt.getDate(),
+      new Date().getUTCHours(),      // Current hours
+      new Date().getUTCMinutes(),    // Current minutes
+      new Date().getUTCSeconds(),    // Current seconds
+      new Date().getUTCMilliseconds() // Current milliseconds
+    )).toISOString() 
+  : null      });
 
       await fetchQACheckData();
       toast({
@@ -610,8 +667,10 @@ function QACheckTab() {
   };
 
   const showCompleteButton =
-    scheduledDate &&
-    (!completionDate || moment(scheduledDate).isAfter(moment(completionDate)));
+    scheduledDate 
+  // const showCompleteButton =
+  //   scheduledDate &&
+  //   (!completionDate || moment(scheduledDate).isAfter(moment(completionDate)));
 
   if (isLoading) {
     return (
@@ -739,7 +798,7 @@ function QACheckTab() {
 
               <div className="pt-1">{renderStatusBadge()}</div>
 
-              {!showCompleteButton && completionDate && (
+              { completionDate && (
                 <div className="flex items-start gap-2 rounded-md bg-green-50 p-3 text-sm text-green-700">
                   <CheckCircle2 className="mt-0.5 h-4 w-4" />
                   <p>
@@ -751,7 +810,7 @@ function QACheckTab() {
                 </div>
               )}
 
-              {(complianceStatus === 'overdue' ||
+              {/* {(complianceStatus === 'overdue' ||
                 complianceStatus === 'due-soon') && (
                 <div
                   className={cn(
@@ -768,32 +827,51 @@ function QACheckTab() {
                       : 'QA check is due soon.'}
                   </p>
                 </div>
-              )}
+              )} */}
 
               <div className="space-y-3 border-t border-gray-100 pt-6">
-                {showCompleteButton ? (
-                  <div className="space-y-3">
-                    <Button
-                      onClick={handleOpenComplete}
-                      disabled={leaverData.length > 0}
-                      className="w-full bg-green-600 text-white hover:bg-green-700"
-                    >
-                      <CheckCircle2 className="mr-2 h-4 w-4" />
-                      Complete QA Check
-                    </Button>
-                  </div>
-                ) : (
-                  <Button
-                    onClick={handleOpenSchedule}
-                                          disabled={leaverData.length > 0}
+                <Button
+                  onClick={handleOpenSchedule}
+                  disabled={leaverData.length > 0}
+                  className="w-full bg-theme text-white hover:bg-theme/90"
+                >
+                  <CalendarClock className="mr-2 h-4 w-4" />
+                  {scheduledDate ? 'Update QA Date' : 'Create First QA Date'}
+                </Button>
 
-                    className="w-full bg-theme text-white hover:bg-theme/90"
+                {showCompleteButton && (
+                  <Button
+                    onClick={handleOpenComplete}
+                    disabled={leaverData.length > 0 || isClosed}
+                    className="w-full bg-green-600 text-white hover:bg-green-700"
                   >
-                    <CalendarClock className="mr-2 h-4 w-4" />
-                    {scheduledDate ? 'Update QA Date' : 'Create First QA Date'}
+                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                    Complete QA Check
+                  </Button>
+                )}
+
+                {qaCheckId && (
+                  <Button
+                    onClick={() => setShowToggleConfirm(true)}
+                    disabled={leaverData.length > 0}
+                    variant="outline"
+                    className={cn(
+                      'w-full border',
+                      isClosed
+                        ? 'bg-theme text-white border-none hover:bg-theme/90'
+                        : 'bg-destructive text-white border-none hover:bg-destructive/90'
+                    )}
+                  >
+                    {isClosed ? (
+                      <><LockOpen className="mr-2 h-4 w-4" /> Open QA</>
+                    ) : (
+                      <><Lock className="mr-2 h-4 w-4" /> Close QA</>
+                    )}
                   </Button>
                 )}
               </div>
+
+              {/* here add close qa or open qa Button */}
             </div>
           </div>
         </div>
@@ -877,7 +955,7 @@ function QACheckTab() {
                                     onClick={() => handleViewDocument(docUrl)}
                                   >
                                     <Eye className="mr-2 h-4 w-4" />
-                                    Document{' '}
+                                    Doc{' '}
                                     {entry.document!.length > 1 ? idx + 1 : ''}
                                   </Button>
                                 ))
@@ -892,7 +970,7 @@ function QACheckTab() {
                                   }
                                 >
                                   <Eye className="mr-2 h-4 w-4" />
-                                  Document
+                                  Doc
                                 </Button>
                               ) : (
                                 <span className="text-gray-300">-</span>
@@ -1074,6 +1152,43 @@ function QACheckTab() {
         </DialogContent>
       </Dialog>
 
+      {/* Close/Open QA Confirmation Dialog */}
+      <Dialog open={showToggleConfirm} onOpenChange={setShowToggleConfirm}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {isClosed ? (
+                <LockOpen className="h-5 w-5 text-green-600" />
+              ) : (
+                <Lock className="h-5 w-5 text-red-600" />
+              )}
+              {isClosed ? 'Reopen QA Check?' : 'Close QA Check?'}
+            </DialogTitle>
+            <DialogDescription className="pt-1 text-sm text-gray-600">
+              {isClosed
+                ? 'This will reopen the QA check and add a log entry for the reopening.'
+                : 'This will close the QA check and add a log entry for the closure.'}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 pt-2 sm:justify-end">
+            <Button
+              variant="outline"
+              onClick={() => setShowToggleConfirm(false)}
+              disabled={isToggling}
+            >
+              Cancel
+            </Button>
+            <Button
+              className={isClosed ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-red-600 text-white hover:bg-red-700'}
+              onClick={handleToggleClose}
+              disabled={isToggling}
+            >
+              {isToggling ? 'Saving...' : isClosed ? 'Yes, Reopen' : 'Yes, Close'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Edit Log Dialog */}
       <Dialog open={showEditLogModal} onOpenChange={setShowEditLogModal}>
         <DialogContent className="sm:max-w-2xl">
@@ -1083,6 +1198,73 @@ function QACheckTab() {
           </DialogHeader>
 
           <div className="space-y-6 py-4">
+            {/* Editable Log Dates */}
+            {editingLog && (
+              <div className="grid grid-cols-3 gap-4 rounded-md border border-gray-200 bg-gray-50 p-4">
+                <div className="flex flex-col space-y-1">
+                  <Label className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                    Created At
+                  </Label>
+                  <DatePicker
+                    selected={editCreatedAt}
+                    onChange={(date) => setEditCreatedAt(date)}
+                    dateFormat="dd-MM-yyyy"
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-theme focus:outline-none focus:ring-2 focus:ring-theme"
+                    placeholderText="Select date..."
+                    showYearDropdown
+                    dropdownMode="select"
+                    preventOpenOnFocus
+                  />
+                </div>
+                <div className="flex flex-col space-y-1">
+                  <Label className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                    Scheduled Date
+                  </Label>
+                  <DatePicker
+                    selected={editScheduledDate}
+                    onChange={(date) => setEditScheduledDate(date)}
+                    dateFormat="dd-MM-yyyy"
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-theme focus:outline-none focus:ring-2 focus:ring-theme"
+                    placeholderText="Select date..."
+                    showYearDropdown
+                    dropdownMode="select"
+                    preventOpenOnFocus
+                  />
+                </div>
+                <div className="flex flex-col space-y-1">
+                  <Label className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                    Completion Date
+                  </Label>
+                  <DatePicker
+                    selected={editCompletionDate}
+                    onChange={(date) => setEditCompletionDate(date)}
+                    dateFormat="dd-MM-yyyy"
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-theme focus:outline-none focus:ring-2 focus:ring-theme"
+                    placeholderText="Select date..."
+                    showYearDropdown
+                    dropdownMode="select"
+                    preventOpenOnFocus
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Editable Note */}
+            {editingLog && (
+              <div className="flex flex-col space-y-1">
+                <Label className="text-sm font-medium text-gray-700">
+                  Note <span className="font-normal text-gray-400">(Optional)</span>
+                </Label>
+                <textarea
+                  value={editNote}
+                  onChange={(e) => setEditNote(e.target.value)}
+                  rows={3}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-theme focus:outline-none focus:ring-2 focus:ring-theme"
+                  placeholder="Add a note..."
+                />
+              </div>
+            )}
+
             {/* Existing Documents */}
             <div className="space-y-3">
               <Label className="text-sm font-medium text-gray-700">
@@ -1112,7 +1294,7 @@ function QACheckTab() {
                           >
                             {decodeURIComponent(
                               docUrl.split('/').pop()?.split('?')[0] ||
-                                `Document ${idx + 1}`
+                                `Doc ${idx + 1}`
                             )}
                           </span>
                         </div>
@@ -1150,10 +1332,8 @@ function QACheckTab() {
             {/* Newly Uploaded Documents */}
             {editLogFiles.length > 0 && (
               <div className="space-y-2">
-                <Label className="text-sm font-medium text-gray-700">
-                  New Documents to Add
-                </Label>
-                <div className="max-h-32 space-y-2 overflow-y-auto pr-1">
+               
+                <div className="max-h-32 space-y-2 overflow-y-auto ">
                   {editLogFiles.map((file, index) => (
                     <div
                       key={`new-${index}`}
