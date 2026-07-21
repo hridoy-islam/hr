@@ -123,7 +123,6 @@ function QACheckTab() {
   const [editLogFiles, setEditLogFiles] = useState<UploadedFile[]>([]);
   const [editLogRemovedUrls, setEditLogRemovedUrls] = useState<string[]>([]);
   const [isEditLogSubmitting, setIsEditLogSubmitting] = useState(false);
-  const [editCreatedAt, setEditCreatedAt] = useState<Date | null>(null);
   const [editScheduledDate, setEditScheduledDate] = useState<Date | null>(null);
   const [editCompletionDate, setEditCompletionDate] = useState<Date | null>(null);
   const [editNote, setEditNote] = useState('');
@@ -541,7 +540,6 @@ function QACheckTab() {
     setEditingLog(entry);
     setEditLogFiles([]);
     setEditLogRemovedUrls([]);
-    setEditCreatedAt(entry.createdAt ? new Date(moment.utc(entry.createdAt).year(), moment.utc(entry.createdAt).month(), moment.utc(entry.createdAt).date()) : entry.date ? new Date(moment.utc(entry.date).year(), moment.utc(entry.date).month(), moment.utc(entry.date).date()) : null);
     setEditScheduledDate(entry.scheduledDate ? new Date(moment.utc(entry.scheduledDate).year(), moment.utc(entry.scheduledDate).month(), moment.utc(entry.scheduledDate).date()) : null);
     setEditCompletionDate(entry.completionDate ? new Date(moment.utc(entry.completionDate).year(), moment.utc(entry.completionDate).month(), moment.utc(entry.completionDate).date()) : null);
     setEditNote(entry.note || '');
@@ -637,18 +635,8 @@ function QACheckTab() {
         document: finalDocuments,
         scheduledDate: editScheduledDate ? new Date(Date.UTC(editScheduledDate.getFullYear(), editScheduledDate.getMonth(), editScheduledDate.getDate())).toISOString() : null,
         completionDate: editCompletionDate ? new Date(Date.UTC(editCompletionDate.getFullYear(), editCompletionDate.getMonth(), editCompletionDate.getDate())).toISOString() : null,
-        note: editNote,
-date: editCreatedAt 
-  ? new Date(Date.UTC(
-      editCreatedAt.getFullYear(), 
-      editCreatedAt.getMonth(), 
-      editCreatedAt.getDate(),
-      new Date().getUTCHours(),      // Current hours
-      new Date().getUTCMinutes(),    // Current minutes
-      new Date().getUTCSeconds(),    // Current seconds
-      new Date().getUTCMilliseconds() // Current milliseconds
-    )).toISOString() 
-  : null      });
+        note: editNote
+      });
 
       await fetchQACheckData();
       toast({
@@ -1200,22 +1188,7 @@ date: editCreatedAt
           <div className="space-y-6 py-4">
             {/* Editable Log Dates */}
             {editingLog && (
-              <div className="grid grid-cols-3 gap-4 rounded-md border border-gray-200 bg-gray-50 p-4">
-                <div className="flex flex-col space-y-1">
-                  <Label className="text-xs font-medium uppercase tracking-wide text-gray-500">
-                    Created At
-                  </Label>
-                  <DatePicker
-                    selected={editCreatedAt}
-                    onChange={(date) => setEditCreatedAt(date)}
-                    dateFormat="dd-MM-yyyy"
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-theme focus:outline-none focus:ring-2 focus:ring-theme"
-                    placeholderText="Select date..."
-                    showYearDropdown
-                    dropdownMode="select"
-                    preventOpenOnFocus
-                  />
-                </div>
+              <div className="grid grid-cols-2 gap-4 rounded-md border border-gray-200 bg-gray-50 p-4">
                 <div className="flex flex-col space-y-1">
                   <Label className="text-xs font-medium uppercase tracking-wide text-gray-500">
                     Scheduled Date
