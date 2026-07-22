@@ -229,7 +229,7 @@ function SupervisionTab() {
 
     if (now.isAfter(target, 'day')) {
       setComplianceStatus('overdue');
-    } else if (scheduleInterval > 0 && diffDays <= 7 && diffDays >= 0) {
+    } else if (diffDays <= 7 && diffDays >= 0) {
       setComplianceStatus('due-soon');
     } else {
       setComplianceStatus('scheduled');
@@ -569,13 +569,26 @@ function SupervisionTab() {
   };
 
   const handleToggleClose = async () => {
-    if (!supervisionId) return;
     setIsToggling(true);
     try {
-      await axiosInstance.patch(`/supervision/${supervisionId}`, {
-        isClosed: !isClosed,
-        updatedBy: user._id
-      });
+      let currentSupervisionId = supervisionId;
+
+      if (!currentSupervisionId) {
+        const createRes = await axiosInstance.post('/supervision', {
+          employeeId: eid,
+          updatedBy: user._id,
+          scheduledDate: null,
+          note: '',
+          isClosed: !isClosed
+        });
+        currentSupervisionId = createRes.data?.data?._id;
+      } else {
+        await axiosInstance.patch(`/supervision/${currentSupervisionId}`, {
+          isClosed: !isClosed,
+          updatedBy: user._id
+        });
+      }
+
       await fetchSupervisionData();
       toast({
         title: isClosed
@@ -886,29 +899,27 @@ function SupervisionTab() {
                   </Button>
                 )}
 
-                {supervisionId && (
-                  <Button
-                    onClick={() => setShowToggleConfirm(true)}
-                    disabled={leaverData.length > 0}
-                    variant="outline"
-                    className={cn(
-                      'w-full border',
-                      isClosed
-                        ? 'border-none bg-green-700 text-white hover:bg-green-600'
+                <Button
+                  onClick={() => setShowToggleConfirm(true)}
+                  disabled={leaverData.length > 0}
+                  variant="outline"
+                  className={cn(
+                    'w-full border',
+                    supervisionId && isClosed
+                      ? 'border-none bg-green-700 text-white hover:bg-green-600'
+                      : supervisionId && !isClosed
+                        ? 'border-none bg-destructive text-white hover:bg-destructive'
                         : 'border-none bg-destructive text-white hover:bg-destructive'
-                    )}
-                  >
-                    {isClosed ? (
-                      <>
-                        <LockOpen className="mr-2 h-4 w-4" /> Open Supervision
-                      </>
-                    ) : (
-                      <>
-                        <Lock className="mr-2 h-4 w-4" /> Close Supervision
-                      </>
-                    )}
-                  </Button>
-                )}
+                  )}
+                >
+                  {supervisionId && isClosed ? (
+                    <><LockOpen className="mr-2 h-4 w-4" /> Open Supervision</>
+                  ) : supervisionId && !isClosed ? (
+                    <><Lock className="mr-2 h-4 w-4" /> Close Supervision</>
+                  ) : (
+                    <><Lock className="mr-2 h-4 w-4" /> Close Supervision</>
+                  )}
+                </Button>
               </div>
             </div>
           </div>

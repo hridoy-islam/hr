@@ -324,7 +324,7 @@ function QACheckTab() {
 
     if (now.isAfter(target, 'day')) {
       setComplianceStatus('overdue');
-    } else if (scheduleInterval > 0 && diffDays <= 7 && diffDays >= 0) {
+    } else if (diffDays <= 7 && diffDays >= 0) {
       setComplianceStatus('due-soon');
     } else {
       setComplianceStatus('scheduled');
@@ -512,13 +512,26 @@ function QACheckTab() {
   };
 
   const handleToggleClose = async () => {
-    if (!qaCheckId) return;
     setIsToggling(true);
     try {
-      await axiosInstance.patch(`/qa/${qaCheckId}`, {
-        isClosed: !isClosed,
-        updatedBy: user._id,
-      });
+      let currentQaCheckId = qaCheckId;
+
+      if (!currentQaCheckId) {
+        const createRes = await axiosInstance.post('/qa', {
+          employeeId: eid,
+          updatedBy: user._id,
+          scheduledDate: null,
+          note: '',
+          isClosed: !isClosed
+        });
+        currentQaCheckId = createRes.data?.data?._id;
+      } else {
+        await axiosInstance.patch(`/qa/${currentQaCheckId}`, {
+          isClosed: !isClosed,
+          updatedBy: user._id,
+        });
+      }
+
       await fetchQACheckData();
       toast({
         title: isClosed ? 'QA Check reopened successfully!' : 'QA Check closed successfully!',
@@ -838,25 +851,27 @@ function QACheckTab() {
                   </Button>
                 )}
 
-                {qaCheckId && (
-                  <Button
-                    onClick={() => setShowToggleConfirm(true)}
-                    disabled={leaverData.length > 0}
-                    variant="outline"
-                    className={cn(
-                      'w-full border',
-                      isClosed
-                        ? 'bg-theme text-white border-none hover:bg-theme/90'
+                <Button
+                  onClick={() => setShowToggleConfirm(true)}
+                  disabled={leaverData.length > 0}
+                  variant="outline"
+                  className={cn(
+                    'w-full border',
+                    qaCheckId && isClosed
+                      ? 'bg-green-600 text-white border-none hover:bg-green-700'
+                      : qaCheckId && !isClosed
+                        ? 'bg-destructive text-white border-none hover:bg-destructive/90'
                         : 'bg-destructive text-white border-none hover:bg-destructive/90'
-                    )}
-                  >
-                    {isClosed ? (
-                      <><LockOpen className="mr-2 h-4 w-4" /> Open QA</>
-                    ) : (
-                      <><Lock className="mr-2 h-4 w-4" /> Close QA</>
-                    )}
-                  </Button>
-                )}
+                  )}
+                >
+                  {qaCheckId && isClosed ? (
+                    <><LockOpen className="mr-2 h-4 w-4" /> Open QA</>
+                  ) : qaCheckId && !isClosed ? (
+                    <><Lock className="mr-2 h-4 w-4" /> Close QA</>
+                  ) : (
+                    <><Lock className="mr-2 h-4 w-4" /> Close QA</>
+                  )}
+                </Button>
               </div>
 
               {/* here add close qa or open qa Button */}

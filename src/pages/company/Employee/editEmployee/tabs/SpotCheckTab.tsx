@@ -297,12 +297,12 @@ function SpotCheckTab() {
     }
 
     // 2. Check for "Cycle Active" state.
-    const isCycleOpen = !completionDate || moment(scheduledDate).isAfter(moment(completionDate));
+    // const isCycleOpen = !completionDate || moment(scheduledDate).isAfter(moment(completionDate));
 
-    if (!isCycleOpen) {
-      setComplianceStatus('completed');
-      return;
-    }
+    // if (!isCycleOpen) {
+    //   setComplianceStatus('completed');
+    //   return;
+    // }
 
     // 3. If cycle is open, calculate status based on Today vs Scheduled
     const now = moment().startOf('day');
@@ -312,7 +312,7 @@ function SpotCheckTab() {
     if (now.isAfter(target, 'day')) {
       setComplianceStatus('overdue');
     } 
-    else if (scheduleInterval > 0 && diffDays <= 7 && diffDays >= 0) {
+    else if (diffDays <= 7 && diffDays >= 0) {
       setComplianceStatus('due-soon');
     } 
     else {
@@ -471,13 +471,26 @@ function SpotCheckTab() {
   };
 
   const handleToggleClose = async () => {
-    if (!spotCheckId) return;
     setIsToggling(true);
     try {
-      await axiosInstance.patch(`/spot-check/${spotCheckId}`, {
-        isClosed: !isClosed,
-        updatedBy: user._id
-      });
+      let currentSpotCheckId = spotCheckId;
+
+      if (!currentSpotCheckId) {
+        const createRes = await axiosInstance.post('/spot-check', {
+          employeeId: eid,
+          updatedBy: user._id,
+          scheduledDate: null,
+          note: '',
+          isClosed: !isClosed
+        });
+        currentSpotCheckId = createRes.data?.data?._id;
+      } else {
+        await axiosInstance.patch(`/spot-check/${currentSpotCheckId}`, {
+          isClosed: !isClosed,
+          updatedBy: user._id
+        });
+      }
+
       await fetchSpotCheckData();
       toast({
         title: isClosed
@@ -494,6 +507,10 @@ function SpotCheckTab() {
     } finally {
       setIsToggling(false);
     }
+  };
+
+  const handleToggleClick = () => {
+    setShowToggleConfirm(true);
   };
 
   // Log Edit Functions
@@ -608,6 +625,7 @@ function SpotCheckTab() {
 
   // Check if we should show "Complete" button
   const showCompleteButton = scheduledDate && (!completionDate || moment(scheduledDate).isAfter(moment(completionDate)));
+
 
   if (isLoading) {
     return (
@@ -768,25 +786,27 @@ function SpotCheckTab() {
                   </Button>
                 )}
 
-                {spotCheckId && (
-                  <Button
-                    onClick={() => setShowToggleConfirm(true)}
-                    disabled={leaverData.length > 0}
-                    variant="outline"
-                    className={cn(
-                      'w-full border',
-                      isClosed
-                        ? 'border-none bg-green-700 text-white hover:bg-green-600'
+                <Button
+                  onClick={handleToggleClick}
+                  disabled={leaverData.length > 0}
+                  variant="outline"
+                  className={cn(
+                    'w-full border',
+                    spotCheckId && isClosed
+                      ? 'border-none bg-green-700 text-white hover:bg-green-600'
+                      : spotCheckId && !isClosed
+                        ? 'border-none bg-destructive text-white hover:bg-destructive'
                         : 'border-none bg-destructive text-white hover:bg-destructive'
-                    )}
-                  >
-                    {isClosed ? (
-                      <><LockOpen className="mr-2 h-4 w-4" /> Open Spot Check</>
-                    ) : (
-                      <><Lock className="mr-2 h-4 w-4" /> Close Spot Check</>
-                    )}
-                  </Button>
-                )}
+                  )}
+                >
+                  {spotCheckId && isClosed ? (
+                    <><LockOpen className="mr-2 h-4 w-4" /> Open Spot Check</>
+                  ) : spotCheckId && !isClosed ? (
+                    <><Lock className="mr-2 h-4 w-4" /> Close Spot Check</>
+                  ) : (
+                    <><Lock className="mr-2 h-4 w-4" /> Close Spot Check</>
+                  )}
+                </Button>
               </div>
             </div>
           </div>
