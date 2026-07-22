@@ -10,7 +10,9 @@ import {
   Eye,
   CheckCircle2,
   Download,
-  Pen
+  Pen,
+  Lock,
+  LockOpen
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import DatePicker from 'react-datepicker';
@@ -48,9 +50,12 @@ interface LogEntry {
   _id?: string;
   title: string;
   date: string;
-  document?: string[] | string; // Updated to support array or legacy string
+  document?: string[] | string;
   note?: string;
   updatedBy: string | { firstName: string; lastName: string; name?: string };
+  createdAt?: string;
+  scheduledDate?: string;
+  completionDate?: string;
 }
 
 interface SpotCheckData {
@@ -59,6 +64,7 @@ interface SpotCheckData {
   scheduledDate: string;
   completionDate?: string;
   spotCheckNote?: string;
+  isClosed?: boolean;
   logs?: LogEntry[];
 }
 
@@ -88,6 +94,7 @@ function SpotCheckTab() {
   const [completionDate, setCompletionDate] = useState<string | null>(null);
   const [savedNote, setSavedNote] = useState<string>('');
   const [history, setHistory] = useState<LogEntry[]>([]);
+  const [isClosed, setIsClosed] = useState(false);
   
   // Settings & Status
   const [scheduleInterval, setScheduleInterval] = useState<number>(0);
@@ -115,10 +122,15 @@ function SpotCheckTab() {
   const [editLogFiles, setEditLogFiles] = useState<UploadedFile[]>([]);
   const [editLogRemovedUrls, setEditLogRemovedUrls] = useState<string[]>([]);
   const [isEditLogSubmitting, setIsEditLogSubmitting] = useState(false);
+  const [editScheduledDate, setEditScheduledDate] = useState<Date | null>(null);
+  const [editCompletionDate, setEditCompletionDate] = useState<Date | null>(null);
+  const [editNote, setEditNote] = useState('');
   const [showRemoveWarning, setShowRemoveWarning] = useState(false);
   const [pendingRemoveIndex, setPendingRemoveIndex] = useState<{ type: 'existing' | 'new'; index: number } | null>(null);
   const editFileInputRef = useRef<HTMLInputElement>(null);
   const[leaverData,setLeaverData] = useState([]);
+  const [showToggleConfirm, setShowToggleConfirm] = useState(false);
+  const [isToggling, setIsToggling] = useState(false);
 
   const handleViewDocument = (url: string) => {
     setPreviewUrl(url);
@@ -239,6 +251,7 @@ function SpotCheckTab() {
         setScheduledDate(data.scheduledDate);
         setCompletionDate(data.completionDate || null);
         setSavedNote(data.spotCheckNote || ''); 
+        setIsClosed(data.isClosed || false);
         setHistory(data.logs || []);
       } else {
         setSpotCheckId(null);
@@ -390,7 +403,13 @@ function SpotCheckTab() {
 
     try {
       const payload = {
-        scheduledDate: moment(inputDate).toISOString(),
+        scheduledDate: new Date(
+          Date.UTC(
+            inputDate!.getFullYear(),
+            inputDate!.getMonth(),
+            inputDate!.getDate()
+          )
+        ).toISOString(),
         updatedBy: user._id,
         note: inputNote,
         document: uploadedFiles.map(f => f.url) // Passed as Array
@@ -428,7 +447,13 @@ function SpotCheckTab() {
 
     try {
       await axiosInstance.patch(`/spot-check/${spotCheckId}`, {
-        completionDate: moment(inputDate).toISOString(),
+        completionDate: new Date(
+          Date.UTC(
+            inputDate!.getFullYear(),
+            inputDate!.getMonth(),
+            inputDate!.getDate()
+          )
+        ).toISOString(),
         document: uploadedFiles.map(f => f.url), // Array submission
         note: inputNote,
         updatedBy: user._id
@@ -445,11 +470,40 @@ function SpotCheckTab() {
     }
   };
 
+  const handleToggleClose = async () => {
+    if (!spotCheckId) return;
+    setIsToggling(true);
+    try {
+      await axiosInstance.patch(`/spot-check/${spotCheckId}`, {
+        isClosed: !isClosed,
+        updatedBy: user._id
+      });
+      await fetchSpotCheckData();
+      toast({
+        title: isClosed
+          ? 'Spot Check reopened successfully!'
+          : 'Spot Check closed successfully!',
+        className: 'bg-theme text-white'
+      });
+      setShowToggleConfirm(false);
+    } catch (err: any) {
+      toast({
+        title: err.response?.data?.message || 'Toggle failed.',
+        className: 'bg-destructive text-white'
+      });
+    } finally {
+      setIsToggling(false);
+    }
+  };
+
   // Log Edit Functions
   const openEditLogModal = (entry: LogEntry) => {
     setEditingLog(entry);
     setEditLogFiles([]);
     setEditLogRemovedUrls([]);
+    setEditScheduledDate(entry.scheduledDate ? new Date(moment.utc(entry.scheduledDate).year(), moment.utc(entry.scheduledDate).month(), moment.utc(entry.scheduledDate).date()) : null);
+    setEditCompletionDate(entry.completionDate ? new Date(moment.utc(entry.completionDate).year(), moment.utc(entry.completionDate).month(), moment.utc(entry.completionDate).date()) : null);
+    setEditNote(entry.note || '');
     setShowEditLogModal(true);
   };
 
@@ -533,7 +587,10 @@ function SpotCheckTab() {
 
     try {
       await axiosInstance.patch(`/spot-check/${spotCheckId}/logs/${editingLog._id}`, {
-        document: finalDocuments
+        document: finalDocuments,
+        scheduledDate: editScheduledDate ? new Date(Date.UTC(editScheduledDate.getFullYear(), editScheduledDate.getMonth(), editScheduledDate.getDate())).toISOString() : null,
+        completionDate: editCompletionDate ? new Date(Date.UTC(editCompletionDate.getFullYear(), editCompletionDate.getMonth(), editCompletionDate.getDate())).toISOString() : null,
+        note: editNote
       });
 
       await fetchSpotCheckData();
@@ -691,17 +748,43 @@ function SpotCheckTab() {
 
               {/* 6. Action Buttons */}
               <div className="border-t border-gray-100 pt-6 space-y-3">
-                {showCompleteButton ? (
-                   <div className="space-y-3">
-                     <Button onClick={handleOpenComplete} disabled={leaverData.length > 0}  className="w-full bg-green-600 text-white hover:bg-green-700">
-                       <CheckCircle2 className="mr-2 h-4 w-4" />
-                       Complete Check
-                     </Button>
-                   </div>
-                ) : (
-                  <Button onClick={handleOpenSchedule} disabled={leaverData.length > 0} className="w-full bg-theme text-white hover:bg-theme/90">
-                    <CalendarClock className="mr-2 h-4 w-4" />
-                    {scheduledDate ? 'Update Spot Date' : 'Create First Spot Date'}
+                <Button
+                  onClick={handleOpenSchedule}
+                  disabled={leaverData.length > 0 || isClosed}
+                  className="w-full bg-theme text-white hover:bg-theme/90"
+                >
+                  <CalendarClock className="mr-2 h-4 w-4" />
+                  {scheduledDate ? 'Update Spot Date' : 'Create First Spot Date'}
+                </Button>
+
+                {showCompleteButton && (
+                  <Button
+                    onClick={handleOpenComplete}
+                    disabled={leaverData.length > 0 || isClosed}
+                    className="w-full bg-green-600 text-white hover:bg-green-700"
+                  >
+                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                    Complete Check
+                  </Button>
+                )}
+
+                {spotCheckId && (
+                  <Button
+                    onClick={() => setShowToggleConfirm(true)}
+                    disabled={leaverData.length > 0}
+                    variant="outline"
+                    className={cn(
+                      'w-full border',
+                      isClosed
+                        ? 'border-none bg-green-700 text-white hover:bg-green-600'
+                        : 'border-none bg-destructive text-white hover:bg-destructive'
+                    )}
+                  >
+                    {isClosed ? (
+                      <><LockOpen className="mr-2 h-4 w-4" /> Open Spot Check</>
+                    ) : (
+                      <><Lock className="mr-2 h-4 w-4" /> Close Spot Check</>
+                    )}
                   </Button>
                 )}
               </div>
@@ -922,6 +1005,54 @@ function SpotCheckTab() {
           </DialogHeader>
 
           <div className="space-y-6 py-4">
+            {/* Editable Log Dates */}
+            {editingLog && (
+              <div className="grid grid-cols-2 gap-4 rounded-md border border-gray-200 bg-gray-50 p-4">
+                <div className="flex flex-col space-y-1">
+                  <Label className="text-xs font-medium uppercase tracking-wide text-gray-500">Scheduled Date</Label>
+                  <DatePicker
+                    selected={editScheduledDate}
+                    onChange={(date) => setEditScheduledDate(date)}
+                    dateFormat="dd-MM-yyyy"
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-theme focus:outline-none focus:ring-2 focus:ring-theme"
+                    placeholderText="Select date..."
+                    showYearDropdown
+                    dropdownMode="select"
+                    preventOpenOnFocus
+                  />
+                </div>
+                <div className="flex flex-col space-y-1">
+                  <Label className="text-xs font-medium uppercase tracking-wide text-gray-500">Completion Date</Label>
+                  <DatePicker
+                    selected={editCompletionDate}
+                    onChange={(date) => setEditCompletionDate(date)}
+                    dateFormat="dd-MM-yyyy"
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-theme focus:outline-none focus:ring-2 focus:ring-theme"
+                    placeholderText="Select date..."
+                    showYearDropdown
+                    dropdownMode="select"
+                    preventOpenOnFocus
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Editable Note */}
+            {editingLog && (
+              <div className="flex flex-col space-y-1">
+                <Label className="text-sm font-medium text-gray-700">
+                  Note <span className="font-normal text-gray-400">(Optional)</span>
+                </Label>
+                <textarea
+                  value={editNote}
+                  onChange={(e) => setEditNote(e.target.value)}
+                  rows={3}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-theme focus:outline-none focus:ring-2 focus:ring-theme"
+                  placeholder="Add a note..."
+                />
+              </div>
+            )}
+
             {/* Existing Documents */}
             <div className="space-y-3">
               <Label className="text-sm font-medium text-gray-700">Current Documents</Label>
@@ -1025,6 +1156,51 @@ function SpotCheckTab() {
             </Button>
             <Button className="bg-theme hover:bg-theme/90 text-white" onClick={handleSubmitEditLog} disabled={isEditLogSubmitting || isUploading}>
               {isEditLogSubmitting ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Close/Open Spot Check Confirmation Dialog */}
+      <Dialog open={showToggleConfirm} onOpenChange={setShowToggleConfirm}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {isClosed ? (
+                <LockOpen className="h-5 w-5 text-green-600" />
+              ) : (
+                <Lock className="h-5 w-5 text-red-600" />
+              )}
+              {isClosed ? 'Reopen Spot Check?' : 'Close Spot Check?'}
+            </DialogTitle>
+            <DialogDescription className="pt-1 text-sm text-gray-600">
+              {isClosed
+                ? 'This will reopen the spot check and add a log entry for the reopening.'
+                : 'This will close the spot check and add a log entry for the closure.'}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 pt-2 sm:justify-end">
+            <Button
+              variant="outline"
+              onClick={() => setShowToggleConfirm(false)}
+              disabled={isToggling}
+            >
+              Cancel
+            </Button>
+            <Button
+              className={
+                isClosed
+                  ? 'bg-green-600 text-white hover:bg-green-700'
+                  : 'bg-red-600 text-white hover:bg-red-700'
+              }
+              onClick={handleToggleClose}
+              disabled={isToggling}
+            >
+              {isToggling
+                ? 'Saving...'
+                : isClosed
+                  ? 'Yes, Reopen'
+                  : 'Yes, Close'}
             </Button>
           </DialogFooter>
         </DialogContent>

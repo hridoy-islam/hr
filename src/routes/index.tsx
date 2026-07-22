@@ -110,6 +110,7 @@ import CompanyLeaveCalendarPage from '@/pages/company/leave-calendar';
 import CompanyPayRoll from '@/pages/company/Payroll';
 import BatchPayrollDetails from '@/pages/company/Payroll/batch-payroll';
 import MissingAttendancePage from '@/pages/company/MissingAttendance';
+import UnscheduleAttendancePage from '@/pages/company/Attendance/UnscheduleAttendance';
 import MissingAttendanceCalendarPage from '@/pages/company/MissingAttendance/MissingShiftCalendar';
 import OfficeMeetingPage from '@/pages/company/officeMeeting';
 import MeetingDetailsPage from '@/pages/company/officeMeeting/meetingDetails/MeetingDetailsPage';
@@ -351,6 +352,7 @@ export default function AppRouter() {
         { path: 'manage-holiday', element: <ManageHolidayPage /> },
         { path: 'docusign-details', element: <CompanyDocusignDetailsPage /> },
         { path: 'missed-attendance', element: <MissingAttendancePage /> },
+        { path: 'unschedule-attendance', element: <UnscheduleAttendancePage /> },
         { path: 'company-meeting', element: <OfficeMeetingPage /> },
         { path: 'company-meeting/:mid', element: <MeetingDetailsPage /> },
         { path: 'company-policy', element: <CompanyPolicyPage /> },

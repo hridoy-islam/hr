@@ -17,7 +17,8 @@ import {
   Coffee,
   Plus,
   Trash2,
-  Edit
+  Edit,
+  ArrowLeft
 } from 'lucide-react';
 
 // Shadcn UI Imports
@@ -148,7 +149,7 @@ const isSameDay = (a: Date | null, b: Date | null) => {
   );
 };
 
-const AttendancePage = () => {
+const UnscheduleAttendancePage = () => {
   const user = useSelector((state: RootState) => state.auth?.user) || null;
   const navigate = useNavigate();
   const { id } = useParams();
@@ -165,20 +166,8 @@ const AttendancePage = () => {
   const [departmentsOptions, setDepartmentsOptions] = useState<any[]>([]);
   const [usersOptions, setUsersOptions] = useState<any[]>([]);
 
-  const approvalOptions = [
-    { value: false, label: 'Admin Needs to Approve' },
-    { value: true, label: 'Already Approved' }
-  ];
-
   const [selectedDesignation, setSelectedDesignation] = useState<any>(null);
-  const [selectedDepartment, setSelectedDepartment] = useState<any>(null);
   const [selectedUser, setSelectedUser] = useState<any>(null);
-  const [selectedApproval, setSelectedApproval] = useState<any>(
-    approvalOptions[0]
-  );
-  const [fetchedApproval, setFetchedApproval] = useState<any>(
-    approvalOptions[0]
-  );
   const [isLoading, setIsLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -313,22 +302,16 @@ const AttendancePage = () => {
           ? `${to.getFullYear()}-${String(to.getMonth() + 1).padStart(2, '0')}-${String(to.getDate()).padStart(2, '0')}`
           : undefined,
         designationId: selectedDesignation?.value,
-        departmentId: selectedDepartment?.value,
         userId: selectedUser?.value,
         userType: 'employee'
       };
 
-      if (selectedApproval !== null) {
-        params.isApproved = selectedApproval.value;
-      }
-
-      const res = await axiosInstance.get(`/hr/attendance`, { params });
+      const res = await axiosInstance.get(`/hr/attendance/unschedule-attendance`, { params });
       const apiResponse = res.data;
 
       if (apiResponse.success && apiResponse.data) {
         setAttendanceData(apiResponse.data.result || []);
         setTotalPages(apiResponse.data.meta?.totalPage || 1);
-        setFetchedApproval(selectedApproval);
       }
     } catch (error) {
       console.error('Error fetching attendance:', error);
@@ -344,13 +327,10 @@ const AttendancePage = () => {
   const handleReset = () => {
     setSelectedUser(null);
     setSelectedDesignation(null);
-    setSelectedDepartment(null);
-    setSelectedApproval(approvalOptions[0]);
     setDateRange([
       new Date(new Date().getFullYear(), new Date().getMonth(), 1),
       new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0)
     ]);
-    setFetchedApproval(approvalOptions[0]);
     setActiveDateBtn(null);
   };
 
@@ -613,13 +593,9 @@ const AttendancePage = () => {
       });
       toast({ title: 'Attendance Approved Successfully' });
 
-      if (selectedApproval?.value === false) {
-        setAttendanceData((prev) => prev.filter((r) => r._id !== recordId));
-      } else {
-        setAttendanceData((prev) =>
-          prev.map((r) => (r._id === recordId ? { ...r, isApproved: true } : r))
-        );
-      }
+      setAttendanceData((prev) =>
+        prev.map((r) => (r._id === recordId ? { ...r, isApproved: true } : r))
+      );
     } catch (error: any) {
       const msg =
         error?.response?.data?.message || 'Failed to approve attendance';
@@ -879,9 +855,20 @@ const AttendancePage = () => {
       .replace(',', '');
 
   return (
-    <div className="space-y-3 relative">
+    <div className="space-y-3 relative min-h-[600px]">
       <Card className="w-full bg-white shadow-md">
         <CardContent className="space-y-3 p-2 pt-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold">Unschedule Attendance</h2>
+            <Button
+              variant="default"
+              onClick={() => navigate(-1)}
+              className="flex items-center gap-1 text-sm"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </Button>
+          </div>
           {/* Filters Top Bar */}
           <div className="grid grid-cols-1 items-end gap-3 lg:grid-cols-6">
             <div>
@@ -895,32 +882,6 @@ const AttendancePage = () => {
                 placeholder="Select..."
                 isClearable
                 className="text-sm"
-              />
-            </div>
-            <div>
-              <label className="mb-2 block text-xs font-semibold uppercase tracking-wider">
-                Department
-              </label>
-              <Select
-                options={departmentsOptions}
-                value={selectedDepartment}
-                onChange={setSelectedDepartment}
-                placeholder="Select..."
-                isClearable
-                className="text-sm"
-              />
-            </div>
-            <div>
-              <label className="mb-2 block text-xs font-semibold uppercase tracking-wider">
-                Status
-              </label>
-              <Select
-                options={approvalOptions}
-                value={selectedApproval}
-                onChange={setSelectedApproval}
-                placeholder="Select Status"
-                isClearable={false}
-                className="text-xs"
               />
             </div>
             <div className="w-full">
@@ -969,20 +930,6 @@ const AttendancePage = () => {
               >
                 Reset
               </Button>
-              <Button
-                variant="outline"
-                onClick={()=> navigate(`/company/${id}/missed-attendance`)}
-                className="h-10 px-3 w-full bg-orange-600 hover:bg-orange-700 text-white border-none"
-              >
-                Missed Shift
-              </Button>
-              {/* <Button
-                variant="outline"
-                onClick={()=> navigate(`/company/${id}/unschedule-attendance`)}
-                className="h-10 px-3 w-full bg-red-600 hover:bg-red-700 text-white border-none"
-              >
-                Unschedule Attendance
-              </Button> */}
             </div>
           </div>
 
@@ -995,19 +942,6 @@ const AttendancePage = () => {
                   <span> - {formatDisplayDate(endDate)}</span>
                 )}
               </div>
-              {fetchedApproval && (
-                <div className="mt-2 flex items-center">
-                  <span
-                    className={`inline-flex items-center rounded-full border px-3 py-0.5 text-sm font-medium ${
-                      fetchedApproval.label === 'Already Approved'
-                        ? 'border-green-200 bg-green-100 text-green-700'
-                        : 'border-orange-200 bg-yellow-100 text-orange-700'
-                    }`}
-                  >
-                    {fetchedApproval.label}
-                  </span>
-                </div>
-              )}
             </div>
             <div className="flex gap-4">
               <Button
@@ -1691,11 +1625,6 @@ const TableSection = ({
                         className={datePickerClass}
                         placeholderText="End Date"
                         portalId="root"
-                        // minDate={
-                        //   editForm.startDate
-                        //     ? moment(editForm.startDate).toDate()
-                        //     : null
-                        // }
                       />
                     </div>
                   ) : (
@@ -1793,29 +1722,7 @@ const TableSection = ({
                           Reconcile
                         </Button>
 
-                        {/* Show Approve Button only if not approved */}
-                        {!record.isApproved && (
-                          <Button
-                            size="sm"
-                            onClick={() => onApprove(record._id)}
-                            disabled={
-                              isApproving ||
-                              !rEndDate ||
-                              !rEndTime ||
-                              rEndTime === '--'
-                            }
-                            title={
-                              !rEndDate || !rEndTime || rEndTime === '--'
-                                ? 'Cannot approve: Missing End Date or End Time'
-                                : 'Approve Attendance'
-                            }
-                          >
-                            {isApproving && (
-                              <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-                            )}
-                            Approve
-                          </Button>
-                        )}
+                        {/* Approve button hidden */}
                       </div>
                     )}
                   </div>
@@ -1848,4 +1755,4 @@ const TableSection = ({
   );
 };
 
-export default AttendancePage;
+export default UnscheduleAttendancePage;
