@@ -11,7 +11,9 @@ import {
   Clock,
   ShieldAlert,
   Download,
-  Pen
+  Pen,
+  Lock,
+  LockOpen
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import DatePicker from 'react-datepicker';
@@ -56,13 +58,16 @@ interface LogEntry {
   date: string;
   document?: string[] | string; // Supports array of strings and legacy string fallback
   note?: string;
+  issueDeadline?: string;
+  extendDeadline?: string;
   updatedBy: string | { firstName: string; lastName: string; name?: string };
 }
 
 interface DisciplinaryData {
   _id: string;
   employeeId: string;
-  issueDeadline?: string; // If present, an issue is active
+  issueDeadline?: string;
+  isClosed?: boolean;
   logs?: LogEntry[];
 }
 
@@ -111,6 +116,16 @@ function DisciplinaryTab() {
   } | null>(null);
   const editFileInputRef = useRef<HTMLInputElement>(null);
 
+  // Toggle States
+  const [isClosed, setIsClosed] = useState(false);
+  const [showToggleConfirm, setShowToggleConfirm] = useState(false);
+  const [isToggling, setIsToggling] = useState(false);
+
+  // Edit Log Date/Note States
+  const [editIssueDeadline, setEditIssueDeadline] = useState<Date | null>(null);
+  const [editExtendDeadline, setEditExtendDeadline] = useState<Date | null>(null);
+  const [editNote, setEditNote] = useState('');
+
   // Form Inputs
   const [inputDate, setInputDate] = useState<Date | null>(null);
   const [inputNote, setInputNote] = useState('');
@@ -142,6 +157,7 @@ function DisciplinaryTab() {
       if (result.length > 0) {
         const data = result[0];
         setDisciplinaryId(data._id);
+        setIsClosed(data.isClosed || false);
 
         if (data.issueDeadline) {
           setActiveIssue(data);
@@ -535,11 +551,55 @@ function DisciplinaryTab() {
     }
   };
 
+  const handleToggleClose = async () => {
+    setIsToggling(true);
+    try {
+      let currentDisciplinaryId = disciplinaryId;
+
+      if (!currentDisciplinaryId) {
+        const createRes = await axiosInstance.post('/disciplinary', {
+          employeeId: eid,
+          updatedBy: user._id,
+          isClosed: !isClosed
+        });
+        currentDisciplinaryId = createRes.data?.data?._id;
+      } else {
+        await axiosInstance.patch(`/disciplinary/${currentDisciplinaryId}`, {
+          isClosed: !isClosed,
+          updatedBy: user._id
+        });
+      }
+
+      await fetchDisciplinaryData();
+      toast({
+        title: isClosed
+          ? 'Disciplinary reopened successfully!'
+          : 'Disciplinary closed successfully!',
+        className: 'bg-theme text-white'
+      });
+      setShowToggleConfirm(false);
+    } catch (err: any) {
+      toast({
+        title: err.response?.data?.message || 'Toggle failed.',
+        className: 'bg-destructive text-white'
+      });
+    } finally {
+      setIsToggling(false);
+    }
+  };
+
+  const handleToggleClick = () => {
+    setShowToggleConfirm(true);
+  };
+
   // Log Edit Functions
   const openEditLogModal = (entry: LogEntry) => {
     setEditingLog(entry);
     setEditLogFiles([]);
     setEditLogRemovedUrls([]);
+    setEditIssueDeadline(entry.issueDeadline ? new Date(moment.utc(entry.issueDeadline).year(), moment.utc(entry.issueDeadline).month(), moment.utc(entry.issueDeadline).date()) : null);
+    setEditExtendDeadline(entry.extendDeadline ? new Date(moment.utc(entry.extendDeadline).year(), moment.utc(entry.extendDeadline).month(), moment.utc(entry.extendDeadline).date()) : null);
+    setEditNote(entry.note || '');
     setShowEditLogModal(true);
   };
 
@@ -625,17 +685,34 @@ function DisciplinaryTab() {
 
     const finalDocuments = [...existingDocs, ...editLogFiles.map((f) => f.url)];
 
+    const payload: Record<string, any> = {};
+
+    if (finalDocuments.length > 0 || editLogRemovedUrls.length > 0) {
+      payload.document = finalDocuments;
+    }
+    if (editIssueDeadline) {
+      payload.issueDeadline = new Date(Date.UTC(editIssueDeadline.getFullYear(), editIssueDeadline.getMonth(), editIssueDeadline.getDate())).toISOString();
+    } else {
+      payload.issueDeadline = null;
+    }
+    if (editExtendDeadline) {
+      payload.extendDeadline = new Date(Date.UTC(editExtendDeadline.getFullYear(), editExtendDeadline.getMonth(), editExtendDeadline.getDate())).toISOString();
+    } else {
+      payload.extendDeadline = null;
+    }
+    if (editNote) {
+      payload.note = editNote;
+    }
+
     try {
       await axiosInstance.patch(
         `/disciplinary/${disciplinaryId}/logs/${editingLog._id}`,
-        {
-          document: finalDocuments
-        }
+        payload
       );
 
       await fetchDisciplinaryData();
       toast({
-        title: 'Log document updated successfully!',
+        title: 'Log updated successfully!',
         className: 'bg-theme text-white'
       });
       setShowEditLogModal(false);
@@ -698,7 +775,7 @@ function DisciplinaryTab() {
                   <div className="space-y-3 border-t border-gray-100 pt-6">
                     <Button
                       onClick={openExtend}
-                      disabled={leaverData.length > 0}
+                      disabled={leaverData.length > 0 || isClosed}
                       className="w-full"
                     >
                       <Clock className="mr-2 h-4 w-4" />
@@ -706,7 +783,7 @@ function DisciplinaryTab() {
                     </Button>
                     <Button
                       onClick={openResolve}
-                      disabled={leaverData.length > 0}
+                      disabled={leaverData.length > 0 || isClosed}
                       className="w-full bg-green-600 text-white hover:bg-green-700"
                     >
                       <CheckCircle2 className="mr-2 h-4 w-4" />
@@ -726,7 +803,7 @@ function DisciplinaryTab() {
                   <div className="border-t border-gray-100 pt-6">
                     <Button
                       onClick={openCreate}
-                      disabled={leaverData.length > 0}
+                      disabled={leaverData.length > 0 || isClosed}
                       className="w-full bg-theme text-white hover:bg-theme/90"
                     >
                       <Gavel className="mr-2 h-4 w-4" />
@@ -735,6 +812,30 @@ function DisciplinaryTab() {
                   </div>
                 </>
               )}
+
+              <div className="space-y-3 border-t border-gray-100 pt-6">
+                <Button
+                  onClick={handleToggleClick}
+                  disabled={leaverData.length > 0}
+                  variant="outline"
+                  className={cn(
+                    'w-full border',
+                    disciplinaryId && isClosed
+                      ? 'border-none bg-green-700 text-white hover:bg-green-600'
+                      : disciplinaryId && !isClosed
+                        ? 'border-none bg-destructive text-white hover:bg-destructive'
+                        : 'border-none bg-destructive text-white hover:bg-destructive'
+                  )}
+                >
+                  {disciplinaryId && isClosed ? (
+                    <><LockOpen className="mr-2 h-4 w-4" /> Open Disciplinary</>
+                  ) : disciplinaryId && !isClosed ? (
+                    <><Lock className="mr-2 h-4 w-4" /> Close Disciplinary</>
+                  ) : (
+                    <><Lock className="mr-2 h-4 w-4" /> Close Disciplinary</>
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -1296,6 +1397,52 @@ function DisciplinaryTab() {
           </DialogHeader>
 
           <div className="space-y-6 py-4">
+            {editingLog && (
+              <div className="grid grid-cols-2 gap-4 rounded-md border border-gray-200 bg-gray-50 p-4">
+                <div className="flex flex-col space-y-1">
+                  <Label className="text-xs font-medium uppercase tracking-wide text-gray-500">Resolution Deadline</Label>
+                  <DatePicker
+                    selected={editIssueDeadline}
+                    onChange={(date) => setEditIssueDeadline(date)}
+                    dateFormat="dd-MM-yyyy"
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-theme focus:outline-none focus:ring-2 focus:ring-theme"
+                    placeholderText="Select date..."
+                    showYearDropdown
+                    dropdownMode="select"
+                    preventOpenOnFocus
+                  />
+                </div>
+                <div className="flex flex-col space-y-1">
+                  <Label className="text-xs font-medium uppercase tracking-wide text-gray-500">Extended Date</Label>
+                  <DatePicker
+                    selected={editExtendDeadline}
+                    onChange={(date) => setEditExtendDeadline(date)}
+                    dateFormat="dd-MM-yyyy"
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-theme focus:outline-none focus:ring-2 focus:ring-theme"
+                    placeholderText="Select date..."
+                    showYearDropdown
+                    dropdownMode="select"
+                    preventOpenOnFocus
+                  />
+                </div>
+              </div>
+            )}
+
+            {editingLog && (
+              <div className="flex flex-col space-y-1">
+                <Label className="text-sm font-medium text-gray-700">
+                  Note <span className="font-normal text-gray-400">(Optional)</span>
+                </Label>
+                <textarea
+                  value={editNote}
+                  onChange={(e) => setEditNote(e.target.value)}
+                  rows={3}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-theme focus:outline-none focus:ring-2 focus:ring-theme"
+                  placeholder="Add a note..."
+                />
+              </div>
+            )}
+
             {/* Existing Documents */}
             <div className="space-y-3">
               <Label className="text-sm font-medium text-gray-700">
@@ -1455,6 +1602,51 @@ function DisciplinaryTab() {
               disabled={isEditLogSubmitting || isUploading}
             >
               {isEditLogSubmitting ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Close/Open Disciplinary Confirmation Dialog */}
+      <Dialog open={showToggleConfirm} onOpenChange={setShowToggleConfirm}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {isClosed ? (
+                <LockOpen className="h-5 w-5 text-green-600" />
+              ) : (
+                <Lock className="h-5 w-5 text-red-600" />
+              )}
+              {isClosed ? 'Reopen Disciplinary?' : 'Close Disciplinary?'}
+            </DialogTitle>
+            <DialogDescription className="pt-1 text-sm text-gray-600">
+              {isClosed
+                ? 'This will reopen the disciplinary and add a log entry for the reopening.'
+                : 'This will close the disciplinary and add a log entry for the closure.'}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 pt-2 sm:justify-end">
+            <Button
+              variant="outline"
+              onClick={() => setShowToggleConfirm(false)}
+              disabled={isToggling}
+            >
+              Cancel
+            </Button>
+            <Button
+              className={
+                isClosed
+                  ? 'bg-green-600 text-white hover:bg-green-700'
+                  : 'bg-red-600 text-white hover:bg-red-700'
+              }
+              onClick={handleToggleClose}
+              disabled={isToggling}
+            >
+              {isToggling
+                ? 'Saving...'
+                : isClosed
+                  ? 'Yes, Reopen'
+                  : 'Yes, Close'}
             </Button>
           </DialogFooter>
         </DialogContent>
