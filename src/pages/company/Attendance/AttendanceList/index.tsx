@@ -883,7 +883,7 @@ const AttendancePage = () => {
       <Card className="w-full bg-white shadow-md">
         <CardContent className="space-y-3 p-2 pt-4">
           {/* Filters Top Bar */}
-          <div className="grid grid-cols-1 items-end gap-3 lg:grid-cols-6">
+          <div className="grid grid-cols-1 items-end gap-2 lg:grid-cols-7">
             <div>
               <label className="mb-2 block text-xs font-semibold uppercase tracking-wider">
                 Employee
@@ -948,7 +948,7 @@ const AttendancePage = () => {
                 />
               </div>
             </div>
-            <div className="flex gap-2 col-span-2">
+            <div className="flex gap-2 col-span-3">
               <Button
                 onClick={() => fetchAttendance(currentPage, entriesPerPage)}
                 disabled={isLoading}
@@ -976,13 +976,13 @@ const AttendancePage = () => {
               >
                 Missed Shift
               </Button>
-              {/* <Button
+              <Button
                 variant="outline"
                 onClick={()=> navigate(`/company/${id}/unschedule-attendance`)}
                 className="h-10 px-3 w-full bg-red-600 hover:bg-red-700 text-white border-none"
               >
                 Unschedule Attendance
-              </Button> */}
+              </Button>
             </div>
           </div>
 
