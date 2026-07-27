@@ -22,9 +22,22 @@ import {
   CalendarRange,
   X,
   Search,
-  ArrowLeft
+  ArrowLeft,
+  TriangleAlert
 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogTrigger,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogAction,
+  AlertDialogCancel
+} from '@/components/ui/alert-dialog';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
+import { useSelector } from 'react-redux';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface User {
@@ -100,7 +113,12 @@ export default function MissingAttendancePage() {
     startTime: '',
     endTime: ''
   });
+  // Snapshot of the values the reconcile form started with, used to detect
+  // whether the user actually changed anything before allowing an update.
+  const [originalEditForm, setOriginalEditForm] =
+    useState<EditFormState | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
+  const { user } = useSelector((state: any) => state.auth);
 
   const datePickerClass =
     'w-full border border-gray-300 rounded-md px-3 h-8 text-sm outline-none focus:border-blue-500 transition-colors';
@@ -162,6 +180,7 @@ export default function MissingAttendancePage() {
 
     setIsLoading(true);
     setEditingRotaId(null);
+    setOriginalEditForm(null);
 
     try {
       let url = `/rota/missed-attendance?companyId=${companyId}&limit=all`;
@@ -217,6 +236,7 @@ export default function MissingAttendancePage() {
     setDateRange([startOfMonth, endOfMonth]);
     setEditingRotaId(null);
     setEditForm({ startDate: '', endDate: '', startTime: '', endTime: '' });
+    setOriginalEditForm(null);
     setEditError(null);
 
     // Fetch and explicitly tell it to bypass the current filter state
@@ -226,12 +246,21 @@ export default function MissingAttendancePage() {
   // ─── Select Shift for Reconciliation ────────────────────────────────────────
   const handleReconcileClick = (rota: RotaData) => {
     setEditingRotaId(rota._id);
-    setEditForm({
+    const initialForm: EditFormState = {
       startDate: rota.startDate,
-      endDate: rota.endDate,
+      endDate: rota.endDate || rota.startDate,
       startTime: rota.startTime,
       endTime: rota.endTime
-    });
+    };
+    setEditForm(initialForm);
+    setOriginalEditForm(initialForm);
+    setEditError(null);
+  };
+
+  // ─── Cancel Reconciliation Edit ─────────────────────────────────────────────
+  const handleCancelEdit = () => {
+    setEditingRotaId(null);
+    setOriginalEditForm(null);
     setEditError(null);
   };
 
@@ -265,40 +294,80 @@ export default function MissingAttendancePage() {
     setEditForm((prev) => ({ ...prev, [field]: cleanValue }));
   };
 
-  // ─── Handle Final Submit ────────────────────────────────────────────────────
-  const handleSubmit = async (rotaId: string, isReconciled: boolean) => {
-    const selectedRota = rotas.find((r) => r._id === rotaId);
-    if (!selectedRota) return;
+  // ─── Handle Reconciliation Update (PATCH the rota, not attendance) ─────────
+  const handleUpdateRota = async (rotaId: string) => {
+    if (!originalEditForm) return;
+
+    if (
+      !editForm.startDate ||
+      !editForm.endDate ||
+      !editForm.startTime ||
+      !editForm.endTime
+    ) {
+      setEditError('All dates and times are required.');
+      toast({
+        variant: 'destructive',
+        title: 'Validation Error',
+        description: 'All dates and times are required.'
+      });
+      return;
+    }
+
+    // Only send the fields that actually changed
+    const payload: any = {};
+    (Object.keys(editForm) as (keyof EditFormState)[]).forEach((key) => {
+      if (editForm[key] !== originalEditForm[key]) {
+        payload[key] = editForm[key];
+      }
+    });
+
+    payload.actionUserId = user?._id;
+
+    if (Object.keys(payload).length <= 1) {
+      return;
+    }
 
     setSubmittingRotaId(rotaId);
     setEditError(null);
 
-    let finalStartDate = selectedRota.startDate;
-    let finalEndDate = selectedRota.endDate || selectedRota.startDate;
-    let finalStartTime = selectedRota.startTime;
-    let finalEndTime = selectedRota.endTime;
+    try {
+      await axiosInstance.patch(`/rota/${rotaId}`, payload);
 
-    if (isReconciled) {
-      if (
-        !editForm.startDate ||
-        !editForm.endDate ||
-        !editForm.startTime ||
-        !editForm.endTime
-      ) {
-        setEditError('All dates and times are required.');
-        setSubmittingRotaId(null);
-        toast({
-          variant: 'destructive',
-          title: 'Validation Error',
-          description: 'All dates and times are required.'
-        });
-        return;
-      }
-      finalStartDate = editForm.startDate;
-      finalEndDate = editForm.endDate;
-      finalStartTime = editForm.startTime;
-      finalEndTime = editForm.endTime;
+      toast({
+        title: 'Updated',
+        description: 'Shift details updated successfully.'
+      });
+
+      // Reflect the new values locally so "Mark as Attendance" uses them
+      setRotas((prev) =>
+        prev.map((r) => (r._id === rotaId ? { ...r, ...payload } : r))
+      );
+      setEditingRotaId(null);
+      setOriginalEditForm(null);
+    } catch (error: any) {
+      console.error('Update Error:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description:
+          error.response?.data?.message || 'Failed to update shift details.'
+      });
+    } finally {
+      setSubmittingRotaId(null);
     }
+  };
+
+  // ─── Handle Mark as Attendance ──────────────────────────────────────────────
+  const handleSubmit = async (rotaId: string) => {
+    const selectedRota = rotas.find((r) => r._id === rotaId);
+    if (!selectedRota) return;
+
+    setSubmittingRotaId(rotaId);
+
+    const finalStartDate = selectedRota.startDate;
+    const finalEndDate = selectedRota.endDate || selectedRota.startDate;
+    const finalStartTime = selectedRota.startTime;
+    const finalEndTime = selectedRota.endTime;
 
     try {
       const payloadClockInDate = moment(finalStartDate)
@@ -439,6 +508,13 @@ export default function MissingAttendancePage() {
         </div>
       </div>
 
+      {/* ── Info Banner ── */}
+   <div className="flex items-center gap-2 text-sm text-orange-600">
+  <TriangleAlert className="h-4 w-4 shrink-0" />
+  <span>
+Selecting "Mark as Attendance" will convert the missing attendance record into an approved attendance record.  </span>
+</div>
+
       {/* ── Data Display ── */}
       <div className="flex-1">
         {isLoading ? (
@@ -519,6 +595,15 @@ export default function MissingAttendancePage() {
 
                   if (dCalc && dCalc.minutes < 1) dCalc.display = '00:00';
                   const isDurationValid = isEditing ? dCalc.minutes > 0 : true;
+
+                  // Whether the reconcile form differs from what it started with
+                  const hasChanges =
+                    isEditing && originalEditForm
+                      ? editForm.startDate !== originalEditForm.startDate ||
+                        editForm.endDate !== originalEditForm.endDate ||
+                        editForm.startTime !== originalEditForm.startTime ||
+                        editForm.endTime !== originalEditForm.endTime
+                      : false;
 
                   return (
                     <TableRow key={rota._id}>
@@ -663,16 +748,13 @@ export default function MissingAttendancePage() {
 
                       {/* Action */}
                       <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
+                        <div className="flex items-center justify-start gap-2">
                           {isEditing ? (
                             <>
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => {
-                                  setEditingRotaId(null);
-                                  setEditError(null);
-                                }}
+                                onClick={handleCancelEdit}
                                 disabled={isSubmittingThis}
                                 className="h-8 px-3"
                               >
@@ -680,37 +762,69 @@ export default function MissingAttendancePage() {
                               </Button>
                               <Button
                                 size="sm"
-                                onClick={() => handleSubmit(rota._id, true)}
-                                disabled={isSubmittingThis || !isDurationValid}
-                                className="h-8 bg-blue-600 px-4 text-white hover:bg-blue-700"
+                                onClick={() => handleUpdateRota(rota._id)}
+                                disabled={
+                                  isSubmittingThis ||
+                                  !isDurationValid ||
+                                  !hasChanges
+                                }
+                                className="h-8 bg-theme px-4 text-white hover:bg-theme/90"
                               >
                                 {isSubmittingThis && (
                                   <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
                                 )}
-                                Approved
+                                Update
                               </Button>
                             </>
                           ) : (
                             <>
                               <Button
                                 size="sm"
-                                className="h-8 bg-black px-3 text-white hover:bg-gray-800"
+                                className="h-8 bg-black  text-white hover:bg-gray-800"
                                 onClick={() => handleReconcileClick(rota)}
                                 disabled={submittingRotaId !== null}
                               >
                                 Reconcile
                               </Button>
-                              <Button
-                                size="sm"
-                                className="h-8 bg-blue-600 px-4 text-white hover:bg-blue-700"
-                                onClick={() => handleSubmit(rota._id, false)}
-                                disabled={submittingRotaId !== null}
-                              >
-                                {isSubmittingThis && (
-                                  <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-                                )}
-                                Approved
-                              </Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button
+                                    size="sm"
+                                    className="h-8 bg-theme px-4 text-white hover:bg-theme/90"
+                                    disabled={
+                                      submittingRotaId !== null ||
+                                      editingRotaId === rota._id
+                                    }
+                                  >
+                                    {isSubmittingThis && (
+                                      <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                                    )}
+                                    Mark as Attendance
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>
+                                      Mark as Attendance
+                                    </AlertDialogTitle>
+                                    <AlertDialogDescription className="text-black">
+  Are you sure you want to mark this shift as attendance for{" "}
+  <strong>{fullName}</strong>? This action is irreversible and
+  cannot be undone.
+</AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>
+                                      Cancel
+                                    </AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => handleSubmit(rota._id)}
+                                    >
+                                      Yes, Mark as Attendance
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
                             </>
                           )}
                         </div>
