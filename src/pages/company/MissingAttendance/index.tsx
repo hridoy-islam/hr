@@ -512,7 +512,7 @@ export default function MissingAttendancePage() {
    <div className="flex items-center gap-2 text-sm text-orange-600">
   <TriangleAlert className="h-4 w-4 shrink-0" />
   <span>
-Selecting "Mark as Attendance" will convert the missing attendance record into an approved attendance record.  </span>
+Selecting "Mark as Attendance" will convert the missed attendance record into an approved attendance record.  </span>
 </div>
 
       {/* ── Data Display ── */}
