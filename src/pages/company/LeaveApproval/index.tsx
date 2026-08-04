@@ -143,19 +143,34 @@ interface HolidayFormErrors {
 }
 
 // --- ZOD SCHEMAS ---
-const leaveProcessSchema = z.object({
-  totalDays: z.preprocess(
-    (val) => (val === '' || Number.isNaN(Number(val)) ? NaN : Number(val)),
-    z.number().min(0, 'Number of days cannot be less than 0')
-  ),
-  totalHours: z.preprocess(
-    (val) => (val === '' || Number.isNaN(Number(val)) ? NaN : Number(val)),
-    z.number().min(0, 'Hours cannot be negative')
-  ),
-  startDate: z.string().optional(),
-  endDate: z.string(),
-  reason: z.string().optional()
-});
+const leaveProcessSchema = z
+  .object({
+    totalDays: z.preprocess(
+      (val) => (val === '' || Number.isNaN(Number(val)) ? NaN : Number(val)),
+      z
+        .number({ invalid_type_error: 'Number of days is required' })
+        .min(1, 'Number of days must be at least 1')
+    ),
+    totalHours: z.preprocess(
+      (val) => (val === '' || Number.isNaN(Number(val)) ? NaN : Number(val)),
+      z.number().min(0, 'Hours cannot be negative')
+    ),
+    startDate: z
+      .string({ required_error: 'Start date is required' })
+      .min(1, 'Start date is required'),
+    endDate: z.string({ required_error: 'End date is required' }).min(1, 'End date is required'),
+    reason: z.string().optional()
+  })
+  .refine(
+    (data) => {
+      if (!data.startDate || !data.endDate) return true;
+      return new Date(data.endDate).getTime() >= new Date(data.startDate).getTime();
+    },
+    {
+      message: 'End date must be on or after start date',
+      path: ['endDate']
+    }
+  );
 
 type LeaveProcessFormValues = z.infer<typeof leaveProcessSchema>;
 
@@ -329,6 +344,19 @@ const CompanyLeaveApprovalPage: React.FC = () => {
   });
 
   const isInitialLoad = useRef(true);
+
+  const watchedStartDate = form.watch('startDate');
+  const watchedEndDate = form.watch('endDate');
+  const approvalStartDate = watchedStartDate
+    ? new Date(watchedStartDate)
+    : selectedLeave?.startDate
+    ? new Date(selectedLeave.startDate)
+    : null;
+  const approvalEndDate = watchedEndDate
+    ? new Date(watchedEndDate)
+    : selectedLeave?.endDate
+    ? new Date(selectedLeave.endDate)
+    : null;
 
   // --- FILE UPLOAD LOGIC ---
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -932,6 +960,65 @@ const CompanyLeaveApprovalPage: React.FC = () => {
     }
   };
 
+  const toUTCDateISO = (inputDate: Date | string | undefined | null): string | undefined => {
+    if (!inputDate) return undefined;
+    const d = typeof inputDate === 'string' ? new Date(inputDate) : inputDate;
+    return new Date(
+      Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())
+    ).toISOString();
+  };
+
+  const rebuildApprovalLeaveDays = (startISO: string, endISO: string) => {
+    if (!selectedLeave) return;
+    const start = new Date(startISO);
+    const end = new Date(endISO);
+    const daysArr: LeaveDayUI[] = [];
+    let current = new Date(start);
+    const isHoliday = selectedLeave.holidayType === 'holiday';
+    while (current <= end) {
+      daysArr.push({
+        leaveDate: new Date(current),
+        leaveType: isHoliday ? 'paid' : 'unpaid',
+        duration: isHoliday ? approvalEmployeeHoursPerDay : 0
+      });
+      current.setDate(current.getDate() + 1);
+    }
+    setEditLeaveDays(daysArr);
+    form.setValue('totalDays', daysArr.length);
+    if (isHoliday && daysArr.length > 0) {
+      const totalHours = daysArr.length * approvalEmployeeHoursPerDay;
+      const hrsPerDay = totalHours / daysArr.length;
+      setEditLeaveDays(
+        daysArr.map((day) => ({
+          ...day,
+          duration: parseFloat(hrsPerDay.toFixed(2))
+        }))
+      );
+      form.setValue('totalHours', totalHours);
+    } else {
+      form.setValue('totalHours', 0);
+    }
+  };
+
+  const handleApprovalDateChange = (field: 'startDate' | 'endDate', date: Date | null) => {
+    if (!date || !selectedLeave) return;
+    const newISO = toUTCDateISO(date)!;
+    let startISO =
+      field === 'startDate' ? newISO : form.getValues('startDate') || selectedLeave.startDate;
+    let endISO =
+      field === 'endDate' ? newISO : form.getValues('endDate') || selectedLeave.endDate;
+    if (new Date(startISO) > new Date(endISO)) {
+      [startISO, endISO] = [endISO, startISO];
+    }
+    form.setValue('startDate', startISO);
+    form.setValue('endDate', endISO);
+    setSelectedLeave((prev) =>
+      prev ? { ...prev, startDate: startISO, endDate: endISO } : prev
+    );
+    rebuildApprovalLeaveDays(startISO, endISO);
+    form.trigger(['startDate', 'endDate']);
+  };
+
   const handleActionSubmit = async (
     action: 'approved' | 'rejected' | 'update',
     formData?: LeaveProcessFormValues
@@ -955,8 +1042,8 @@ const CompanyLeaveApprovalPage: React.FC = () => {
       if ((action === 'approved' || action === 'update') && formData) {
         payload.totalDays = formData.totalDays;
         payload.totalHours = formData.totalHours;
-        payload.startDate = form.getValues('startDate') || selectedLeave.startDate;
-        payload.endDate = formData.endDate;
+        payload.startDate = toUTCDateISO(form.getValues('startDate') || selectedLeave.startDate);
+        payload.endDate = toUTCDateISO(formData.endDate);
         payload.reason = formData.reason;
         payload.documents = uploadedFiles.map((f) => f.url);
         payload.leaveDays = editLeaveDays.map((day) => ({
@@ -1025,8 +1112,8 @@ const CompanyLeaveApprovalPage: React.FC = () => {
       const payload: any = {
         totalDays: formData.totalDays,
         totalHours: formData.totalHours,
-        startDate: formData.startDate || selectedLeave.startDate,
-        endDate: formData.endDate || selectedLeave.endDate,
+        startDate: toUTCDateISO(formData.startDate || selectedLeave.startDate),
+        endDate: toUTCDateISO(formData.endDate || selectedLeave.endDate),
         reason: formData.reason,
         documents: uploadedFiles.map((f) => f.url),
         leaveDays: editLeaveDays.map((day) => ({
@@ -1620,18 +1707,8 @@ const CompanyLeaveApprovalPage: React.FC = () => {
                 {selectedLeave && (
                   <>
                     <SheetHeader className="mb-6">
-                      <SheetTitle className="text-2xl font-bold flex flex-row items-center gap-5">
-                        <span>Process Leave Request</span>
-                        <span className="flex text-lg">
-                          {formatDate(selectedLeave.startDate)}
-                          <span className="mx-2 font-bold">&rarr;</span>
-                          {formatDate(selectedLeave.endDate)}
-                        </span>
-                      </SheetTitle>
-                    </SheetHeader>
-
-                    <div>
-                      {/* Header Info */}
+                      <SheetTitle className="text-2xl font-bold">Process Leave Request</SheetTitle>
+                        {/* Header Info */}
                       <div className="text-md flex items-center justify-between pb-4 font-semibold">
                         <div className="flex flex-row items-center gap-2">
                           <span>
@@ -1645,6 +1722,64 @@ const CompanyLeaveApprovalPage: React.FC = () => {
                           )}
                         </div>
                       </div>
+                      <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div className="space-y-1">
+                          <Label className="text-sm font-semibold ">
+                            Start Date (DD-MM-YYYY)
+                          </Label>
+                          <DatePicker
+                            selected={approvalStartDate}
+                            onChange={(date) => handleApprovalDateChange('startDate', date)}
+                            dateFormat="dd-MM-yyyy"
+                            placeholderText="Select start date"
+                            className={`h-10 w-full rounded-md border px-3 text-sm focus:border-theme focus:outline-none focus:ring-1 focus:ring-theme ${
+                              form.formState.errors.startDate
+                                ? 'border-red-500'
+                                : 'border-gray-300'
+                            }`}
+                            wrapperClassName="w-full"
+                            isClearable
+                            showMonthDropdown
+                            showYearDropdown
+                            dropdownMode="select"
+                            preventOpenOnFocus
+                          />
+                          {form.formState.errors.startDate && (
+                            <p className="text-xs font-medium text-red-500">
+                              {form.formState.errors.startDate.message}
+                            </p>
+                          )}
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-sm font-semibold ">
+                            End Date (DD-MM-YYYY)
+                          </Label>
+                          <DatePicker
+                            selected={approvalEndDate}
+                            onChange={(date) => handleApprovalDateChange('endDate', date)}
+                            dateFormat="dd-MM-yyyy"
+                            placeholderText="Select end date"
+                            className={`h-10 w-full rounded-md border px-3 text-sm focus:border-theme focus:outline-none focus:ring-1 focus:ring-theme ${
+                              form.formState.errors.endDate ? 'border-red-500' : 'border-gray-300'
+                            }`}
+                            wrapperClassName="w-full"
+                            isClearable
+                            showMonthDropdown
+                            showYearDropdown
+                            dropdownMode="select"
+                            preventOpenOnFocus
+                          />
+                          {form.formState.errors.endDate && (
+                            <p className="text-xs font-medium text-red-500">
+                              {form.formState.errors.endDate.message}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </SheetHeader>
+
+                    <div>
+                    
 
                       {/* Reason Box */}
                       <div className="space-y-2 pb-6">
@@ -1898,7 +2033,10 @@ const CompanyLeaveApprovalPage: React.FC = () => {
                                 Close
                               </Button>
                               <Button
-                                onClick={() => {
+                                onClick={async () => {
+                                  const valid = await form.trigger();
+                                  if (!valid) return;
+
                                   const totalDays = form.getValues('totalDays');
                                   const totalHours = form.getValues('totalHours');
                                   const reason = form.getValues('reason');
