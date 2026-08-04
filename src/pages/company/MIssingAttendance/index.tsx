@@ -433,7 +433,7 @@ export default function MissingAttendancePage() {
       {/* ── Header & Filters ── */}
       <div className="flex flex-col gap-4">
         <div className="flex flex-row items-center justify-between">
-          <h1 className="text-xl font-bold text-gray-900">Missed Attendance</h1>
+          <h1 className="text-xl font-bold text-gray-900">Absent</h1>
 
           <div className='flex flex-row items-center gap-2'>
 
@@ -512,7 +512,7 @@ export default function MissingAttendancePage() {
    <div className="flex items-center gap-2 text-sm text-orange-600">
   <TriangleAlert className="h-4 w-4 shrink-0" />
   <span>
-Selecting "Mark as Attendance" will convert the missed attendance record into an approved attendance record.  </span>
+Selecting "Mark as Attendance" will convert the absent record into an approved attendance record.  </span>
 </div>
 
       {/* ── Data Display ── */}
@@ -530,7 +530,7 @@ Selecting "Mark as Attendance" will convert the missed attendance record into an
               No shift found
             </h3>
             <p className="max-w-[250px] text-sm text-gray-500">
-              There are no missing attendance records matching your criteria.
+              There are no absent records matching your criteria.
             </p>
           </div>
         ) : (

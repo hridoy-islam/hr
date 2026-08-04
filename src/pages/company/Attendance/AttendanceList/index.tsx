@@ -974,7 +974,7 @@ const AttendancePage = () => {
                 onClick={()=> navigate(`/company/${id}/missed-attendance`)}
                 className="h-10 px-3 w-full bg-orange-600 hover:bg-orange-700 text-white border-none"
               >
-                Missed Shift
+                Absent
               </Button>
               <Button
                 variant="outline"
