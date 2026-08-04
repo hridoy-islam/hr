@@ -926,38 +926,11 @@ const CompanyLeaveApprovalPage: React.FC = () => {
         : 'unpaid';
     setEditLeaveDays(updatedDays);
 
-    const activeDays = updatedDays.filter((day) => {
-      const d = parseFloat(String(day.duration));
-      return !isNaN(d) && d > 0;
-    });
-
-    const totalHrs = activeDays.reduce((acc, curr) => {
+    const totalHrs = updatedDays.reduce((acc, curr) => {
       const d = parseFloat(String(curr.duration));
       return acc + (isNaN(d) ? 0 : d);
     }, 0);
     form.setValue('totalHours', totalHrs);
-    form.setValue('totalDays', activeDays.length);
-
-    if (activeDays.length > 0) {
-      const sorted = [...activeDays].sort(
-        (a, b) => new Date(a.leaveDate).getTime() - new Date(b.leaveDate).getTime()
-      );
-      const newStartDate = sorted[0].leaveDate.toISOString();
-      const newEndDate = sorted[sorted.length - 1].leaveDate.toISOString();
-      form.setValue('startDate', newStartDate);
-      form.setValue('endDate', newEndDate);
-      if (selectedLeave) {
-        setSelectedLeave({
-          ...selectedLeave,
-          startDate: newStartDate,
-          endDate: newEndDate,
-          totalDays: activeDays.length,
-          totalHours: totalHrs
-        });
-      }
-    } else if (selectedLeave) {
-      setSelectedLeave({ ...selectedLeave, totalDays: 0, totalHours: 0 });
-    }
   };
 
   const toUTCDateISO = (inputDate: Date | string | undefined | null): string | undefined => {
@@ -1040,13 +1013,21 @@ const CompanyLeaveApprovalPage: React.FC = () => {
       if (action !== 'update') payload.status = action;
 
       if ((action === 'approved' || action === 'update') && formData) {
+        const payloadStart = toUTCDateISO(
+          form.getValues('startDate') || selectedLeave.startDate
+        );
+        const payloadEnd = toUTCDateISO(formData.endDate);
         payload.totalDays = formData.totalDays;
         payload.totalHours = formData.totalHours;
-        payload.startDate = toUTCDateISO(form.getValues('startDate') || selectedLeave.startDate);
-        payload.endDate = toUTCDateISO(formData.endDate);
+        payload.startDate = payloadStart;
+        payload.endDate = payloadEnd;
         payload.reason = formData.reason;
         payload.documents = uploadedFiles.map((f) => f.url);
-        payload.leaveDays = editLeaveDays.map((day) => ({
+        payload.leaveDays = filterDaysWithinRange(
+          editLeaveDays,
+          payloadStart,
+          payloadEnd
+        ).map((day) => ({
           leaveDate: day.leaveDate,
           leaveType:
             selectedLeave?.holidayType === 'holiday' ? day.leaveType : 'unpaid',
@@ -1109,23 +1090,27 @@ const CompanyLeaveApprovalPage: React.FC = () => {
     if (!selectedLeave) return;
     setIsUpdating(true);
     try {
+      const payloadStart = toUTCDateISO(formData.startDate || selectedLeave.startDate);
+      const payloadEnd = toUTCDateISO(formData.endDate || selectedLeave.endDate);
       const payload: any = {
         totalDays: formData.totalDays,
         totalHours: formData.totalHours,
-        startDate: toUTCDateISO(formData.startDate || selectedLeave.startDate),
-        endDate: toUTCDateISO(formData.endDate || selectedLeave.endDate),
+        startDate: payloadStart,
+        endDate: payloadEnd,
         reason: formData.reason,
         documents: uploadedFiles.map((f) => f.url),
-        leaveDays: editLeaveDays.map((day) => ({
-          leaveDate: day.leaveDate,
-          leaveType: selectedLeave?.holidayType === 'holiday' ? day.leaveType : 'unpaid',
-          duration:
-            selectedLeave?.holidayType === 'holiday' || selectedLeave?.holidayType === 'sick'
-              ? isNaN(parseFloat(String(day.duration)))
-                ? 0
-                : parseFloat(String(day.duration))
-              : 0
-        })),
+        leaveDays: filterDaysWithinRange(editLeaveDays, payloadStart, payloadEnd).map(
+          (day) => ({
+            leaveDate: day.leaveDate,
+            leaveType: selectedLeave?.holidayType === 'holiday' ? day.leaveType : 'unpaid',
+            duration:
+              selectedLeave?.holidayType === 'holiday' || selectedLeave?.holidayType === 'sick'
+                ? isNaN(parseFloat(String(day.duration)))
+                  ? 0
+                  : parseFloat(String(day.duration))
+                : 0
+          })
+        ),
         actionUserId: user?._id
       };
 
@@ -1167,16 +1152,46 @@ const CompanyLeaveApprovalPage: React.FC = () => {
     }
   };
 
+  const filterDaysWithinRange = (
+    days: LeaveDayUI[],
+    startISO?: string,
+    endISO?: string
+  ): LeaveDayUI[] => {
+    if (!startISO || !endISO) return days;
+    const rangeStart = moment(startISO).format('YYYY-MM-DD');
+    const rangeEnd = moment(endISO).format('YYYY-MM-DD');
+    return days.filter((day) => {
+      const d = moment(day.leaveDate).format('YYYY-MM-DD');
+      return d >= rangeStart && d <= rangeEnd;
+    });
+  };
+
   const openApprovalSheet = (request: LeaveRequest) => {
     setSelectedLeave(request);
 
+    const rangeStart = moment(request.startDate).format('YYYY-MM-DD');
+    const rangeEnd = moment(request.endDate).format('YYYY-MM-DD');
     const mappedDays =
-      request.leaveDays?.map((ld) => ({
-        leaveDate: new Date(ld.leaveDate),
-        leaveType: ld.leaveType,
-        duration: ld.duration ?? 0
-      })) || [];
+      request.leaveDays
+        ?.map((ld) => ({
+          leaveDate: new Date(ld.leaveDate),
+          leaveType: ld.leaveType,
+          duration: ld.duration ?? 0
+        }))
+        .filter((day) => {
+          const d = moment(day.leaveDate).format('YYYY-MM-DD');
+          return d >= rangeStart && d <= rangeEnd;
+        }) || [];
     setEditLeaveDays(mappedDays);
+
+    let initialTotalHours = request.totalHours || 0;
+    if (request.holidayType === 'holiday' && mappedDays.length > 0) {
+      const daySum = mappedDays.reduce((acc, day) => {
+        const v = parseFloat(String(day.duration));
+        return acc + (isNaN(v) ? 0 : v);
+      }, 0);
+      if (daySum > 0) initialTotalHours = daySum;
+    }
 
     if (request.documents && request.documents.length > 0) {
       setUploadedFiles(
@@ -1187,8 +1202,8 @@ const CompanyLeaveApprovalPage: React.FC = () => {
     }
 
     form.reset({
-      totalDays: request.totalDays,
-      totalHours: request.totalHours || 0,
+      totalDays: mappedDays.length > 0 ? mappedDays.length : request.totalDays,
+      totalHours: initialTotalHours,
       startDate: request.startDate,
       endDate: request.endDate,
       reason: request.reason || ''
