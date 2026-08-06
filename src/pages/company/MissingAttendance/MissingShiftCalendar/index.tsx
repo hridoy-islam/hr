@@ -63,6 +63,11 @@ const DRAG_TYPE = 'ROW';
 const DEPT_DRAG_TYPE = 'DEPARTMENT';
 const CHILD_DEPT_DRAG_TYPE = 'CHILD_DEPARTMENT';
 
+const toLocalMoment = (date: Date | null) => {
+  if (!date) return moment();
+  return moment([date.getFullYear(), date.getMonth(), date.getDate()]);
+};
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const getInitials = (firstName?: string, lastName?: string, name?: string) => {
   if (firstName && lastName)
@@ -598,7 +603,7 @@ export default function MissingAttendanceCalendarPage() {
   }, []);
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
-  const fetchUsersAndRotas = useCallback(async () => {
+ const fetchUsersAndRotas = useCallback(async () => {
     if (!companyId) return;
     setIsLoading(true);
     try {
@@ -618,12 +623,12 @@ export default function MissingAttendanceCalendarPage() {
         userRes.data?.data?.result || userRes.data?.data || [];
       setUsers(fetchedUsers);
 
-      const startDate = isCustomRange
-        ? moment(appliedStart).format('YYYY-MM-DD')
+      const startDate = isCustomRange && appliedStart
+        ? toLocalMoment(appliedStart).format('YYYY-MM-DD')
         : currentDate.clone().startOf('month').format('YYYY-MM-DD');
 
-      const endDate = isCustomRange
-        ? moment(appliedEnd).format('YYYY-MM-DD')
+      const endDate = isCustomRange && appliedEnd
+        ? toLocalMoment(appliedEnd).format('YYYY-MM-DD')
         : currentDate.clone().endOf('month').format('YYYY-MM-DD');
 
       const rotaRes = await axiosInstance.get(
@@ -640,7 +645,6 @@ export default function MissingAttendanceCalendarPage() {
       setIsLoading(false);
     }
   }, [companyId, currentDate, toast, isCustomRange, appliedStart, appliedEnd]);
-
   useEffect(() => {
     fetchUsersAndRotas();
   }, [fetchUsersAndRotas]);
@@ -877,11 +881,11 @@ export default function MissingAttendanceCalendarPage() {
     return { rotaMap: map };
   }, [rotas]);
 
-  const daysArray = useMemo(() => {
+ const daysArray = useMemo(() => {
     let days: moment.Moment[] = [];
     if (isCustomRange && appliedStart && appliedEnd) {
-      let current = moment(appliedStart).clone();
-      const end = moment(appliedEnd);
+      let current = toLocalMoment(appliedStart);
+      const end = toLocalMoment(appliedEnd);
       while (current.isSameOrBefore(end, 'day')) {
         days.push(current.clone());
         current.add(1, 'day');
@@ -893,10 +897,9 @@ export default function MissingAttendanceCalendarPage() {
       );
     }
     // Cap at today's date
-    const today = moment();
+    const today = moment().startOf('day');
     return days.filter((day) => day.isSameOrBefore(today, 'day'));
   }, [currentDate, isCustomRange, appliedStart, appliedEnd]);
-
   // ── Simple Navigation Handlers ─────────────────────────────────────────────
   const prevMonth = () => setCurrentDate((d) => d.clone().subtract(1, 'month'));
   const nextMonth = () => setCurrentDate((d) => d.clone().add(1, 'month'));
@@ -945,15 +948,15 @@ export default function MissingAttendanceCalendarPage() {
           {/* Center: Unified Date Control */}
           <div className="flex items-center gap-2">
             {isCustomRange && !isCustomMode ? (
-              <div className="flex items-center gap-1 rounded-full border border-theme/30 bg-theme/5 p-1">
+             <div className="flex items-center gap-1 rounded-full border border-theme/30 bg-theme/5 p-1">
                 <button
                   onClick={() => setIsCustomMode(true)}
                   className="flex items-center gap-2 px-3 py-1 text-xs font-semibold text-theme transition-all hover:text-blue-900"
                 >
                   <CalendarRange className="h-3.5 w-3.5 flex-shrink-0" />
-                  {moment(appliedStart).format('DD MMM YYYY')}
+                  {toLocalMoment(appliedStart).format('DD MMM YYYY')}
                   {' → '}
-                  {moment(appliedEnd).format('DD MMM YYYY')}
+                  {toLocalMoment(appliedEnd).format('DD MMM YYYY')}
                 </button>
                 <button
                   onClick={clearRange}

@@ -59,7 +59,8 @@ import {
   FileClock,
   Heart,
   CalendarMinus2,
-  File
+  File,
+  Grid3X3
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Link, useNavigate, useLocation, useParams } from 'react-router-dom';
@@ -180,6 +181,7 @@ const navItems = [
     roles: ['company', 'companyAdmin'],
     accessKey: 'employee'
   },
+ 
   // --- BADGE ITEMS ---
   {
     icon: ShieldCheck,
@@ -327,6 +329,13 @@ const navItems = [
     href: 'audit',
     roles: ['company', 'companyAdmin'],
     accessKey: 'serviceUser'
+  },
+   {
+    icon: Grid3X3,
+    label: 'Employee Matrix',
+    href: 'employee-matrix',
+    roles: ['company', 'companyAdmin'],
+    accessKey: 'employee'
   },
  
   // {

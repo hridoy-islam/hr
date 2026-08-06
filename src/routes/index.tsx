@@ -124,6 +124,7 @@ import CompanyPlannedRota from '@/pages/company/planned-Rota';
 import CompanyPlannedVsActualRotaReport from '@/pages/company/plannedVsActualRotaReport';
 import ServiceUserDetailsPage from '@/pages/company/serviceUser/serviceUserDetails';
 import CompanyAuditPage from '@/pages/company/auditPage';
+import EmployeeMatrixPage from '@/pages/company/EmployeeMatrix';
 
 const SignInPage = lazy(() => import('@/pages/auth/signin'));
 
@@ -334,6 +335,7 @@ export default function AppRouter() {
         { path: 'email-setup', element: <EmailSetup /> },
         { path: 'bank-holiday', element: <BankHolidayPage /> },
         { path: 'schedule-check', element: <CompanyScheduleCheckPage /> },
+        { path: 'employee-matrix', element: <EmployeeMatrixPage /> },
         { path: 'leave-approval', element: <CompanyLeaveApprovalPage /> },
         { path: 'leave-approval/leave-report', element: <LeaveReportPage /> },
         { path: 'attendance-account', element: <AttendanceAccountPage /> },
