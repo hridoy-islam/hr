@@ -55,9 +55,10 @@ const MODULE_COMPONENTS: Record<string, React.ComponentType<ModuleComponentProps
   disciplinary: DisciplinaryMatrix,
   qa: QaMatrix,
   'required-documents': RequiredDocumentsMatrix,
-  'company-policy': CompanyPolicyMatrix,
-  'health-and-safety': HealthSafetyMatrix
+ 
+
 };
+
 
 export default function EmployeeMatrixPage() {
   const [selectedModule, setSelectedModule] = useState<OptionType | null>(null);

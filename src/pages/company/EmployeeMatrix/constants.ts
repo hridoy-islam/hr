@@ -17,8 +17,6 @@ export const MODULES: OptionType[] = [
   { value: 'disciplinary', label: 'Disciplinary' },
   { value: 'qa', label: 'Quality Assurance' },
   { value: 'required-documents', label: 'Required Documents' },
-  { value: 'company-policy', label: 'Company Policy' },
-  { value: 'health-and-safety', label: 'Health & Safety' }
 ];
 
 export const TRAINING_STATUSES: OptionType[] = [
@@ -28,4 +26,13 @@ export const TRAINING_STATUSES: OptionType[] = [
   { value: 'expiring-soon', label: 'Expiring Soon' },
   { value: 'expired', label: 'Expired' },
   { value: 'missing', label: 'Not Assigned' }
+];
+
+// Add RTW specific statuses
+export const RTW_STATUSES: OptionType[] = [
+  { value: 'all', label: 'All Statuses' },
+  { value: 'active', label: 'Active' },
+  { value: 'expiring-soon', label: 'Expiring Soon' },
+  { value: 'expired', label: 'Expired' },
+  { value: 'missing', label: 'Not Set' }
 ];

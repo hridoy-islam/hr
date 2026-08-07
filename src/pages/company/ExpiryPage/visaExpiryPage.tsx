@@ -97,21 +97,21 @@ const VisaExpiryPage = () => {
   };
 
   // --- 2. Helper: Calculate Status ---
-  const getComplianceStatus = (dateString: string | null) => {
-    if (!dateString) return 'missing';
+ const getComplianceStatus = (dateString: string | null) => {
+  if (!dateString) return 'missing';
 
-    const now = moment().startOf('day');
-    const expiry = moment(dateString);
-    const diffDays = expiry.diff(now, 'days');
+  const now = moment().startOf('day');
+  const expiry = moment(dateString).startOf('day');
+  const daysUntilExpiry = expiry.diff(now, 'days');
 
-    if (now.isAfter(expiry, 'day')) {
-      return 'expired';
-    } else if (visaCheckInterval > 0 && diffDays <= visaCheckInterval) {
-      return 'expiring-soon';
-    } else {
-      return 'active';
-    }
-  };
+  if (daysUntilExpiry < 0) {
+    return 'expired';
+  } else if (visaCheckInterval > 0 && daysUntilExpiry <= visaCheckInterval) {
+    return 'expiring-soon';
+  } else {
+    return 'active';
+  }
+};
 
   // --- 3. Fetch Employees ---
   const fetchEmployees = async () => {

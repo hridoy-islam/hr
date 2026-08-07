@@ -652,10 +652,9 @@ function RightToWorkTab() {
                       : 'Not Set'}
                 </div>
 
-                {!userData?.noRtwCheck ||
-                  leaverData.length === 0 && (
-                    <div className="pt-1">{getStatusBadge()}</div>
-                  )}
+               {!userData?.noRtwCheck && leaverData.length === 0 && (
+  <div className="pt-1">{getStatusBadge()}</div>
+)}
               </div>
 
               {/* Action Button */}

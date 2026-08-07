@@ -300,7 +300,7 @@ function AppraisalTab() {
   // 4. Status Calculation (Using Days Logic exactly like Passport)
   useEffect(() => {
     // 1. Check override flag first
-    if (userData?.noRtwCheck || leaverData.length > 0) {
+    if ( leaverData.length > 0) {
       setComplianceStatus('no-check-required');
       return;
     }
@@ -605,7 +605,7 @@ function AppraisalTab() {
                   Next Appraisal Date
                 </Label>
                 <div className="text-2xl font-bold text-gray-900">
-                  {userData?.noRtwCheck || leaverData.length > 0
+                  { leaverData.length > 0
                     ? 'N/A'
                     : currentCheckDate
                       ? moment(currentCheckDate).format('DD MMMM YYYY')
@@ -619,15 +619,15 @@ function AppraisalTab() {
               <div className="border-t border-gray-100 pt-4">
                 <Button
                   onClick={openUpdateModal}
-                  disabled={userData?.noRtwCheck || leaverData.length > 0}
+                  disabled={leaverData.length > 0}
                   className={cn(
                     'w-full text-white',
-                    userData?.noRtwCheck || leaverData.length > 0
+                     leaverData.length > 0
                       ? 'cursor-not-allowed bg-gray-300 hover:bg-gray-300'
                       : 'bg-theme hover:bg-theme/90'
                   )}
                 >
-                  {userData?.noRtwCheck || leaverData.length > 0
+                  { leaverData.length > 0
                     ? 'Update Not Required'
                     : 'Update Next Appraisal Date'}
                 </Button>
