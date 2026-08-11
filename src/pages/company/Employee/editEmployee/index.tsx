@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { MoveLeft } from 'lucide-react';
 import { Tabs } from './Tabs';
@@ -47,7 +47,7 @@ const EditEmployee = () => {
     handleCheckboxChange,
     isFieldSaving
   } = useEditEmployee();
-
+const [searchParams] = useSearchParams();
   const location = useLocation();
 
   const { id,eid } = useParams();
@@ -64,11 +64,15 @@ const EditEmployee = () => {
     }
   };
 
-  useEffect(() => {
-    if (location.state?.activeTab) {
-      setActiveTab(location.state.activeTab);
-    }
-  }, [location.state, setActiveTab]);
+useEffect(() => {
+  // Checks location.state first (for same-tab navigate calls), 
+  // then checks searchParams (for new-tab window.open calls)
+  const tabToSet = location.state?.activeTab || searchParams.get('activeTab');
+
+  if (tabToSet) {
+    setActiveTab(tabToSet);
+  }
+}, [location.state, searchParams, setActiveTab]);
 
   useEffect(() => {
     fetchEmployee();

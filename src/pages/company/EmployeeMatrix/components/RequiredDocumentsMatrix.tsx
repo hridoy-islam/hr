@@ -11,7 +11,9 @@ import {
   CheckCircle,
   AlertCircle,
   FileWarning,
-  FolderOpen
+  FolderOpen,
+  MoveRight,
+  ExternalLink
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -97,6 +99,7 @@ interface RequiredDocumentsMatrixRow {
   isCompliant: boolean;
   status: 'No Issue' | 'Missing Document';
   documents: DocumentItem[];
+  documentUrls?: Record<string, string>;
 }
 
 const getDepartmentName = (row: RequiredDocumentsMatrixRow) => {
@@ -151,7 +154,6 @@ const getStatusBadge = (status: RequiredDocumentsMatrixRow['status']) => {
 
 // Required Documents Status options
 const REQUIRED_DOCS_STATUSES = [
-  { value: 'all', label: 'All Statuses' },
   { value: 'No Issue', label: 'No Issue' },
   { value: 'Missing Document', label: 'Missing Document' }
 ];
@@ -165,12 +167,13 @@ export const RequiredDocumentsMatrix = ({
   const { user } = useSelector((state: any) => state.auth);
   const companyId = id || user?.company;
 
-  const [selectedEmployee, setSelectedEmployee] = useState<MatrixOption | null>(
-    null
-  );
-  const [selectedStatus, setSelectedStatus] = useState<MatrixOption>({
+  const [selectedEmployee, setSelectedEmployee] = useState<MatrixOption>({
     value: 'all',
-    label: 'All Statuses'
+    label: 'All Employee'
+  });
+  const [selectedStatus, setSelectedStatus] = useState<MatrixOption>({
+    value: 'Missing Document',
+    label: 'Missing Document'
   });
 
   const [employees, setEmployees] = useState<MatrixOption[]>([]);
@@ -242,8 +245,9 @@ export const RequiredDocumentsMatrix = ({
             status: 'active'
           }
         });
-        setEmployees(
-          (employeeRes.data.data.result || []).map(
+        setEmployees([
+          { value: 'all', label: 'All Employee' },
+          ...(employeeRes.data.data.result || []).map(
             (e: {
               _id: string;
               firstName?: string;
@@ -255,7 +259,7 @@ export const RequiredDocumentsMatrix = ({
                 `${e.firstName || ''} ${e.lastName || ''}`.trim() || e.email
             })
           )
-        );
+        ]);
       } catch (error) {
         console.error('Failed to load employees:', error);
       } finally {
@@ -271,9 +275,15 @@ export const RequiredDocumentsMatrix = ({
     setHasSearched(true);
     try {
       const params: Record<string, string> = {};
-      if (selectedEmployee) params.employeeId = selectedEmployee.value;
+      if (selectedEmployee && selectedEmployee.value !== 'all') params.employeeId = selectedEmployee.value;
       if (selectedStatus && selectedStatus.value !== 'all') {
         params.status = selectedStatus.value;
+      }
+      if (
+        selectedDocumentFilter &&
+        selectedDocumentFilter.value !== 'all'
+      ) {
+        params.documentType = selectedDocumentFilter.value;
       }
       const response = await axiosInstance.get(
         `/schedule-status/${companyId}/employee-matrix/required-documents`,
@@ -286,7 +296,7 @@ export const RequiredDocumentsMatrix = ({
     } finally {
       setLoading(false);
     }
-  }, [companyId, selectedEmployee, selectedStatus]);
+  }, [companyId, selectedEmployee, selectedStatus, selectedDocumentFilter]);
 
   const openDocuments = (row: RequiredDocumentsMatrixRow) => {
     setSelectedEmployeeData(row);
@@ -377,7 +387,7 @@ export const RequiredDocumentsMatrix = ({
         <h3 className="text-lg font-medium text-gray-900">
           Preview not available
         </h3>
-        <p className="mb-6 mt-2 text-sm text-gray-500">
+        <p className="mb-6 mt-2 text-sm text-black">
           This file format cannot be safely previewed in the browser.
         </p>
         <Button
@@ -399,38 +409,53 @@ export const RequiredDocumentsMatrix = ({
         return `"${value.toString().replace(/"/g, '""')}"`;
       };
 
+      const docColumns: string[] = [];
+      rows.forEach((row) => {
+        (row.requiredDocuments || []).forEach((doc) => {
+          if (!docColumns.includes(doc)) docColumns.push(doc);
+        });
+      });
+
+      const hasReferenceDocs = rows.some((row) =>
+        (row.documents || []).some(
+          (d) =>
+            d.documentTitle.toLowerCase().includes('reference') &&
+            !d.documentTitle.toLowerCase().includes('dbs')
+        )
+      );
+      if (hasReferenceDocs) docColumns.push('Reference');
+
       const headers = [
         'Employee Name',
         'Email',
         'Department',
         'Designation',
         'Status',
-        'Required Documents',
-        'Missing Documents'
+        ...docColumns
       ];
 
       const csvRows = [headers.join(',')];
 
-      const filteredRows = filterByDocumentSearch(rows, selectedDocumentFilter);
-
-      filteredRows.forEach((row) => {
+      rows.forEach((row) => {
         const emp = row.employeeId;
-        const missingToShow =
-          selectedDocumentFilter && selectedDocumentFilter.value !== 'all'
-            ? row.missingDocuments.filter((d) =>
-                d
-                  .toLowerCase()
-                  .includes(selectedDocumentFilter.value.toLowerCase())
-              )
-            : row.missingDocuments;
         const rowData = [
           escapeCSV(`${emp.firstName || ''} ${emp.lastName || ''}`.trim()),
           escapeCSV(emp.email),
           escapeCSV(getDepartmentName(row)),
           escapeCSV(getDesignationName(row)),
           escapeCSV(row.isCompliant ? 'No Issue' : 'Missing Document'),
-          escapeCSV((row.requiredDocuments || []).join('; ')),
-          escapeCSV(missingToShow.join('; '))
+          ...docColumns.map((doc) => {
+            if (doc === 'Reference') {
+              const refDoc = (row.documents || []).find(
+                (d) =>
+                  d.documentTitle.toLowerCase().includes('reference') &&
+                  !d.documentTitle.toLowerCase().includes('dbs')
+              );
+              return escapeCSV(refDoc?.documentUrl?.[0] || 'No');
+            }
+            const url = row.documentUrls?.[doc];
+            return escapeCSV(url || 'No');
+          })
         ];
 
         csvRows.push(rowData.join(','));
@@ -460,29 +485,25 @@ export const RequiredDocumentsMatrix = ({
     return <AlertCircle className="h-4 w-4 text-red-500" />;
   };
 
-  const filterByDocumentSearch = (
-    rows: RequiredDocumentsMatrixRow[],
-    selectedDoc: MatrixOption | null
-  ) => {
-    if (!selectedDoc || selectedDoc.value === 'all') return rows;
-    const term = selectedDoc.value.toLowerCase();
-    return rows.filter((row) => {
-      const docMatch = row.documents.some(
-        (d) => d.documentTitle.toLowerCase() === term
-      );
-      const reqMatch = row.requiredDocuments.some(
-        (d) => d.toLowerCase() === term
-      );
-      return docMatch || reqMatch;
-    });
-  };
-
   return (
     <div className="space-y-4">
       {/* Filters — module + fields in the same row */}
       <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-5">
         {moduleSelect}
-
+        <div className="w-full">
+          <label className="mb-1.5 block text-sm font-medium text-gray-700">
+            Document Type
+          </label>
+          <Select
+            options={REQUIRED_DOCUMENTS_OPTIONS}
+            value={selectedDocumentFilter}
+            onChange={(opt) => setSelectedDocumentFilter(opt)}
+            isClearable
+            isSearchable
+            placeholder="Select Document"
+            styles={selectStyles()}
+          />
+        </div>
         <div className="w-full">
           <label className="mb-1.5 block text-sm font-medium text-gray-700">
             Employee
@@ -511,21 +532,6 @@ export const RequiredDocumentsMatrix = ({
             }
             isSearchable
             placeholder="Select Status"
-            styles={selectStyles()}
-          />
-        </div>
-
-        <div className="w-full">
-          <label className="mb-1.5 block text-sm font-medium text-gray-700">
-            Search Document
-          </label>
-          <Select
-            options={REQUIRED_DOCUMENTS_OPTIONS}
-            value={selectedDocumentFilter}
-            onChange={(opt) => setSelectedDocumentFilter(opt)}
-            isClearable
-            isSearchable
-            placeholder="Select Document"
             styles={selectStyles()}
           />
         </div>
@@ -579,7 +585,7 @@ export const RequiredDocumentsMatrix = ({
               </p>
             </div>
           ) : rows.length === 0 ? (
-            <div className="py-12 text-center text-gray-500">
+            <div className="py-12 text-center text-black">
               No records found for the selected filters.
             </div>
           ) : (
@@ -588,79 +594,80 @@ export const RequiredDocumentsMatrix = ({
                 <TableHeader>
                   <TableRow>
                     <TableHead>Employee</TableHead>
-                    <TableHead>Department</TableHead>
-                    <TableHead>Designation</TableHead>
-                    <TableHead>Status</TableHead>
+                    {/* <TableHead>Department</TableHead>
+                    <TableHead>Designation</TableHead> */}
+                    {/* <TableHead>Status</TableHead> */}
                     <TableHead>Missing Documents</TableHead>
                     {/* <TableHead className="text-right">Actions</TableHead> */}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filterByDocumentSearch(rows, selectedDocumentFilter).map(
-                    (row, idx) => (
-                      <TableRow
+                  {rows.map((row, idx) => (
+                    <TableRow
                         key={`${row.employeeId._id}-${idx}`}
                         className="cursor-pointer transition-colors hover:bg-gray-50"
                       >
-                        <TableCell onClick={() => navigate(`/company/${companyId}/employee/${row.employeeId._id}`, { state: { activeTab: 'document' } })}>
+                       <TableCell
+  onClick={() =>
+    window.open(
+      `/company/${companyId}/employee/${row.employeeId._id}?activeTab=document`,
+      '_blank',
+      'noopener,noreferrer'
+    )
+  }
+>
                           <div className="flex items-center space-x-3">
                             <div className="flex flex-col">
-                              <span className="font-medium hover:underline text-theme cursor-pointer">
-                                {row.employeeId.firstName}{' '}
-                                {row.employeeId.lastName}
-                              </span>
-                              <span className="text-sm text-gray-500">
+                              <div className="flex items-center gap-3">
+                                <span className="cursor-pointer font-medium text-gray-900 transition-colors hover:text-theme hover:underline">
+                                  {row.employeeId.firstName}{' '}
+                                  {row.employeeId.lastName}
+                                </span>
+
+                                <Button
+                                  size="sm"
+                                  className="h-8 gap-1.5 px-2.5 text-xs font-medium"
+                                >
+                                  Update
+                                  <ExternalLink className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                              <span className="text-sm text-black">
                                 {row.employeeId.email}
+                              </span>
+                              <span className="text-sm text-black">
+                                {getDepartmentName(row) || '—'}{' '}
+                              </span>
+                              <span className="text-sm text-black">
+                                {getDesignationName(row) || '—'}
                               </span>
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell onClick={() => openDocuments(row)}>
-                          {getDepartmentName(row) || '—'}
-                        </TableCell>
-                        <TableCell onClick={() => openDocuments(row)}>
-                          {getDesignationName(row) || '—'}
-                        </TableCell>
-                        <TableCell onClick={() => openDocuments(row)}>
+
+                        {/* <TableCell onClick={() => openDocuments(row)}>
                           <div className="flex items-center gap-2">
-                            {renderStatusIcon(row)}
                             {getStatusBadge(row.status)}
                           </div>
-                        </TableCell>
-                        <TableCell  onClick={() => openDocuments(row)}>
-                          {(() => {
-                            const missingToShow =
-                              selectedDocumentFilter &&
-                              selectedDocumentFilter.value !== 'all'
-                                ? row.missingDocuments.filter((d) =>
-                                    d
-                                      .toLowerCase()
-                                      .includes(
-                                        selectedDocumentFilter.value.toLowerCase()
-                                      )
-                                  )
-                                : row.missingDocuments;
-                            if (missingToShow.length > 0) {
-                              return (
-                                <div className="flex flex-wrap gap-1">
-                                  {missingToShow.map((doc, idx) => (
-                                    <Badge
-                                      key={idx}
-                                      variant="outline"
-                                      className="border-red-200 bg-red-50 text-xs text-red-700"
-                                    >
-                                      {doc}
-                                    </Badge>
-                                  ))}
-                                </div>
-                              );
-                            }
-                            return (
-                              <span className="text-xs text-gray-400">
-                                None
-                              </span>
-                            );
-                          })()}
+                        </TableCell> */}
+                        <TableCell onClick={() => openDocuments(row)}>
+                          {row.missingDocuments.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {row.missingDocuments.map((doc, idx) => (
+                                <Badge
+                                  key={idx}
+                                  variant="outline"
+                                  className="border-red-200 bg-red-50 text-xs text-red-700"
+                                >
+                                  {doc}
+                                </Badge>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-xs text-gray-400">
+                              None
+                            </span>
+                          )}
                         </TableCell>
                         {/* <TableCell className="text-right">
                         <Button
@@ -676,8 +683,7 @@ export const RequiredDocumentsMatrix = ({
                         </Button>
                       </TableCell> */}
                       </TableRow>
-                    )
-                  )}
+                  ))}
                 </TableBody>
               </Table>
             </div>
@@ -701,14 +707,14 @@ export const RequiredDocumentsMatrix = ({
                     {selectedEmployeeData.employeeId.lastName}
                   </p>
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-                    <span className="text-gray-500">
+                    <span className="text-black">
                       Email: {selectedEmployeeData.employeeId.email}
                     </span>
-                    <span className="text-gray-500">
+                    <span className="text-black">
                       Department:{' '}
                       {getDepartmentName(selectedEmployeeData) || '—'}
                     </span>
-                    <span className="text-gray-500">
+                    <span className="text-black">
                       Designation:{' '}
                       {getDesignationName(selectedEmployeeData) || '—'}
                     </span>
@@ -767,7 +773,7 @@ export const RequiredDocumentsMatrix = ({
           selectedEmployeeData.documents.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <FileWarning className="h-12 w-12 text-gray-300" />
-              <p className="mt-2 text-sm text-gray-500">
+              <p className="mt-2 text-sm text-black">
                 No documents uploaded for this employee.
               </p>
             </div>
@@ -788,10 +794,10 @@ export const RequiredDocumentsMatrix = ({
                       <TableCell className="font-medium text-gray-900">
                         {doc.documentTitle}
                       </TableCell>
-                      <TableCell className="text-sm text-gray-500">
+                      <TableCell className="text-sm text-black">
                         {doc.note || <span className="text-gray-300">—</span>}
                       </TableCell>
-                      <TableCell className="text-sm text-gray-500">
+                      <TableCell className="text-sm text-black">
                         {formatDate(doc.createdAt)}
                       </TableCell>
                       <TableCell className="text-right">
@@ -835,7 +841,7 @@ export const RequiredDocumentsMatrix = ({
               <DialogTitle className="text-lg font-semibold text-gray-900">
                 Document Preview
               </DialogTitle>
-              <DialogDescription className="mt-1 max-w-sm truncate text-xs text-gray-500">
+              <DialogDescription className="mt-1 max-w-sm truncate text-xs text-black">
                 {previewFileName || 'Unknown Document'}
               </DialogDescription>
             </div>
