@@ -34,7 +34,7 @@ import {
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 import axiosInstance from '@/lib/axios';
 import { useSelector } from 'react-redux';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import moment from '@/lib/moment-setup';
 import type { ModuleComponentProps } from '../types';
 
@@ -93,8 +93,9 @@ interface RequiredDocumentsMatrixRow {
   };
   totalUploaded: number;
   missingDocuments: string[];
+  requiredDocuments: string[];
   isCompliant: boolean;
-  status: 'compliant' | 'missing';
+  status: 'No Issue' | 'Missing Document';
   documents: DocumentItem[];
 }
 
@@ -132,18 +133,18 @@ const getFileNameFromUrl = (url: string) => {
 };
 
 const getStatusBadge = (status: RequiredDocumentsMatrixRow['status']) => {
-  if (status === 'compliant') {
+  if (status === 'No Issue') {
     return (
-      <Badge className="bg-green-100 text-green-800 hover:bg-green-100 px-3 py-1 flex items-center">
+      <Badge className="flex items-center bg-green-100 px-3 py-1 text-green-800 hover:bg-green-100">
         <CheckCircle className="mr-1 h-3 w-3" />
-        Compliant
+        No Issue
       </Badge>
     );
   }
   return (
-    <Badge className="bg-red-100 text-red-800 hover:bg-red-100 px-3 py-1 flex items-center">
+    <Badge className="flex items-center bg-red-100 px-3 py-1 text-red-800 hover:bg-red-100">
       <AlertCircle className="mr-1 h-3 w-3" />
-      Missing Documents
+      Missing Document
     </Badge>
   );
 };
@@ -151,12 +152,15 @@ const getStatusBadge = (status: RequiredDocumentsMatrixRow['status']) => {
 // Required Documents Status options
 const REQUIRED_DOCS_STATUSES = [
   { value: 'all', label: 'All Statuses' },
-  { value: 'compliant', label: 'Compliant' },
-  { value: 'missing', label: 'Missing Documents' }
+  { value: 'No Issue', label: 'No Issue' },
+  { value: 'Missing Document', label: 'Missing Document' }
 ];
 
-export const RequiredDocumentsMatrix = ({ moduleSelect }: ModuleComponentProps) => {
+export const RequiredDocumentsMatrix = ({
+  moduleSelect
+}: ModuleComponentProps) => {
   const { id } = useParams();
+  const navigate = useNavigate();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { user } = useSelector((state: any) => state.auth);
   const companyId = id || user?.company;
@@ -175,6 +179,45 @@ export const RequiredDocumentsMatrix = ({ moduleSelect }: ModuleComponentProps) 
   const [rows, setRows] = useState<RequiredDocumentsMatrixRow[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [selectedDocumentFilter, setSelectedDocumentFilter] =
+    useState<MatrixOption>({
+      value: 'all',
+      label: 'All'
+    });
+
+  const REQUIRED_DOCUMENTS_OPTIONS = [
+    { value: 'all', label: 'All' },
+    { value: 'Immigration Status', label: 'Immigration Status' },
+    { value: 'DBS Certificate', label: 'DBS Certificate' },
+    { value: 'Passport', label: 'Passport' },
+    { value: 'Right to Work', label: 'Right to Work' },
+    { value: 'Proof of Address', label: 'Proof of Address' },
+    { value: 'Application Form', label: 'Application Form' },
+    { value: 'Curriculum Vitae', label: 'Curriculum Vitae' },
+    { value: 'Contract of Employment', label: 'Contract of Employment' },
+    { value: 'Confidentiality Agreement', label: 'Confidentiality Agreement' },
+    {
+      value: 'Interview Invitation Letter',
+      label: 'Interview Invitation Letter'
+    },
+    {
+      value: 'Interview Notes / Literacy and Numeracy Assessment',
+      label: 'Interview Notes / Literacy and Numeracy Assessment'
+    },
+    { value: 'Appointment Letter', label: 'Appointment Letter' },
+    { value: 'Job Description', label: 'Job Description' },
+    { value: 'Induction', label: 'Induction' },
+    { value: 'GDPR declaration form', label: 'GDPR declaration form' },
+    {
+      value: 'Health Declaration / Post employment Medical Questionnaire',
+      label: 'Health Declaration / Post employment Medical Questionnaire'
+    },
+    { value: 'Identification Document', label: 'Identification Document' },
+    { value: 'DBS Reference', label: 'DBS Reference' },
+    { value: 'Bank Account Details', label: 'Bank Account Details' },
+    { value: 'P46 / P45', label: 'P46 / P45' },
+    { value: 'Ni number/Driving licence', label: 'Ni number/Driving licence' }
+  ];
 
   // Documents Dialog State
   const [documentsOpen, setDocumentsOpen] = useState(false);
@@ -208,7 +251,8 @@ export const RequiredDocumentsMatrix = ({ moduleSelect }: ModuleComponentProps) 
               email?: string;
             }) => ({
               value: e._id,
-              label: `${e.firstName || ''} ${e.lastName || ''}`.trim() || e.email
+              label:
+                `${e.firstName || ''} ${e.lastName || ''}`.trim() || e.email
             })
           )
         );
@@ -360,23 +404,33 @@ export const RequiredDocumentsMatrix = ({ moduleSelect }: ModuleComponentProps) 
         'Email',
         'Department',
         'Designation',
-        'Total Uploaded',
         'Status',
+        'Required Documents',
         'Missing Documents'
       ];
 
       const csvRows = [headers.join(',')];
 
-      rows.forEach((row) => {
+      const filteredRows = filterByDocumentSearch(rows, selectedDocumentFilter);
+
+      filteredRows.forEach((row) => {
         const emp = row.employeeId;
+        const missingToShow =
+          selectedDocumentFilter && selectedDocumentFilter.value !== 'all'
+            ? row.missingDocuments.filter((d) =>
+                d
+                  .toLowerCase()
+                  .includes(selectedDocumentFilter.value.toLowerCase())
+              )
+            : row.missingDocuments;
         const rowData = [
           escapeCSV(`${emp.firstName || ''} ${emp.lastName || ''}`.trim()),
           escapeCSV(emp.email),
           escapeCSV(getDepartmentName(row)),
           escapeCSV(getDesignationName(row)),
-          escapeCSV(row.totalUploaded),
-          escapeCSV(row.isCompliant ? 'Compliant' : 'Missing Documents'),
-          escapeCSV(row.missingDocuments.join('; '))
+          escapeCSV(row.isCompliant ? 'No Issue' : 'Missing Document'),
+          escapeCSV((row.requiredDocuments || []).join('; ')),
+          escapeCSV(missingToShow.join('; '))
         ];
 
         csvRows.push(rowData.join(','));
@@ -406,10 +460,27 @@ export const RequiredDocumentsMatrix = ({ moduleSelect }: ModuleComponentProps) 
     return <AlertCircle className="h-4 w-4 text-red-500" />;
   };
 
+  const filterByDocumentSearch = (
+    rows: RequiredDocumentsMatrixRow[],
+    selectedDoc: MatrixOption | null
+  ) => {
+    if (!selectedDoc || selectedDoc.value === 'all') return rows;
+    const term = selectedDoc.value.toLowerCase();
+    return rows.filter((row) => {
+      const docMatch = row.documents.some(
+        (d) => d.documentTitle.toLowerCase() === term
+      );
+      const reqMatch = row.requiredDocuments.some(
+        (d) => d.toLowerCase() === term
+      );
+      return docMatch || reqMatch;
+    });
+  };
+
   return (
     <div className="space-y-4">
       {/* Filters — module + fields in the same row */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-1 md:grid-cols-2 xl:grid-cols-5">
         {moduleSelect}
 
         <div className="w-full">
@@ -435,9 +506,26 @@ export const RequiredDocumentsMatrix = ({ moduleSelect }: ModuleComponentProps) 
           <Select
             options={REQUIRED_DOCS_STATUSES}
             value={selectedStatus}
-            onChange={(opt) => setSelectedStatus(opt || REQUIRED_DOCS_STATUSES[0])}
+            onChange={(opt) =>
+              setSelectedStatus(opt || REQUIRED_DOCS_STATUSES[0])
+            }
             isSearchable
             placeholder="Select Status"
+            styles={selectStyles()}
+          />
+        </div>
+
+        <div className="w-full">
+          <label className="mb-1.5 block text-sm font-medium text-gray-700">
+            Search Document
+          </label>
+          <Select
+            options={REQUIRED_DOCUMENTS_OPTIONS}
+            value={selectedDocumentFilter}
+            onChange={(opt) => setSelectedDocumentFilter(opt)}
+            isClearable
+            isSearchable
+            placeholder="Select Document"
             styles={selectStyles()}
           />
         </div>
@@ -446,9 +534,9 @@ export const RequiredDocumentsMatrix = ({ moduleSelect }: ModuleComponentProps) 
           <Button
             onClick={fetchMatrix}
             disabled={loading}
-            className="bg-theme hover:bg-theme/90 border-none text-white"
+            className="border-none bg-theme px-2 text-white hover:bg-theme/90"
           >
-            <Search className="mr-2 h-4 w-4" />
+            <Search className="mr-1 h-4 w-4" />
             {loading ? 'Searching...' : 'Search'}
           </Button>
           {rows.length > 0 && (
@@ -456,8 +544,9 @@ export const RequiredDocumentsMatrix = ({ moduleSelect }: ModuleComponentProps) 
               onClick={downloadCsv}
               disabled={isDownloading}
               variant="outline"
+              className="px-2"
             >
-              <Download className="mr-2 h-4 w-4" />
+              <Download className="mr-1 h-4 w-4" />
               {isDownloading ? 'Downloading...' : 'Download CSV'}
             </Button>
           )}
@@ -485,7 +574,8 @@ export const RequiredDocumentsMatrix = ({ moduleSelect }: ModuleComponentProps) 
             <div className="flex flex-col items-center justify-center gap-2 py-12 text-gray-400">
               <FileText className="h-10 w-10" />
               <p className="text-sm">
-                Select filters and click Search to view employee document compliance
+                Select filters and click Search to view employee document
+                compliance
               </p>
             </div>
           ) : rows.length === 0 ? (
@@ -500,57 +590,79 @@ export const RequiredDocumentsMatrix = ({ moduleSelect }: ModuleComponentProps) 
                     <TableHead>Employee</TableHead>
                     <TableHead>Department</TableHead>
                     <TableHead>Designation</TableHead>
-                    <TableHead>Uploaded</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead>Missing Documents</TableHead>
+                    {/* <TableHead className="text-right">Actions</TableHead> */}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {rows.map((row, idx) => (
-                    <TableRow
-                      key={`${row.employeeId._id}-${idx}`}
-                      className="cursor-pointer transition-colors hover:bg-gray-50"
-                      onClick={() => openDocuments(row)}
-                    >
-                      <TableCell>
-                        <div className="flex items-center space-x-3">
-                          <img
-                            src={row.employeeId.avatar || '/placeholder.jpg'}
-                            alt="avatar"
-                            className="h-9 w-9 rounded-full object-cover"
-                          />
-                          <div className="flex flex-col">
-                            <span className="font-medium text-gray-900">
-                              {row.employeeId.firstName} {row.employeeId.lastName}
-                            </span>
-                            <span className="text-sm text-gray-500">
-                              {row.employeeId.email}
-                            </span>
+                  {filterByDocumentSearch(rows, selectedDocumentFilter).map(
+                    (row, idx) => (
+                      <TableRow
+                        key={`${row.employeeId._id}-${idx}`}
+                        className="cursor-pointer transition-colors hover:bg-gray-50"
+                      >
+                        <TableCell onClick={() => navigate(`/company/${companyId}/employee/${row.employeeId._id}`, { state: { activeTab: 'document' } })}>
+                          <div className="flex items-center space-x-3">
+                            <div className="flex flex-col">
+                              <span className="font-medium hover:underline text-theme cursor-pointer">
+                                {row.employeeId.firstName}{' '}
+                                {row.employeeId.lastName}
+                              </span>
+                              <span className="text-sm text-gray-500">
+                                {row.employeeId.email}
+                              </span>
+                            </div>
                           </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>{getDepartmentName(row) || '—'}</TableCell>
-                      <TableCell>{getDesignationName(row) || '—'}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <FileText className="h-4 w-4 text-gray-400" />
-                          <span className="font-medium text-gray-700">
-                            {row.totalUploaded}
-                          </span>
-                          {row.missingDocuments.length > 0 && (
-                            <span className="text-xs text-red-500">
-                              ({row.missingDocuments.length} missing)
-                            </span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          {renderStatusIcon(row)}
-                          {getStatusBadge(row.status)}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
+                        </TableCell>
+                        <TableCell onClick={() => openDocuments(row)}>
+                          {getDepartmentName(row) || '—'}
+                        </TableCell>
+                        <TableCell onClick={() => openDocuments(row)}>
+                          {getDesignationName(row) || '—'}
+                        </TableCell>
+                        <TableCell onClick={() => openDocuments(row)}>
+                          <div className="flex items-center gap-2">
+                            {renderStatusIcon(row)}
+                            {getStatusBadge(row.status)}
+                          </div>
+                        </TableCell>
+                        <TableCell  onClick={() => openDocuments(row)}>
+                          {(() => {
+                            const missingToShow =
+                              selectedDocumentFilter &&
+                              selectedDocumentFilter.value !== 'all'
+                                ? row.missingDocuments.filter((d) =>
+                                    d
+                                      .toLowerCase()
+                                      .includes(
+                                        selectedDocumentFilter.value.toLowerCase()
+                                      )
+                                  )
+                                : row.missingDocuments;
+                            if (missingToShow.length > 0) {
+                              return (
+                                <div className="flex flex-wrap gap-1">
+                                  {missingToShow.map((doc, idx) => (
+                                    <Badge
+                                      key={idx}
+                                      variant="outline"
+                                      className="border-red-200 bg-red-50 text-xs text-red-700"
+                                    >
+                                      {doc}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              );
+                            }
+                            return (
+                              <span className="text-xs text-gray-400">
+                                None
+                              </span>
+                            );
+                          })()}
+                        </TableCell>
+                        {/* <TableCell className="text-right">
                         <Button
                           size="icon"
                           variant="ghost"
@@ -562,9 +674,10 @@ export const RequiredDocumentsMatrix = ({ moduleSelect }: ModuleComponentProps) 
                         >
                           <FolderOpen className="h-4 w-4" />
                         </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                      </TableCell> */}
+                      </TableRow>
+                    )
+                  )}
                 </TableBody>
               </Table>
             </div>
@@ -592,10 +705,12 @@ export const RequiredDocumentsMatrix = ({ moduleSelect }: ModuleComponentProps) 
                       Email: {selectedEmployeeData.employeeId.email}
                     </span>
                     <span className="text-gray-500">
-                      Department: {getDepartmentName(selectedEmployeeData) || '—'}
+                      Department:{' '}
+                      {getDepartmentName(selectedEmployeeData) || '—'}
                     </span>
                     <span className="text-gray-500">
-                      Designation: {getDesignationName(selectedEmployeeData) || '—'}
+                      Designation:{' '}
+                      {getDesignationName(selectedEmployeeData) || '—'}
                     </span>
                   </div>
                   <div className="mt-2 flex flex-wrap items-center gap-4 rounded-md p-2 text-sm">
@@ -615,17 +730,31 @@ export const RequiredDocumentsMatrix = ({ moduleSelect }: ModuleComponentProps) 
                         <AlertCircle className="h-4 w-4 text-red-500" />
                       )}
                       <span className="font-semibold">
-                        {selectedEmployeeData.isCompliant ? 'Compliant' : `${selectedEmployeeData.missingDocuments.length} document(s) missing`}
+                        {selectedEmployeeData.isCompliant
+                          ? 'No Issue'
+                          : `${selectedEmployeeData.missingDocuments.length} document(s) missing`}
                       </span>
                     </div>
+                  </div>
+                  <div className="mt-2 rounded-md bg-blue-50 p-3 text-sm text-blue-700">
+                    <span className="font-medium">Required Documents:</span>
+                    <ul className="mt-1 list-disc pl-5">
+                      {selectedEmployeeData.requiredDocuments.map(
+                        (doc, idx) => (
+                          <li key={idx}>{doc}</li>
+                        )
+                      )}
+                    </ul>
                   </div>
                   {!selectedEmployeeData.isCompliant && (
                     <div className="mt-2 rounded-md bg-red-50 p-3 text-sm text-red-700">
                       <span className="font-medium">Missing Documents:</span>
                       <ul className="mt-1 list-disc pl-5">
-                        {selectedEmployeeData.missingDocuments.map((doc, idx) => (
-                          <li key={idx}>{doc}</li>
-                        ))}
+                        {selectedEmployeeData.missingDocuments.map(
+                          (doc, idx) => (
+                            <li key={idx}>{doc}</li>
+                          )
+                        )}
                       </ul>
                     </div>
                   )}
@@ -634,7 +763,8 @@ export const RequiredDocumentsMatrix = ({ moduleSelect }: ModuleComponentProps) 
             </DialogDescription>
           </DialogHeader>
 
-          {selectedEmployeeData && selectedEmployeeData.documents.length === 0 ? (
+          {selectedEmployeeData &&
+          selectedEmployeeData.documents.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <FileWarning className="h-12 w-12 text-gray-300" />
               <p className="mt-2 text-sm text-gray-500">
@@ -677,7 +807,9 @@ export const RequiredDocumentsMatrix = ({ moduleSelect }: ModuleComponentProps) 
                                 onClick={() => handleViewDocument(url)}
                               >
                                 <Eye className="mr-1 h-3 w-3" />
-                                {doc.documentUrl.length > 1 ? `Doc ${idx + 1}` : 'View'}
+                                {doc.documentUrl.length > 1
+                                  ? `Doc ${idx + 1}`
+                                  : 'View'}
                               </Button>
                             ))}
                         </div>

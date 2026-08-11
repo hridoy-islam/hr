@@ -17,7 +17,8 @@ import {
   Coffee,
   Plus,
   Trash2,
-  Edit
+  Edit,
+  Download
 } from 'lucide-react';
 
 // Shadcn UI Imports
@@ -241,6 +242,147 @@ const AttendancePage = () => {
     setDateRange([yesterday, yesterday]);
     setActiveDateBtn('yesterday');
     fetchAttendance(1, entriesPerPage, yesterday, yesterday);
+  };
+
+const handleDownloadCSV = () => {
+    if (!attendanceData || attendanceData.length === 0) return;
+
+    const maxHistory = attendanceData.reduce((max, r) => Math.max(max, (r.history || []).length), 0);
+
+    const headers = [
+      'Employee Name',
+      'Email',
+      'Department',
+      'Designation',
+      'Shift Name',
+      'Rota Start Time',
+      'Rota End Time',
+      'Clock In Date',
+      'Clock In Time',
+      'Clock Out Date',
+      'Clock Out Time',
+      'Duration',
+      'Status',
+      'Approved',
+      ...Array.from({ length: maxHistory }, (_, i) => `History Log ${i + 1}`)
+    ];
+
+    const sortedData = [...attendanceData].sort((a: any, b: any) => {
+      const dateA = a.clockInDate || a.date || '';
+      const dateB = b.clockInDate || b.date || '';
+      if (!dateA && !dateB) return 0;
+      if (!dateA) return 1;
+      if (!dateB) return -1;
+      return new Date(dateA).getTime() - new Date(dateB).getTime();
+    });
+
+    const displayTime = (t: string) => {
+      if (!t || t === '--') return '-';
+      if (t.includes('T')) return moment(t).format('HH:mm');
+      if (t.length >= 5) return t.substring(0, 5);
+      return t;
+    };
+
+    const displayDate = (d: string) => (d ? moment(d).format('DD-MM-YYYY') : '-');
+
+    const rows = sortedData.map((record: any) => {
+      const firstName = record.userId?.firstName || '';
+      const lastName = record.userId?.lastName || '';
+      const fullName = `${firstName} ${lastName}`.trim() || '-';
+      const email = record.userId?.email || '-';
+
+      const departmentName = record.rotaId?.departmentId?.departmentName || '-';
+      const designation = (record.userId?.designationId || []).map((d: any) => d.title).join(', ') || '-';
+      const shiftName = record.rotaId?.shiftName || '-';
+      const rotaStartTime = record.rotaId?.startTime || '-';
+      const rotaEndTime = record.rotaId?.endTime || '-';
+
+      const rStartDate = record.clockInDate || record.date || '';
+      const rEndDate = record.clockOutDate || record.date || '';
+
+      const firstLog = record.attendanceLogs?.[0];
+      const rStartTime = firstLog?.clockIn || record.clockIn || '';
+      const rEndTime = firstLog?.clockOut || record.clockOut || '';
+
+      const clockInDate = displayDate(rStartDate);
+      const clockInTime = displayTime(rStartTime);
+      const clockOutDate = displayDate(rEndDate);
+      const clockOutTime = displayTime(rEndTime);
+
+      const dCalc = calculateDuration(
+        rStartDate,
+        rStartTime,
+        rEndDate,
+        rEndTime
+      );
+
+      let duration = dCalc.display;
+      if (dCalc.minutes < 1) {
+        duration = '00:00';
+      }
+
+      const status = record.status || '-';
+      const approved = record.isApproved ? 'Yes' : 'No';
+
+      const historyCols = Array.from({ length: maxHistory }, (_, i) => {
+        const h = (record.history || [])[i];
+        if (!h) return '-';
+        const msg = h.message || '';
+        const date = h.createdAt ? moment(h.createdAt).format('DD MMM YYYY') : '';
+        return `${msg} ${date}`.trim() || '-';
+      });
+
+      return [
+        fullName,
+        email,
+        departmentName,
+        designation,
+        shiftName,
+        rotaStartTime,
+        rotaEndTime,
+        clockInDate,
+        clockInTime,
+        clockOutDate,
+        clockOutTime,
+        duration,
+        status,
+        approved,
+        ...historyCols
+      ].map((v) => `"${String(v).replace(/"/g, '""')}"`);
+    });
+
+    // Timezone-safe local date formatting function
+    const formatLocalDate = (d: Date | null) => {
+      if (!d) return '';
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${day}-${month}-${year}`;
+    };
+
+    let filename = `attendance_${formatLocalDate(new Date())}.csv`;
+
+    if (startDate && endDate) {
+      const startStr = formatLocalDate(startDate);
+      const endStr = formatLocalDate(endDate);
+
+      filename = startStr === endStr
+        ? `attendance_${startStr}.csv`
+        : `attendance_${startStr}_to_${endStr}.csv`;
+    } else if (startDate) {
+      filename = `attendance_${formatLocalDate(startDate)}.csv`;
+    }
+
+    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const rotaRawMap = useMemo(() => {
@@ -1009,22 +1151,32 @@ const AttendancePage = () => {
                 </div>
               )}
             </div>
-            <div className="flex gap-4">
-              <Button
-                size={'sm'}
-                variant={activeDateBtn === 'today' ? 'default' : 'outline'}
-                onClick={handleToday}
-              >
-                Today
-              </Button>
-              <Button
-                size={'sm'}
-                variant={activeDateBtn === 'yesterday' ? 'default' : 'outline'}
-                onClick={handleYesterday}
-              >
-                Yesterday
-              </Button>
-            </div>
+             <div className="flex gap-4">
+               <Button
+                 size={'sm'}
+                 variant={activeDateBtn === 'today' ? 'default' : 'outline'}
+                 onClick={handleToday}
+               >
+                 Today
+               </Button>
+               <Button
+                 size={'sm'}
+                 variant={activeDateBtn === 'yesterday' ? 'default' : 'outline'}
+                 onClick={handleYesterday}
+               >
+                 Yesterday
+               </Button>
+               <Button
+                 size={'sm'}
+                 variant="outline"
+                 onClick={handleDownloadCSV}
+                 disabled={!attendanceData || attendanceData.length === 0}
+                 title="Download CSV"
+               >
+                 <Download className="mr-1 h-4 w-4" />
+                 Download CSV
+               </Button>
+             </div>
           </div>
 
           <div className="rounded-md">
@@ -1469,19 +1621,19 @@ const TableSection = ({
   return (
     <div className="space-y-2">
       <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Shift Name</TableHead>
-            <TableHead>Employee</TableHead>
-            <TableHead>Department</TableHead>
-            <TableHead className="w-[9%]">Start Date</TableHead>
-            <TableHead className="w-[9%]">Start Time</TableHead>
-            <TableHead className="w-[9%]">End Date</TableHead>
-            <TableHead className="w-[9%]">End Time</TableHead>
-            <TableHead className="w-[12%]">Duration</TableHead>
-            <TableHead className="text-right">Action</TableHead>
-          </TableRow>
-        </TableHeader>
+         <TableHeader>
+           <TableRow>
+             <TableHead>Shift Name</TableHead>
+             <TableHead>Employee</TableHead>
+             <TableHead>Department</TableHead>
+             <TableHead className="w-[9%]">Start Date</TableHead>
+             <TableHead className="w-[9%]">Start Time</TableHead>
+             <TableHead className="w-[9%]">End Date</TableHead>
+             <TableHead className="w-[9%]">End Time</TableHead>
+             <TableHead className="w-[12%]">Duration</TableHead>
+             <TableHead className="text-right">Action</TableHead>
+           </TableRow>
+         </TableHeader>
         <TableBody>
           {data.map((record: any) => {
             const firstName = record.userId?.firstName || '';
@@ -1744,9 +1896,9 @@ const TableSection = ({
                   </div>
                 </TableCell>
 
-                <TableCell className="text-right">
-                  <div className="flex items-center justify-end gap-2">
-                    {isEditing ? (
+                 <TableCell className="text-right">
+                   <div className="flex items-center justify-end gap-2">
+                     {isEditing ? (
                       <>
                         <Button
                           size="sm"
