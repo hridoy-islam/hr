@@ -251,7 +251,7 @@ export default function CompanyAuditPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="flex items-center gap-2 text-2xl font-bold text-gray-900">
-          <ShieldCheck className="h-6 w-6" />
+          <Search className="h-6 w-6" />
           All Audits
         </h2>
         <Button
@@ -308,7 +308,7 @@ export default function CompanyAuditPage() {
         </div>
         <div className="flex flex-col space-y-1 ">
           <Label className="text-xs font-medium text-black">
-            Audit Date Range
+            Audit Check Date Range
           </Label>
           <DatePicker
             selectsRange={true}
