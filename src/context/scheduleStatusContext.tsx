@@ -28,6 +28,7 @@ export interface ScheduleStatus {
   meeting: number; 
   policy: number;
   healthAndSafety: number;
+  audit: number;
 }
 
 interface ScheduleStatusContextType {
@@ -53,7 +54,8 @@ const defaultStatus: ScheduleStatus = {
   employeeDocument: 0 ,
   meeting: 0 ,
   policy: 0,
-  healthAndSafety: 0
+  healthAndSafety: 0,
+  audit: 0
 };
 
 

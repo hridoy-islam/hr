@@ -20,6 +20,7 @@ import Recruitment from '@/pages/company/Recruitment';
 import Settings from '@/pages/Hr/Settings';
 import HrLayout from '@/components/layout/hr-layout';
 import Department from '@/pages/company/Department';
+import AuditTypePage from '@/pages/company/auditTypePage';
 import Shift from '@/pages/company/Shift';
 import Designation from '@/pages/company/Designation';
 import CompanyDetails from '@/pages/company/Company-Details';
@@ -124,6 +125,8 @@ import CompanyPlannedRota from '@/pages/company/planned-Rota';
 import CompanyPlannedVsActualRotaReport from '@/pages/company/plannedVsActualRotaReport';
 import ServiceUserDetailsPage from '@/pages/company/serviceUser/serviceUserDetails';
 import CompanyAuditPage from '@/pages/company/auditPage';
+import CreateAuditPage from '@/pages/company/auditPage/create';
+import ViewAuditPage from '@/pages/company/auditPage/view';
 import EmployeeMatrixPage from '@/pages/company/EmployeeMatrix';
 
 const SignInPage = lazy(() => import('@/pages/auth/signin'));
@@ -261,6 +264,7 @@ export default function AppRouter() {
         { path: 'employee/:eid/rtw', element: <RtwPage /> },
 
         { path: 'department', element: <Department /> },
+        { path: 'audit-type', element: <AuditTypePage /> },
 
         { path: 'rota', element: <CompanyRota /> },
         { path: 'shift', element: <Shift /> },
@@ -472,7 +476,23 @@ export default function AppRouter() {
             </Suspense>
           )
         },
-   
+        {
+          path: 'create',
+          element: (
+            <Suspense>
+              <CreateAuditPage />
+            </Suspense>
+          )
+        },
+        {
+          path: 'view/:auditId',
+          element: (
+            <Suspense>
+              <ViewAuditPage />
+            </Suspense>
+          )
+        },
+
       ]
     }
   ];

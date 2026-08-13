@@ -248,6 +248,17 @@ const CompanyDashboardPage = () => {
       onClick: () => navigate(`/company/${id}/health-and-safety`), 
       functional: true,
       isWarning: status.healthAndSafety > 0
+    },
+    // --- NEW CARD: AUDIT ---
+    {
+      title: 'AUDIT',
+      main: loadingStats ? '...' : status.audit,
+      sub: getSubText(status.audit),
+      icon: <FileCheck className="h-6 w-6" />,
+      gradient: 'from-amber-600 to-amber-800',
+      onClick: () => navigate(`/company/${id}/audit`),
+      functional: true,
+      isWarning: status.audit > 0
     }
   ];
 

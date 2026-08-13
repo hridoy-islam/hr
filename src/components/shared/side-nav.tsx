@@ -315,6 +315,13 @@ const navItems = [
     href: 'company-policy',
     roles: ['company', 'companyAdmin'],
     badgeKey: 'policy'
+  },  {
+    icon: File,
+    label: 'Audit',
+    href: 'audit',
+    roles: ['company', 'companyAdmin'],
+    accessKey: 'serviceUser',
+    badgeKey: 'audit'
   },
   {
     icon: Users2,
@@ -323,13 +330,7 @@ const navItems = [
     roles: ['company', 'companyAdmin'],
     accessKey: 'serviceUser'
   },
-  {
-    icon: File,
-    label: 'Audit',
-    href: 'audit',
-    roles: ['company', 'companyAdmin'],
-    accessKey: 'serviceUser'
-  },
+
    {
     icon: Grid3X3,
     label: 'Employee Matrix',
@@ -466,6 +467,13 @@ const navItems = [
         icon: Building2,
         label: 'Department',
         href: 'department',
+        roles: ['company', 'companyAdmin'],
+        accessKey: 'setting'
+      },
+      {
+        icon: FileCheck2,
+        label: 'Audit Type',
+        href: 'audit-type',
         roles: ['company', 'companyAdmin'],
         accessKey: 'setting'
       },
