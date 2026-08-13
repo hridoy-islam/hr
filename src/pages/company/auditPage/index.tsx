@@ -106,7 +106,7 @@ export default function CompanyAuditPage() {
         const end = new Date(
           Date.UTC(toDate.getFullYear(), toDate.getMonth(), toDate.getDate())
         );
-        end.setUTCDate(end.getUTCDate() + 1);
+        end.setUTCDate(end.getUTCDate() );
         params.toDate = end.toISOString();
       }
 
@@ -192,8 +192,10 @@ export default function CompanyAuditPage() {
       };
     }
     if (
-      audit.auditDate &&
-      moment(audit.auditDate).startOf('day').isBefore(moment().startOf('day'))
+      audit.nextCheckDate &&
+      moment(audit.nextCheckDate)
+        .startOf('day')
+        .isBefore(moment().startOf('day'))
     ) {
       return {
         label: 'Due',
@@ -360,6 +362,7 @@ export default function CompanyAuditPage() {
                 <TableHead>Service User</TableHead>
                 <TableHead>Audit Type</TableHead>
                 <TableHead>Audit Date</TableHead>
+                <TableHead>Next Check Date</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -398,6 +401,17 @@ export default function CompanyAuditPage() {
                     >
                       {audit.auditDate
                         ? moment(audit.auditDate).format('DD MMM YYYY')
+                        : '-'}
+                    </TableCell>
+                    <TableCell
+                      onClick={() =>
+                        navigate(
+                          `/company/${companyId}/audit/view/${audit._id}`
+                        )
+                      }
+                    >
+                      {audit.nextCheckDate
+                        ? moment(audit.nextCheckDate).format('DD MMM YYYY')
                         : '-'}
                     </TableCell>
                     <TableCell

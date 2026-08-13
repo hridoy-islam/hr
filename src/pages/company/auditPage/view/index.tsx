@@ -48,7 +48,8 @@ import {
   X,
   Eye,
   ShieldCheck,
-  History
+  History,
+  Search
 } from 'lucide-react';
 
 interface UploadedFile {
@@ -63,6 +64,7 @@ interface LogEntry {
   document?: string[] | string;
   note?: string;
   auditDate?: string;
+  nextCheckDate?: string;
   extendDeadline?: string;
   updatedBy: string | { firstName: string; lastName: string; name?: string };
 }
@@ -103,6 +105,9 @@ export default function ViewAuditPage() {
   const [showEditLogModal, setShowEditLogModal] = useState(false);
   const [editingLog, setEditingLog] = useState<LogEntry | null>(null);
   const [editLogAuditDate, setEditLogAuditDate] = useState<Date | null>(null);
+  const [editLogNextCheckDate, setEditLogNextCheckDate] = useState<Date | null>(
+    null
+  );
   const [editLogExtendDate, setEditLogExtendDate] = useState<Date | null>(null);
   const [editLogNote, setEditLogNote] = useState('');
   const [editLogFiles, setEditLogFiles] = useState<UploadedFile[]>([]);
@@ -139,21 +144,25 @@ export default function ViewAuditPage() {
     if (audit.status === 'completed') {
       return {
         label: 'Completed',
-        className: 'bg-green-100 text-green-800 border-green-200'
+        className: 'bg-green-100 text-green-800 border-green-200',
+        banner: 'from-green-500 to-emerald-700'
       };
     }
-    if (
-      audit.auditDate &&
-      moment(audit.auditDate).startOf('day').isBefore(moment().startOf('day'))
-    ) {
+    const nextCheck = audit.nextCheckDate
+      ? moment(audit.nextCheckDate).startOf('day')
+      : null;
+    const today = moment().startOf('day');
+    if (nextCheck && nextCheck.isBefore(today)) {
       return {
         label: 'Due',
-        className: 'bg-red-100 text-red-800 border-red-200'
+        className: 'bg-red-100 text-red-800 border-red-200',
+        banner: 'from-red-500 to-rose-700'
       };
     }
     return {
       label: 'Active',
-      className: 'bg-blue-100 text-blue-800 border-blue-200'
+      className: 'bg-blue-100 text-blue-800 border-blue-200',
+      banner: 'from-blue-500 to-indigo-700'
     };
   };
 
@@ -225,7 +234,7 @@ export default function ViewAuditPage() {
   };
 
   const openExtend = () => {
-    setInputDate(audit?.auditDate ? new Date(audit.auditDate) : null);
+    setInputDate(audit?.nextCheckDate ? new Date(audit.nextCheckDate) : null);
     setInputNote('');
     setUploadedFiles([]);
     setShowExtendModal(true);
@@ -237,7 +246,7 @@ export default function ViewAuditPage() {
     try {
       await axiosInstance.patch(`/audit/${auditId}`, {
         action: 'extendDate',
-        auditDate: new Date(
+        nextCheckDate: new Date(
           Date.UTC(
             inputDate.getFullYear(),
             inputDate.getMonth(),
@@ -344,6 +353,9 @@ export default function ViewAuditPage() {
     setEditingLog(entry);
     setEditLogFiles([]);
     setEditLogAuditDate(entry.auditDate ? new Date(entry.auditDate) : null);
+    setEditLogNextCheckDate(
+      entry.nextCheckDate ? new Date(entry.nextCheckDate) : null
+    );
     setEditLogExtendDate(
       entry.extendDeadline ? new Date(entry.extendDeadline) : null
     );
@@ -373,6 +385,15 @@ export default function ViewAuditPage() {
           editLogAuditDate.getFullYear(),
           editLogAuditDate.getMonth(),
           editLogAuditDate.getDate()
+        )
+      ).toISOString();
+    }
+    if (editLogNextCheckDate) {
+      payload.nextCheckDate = new Date(
+        Date.UTC(
+          editLogNextCheckDate.getFullYear(),
+          editLogNextCheckDate.getMonth(),
+          editLogNextCheckDate.getDate()
         )
       ).toISOString();
     }
@@ -483,7 +504,7 @@ export default function ViewAuditPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="flex items-center gap-2 text-xl font-bold text-gray-900">
-          <ShieldCheck className="h-6 w-6" />
+          <Search className="h-6 w-6" />
           Audit Details
         </h2>
         <Button
@@ -495,246 +516,283 @@ export default function ViewAuditPage() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <div className="flex flex-col gap-4">
         {/* Left Column: Status & Actions */}
-        <div className="lg:col-span-1">
-          <div className="h-auto rounded-lg border border-gray-200 bg-gray-50 p-6">
-            <h2 className="mb-6 flex items-center gap-2 text-xl font-semibold text-gray-900">
-              <ShieldCheck className="h-5 w-5 text-theme" />
-              Audit Status
-            </h2>
-
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs font-medium uppercase tracking-wide text-gray-500">
-                  Current Status
-                </Label>
-                <Badge variant="outline" className={status.className}>
-                  {status.label}
-                </Badge>
-              </div>
-
-              <div className="space-y-1">
-                <Label className="text-xs font-medium uppercase tracking-wide text-gray-500">
-                  Audit Type
-                </Label>
-                <div className="text-sm font-semibold text-gray-900">
-                  {audit.auditTypeId?.title || '-'}
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <Label className="text-xs font-medium uppercase tracking-wide text-gray-500">
-                  Employee
-                </Label>
-                <div className="text-sm font-semibold text-gray-900">
-                  {employeeName()}
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <Label className="text-xs font-medium uppercase tracking-wide text-gray-500">
-                  Service User
-                </Label>
-                <div className="text-sm font-semibold text-gray-900">
-                  {audit.serviceUserId?.name || '-'}
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <Label className="text-xs font-medium uppercase tracking-wide text-gray-500">
-                  Audit Date
-                </Label>
-                <div
-                  className={cn(
-                    'text-lg font-semibold',
-                    status.label === 'Due'
-                      ? 'text-red-600'
-                      : 'text-gray-900'
-                  )}
-                >
-                  {audit.auditDate
-                    ? moment(audit.auditDate).format('DD MMMM YYYY')
-                    : '-'}
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <Label className="text-xs font-medium uppercase tracking-wide text-gray-500">
-                    Note
-                  </Label>
-                  <Button
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={openEditDetails}
-                  >
-                    <Pen className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-                <p className="text-sm text-gray-700">
-                  {audit.note?.trim() ? audit.note : '-'}
-                </p>
-              </div>
-
-              <div className="space-y-1">
-                <Label className="text-xs font-medium uppercase tracking-wide text-gray-500">
-                  Documents
-                </Label>
-                {Array.isArray(audit.document) &&
-                audit.document.filter((doc: string) => doc?.trim()).length >
-                  0 ? (
-                  <div className="flex flex-col items-start gap-1">
-                    {audit.document
-                      .filter((doc: string) => doc?.trim())
-                      .map((docUrl: string, idx: number) => (
-                        <Button
-                          key={idx}
-                          size="sm"
-                          className="h-8"
-                          onClick={() => handleViewDocument(docUrl)}
-                        >
-                          <Eye className="mr-2 h-4 w-4" />
-                          Document {idx + 1}
-                        </Button>
-                      ))}
-                  </div>
-                ) : (
-                  <span className="text-sm text-gray-500">-</span>
-                )}
-              </div>
-
-              <div className="space-y-3 border-t border-gray-100 pt-6">
-                <Button
-                  onClick={openExtend}
-                  disabled={isCompleted}
-                  className="w-full"
-                >
-                  <Clock className="mr-2 h-4 w-4" />
-                  Extend Audit Date
-                </Button>
-                <Button
-                  onClick={() => setShowCompleteConfirm(true)}
-                  disabled={isCompleted}
-                  className="w-full bg-green-600 text-white hover:bg-green-700"
-                >
-                  <CheckCircle2 className="mr-2 h-4 w-4" />
-                  Complete Audit
-                </Button>
-              </div>
-            </div>
-          </div>
+     <div className="w-full">
+  <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+    
+    {/* Header Section */}
+    <div className="flex flex-col gap-4 border-b border-gray-100 pb-5 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-center gap-3">
+       
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900">Audit Status</h2>
+          <p className="text-xs text-gray-500">Overview and schedule details</p>
         </div>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-medium uppercase tracking-wider text-black">
+          Status:
+        </span>
+        <Badge variant="outline" className={status.className}>
+          {status.label}
+        </Badge>
+      </div>
+    </div>
+
+    {/* Primary Metadata Grid (Row-wise Layout) */}
+    <div className="mt-6 pb-6 border-b border-gray-100 grid grid-cols-1 gap-6 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="space-y-1">
+        <Label className="text-xs font-semibold uppercase tracking-wider text-black">
+          Audit Type
+        </Label>
+        <div className="text-sm font-semibold text-gray-900 truncate">
+          {audit.auditTypeId?.title || '-'}
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        <Label className="text-xs font-semibold uppercase tracking-wider text-black">
+          Employee
+        </Label>
+        <div className="text-sm font-semibold text-gray-900 truncate">
+          {employeeName()}
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        <Label className="text-xs font-semibold uppercase tracking-wider text-black">
+          Service User
+        </Label>
+        <div className="text-sm font-semibold text-gray-900 truncate">
+          {audit.serviceUserId?.name || '-'}
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        <Label className="text-xs font-semibold uppercase tracking-wider text-black">
+          Audit Date
+        </Label>
+        <div className="text-sm font-semibold text-gray-900">
+          {audit.auditDate
+            ? moment(audit.auditDate).format('DD MMMM YYYY')
+            : '-'}
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        <Label className="text-xs font-semibold uppercase tracking-wider text-black">
+          Next Check Date
+        </Label>
+        <div
+          className={cn(
+            'text-sm font-semibold',
+            status.label === 'Due' ? 'text-red-600' : 'text-gray-900'
+          )}
+        >
+          {audit.nextCheckDate
+            ? moment(audit.nextCheckDate).format('DD MMMM YYYY')
+            : '-'}
+        </div>
+      </div>
+    </div>
+
+    {/* Secondary Section: Notes & Documents (Vertical Layout, Black Text) */}
+    <div className="mt-6 space-y-4">
+      {/* Section Header with Edit Button */}
+      <div className="flex items-center justify-start gap-4">
+        <span className="text-xs font-semibold uppercase tracking-wider text-black">
+          Notes & Documents
+        </span>
+        <Button
+          size="icon"
+          className="h-7 w-7 "
+          onClick={openEditDetails}
+          title="Edit Note and Documents"
+        >
+          <Pen className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+
+      {/* Note Section */}
+      <div className="space-y-1">
+        <Label className="text-xs font-semibold uppercase tracking-wider text-black">
+          Note
+        </Label>
+        <p className="text-sm text-black leading-relaxed">
+          {audit.note?.trim() ? audit.note : '-'}
+        </p>
+      </div>
+
+      {/* Documents Section (Stacked Under Note) */}
+      <div className="space-y-1">
+        <Label className="text-xs font-semibold uppercase tracking-wider text-black">
+          Documents
+        </Label>
+        <div>
+          {Array.isArray(audit.document) &&
+          audit.document.filter((doc: string) => doc?.trim()).length > 0 ? (
+            <div className="flex flex-wrap gap-2 pt-1">
+              {audit.document
+                .filter((doc: string) => doc?.trim())
+                .map((docUrl: string, idx: number) => (
+                  <Button
+                    key={idx}
+                    size="sm"
+                    variant="outline"
+                    className="h-8 border-gray-200 bg-white text-xs text-black hover:bg-gray-100 shadow-none"
+                    onClick={() => handleViewDocument(docUrl)}
+                  >
+                    <Eye className="mr-1.5 h-3.5 w-3.5 text-black" />
+                    Document {idx + 1}
+                  </Button>
+                ))}
+            </div>
+          ) : (
+            <span className="text-sm text-black block pt-1">-</span>
+          )}
+        </div>
+      </div>
+    </div>
+
+    {/* Footer Action Buttons */}
+    <div className="mt-6 flex flex-col-reverse justify-end gap-3 border-t border-gray-100 pt-5 sm:flex-row">
+      <Button
+        variant="outline"
+        onClick={openExtend}
+        disabled={isCompleted}
+        className="w-full sm:w-auto"
+      >
+        <Clock className="mr-2 h-4 w-4 text-gray-500" />
+        Extend Check Date
+      </Button>
+      <Button
+        onClick={() => setShowCompleteConfirm(true)}
+        disabled={isCompleted}
+        className="w-full sm:w-auto bg-green-600 text-white hover:bg-green-700 shadow-sm"
+      >
+        <CheckCircle2 className="mr-2 h-4 w-4" />
+        Complete Audit
+      </Button>
+    </div>
+
+  </div>
+</div>
 
         {/* Right Column: History Log */}
-        <div className="lg:col-span-2">
-          <div className="rounded-lg border border-gray-200 bg-gray-50 p-6">
-            <h2 className="mb-6 flex items-center gap-2 text-xl font-semibold text-gray-900">
-              <History className="h-5 w-5 text-theme" />
-              History Log
-            </h2>
+       <div className="">
+  <div className="rounded-lg border border-gray-200 bg-gray-50 p-6">
+    <h2 className="mb-6 flex items-center gap-2 text-xl font-semibold text-gray-900">
+      <History className="h-5 w-5 text-theme" />
+      History Log
+    </h2>
 
-            <div className="overflow-hidden rounded-md border border-gray-200">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Activity</TableHead>
-                    <TableHead>Updated By</TableHead>
-                    <TableHead>Note</TableHead>
-                    <TableHead className="text-right">Document(s)</TableHead>
-                    <TableHead></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {!audit.logs || audit.logs.length === 0 ? (
-                    <TableRow>
-                      <TableCell
-                        colSpan={5}
-                        className="py-8 text-center italic text-gray-500"
-                      >
-                        No history records found.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    audit.logs
-                      .slice()
-                      .sort(
-                        (a: any, b: any) =>
-                          new Date(b.date).getTime() -
-                          new Date(a.date).getTime()
-                      )
-                      .map((entry: LogEntry) => (
-                        <TableRow
-                          key={entry._id || Math.random()}
-                          className="hover:bg-gray-50"
-                        >
-                          <TableCell className="font-medium text-gray-900">
-                            {entry.title || 'Update'}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex flex-col text-xs font-medium">
-                              <span className="font-medium">
-                                {entry.updatedBy &&
-                                typeof entry.updatedBy === 'object'
-                                  ? entry.updatedBy.name ||
-                                    `${entry.updatedBy.firstName ?? ''} ${
-                                      entry.updatedBy.lastName ?? ''
-                                    }`.trim()
-                                  : 'System'}
-                              </span>
-                              {moment(entry.date).format('DD MMM YYYY')}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <p
-                              className="max-w-[150px] truncate text-sm text-gray-600"
-                              title={entry.note}
-                            >
-                              {entry.note || '-'}
-                            </p>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex flex-col items-end gap-1">
-                              {Array.isArray(entry.document) &&
-                              entry.document.filter((doc) => doc?.trim())
-                                .length > 0 ? (
-                                entry.document
-                                  .filter((doc) => doc?.trim())
-                                  .map((docUrl, idx) => (
-                                    <Button
-                                      key={idx}
-                                      size="sm"
-                                      className="h-8"
-                                      onClick={() =>
-                                        handleViewDocument(docUrl)
-                                      }
-                                    >
-                                      <Eye className="mr-2 h-4 w-4" />
-                                      Document {idx + 1}
-                                    </Button>
-                                  ))
-                              ) : (
-                                <span className="text-gray-300">-</span>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right">
+    <div className="overflow-hidden rounded-md border border-gray-200 bg-white">
+      <Table className="table-fixed w-full">
+        <TableHeader>
+          <TableRow>
+            {/* 40% Width for Activity */}
+            <TableHead className="w-[40%]">Activity</TableHead>
+            <TableHead>Updated By</TableHead>
+            {/* 30% Width for Note */}
+            <TableHead className="w-[30%]">Note</TableHead>
+            <TableHead className="text-center">Document(s)</TableHead>
+            <TableHead className="text-right">Action</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {!audit.logs || audit.logs.length === 0 ? (
+            <TableRow>
+              <TableCell
+                colSpan={5}
+                className="py-8 text-center italic text-gray-500"
+              >
+                No history records found.
+              </TableCell>
+            </TableRow>
+          ) : (
+            audit.logs
+              .slice()
+              .sort(
+                (a: any, b: any) =>
+                  new Date(b.date).getTime() -
+                  new Date(a.date).getTime()
+              )
+              .map((entry: LogEntry) => (
+                <TableRow
+                  key={entry._id || Math.random()}
+                  className="hover:bg-gray-50"
+                >
+                  <TableCell className="w-[40%] font-medium break-words whitespace-normal">
+                    {entry.title || 'Update'}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-col text-xs font-medium">
+                      <span className="font-medium">
+                        {entry.updatedBy &&
+                        typeof entry.updatedBy === 'object'
+                          ? entry.updatedBy.name ||
+                            `${entry.updatedBy.firstName ?? ''} ${
+                              entry.updatedBy.lastName ?? ''
+                            }`.trim()
+                          : 'System'}
+                      </span>
+                      <span className="text-gray-500 font-normal">
+                        {moment(entry.date).format('DD MMM YYYY')}
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="w-[30%]">
+                    <p
+                      className="w-full break-words whitespace-normal text-sm "
+                      title={entry.note}
+                    >
+                      {entry.note || '-'}
+                    </p>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex flex-col items-end gap-1">
+                      {Array.isArray(entry.document) &&
+                      entry.document.filter((doc) => doc?.trim())
+                        .length > 0 ? (
+                        entry.document
+                          .filter((doc) => doc?.trim())
+                          .map((docUrl, idx) => (
                             <Button
-                              size={'icon'}
-                              variant={'outline'}
-                              onClick={() => openEditLog(entry)}
+                              key={idx}
+                              size="sm"
+                              className="h-8"
+                              onClick={() =>
+                                handleViewDocument(docUrl)
+                              }
                             >
-                              <Pen className="h-4 w-4" />
+                              <Eye className="mr-2 h-4 w-4" />
+                              Document {idx + 1}
                             </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </div>
-        </div>
+                          ))
+                      ) : (
+                        <span className="text-gray-300">-</span>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right w-12">
+                    <Button
+                      size={'icon'}
+                      variant={'outline'}
+                      onClick={() => openEditLog(entry)}
+                    >
+                      <Pen className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))
+          )}
+        </TableBody>
+      </Table>
+    </div>
+  </div>
+</div>
       </div>
 
       {/* Edit Note/Documents Modal */}
@@ -859,11 +917,11 @@ export default function ViewAuditPage() {
                   </div>
                 ) : (
                   <div className="flex flex-col items-center gap-1 text-center">
-                    <Upload className="h-6 w-6 text-gray-400" />
+                    <Upload className="h-6 w-6 text-black" />
                     <span className="text-sm font-medium text-gray-600">
                       Upload Document(s)
                     </span>
-                    <span className="text-xs text-gray-400">
+                    <span className="text-xs text-black">
                       PDF/Images (Max 20MB each)
                     </span>
                   </div>
@@ -889,19 +947,19 @@ export default function ViewAuditPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Extend Audit Date Modal */}
+      {/* Extend Next Check Date Modal */}
       <Dialog open={showExtendModal} onOpenChange={setShowExtendModal}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Extend Audit Date</DialogTitle>
+            <DialogTitle>Extend Next Check Date</DialogTitle>
             <DialogDescription>
-              Extend the audit date for the current audit.
+              Extend the next check date for the current audit.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="flex flex-col space-y-2">
               <Label className="text-sm font-medium text-gray-700">
-                New Audit Date (DD-MM-YYYY)
+                Next Check Date (DD-MM-YYYY)
                 <span className="text-red-500">*</span>
               </Label>
               <DatePicker
@@ -1057,7 +1115,7 @@ export default function ViewAuditPage() {
 
           <div className="space-y-6 py-4">
             {editingLog && (
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <div className="flex flex-col space-y-1">
                   <Label className="text-xs font-medium uppercase tracking-wide text-gray-500">
                     Audit Date
@@ -1065,6 +1123,21 @@ export default function ViewAuditPage() {
                   <DatePicker
                     selected={editLogAuditDate}
                     onChange={(date) => setEditLogAuditDate(date)}
+                    dateFormat="dd-MM-yyyy"
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-theme focus:outline-none focus:ring-2 focus:ring-theme"
+                    placeholderText="Select date..."
+                    showYearDropdown
+                    dropdownMode="select"
+                    preventOpenOnFocus
+                  />
+                </div>
+                <div className="flex flex-col space-y-1">
+                  <Label className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                    Next Check Date
+                  </Label>
+                  <DatePicker
+                    selected={editLogNextCheckDate}
+                    onChange={(date) => setEditLogNextCheckDate(date)}
                     dateFormat="dd-MM-yyyy"
                     className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-theme focus:outline-none focus:ring-2 focus:ring-theme"
                     placeholderText="Select date..."

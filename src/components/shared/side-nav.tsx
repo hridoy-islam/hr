@@ -60,7 +60,8 @@ import {
   Heart,
   CalendarMinus2,
   File,
-  Grid3X3
+  Grid3X3,
+  Search
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Link, useNavigate, useLocation, useParams } from 'react-router-dom';
@@ -316,7 +317,7 @@ const navItems = [
     roles: ['company', 'companyAdmin'],
     badgeKey: 'policy'
   },  {
-    icon: File,
+    icon: Search  ,
     label: 'Audit',
     href: 'audit',
     roles: ['company', 'companyAdmin'],

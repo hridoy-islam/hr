@@ -43,6 +43,7 @@ export default function CreateAuditPage() {
   const [selectedAuditType, setSelectedAuditType] =
     useState<OptionType | null>(null);
   const [auditDate, setAuditDate] = useState<Date | null>(null);
+  const [nextCheckDate, setNextCheckDate] = useState<Date | null>(null);
   const [note, setNote] = useState('');
 
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
@@ -161,6 +162,13 @@ export default function CreateAuditPage() {
       });
       return;
     }
+    if (!nextCheckDate) {
+      toast({
+        title: 'Next check date is required',
+        variant: 'destructive'
+      });
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -174,6 +182,13 @@ export default function CreateAuditPage() {
             auditDate.getFullYear(),
             auditDate.getMonth(),
             auditDate.getDate()
+          )
+        ).toISOString(),
+        nextCheckDate: new Date(
+          Date.UTC(
+            nextCheckDate.getFullYear(),
+            nextCheckDate.getMonth(),
+            nextCheckDate.getDate()
           )
         ).toISOString(),
         note,
@@ -279,6 +294,23 @@ export default function CreateAuditPage() {
               dateFormat="dd-MM-yyyy"
               className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-theme focus:outline-none focus:ring-2 focus:ring-theme"
               placeholderText="Select audit date..."
+              showMonthDropdown
+              showYearDropdown
+              dropdownMode="select"
+              wrapperClassName='w-full'
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-sm font-medium text-gray-700">
+              Next Check Date (DD-MM-YYYY) <span className="text-red-500">*</span>
+            </Label>
+            <DatePicker
+              selected={nextCheckDate}
+              onChange={(date) => setNextCheckDate(date)}
+              dateFormat="dd-MM-yyyy"
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-theme focus:outline-none focus:ring-2 focus:ring-theme"
+              placeholderText="Select next check date..."
               showMonthDropdown
               showYearDropdown
               dropdownMode="select"
