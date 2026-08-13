@@ -12,6 +12,7 @@ import { useSelector } from 'react-redux';
 import { cn } from '@/lib/utils';
 import { ArrowLeft, FileText, Loader2, Plus, Upload, X } from 'lucide-react';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
+import { z } from 'zod';
 
 interface OptionType {
   value: string;
@@ -22,6 +23,15 @@ interface UploadedFile {
   name: string;
   url: string;
 }
+
+const auditFormSchema = z.object({
+  auditTypeId: z.string().min(1, 'Audit type is required'),
+  employeeId: z.string().min(1, 'Employee is required'),
+  serviceUserId: z.string().optional(),
+  auditDate: z.string().min(1, 'Audit date is required'),
+  nextCheckDate: z.string().optional(),
+  note: z.string().optional()
+});
 
 export default function CreateAuditPage() {
   const { id: companyId } = useParams<{ id: string }>();
@@ -49,6 +59,7 @@ export default function CreateAuditPage() {
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchOptions = async () => {
@@ -148,49 +159,51 @@ export default function CreateAuditPage() {
   };
 
   const handleSubmit = async () => {
-    if (!selectedEmployee || !selectedServiceUser || !selectedAuditType) {
-      toast({
-        title: 'Please select employee, service user and audit type',
-        variant: 'destructive'
+    const values = {
+      auditTypeId: selectedAuditType?.value ?? '',
+      employeeId: selectedEmployee?.value ?? '',
+      serviceUserId: selectedServiceUser?.value,
+      auditDate: auditDate
+        ? new Date(
+            Date.UTC(
+              auditDate.getFullYear(),
+              auditDate.getMonth(),
+              auditDate.getDate()
+            )
+          ).toISOString()
+        : '',
+      nextCheckDate: nextCheckDate
+        ? new Date(
+            Date.UTC(
+              nextCheckDate.getFullYear(),
+              nextCheckDate.getMonth(),
+              nextCheckDate.getDate()
+            )
+          ).toISOString()
+        : undefined,
+      note
+    };
+
+    const result = auditFormSchema.safeParse(values);
+    if (!result.success) {
+      const fieldErrors: Record<string, string> = {};
+      result.error.issues.forEach((issue) => {
+        if (issue.path[0]) fieldErrors[String(issue.path[0])] = issue.message;
       });
+      setFormErrors(fieldErrors);
       return;
     }
-    if (!auditDate) {
-      toast({
-        title: 'Audit date is required',
-        variant: 'destructive'
-      });
-      return;
-    }
-    if (!nextCheckDate) {
-      toast({
-        title: 'Next check date is required',
-        variant: 'destructive'
-      });
-      return;
-    }
+    setFormErrors({});
 
     setIsSubmitting(true);
     try {
       const payload = {
         companyId,
-        employeeId: selectedEmployee.value,
-        serviceUserId: selectedServiceUser.value,
-        auditTypeId: selectedAuditType.value,
-        auditDate: new Date(
-          Date.UTC(
-            auditDate.getFullYear(),
-            auditDate.getMonth(),
-            auditDate.getDate()
-          )
-        ).toISOString(),
-        nextCheckDate: new Date(
-          Date.UTC(
-            nextCheckDate.getFullYear(),
-            nextCheckDate.getMonth(),
-            nextCheckDate.getDate()
-          )
-        ).toISOString(),
+        employeeId: selectedEmployee!.value,
+        serviceUserId: selectedServiceUser?.value,
+        auditTypeId: selectedAuditType!.value,
+        auditDate: values.auditDate,
+        nextCheckDate: values.nextCheckDate,
         note,
         document:
           uploadedFiles.length > 0
@@ -255,9 +268,19 @@ export default function CreateAuditPage() {
             <Select
               options={auditTypes}
               value={selectedAuditType}
-              onChange={setSelectedAuditType}
+              onChange={(opt) => {
+                setSelectedAuditType(opt);
+                setFormErrors((prev) => {
+                  const next = { ...prev };
+                  delete next.auditTypeId;
+                  return next;
+                });
+              }}
               placeholder="Select audit type..."
             />
+            {formErrors.auditTypeId && (
+              <p className="text-xs text-red-600">{formErrors.auditTypeId}</p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -267,19 +290,31 @@ export default function CreateAuditPage() {
             <Select
               options={employees}
               value={selectedEmployee}
-              onChange={setSelectedEmployee}
+              onChange={(opt) => {
+                setSelectedEmployee(opt);
+                setFormErrors((prev) => {
+                  const next = { ...prev };
+                  delete next.employeeId;
+                  return next;
+                });
+              }}
               placeholder="Select employee..."
             />
+            {formErrors.employeeId && (
+              <p className="text-xs text-red-600">{formErrors.employeeId}</p>
+            )}
           </div>
 
           <div className="space-y-2">
             <Label className="text-sm font-medium text-gray-700">
-              Service User <span className="text-red-500">*</span>
+              Service User{' '}
+              <span className="font-normal text-gray-400">(Optional)</span>
             </Label>
             <Select
               options={serviceUsers}
               value={selectedServiceUser}
               onChange={setSelectedServiceUser}
+              isClearable
               placeholder="Select service user..."
             />
           </div>
@@ -290,7 +325,14 @@ export default function CreateAuditPage() {
             </Label>
             <DatePicker
               selected={auditDate}
-              onChange={(date) => setAuditDate(date)}
+              onChange={(date) => {
+                setAuditDate(date);
+                setFormErrors((prev) => {
+                  const next = { ...prev };
+                  delete next.auditDate;
+                  return next;
+                });
+              }}
               dateFormat="dd-MM-yyyy"
               className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-theme focus:outline-none focus:ring-2 focus:ring-theme"
               placeholderText="Select audit date..."
@@ -299,11 +341,15 @@ export default function CreateAuditPage() {
               dropdownMode="select"
               wrapperClassName='w-full'
             />
+            {formErrors.auditDate && (
+              <p className="text-xs text-red-600">{formErrors.auditDate}</p>
+            )}
           </div>
 
           <div className="space-y-2">
             <Label className="text-sm font-medium text-gray-700">
-              Next Check Date (DD-MM-YYYY) <span className="text-red-500">*</span>
+              Next Check Date (DD-MM-YYYY){' '}
+              <span className="font-normal text-gray-400">(Optional)</span>
             </Label>
             <DatePicker
               selected={nextCheckDate}

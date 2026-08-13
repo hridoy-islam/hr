@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+﻿import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import axiosInstance from '@/lib/axios';
 import { Button } from '@/components/ui/button';
@@ -33,6 +33,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
+import Select from 'react-select';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 import { useToast } from '@/components/ui/use-toast';
 import moment from '@/lib/moment-setup';
@@ -47,7 +48,6 @@ import {
   Upload,
   X,
   Eye,
-  ShieldCheck,
   History,
   Search
 } from 'lucide-react';
@@ -55,6 +55,11 @@ import {
 interface UploadedFile {
   name: string;
   url: string;
+}
+
+interface OptionType {
+  value: string;
+  label: string;
 }
 
 interface LogEntry {
@@ -94,16 +99,31 @@ export default function ViewAuditPage() {
   // Complete confirm
   const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
 
-  // Edit note/documents modal
-  const [showEditDetailsModal, setShowEditDetailsModal] = useState(false);
-  const [editNote, setEditNote] = useState('');
-  const [editRemovedDocs, setEditRemovedDocs] = useState<string[]>([]);
-  const [editNewDocs, setEditNewDocs] = useState<UploadedFile[]>([]);
-  const editDocsInputRef = useRef<HTMLInputElement>(null);
+  // Update audit details modal
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const [updateOptionsLoading, setUpdateOptionsLoading] = useState(false);
+  const [updateEmployees, setUpdateEmployees] = useState<OptionType[]>([]);
+  const [updateServiceUsers, setUpdateServiceUsers] = useState<OptionType[]>(
+    []
+  );
+  const [updateAuditTypes, setUpdateAuditTypes] = useState<OptionType[]>([]);
+  const [updAuditType, setUpdAuditType] = useState<OptionType | null>(null);
+  const [updEmployee, setUpdEmployee] = useState<OptionType | null>(null);
+  const [updServiceUser, setUpdServiceUser] = useState<OptionType | null>(
+    null
+  );
+  const [updAuditDate, setUpdAuditDate] = useState<Date | null>(null);
+  const [updNextCheckDate, setUpdNextCheckDate] = useState<Date | null>(null);
+  const [updNote, setUpdNote] = useState('');
+  const [updRemovedDocs, setUpdRemovedDocs] = useState<string[]>([]);
+  const [updNewDocs, setUpdNewDocs] = useState<UploadedFile[]>([]);
+  const [updErrors, setUpdErrors] = useState<Record<string, string>>({});
+  const updDocsInputRef = useRef<HTMLInputElement>(null);
 
   // Edit log
   const [showEditLogModal, setShowEditLogModal] = useState(false);
   const [editingLog, setEditingLog] = useState<LogEntry | null>(null);
+  const [viewLogEntry, setViewLogEntry] = useState<LogEntry | null>(null);
   const [editLogAuditDate, setEditLogAuditDate] = useState<Date | null>(null);
   const [editLogNextCheckDate, setEditLogNextCheckDate] = useState<Date | null>(
     null
@@ -299,37 +319,131 @@ export default function ViewAuditPage() {
     }
   };
 
-  const openEditDetails = () => {
-    setEditNote(audit?.note || '');
-    setEditRemovedDocs([]);
-    setEditNewDocs([]);
-    setShowEditDetailsModal(true);
+  const openUpdateDetails = async () => {
+    if (!audit) return;
+    setUpdateOptionsLoading(true);
+    try {
+      const [empRes, suRes, atRes] = await Promise.all([
+        axiosInstance.get(
+          `/users?role=employee&company=${companyId}&limit=all`
+        ),
+        axiosInstance.get(`/serviceuser?companyId=${companyId}&limit=all`),
+        axiosInstance.get(`/audit-type?companyId=${companyId}&limit=all`)
+      ]);
+      setUpdateEmployees(
+        (empRes.data.data.result || []).map((e: any) => ({
+          value: e._id,
+          label: `${e.firstName ?? ''} ${e.lastName ?? ''}`.trim() || e.name
+        }))
+      );
+      setUpdateServiceUsers(
+        (suRes.data.data.result || []).map((s: any) => ({
+          value: s._id,
+          label: s.name
+        }))
+      );
+      setUpdateAuditTypes(
+        (atRes.data.data.result || []).map((a: any) => ({
+          value: a._id,
+          label: a.title
+        }))
+      );
+    } catch (error) {
+      console.error('Error fetching update options:', error);
+      toast({
+        title: 'Failed to load options',
+        variant: 'destructive'
+      });
+    } finally {
+      setUpdateOptionsLoading(false);
+    }
+
+    const emp = audit.employeeId;
+    setUpdAuditType(
+      audit.auditTypeId?._id
+        ? { value: audit.auditTypeId._id, label: audit.auditTypeId.title || '' }
+        : null
+    );
+    setUpdEmployee(
+      emp && typeof emp === 'object'
+        ? {
+            value: emp._id,
+            label: `${emp.firstName ?? ''} ${emp.lastName ?? ''}`.trim() ||
+              emp.name
+          }
+        : null
+    );
+    setUpdServiceUser(
+      audit.serviceUserId?._id
+        ? {
+            value: audit.serviceUserId._id,
+            label: audit.serviceUserId.name || ''
+          }
+        : null
+    );
+    setUpdAuditDate(audit.auditDate ? new Date(audit.auditDate) : null);
+    setUpdNextCheckDate(
+      audit.nextCheckDate ? new Date(audit.nextCheckDate) : null
+    );
+    setUpdNote(audit.note || '');
+    setUpdRemovedDocs([]);
+    setUpdNewDocs([]);
+    setUpdErrors({});
+    setShowUpdateModal(true);
   };
 
-  const handleEditDocsFileSelect = async (
+  const handleUpdDocsFileSelect = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const files = Array.from(event.target.files || []);
     if (!files.length) return;
     const results = await uploadFiles(files);
-    setEditNewDocs((prev) => [...prev, ...results]);
-    if (editDocsInputRef.current) editDocsInputRef.current.value = '';
+    setUpdNewDocs((prev) => [...prev, ...results]);
+    if (updDocsInputRef.current) updDocsInputRef.current.value = '';
   };
 
-  const submitEditDetails = async () => {
+  const submitUpdateDetails = async () => {
+    const errors: Record<string, string> = {};
+    if (!updAuditType) errors.auditTypeId = 'Audit type is required';
+    if (!updEmployee) errors.employeeId = 'Employee is required';
+    if (!updAuditDate) errors.auditDate = 'Audit date is required';
+    setUpdErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+
     const existingDocs = Array.isArray(audit?.document)
       ? audit.document.filter((doc: string) => doc?.trim())
       : [];
     const finalDocuments = [
-      ...existingDocs.filter((doc: string) => !editRemovedDocs.includes(doc)),
-      ...editNewDocs.map((f) => f.url)
+      ...existingDocs.filter((doc: string) => !updRemovedDocs.includes(doc)),
+      ...updNewDocs.map((f) => f.url)
     ];
 
     setIsSubmitting(true);
     try {
       await axiosInstance.patch(`/audit/${auditId}`, {
-        action: 'editDetails',
-        note: editNote,
+        action: 'update',
+        auditTypeId: updAuditType!.value,
+        employeeId: updEmployee!.value,
+        serviceUserId: updServiceUser?.value,
+        auditDate: updAuditDate
+          ? new Date(
+              Date.UTC(
+                updAuditDate.getFullYear(),
+                updAuditDate.getMonth(),
+                updAuditDate.getDate()
+              )
+            ).toISOString()
+          : undefined,
+        nextCheckDate: updNextCheckDate
+          ? new Date(
+              Date.UTC(
+                updNextCheckDate.getFullYear(),
+                updNextCheckDate.getMonth(),
+                updNextCheckDate.getDate()
+              )
+            ).toISOString()
+          : undefined,
+        note: updNote,
         document: finalDocuments,
         updatedBy: user._id
       });
@@ -337,11 +451,11 @@ export default function ViewAuditPage() {
         title: 'Audit details updated successfully',
         className: 'bg-theme text-white'
       });
-      setShowEditDetailsModal(false);
+      setShowUpdateModal(false);
       await fetchAudit();
     } catch (error: any) {
       toast({
-        title: error.response?.data?.message || 'Failed to update audit details',
+        title: error.response?.data?.message || 'Failed to update audit',
         variant: 'destructive'
       });
     } finally {
@@ -468,7 +582,7 @@ export default function ViewAuditPage() {
     return (
       <div className="flex flex-col items-center justify-center p-8 text-center">
         <FileText className="mb-4 h-16 w-16 text-black" />
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-black">
           Preview not available for this file format.
         </p>
       </div>
@@ -486,7 +600,7 @@ export default function ViewAuditPage() {
   if (!audit) {
     return (
       <div className="flex h-64 w-full flex-col items-center justify-center gap-4">
-        <p className="text-gray-500">Audit not found.</p>
+        <p className="text-black">Audit not found.</p>
         <Button
           onClick={() => navigate(`/company/${companyId}/audit`)}
         >
@@ -527,7 +641,7 @@ export default function ViewAuditPage() {
        
         <div>
           <h2 className="text-lg font-semibold text-gray-900">Audit Status</h2>
-          <p className="text-xs text-gray-500">Overview and schedule details</p>
+          <p className="text-xs text-black">Overview and schedule details</p>
         </div>
       </div>
 
@@ -538,6 +652,15 @@ export default function ViewAuditPage() {
         <Badge variant="outline" className={status.className}>
           {status.label}
         </Badge>
+        <Button
+          size="sm"
+          onClick={openUpdateDetails}
+          disabled={isCompleted}
+          className="ml-2"
+        >
+          <Pen className="mr-1 h-3.5 w-3.5" />
+          Update Detail
+        </Button>
       </div>
     </div>
 
@@ -600,21 +723,6 @@ export default function ViewAuditPage() {
 
     {/* Secondary Section: Notes & Documents (Vertical Layout, Black Text) */}
     <div className="mt-6 space-y-4">
-      {/* Section Header with Edit Button */}
-      <div className="flex items-center justify-start gap-4">
-        <span className="text-xs font-semibold uppercase tracking-wider text-black">
-          Notes & Documents
-        </span>
-        <Button
-          size="icon"
-          className="h-7 w-7 "
-          onClick={openEditDetails}
-          title="Edit Note and Documents"
-        >
-          <Pen className="h-3.5 w-3.5" />
-        </Button>
-      </div>
-
       {/* Note Section */}
       <div className="space-y-1">
         <Label className="text-xs font-semibold uppercase tracking-wider text-black">
@@ -640,11 +748,10 @@ export default function ViewAuditPage() {
                   <Button
                     key={idx}
                     size="sm"
-                    variant="outline"
-                    className="h-8 border-gray-200 bg-white text-xs text-black hover:bg-gray-100 shadow-none"
+                    className="h-8 "
                     onClick={() => handleViewDocument(docUrl)}
                   >
-                    <Eye className="mr-1.5 h-3.5 w-3.5 text-black" />
+                    <Eye className="mr-1.5 h-3.5 w-3.5 " />
                     Document {idx + 1}
                   </Button>
                 ))}
@@ -664,7 +771,7 @@ export default function ViewAuditPage() {
         disabled={isCompleted}
         className="w-full sm:w-auto"
       >
-        <Clock className="mr-2 h-4 w-4 text-gray-500" />
+        <Clock className="mr-2 h-4 w-4 " />
         Extend Check Date
       </Button>
       <Button
@@ -706,7 +813,7 @@ export default function ViewAuditPage() {
             <TableRow>
               <TableCell
                 colSpan={5}
-                className="py-8 text-center italic text-gray-500"
+                className="py-8 text-center italic text-black"
               >
                 No history records found.
               </TableCell>
@@ -722,7 +829,8 @@ export default function ViewAuditPage() {
               .map((entry: LogEntry) => (
                 <TableRow
                   key={entry._id || Math.random()}
-                  className="hover:bg-gray-50"
+                  className="cursor-pointer hover:bg-gray-50"
+                  onClick={() => setViewLogEntry(entry)}
                 >
                   <TableCell className="w-[40%] font-medium break-words whitespace-normal">
                     {entry.title || 'Update'}
@@ -738,7 +846,7 @@ export default function ViewAuditPage() {
                             }`.trim()
                           : 'System'}
                       </span>
-                      <span className="text-gray-500 font-normal">
+                      <span className="text-black font-normal">
                         {moment(entry.date).format('DD MMM YYYY')}
                       </span>
                     </div>
@@ -763,9 +871,10 @@ export default function ViewAuditPage() {
                               key={idx}
                               size="sm"
                               className="h-8"
-                              onClick={() =>
-                                handleViewDocument(docUrl)
-                              }
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleViewDocument(docUrl);
+                              }}
                             >
                               <Eye className="mr-2 h-4 w-4" />
                               Document {idx + 1}
@@ -780,7 +889,10 @@ export default function ViewAuditPage() {
                     <Button
                       size={'icon'}
                       variant={'outline'}
-                      onClick={() => openEditLog(entry)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openEditLog(entry);
+                      }}
                     >
                       <Pen className="h-4 w-4" />
                     </Button>
@@ -795,150 +907,271 @@ export default function ViewAuditPage() {
 </div>
       </div>
 
-      {/* Edit Note/Documents Modal */}
-      <Dialog open={showEditDetailsModal} onOpenChange={setShowEditDetailsModal}>
-        <DialogContent className="sm:max-w-2xl">
+      {/* Update Audit Details Modal */}
+      <Dialog open={showUpdateModal} onOpenChange={setShowUpdateModal}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Edit Note & Documents</DialogTitle>
+            <DialogTitle>Update Audit Details</DialogTitle>
             <DialogDescription>
-              Update the note and supporting documents for this audit.
+              Update the audit fields below.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label className="text-sm font-medium text-gray-700">
-                Note
-              </Label>
-              <Textarea
-                placeholder="Enter note..."
-                value={editNote}
-                onChange={(e) => setEditNote(e.target.value)}
-                rows={4}
-              />
+
+          {updateOptionsLoading ? (
+            <div className="flex justify-center py-6">
+              <BlinkingDots size="large" color="bg-theme" />
             </div>
-
-            <div className="space-y-3">
-              <Label className="text-sm font-medium text-gray-700">
-                Document(s)
-              </Label>
-
-              {Array.isArray(audit?.document) &&
-                audit.document
-                  .filter((doc: string) => doc?.trim())
-                  .filter((doc: string) => !editRemovedDocs.includes(doc))
-                  .length > 0 && (
-                  <div className="max-h-32 space-y-2 overflow-y-auto pr-1">
-                    {audit.document
-                      .filter((doc: string) => doc?.trim())
-                      .filter((doc: string) => !editRemovedDocs.includes(doc))
-                      .map((docUrl: string, index: number) => (
-                        <div
-                          key={index}
-                          className="flex w-full items-center justify-between rounded-md border border-gray-200 bg-gray-50 p-2"
-                        >
-                          <div className="flex items-center gap-2 overflow-hidden">
-                            <FileText className="h-5 w-5 flex-shrink-0 text-gray-600" />
-                            <p className="truncate text-xs font-medium text-gray-700">
-                              Document {index + 1}
-                            </p>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() =>
-                              setEditRemovedDocs((prev) => [
-                                ...prev,
-                                docUrl
-                              ])
-                            }
-                            className="h-8 w-8 flex-shrink-0 hover:bg-red-100 hover:text-red-600"
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
-                  </div>
-                )}
-
-              {editNewDocs.length > 0 && (
-                <div className="max-h-32 space-y-2 overflow-y-auto pr-1">
-                  {editNewDocs.map((file, index) => (
-                    <div
-                      key={index}
-                      className="flex w-full items-center justify-between rounded-md border border-green-200 bg-green-50 p-2"
-                    >
-                      <div className="flex items-center gap-2 overflow-hidden">
-                        <FileText className="h-5 w-5 flex-shrink-0 text-green-600" />
-                        <p
-                          className="truncate text-xs font-medium text-green-700"
-                          title={file.name}
-                        >
-                          {file.name}
-                        </p>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() =>
-                          setEditNewDocs((prev) =>
-                            prev.filter((_, i) => i !== index)
-                          )
-                        }
-                        className="h-8 w-8 flex-shrink-0 hover:bg-red-100 hover:text-red-600"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
+          ) : (
+            <div className="space-y-4 py-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-gray-700">
+                    Audit Type <span className="text-red-500">*</span>
+                  </Label>
+                  <Select
+                    options={updateAuditTypes}
+                    value={updAuditType}
+                    onChange={(opt) => {
+                      setUpdAuditType(opt);
+                      setUpdErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.auditTypeId;
+                        return next;
+                      });
+                    }}
+                    placeholder="Select audit type..."
+                  />
+                  {updErrors.auditTypeId && (
+                    <p className="text-xs text-red-600">
+                      {updErrors.auditTypeId}
+                    </p>
+                  )}
                 </div>
-              )}
 
-              <div
-                className={cn(
-                  'relative flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 transition-colors',
-                  isUploading
-                    ? 'border-blue-500 bg-blue-50'
-                    : 'border-gray-300 bg-gray-50 hover:bg-gray-100'
-                )}
-              >
-                <input
-                  ref={editDocsInputRef}
-                  type="file"
-                  multiple
-                  accept=".pdf,application/pdf,image/*"
-                  onChange={handleEditDocsFileSelect}
-                  className="absolute inset-0 cursor-pointer opacity-0"
-                  disabled={isUploading}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-gray-700">
+                    Employee <span className="text-red-500">*</span>
+                  </Label>
+                  <Select
+                    options={updateEmployees}
+                    value={updEmployee}
+                    onChange={(opt) => {
+                      setUpdEmployee(opt);
+                      setUpdErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.employeeId;
+                        return next;
+                      });
+                    }}
+                    placeholder="Select employee..."
+                  />
+                  {updErrors.employeeId && (
+                    <p className="text-xs text-red-600">
+                      {updErrors.employeeId}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-gray-700">
+                    Service User{' '}
+                    <span className="font-normal text-gray-400">
+                      (Optional)
+                    </span>
+                  </Label>
+                  <Select
+                    options={updateServiceUsers}
+                    value={updServiceUser}
+                    onChange={setUpdServiceUser}
+                    isClearable
+                    placeholder="Select service user..."
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-gray-700">
+                    Audit Date (DD-MM-YYYY){' '}
+                    <span className="text-red-500">*</span>
+                  </Label>
+                  <DatePicker
+                    selected={updAuditDate}
+                    onChange={(date) => {
+                      setUpdAuditDate(date);
+                      setUpdErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.auditDate;
+                        return next;
+                      });
+                    }}
+                    dateFormat="dd-MM-yyyy"
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-theme focus:outline-none focus:ring-2 focus:ring-theme"
+                    placeholderText="Select audit date..."
+                    showMonthDropdown
+                    showYearDropdown
+                    dropdownMode="select"
+                    wrapperClassName="w-full"
+                    preventOpenOnFocus
+                  />
+                  {updErrors.auditDate && (
+                    <p className="text-xs text-red-600">{updErrors.auditDate}</p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-gray-700">
+                    Next Check Date (DD-MM-YYYY){' '}
+                    <span className="font-normal text-gray-400">
+                      (Optional)
+                    </span>
+                  </Label>
+                  <DatePicker
+                    selected={updNextCheckDate}
+                    onChange={(date) => setUpdNextCheckDate(date)}
+                    dateFormat="dd-MM-yyyy"
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-theme focus:outline-none focus:ring-2 focus:ring-theme"
+                    placeholderText="Select next check date..."
+                    showMonthDropdown
+                    showYearDropdown
+                    dropdownMode="select"
+                    wrapperClassName="w-full"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-gray-700">Note</Label>
+                <Textarea
+                  value={updNote}
+                  onChange={(e) => setUpdNote(e.target.value)}
+                  rows={3}
+                  placeholder="Add any notes about this audit..."
                 />
-                {isUploading ? (
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent"></div>
-                    <p className="text-xs text-blue-600">Uploading...</p>
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center gap-1 text-center">
-                    <Upload className="h-6 w-6 text-black" />
-                    <span className="text-sm font-medium text-gray-600">
-                      Upload Document(s)
-                    </span>
-                    <span className="text-xs text-black">
-                      PDF/Images (Max 20MB each)
-                    </span>
+              </div>
+
+              <div className="space-y-3">
+                <Label className="text-sm font-medium text-gray-700">
+                  Document(s)
+                </Label>
+
+                {Array.isArray(audit?.document) &&
+                  audit.document
+                    .filter((doc: string) => doc?.trim())
+                    .filter((doc: string) => !updRemovedDocs.includes(doc))
+                    .length > 0 && (
+                    <div className="max-h-32 space-y-2 overflow-y-auto pr-1">
+                      {audit.document
+                        .filter((doc: string) => doc?.trim())
+                        .filter((doc: string) => !updRemovedDocs.includes(doc))
+                        .map((docUrl: string, index: number) => (
+                          <div
+                            key={index}
+                            className="flex w-full items-center justify-between rounded-md border border-gray-200 bg-gray-50 p-2"
+                          >
+                            <div className="flex items-center gap-2 overflow-hidden">
+                              <FileText className="h-5 w-5 flex-shrink-0 text-gray-600" />
+                              <p className="truncate text-xs font-medium text-gray-700">
+                                Document {index + 1}
+                              </p>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() =>
+                                setUpdRemovedDocs((prev) => [
+                                  ...prev,
+                                  docUrl
+                                ])
+                              }
+                              className="h-8 w-8 flex-shrink-0 hover:bg-red-100 hover:text-red-600"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+
+                {updNewDocs.length > 0 && (
+                  <div className="max-h-32 space-y-2 overflow-y-auto pr-1">
+                    {updNewDocs.map((file, index) => (
+                      <div
+                        key={index}
+                        className="flex w-full items-center justify-between rounded-md border border-green-200 bg-green-50 p-2"
+                      >
+                        <div className="flex items-center gap-2 overflow-hidden">
+                          <FileText className="h-5 w-5 flex-shrink-0 text-green-600" />
+                          <p
+                            className="truncate text-xs font-medium text-green-700"
+                            title={file.name}
+                          >
+                            {file.name}
+                          </p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() =>
+                            setUpdNewDocs((prev) =>
+                              prev.filter((_, i) => i !== index)
+                            )
+                          }
+                          className="h-8 w-8 flex-shrink-0 hover:bg-red-100 hover:text-red-600"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
                   </div>
                 )}
+
+                <div
+                  className={cn(
+                    'relative flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 transition-colors',
+                    isUploading
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-gray-300 bg-gray-50 hover:bg-gray-100'
+                  )}
+                >
+                  <input
+                    ref={updDocsInputRef}
+                    type="file"
+                    multiple
+                    accept=".pdf,application/pdf,image/*"
+                    onChange={handleUpdDocsFileSelect}
+                    className="absolute inset-0 cursor-pointer opacity-0"
+                    disabled={isUploading}
+                  />
+                  {isUploading ? (
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent"></div>
+                      <p className="text-xs text-blue-600">Uploading...</p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center gap-1 text-center">
+                      <Upload className="h-6 w-6 text-gray-400" />
+                      <span className="text-sm font-medium text-gray-600">
+                        Upload Document(s)
+                      </span>
+                      <span className="text-xs text-gray-400">
+                        PDF/Images (Max 20MB each)
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
+          )}
+
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => setShowEditDetailsModal(false)}
+              onClick={() => setShowUpdateModal(false)}
             >
               Cancel
             </Button>
             <Button
               className="bg-theme text-white"
-              onClick={submitEditDetails}
+              onClick={submitUpdateDetails}
               disabled={isSubmitting || isUploading}
             >
               {isSubmitting ? 'Saving...' : 'Save'}
@@ -1105,6 +1338,119 @@ export default function ViewAuditPage() {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Log Detail Dialog */}
+      <Dialog
+        open={!!viewLogEntry}
+        onOpenChange={(open) => !open && setViewLogEntry(null)}
+      >
+        <DialogContent className="sm:max-w-2xl max-h-[90%] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{viewLogEntry?.title || 'Log Detail'}</DialogTitle>
+            <DialogDescription>
+              {viewLogEntry &&
+                (() => {
+                  const u = viewLogEntry.updatedBy as any;
+                  const name =
+                    u && typeof u === 'object'
+                      ? u.name ||
+                        `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim() ||
+                        'System'
+                      : 'System';
+                  return `${name} - ${moment(viewLogEntry.date).format(
+                    'DD MMM YYYY'
+                  )}`;
+                })()}
+            </DialogDescription>
+          </DialogHeader>
+
+          {viewLogEntry && (
+            <div className="space-y-4 py-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <div className="flex flex-col space-y-1">
+                  <Label className="text-xs font-medium uppercase tracking-wide text-black">
+                    Audit Date
+                  </Label>
+                  <p className="text-sm font-medium text-gray-800">
+                    {viewLogEntry.auditDate
+                      ? moment(viewLogEntry.auditDate).format('DD MMM YYYY')
+                      : '-'}
+                  </p>
+                </div>
+                <div className="flex flex-col space-y-1">
+                  <Label className="text-xs font-medium uppercase tracking-wide text-black">
+                    Next Check Date
+                  </Label>
+                  <p className="text-sm font-medium text-gray-800">
+                    {viewLogEntry.nextCheckDate
+                      ? moment(viewLogEntry.nextCheckDate).format(
+                          'DD MMM YYYY'
+                        )
+                      : '-'}
+                  </p>
+                </div>
+                <div className="flex flex-col space-y-1">
+                  <Label className="text-xs font-medium uppercase tracking-wide text-black">
+                    Extended Date
+                  </Label>
+                  <p className="text-sm font-medium text-gray-800">
+                    {viewLogEntry.extendDeadline
+                      ? moment(viewLogEntry.extendDeadline).format(
+                          'DD MMM YYYY'
+                        )
+                      : '-'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-col space-y-1">
+                <Label className="text-xs font-medium uppercase tracking-wide text-black">
+                  Note
+                </Label>
+                <p className="whitespace-pre-wrap break-words text-sm text-gray-800">
+                  {viewLogEntry.note?.trim() || '-'}
+                </p>
+              </div>
+
+              <div className="flex flex-col space-y-2">
+                <Label className="text-xs font-medium uppercase tracking-wide text-black">
+                  Document(s)
+                </Label>
+                {Array.isArray(viewLogEntry.document) &&
+                viewLogEntry.document.filter((doc: string) => doc?.trim())
+                  .length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {viewLogEntry.document
+                      .filter((doc: string) => doc?.trim())
+                      .map((docUrl, idx) => (
+                        <Button
+                          key={idx}
+                          size="sm"
+                          className="h-8 "
+                          onClick={() => handleViewDocument(docUrl)}
+                        >
+                          <Eye className="mr-1.5 h-3.5 w-3.5" />
+                          Document {idx + 1}
+                        </Button>
+                      ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-black">-</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setViewLogEntry(null)}
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Edit Log Dialog */}
       <Dialog open={showEditLogModal} onOpenChange={setShowEditLogModal}>
         <DialogContent className="sm:max-w-2xl">
@@ -1117,7 +1463,7 @@ export default function ViewAuditPage() {
             {editingLog && (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <div className="flex flex-col space-y-1">
-                  <Label className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                  <Label className="text-xs font-medium uppercase tracking-wide text-black">
                     Audit Date
                   </Label>
                   <DatePicker
@@ -1132,7 +1478,7 @@ export default function ViewAuditPage() {
                   />
                 </div>
                 <div className="flex flex-col space-y-1">
-                  <Label className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                  <Label className="text-xs font-medium uppercase tracking-wide text-black">
                     Next Check Date
                   </Label>
                   <DatePicker
@@ -1147,7 +1493,7 @@ export default function ViewAuditPage() {
                   />
                 </div>
                 <div className="flex flex-col space-y-1">
-                  <Label className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                  <Label className="text-xs font-medium uppercase tracking-wide text-black">
                     Extended Date
                   </Label>
                   <DatePicker

@@ -28,7 +28,11 @@ import Select from 'react-select';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 import { useToast } from '@/components/ui/use-toast';
 import moment from '@/lib/moment-setup';
-import { Plus, Eye, ShieldCheck, Search } from 'lucide-react';
+import {
+  Plus,
+  Eye,
+  Search
+} from 'lucide-react';
 import { DynamicPagination } from '@/components/shared/DynamicPagination';
 
 interface OptionType {
