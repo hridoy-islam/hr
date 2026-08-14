@@ -22,16 +22,27 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@/components/ui/alert-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription
+} from '@/components/ui/dialog';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import Select from 'react-select';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 import { useToast } from '@/components/ui/use-toast';
+import { useSelector } from 'react-redux';
 import moment from '@/lib/moment-setup';
 import {
   Plus,
   Eye,
-  Search
+  Search,
+  PauseCircle,
+  PlayCircle
 } from 'lucide-react';
 import { DynamicPagination } from '@/components/shared/DynamicPagination';
 
@@ -44,6 +55,8 @@ export default function CompanyAuditPage() {
   const { id: companyId } = useParams<{ id: string }>();
   const { toast } = useToast();
   const navigate = useNavigate();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { user } = useSelector((state: any) => state.auth);
 
   const [audits, setAudits] = useState<any[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -81,6 +94,10 @@ export default function CompanyAuditPage() {
   // Complete confirm
   const [completeAudit, setCompleteAudit] = useState<any>(null);
   const [isCompleting, setIsCompleting] = useState(false);
+
+  // Hold/Restart toggle
+  const [holdAudit, setHoldAudit] = useState<any>(null);
+  const [isToggling, setIsToggling] = useState(false);
 
   const [fromDate, toDate] = dateRange;
 
@@ -195,6 +212,12 @@ export default function CompanyAuditPage() {
         className: 'bg-green-100 text-green-800 border-green-200'
       };
     }
+    if (audit.status === 'hold') {
+      return {
+        label: 'Hold',
+        className: 'bg-amber-100 text-amber-800 border-amber-200'
+      };
+    }
     if (
       audit.nextCheckDate &&
       moment(audit.nextCheckDate)
@@ -214,6 +237,7 @@ export default function CompanyAuditPage() {
 
   const statusOptions: OptionType[] = [
     { value: 'active', label: 'Active' },
+    { value: 'hold', label: 'Hold' },
     { value: 'due', label: 'Due' },
     { value: 'completed', label: 'Completed' }
   ];
@@ -247,6 +271,34 @@ export default function CompanyAuditPage() {
       });
     } finally {
       setIsCompleting(false);
+    }
+  };
+
+  const submitHoldToggle = async () => {
+    if (!holdAudit) return;
+    setIsToggling(true);
+    try {
+      const restarting = holdAudit.status === 'hold';
+      await axiosInstance.patch(`/audit/${holdAudit._id}`, {
+        action: restarting ? 'restart' : 'hold',
+        updatedBy: user?._id
+      });
+      toast({
+        title: restarting
+          ? 'Audit restarted successfully'
+          : 'Audit put on hold successfully',
+        className: 'bg-theme text-white'
+      });
+      setHoldAudit(null);
+      fetchData(currentPage, entriesPerPage);
+    } catch (error: any) {
+      toast({
+        title:
+          error.response?.data?.message || 'Failed to update audit status',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsToggling(false);
     }
   };
 
@@ -431,15 +483,7 @@ export default function CompanyAuditPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
-                        {/* <Button
-                          size="sm"
-                          className="bg-green-600 text-white hover:bg-green-700"
-                          disabled={isCompleted}
-                          onClick={() => setCompleteAudit(audit)}
-                        >
-                          <CheckCircle2 className="mr-1 h-4 w-4" />
-                          Complete Audit
-                        </Button> */}
+                        
                         <Button
                           size="sm"
                           onClick={() =>
@@ -470,6 +514,56 @@ export default function CompanyAuditPage() {
           />
         )}
       </div>
+
+      {/* Hold/Restart Confirm Dialog */}
+      <Dialog
+        open={!!holdAudit}
+        onOpenChange={(open) => !open && setHoldAudit(null)}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {holdAudit?.status === 'hold' ? (
+                <PlayCircle className="h-5 w-5 text-green-600" />
+              ) : (
+                <PauseCircle className="h-5 w-5 text-amber-600" />
+              )}
+              {holdAudit?.status === 'hold'
+                ? 'Restart this audit?'
+                : 'Hold this audit?'}
+            </DialogTitle>
+            <DialogDescription className="pt-1 text-sm text-gray-600">
+              {holdAudit?.status === 'hold'
+                ? 'This will restart the audit and add a log entry for the restart.'
+                : 'This will put the audit on hold and add a log entry for the hold.'}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 pt-2 sm:justify-end">
+            <Button
+              variant="outline"
+              onClick={() => setHoldAudit(null)}
+              disabled={isToggling}
+            >
+              Cancel
+            </Button>
+            <Button
+              className={
+                holdAudit?.status === 'hold'
+                  ? 'bg-green-600 text-white hover:bg-green-700'
+                  : 'bg-amber-600 text-white hover:bg-amber-700'
+              }
+              onClick={submitHoldToggle}
+              disabled={isToggling}
+            >
+              {isToggling
+                ? 'Saving...'
+                : holdAudit?.status === 'hold'
+                  ? 'Yes, Restart'
+                  : 'Yes, Hold'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Complete Confirm Dialog */}
       <AlertDialog

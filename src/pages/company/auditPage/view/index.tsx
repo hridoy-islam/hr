@@ -49,7 +49,9 @@ import {
   X,
   Eye,
   History,
-  Search
+  Search,
+  PauseCircle,
+  PlayCircle
 } from 'lucide-react';
 
 interface UploadedFile {
@@ -98,6 +100,10 @@ export default function ViewAuditPage() {
 
   // Complete confirm
   const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
+
+  // Hold/Restart toggle
+  const [showHoldConfirm, setShowHoldConfirm] = useState(false);
+  const [isToggling, setIsToggling] = useState(false);
 
   // Update audit details modal
   const [showUpdateModal, setShowUpdateModal] = useState(false);
@@ -168,6 +174,13 @@ export default function ViewAuditPage() {
         banner: 'from-green-500 to-emerald-700'
       };
     }
+    if (audit.status === 'hold') {
+      return {
+        label: 'Hold',
+        className: 'bg-amber-100 text-amber-800 border-amber-200',
+        banner: 'from-amber-500 to-orange-700'
+      };
+    }
     const nextCheck = audit.nextCheckDate
       ? moment(audit.nextCheckDate).startOf('day')
       : null;
@@ -196,6 +209,7 @@ export default function ViewAuditPage() {
   };
 
   const isCompleted = audit?.status === 'completed';
+  const isOnHold = audit?.status === 'hold';
 
   const uploadFiles = async (files: File[]) => {
     const validTypes = ['application/pdf', 'image/jpeg', 'image/png'];
@@ -316,6 +330,33 @@ export default function ViewAuditPage() {
       });
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const submitHoldToggle = async () => {
+    setIsToggling(true);
+    try {
+      const restarting = audit.status === 'hold';
+      await axiosInstance.patch(`/audit/${auditId}`, {
+        action: restarting ? 'restart' : 'hold',
+        updatedBy: user._id
+      });
+      toast({
+        title: restarting
+          ? 'Audit restarted successfully'
+          : 'Audit put on hold successfully',
+        className: 'bg-theme text-white'
+      });
+      setShowHoldConfirm(false);
+      await fetchAudit();
+    } catch (error: any) {
+      toast({
+        title:
+          error.response?.data?.message || 'Failed to update audit status',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsToggling(false);
     }
   };
 
@@ -655,7 +696,7 @@ export default function ViewAuditPage() {
         <Button
           size="sm"
           onClick={openUpdateDetails}
-          disabled={isCompleted}
+          disabled={isCompleted || isOnHold}
           className="ml-2"
         >
           <Pen className="mr-1 h-3.5 w-3.5" />
@@ -766,17 +807,34 @@ export default function ViewAuditPage() {
     {/* Footer Action Buttons */}
     <div className="mt-6 flex flex-col-reverse justify-end gap-3 border-t border-gray-100 pt-5 sm:flex-row">
       <Button
-        variant="outline"
         onClick={openExtend}
-        disabled={isCompleted}
+        disabled={isCompleted || isOnHold}
         className="w-full sm:w-auto"
       >
         <Clock className="mr-2 h-4 w-4 " />
         Rollback Next Check Date
       </Button>
       <Button
-        onClick={() => setShowCompleteConfirm(true)}
+        variant="outline"
+        onClick={() => setShowHoldConfirm(true)}
         disabled={isCompleted}
+        className="w-full sm:w-auto"
+      >
+        {isOnHold ? (
+          <>
+            <PlayCircle className="mr-2 h-4 w-4" />
+            Restart Audit
+          </>
+        ) : (
+          <>
+            <PauseCircle className="mr-2 h-4 w-4" />
+            Hold Audit
+          </>
+        )}
+      </Button>
+      <Button
+        onClick={() => setShowCompleteConfirm(true)}
+        disabled={isCompleted || isOnHold}
         className="w-full sm:w-auto bg-green-600 text-white hover:bg-green-700 shadow-sm"
       >
         <CheckCircle2 className="mr-2 h-4 w-4" />
@@ -1307,6 +1365,51 @@ export default function ViewAuditPage() {
               disabled={isSubmitting || !inputDate || isUploading}
             >
               {isSubmitting ? 'Saving...' : 'Confirm Extension'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Hold/Restart Confirm Dialog */}
+      <Dialog open={showHoldConfirm} onOpenChange={setShowHoldConfirm}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {isOnHold ? (
+                <PlayCircle className="h-5 w-5 text-green-600" />
+              ) : (
+                <PauseCircle className="h-5 w-5 text-amber-600" />
+              )}
+              {isOnHold ? 'Restart this audit?' : 'Hold this audit?'}
+            </DialogTitle>
+            <DialogDescription className="pt-1 text-sm text-gray-600">
+              {isOnHold
+                ? 'This will restart the audit and add a log entry for the restart.'
+                : 'This will put the audit on hold and add a log entry for the hold.'}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 pt-2 sm:justify-end">
+            <Button
+              variant="outline"
+              onClick={() => setShowHoldConfirm(false)}
+              disabled={isToggling}
+            >
+              Cancel
+            </Button>
+            <Button
+              className={
+                isOnHold
+                  ? 'bg-green-600 text-white hover:bg-green-700'
+                  : 'bg-amber-600 text-white hover:bg-amber-700'
+              }
+              onClick={submitHoldToggle}
+              disabled={isToggling}
+            >
+              {isToggling
+                ? 'Saving...'
+                : isOnHold
+                  ? 'Yes, Restart'
+                  : 'Yes, Hold'}
             </Button>
           </DialogFooter>
         </DialogContent>
