@@ -281,14 +281,14 @@ export default function ViewAuditPage() {
         updatedBy: user._id
       });
       toast({
-        title: 'Audit date extended successfully',
+        title: 'Audit date rollback successfully',
         className: 'bg-theme text-white'
       });
       setShowExtendModal(false);
       await fetchAudit();
     } catch (error: any) {
       toast({
-        title: error.response?.data?.message || 'Failed to extend audit date',
+        title: error.response?.data?.message || 'Failed to rollback audit date',
         variant: 'destructive'
       });
     } finally {
@@ -772,7 +772,7 @@ export default function ViewAuditPage() {
         className="w-full sm:w-auto"
       >
         <Clock className="mr-2 h-4 w-4 " />
-        Extend Check Date
+        Rollback Next Check Date
       </Button>
       <Button
         onClick={() => setShowCompleteConfirm(true)}
@@ -1184,9 +1184,9 @@ export default function ViewAuditPage() {
       <Dialog open={showExtendModal} onOpenChange={setShowExtendModal}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Extend Next Check Date</DialogTitle>
+            <DialogTitle>Rollback Next Check Date</DialogTitle>
             <DialogDescription>
-              Extend the next check date for the current audit.
+              Rollback the next check date for the current audit.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -1210,11 +1210,11 @@ export default function ViewAuditPage() {
 
             <div className="space-y-2">
               <Label className="text-sm font-medium text-gray-700">
-                Reason for Extension{' '}
+                Reason for Rollback{' '}
                 <span className="font-normal text-black">(Optional)</span>
               </Label>
               <Textarea
-                placeholder="Why is the audit date being extended?"
+                placeholder="Why is the audit date being Rollback?"
                 value={inputNote}
                 onChange={(e) => setInputNote(e.target.value)}
                 rows={3}
