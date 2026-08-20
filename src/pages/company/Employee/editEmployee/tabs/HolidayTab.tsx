@@ -26,18 +26,24 @@ import {
   DialogFooter
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { CalendarDays, Users, Edit2, Save, X } from 'lucide-react';
+import { CalendarDays, Users, Edit2, Save, X, Info } from 'lucide-react';
 import axiosInstance from '@/lib/axios';
 import { useToast } from '@/components/ui/use-toast';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 import { useParams } from 'react-router-dom';
 import moment from '@/lib/moment-setup';
+import { useSelector } from 'react-redux';
 
 interface HolidayTabProps {
   formData?: any;
 }
 
 const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
+  const { user } = useSelector((state: any) => state.auth);
+  const isAdminView =
+    user?.role === 'admin' || user?.role === 'company' || user?.role === 'companyAdmin';
+  const [showEquation, setShowEquation] = useState(false);
+
   const getCurrentHolidayYear = () => {
     const year = moment().year();
     return `${year}-${year + 1}`;
@@ -450,31 +456,74 @@ const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
                 <div className="grid grid-cols-2 gap-4 rounded-lg bg-blue-50 p-4 md:grid-cols-4">
                   <div className="text-center">
                     <div className="text-2xl font-bold text-gray-800">
-                      {leaveAllowance.holidayAllowance.toFixed(1)} h
+                      {leaveAllowance.holidayAllowance.toFixed(2)} h
                     </div>
                     <div className="text-sm text-gray-600">Total Allowance</div>
                   </div>
                   <div className="text-center">
                     <div className="text-2xl font-bold text-green-600">
-                      {leaveAllowance.usedHours.toFixed(1)} h
+                      {leaveAllowance.usedHours.toFixed(2)} h
                     </div>
                     <div className="text-sm text-gray-600">Taken</div>
                   </div>
                   <div className="text-center">
                     <div className="text-2xl font-bold text-orange-600">
-                      {leaveAllowance.bookedHours.toFixed(1)} h
+                      {leaveAllowance.bookedHours.toFixed(2)} h
                     </div>
                     <div className="text-sm text-gray-600">Booked</div>
                   </div>
                   <div className="text-center">
                     <div className="text-2xl font-bold text-purple-600">
-                      {leaveAllowance.remainingHours.toFixed(1)} h
+                      {leaveAllowance.remainingHours.toFixed(2)} h
                     </div>
                     <div className="text-sm text-gray-600">
                       Remaining Balance
                     </div>
                   </div>
                 </div>
+
+                {isAdminView && (
+                  <div className="flex items-start justify-between gap-3 rounded-lg border border-gray-200 bg-white p-3">
+                    <p className="text-xs leading-relaxed text-black">
+  <span className="font-semibold">Calculation:</span>{" "}
+  Carry Forward = C | Holiday Accrued = H | Opening This Year (C + H = O) |
+  Taken = T | Booked = B | Balance Remaining = O − (T + B)
+</p>
+                    <button
+                      type="button"
+                      onClick={() => setShowEquation((prev) => !prev)}
+                      className="shrink-0 rounded-full border border-gray-300 bg-white p-1 text-gray-900 shadow-sm transition-colors hover:bg-gray-100"
+                      title={
+                        showEquation
+                          ? 'Hide formula'
+                          : 'Show holiday balance formula'
+                      }
+                      aria-label="Show holiday balance formula"
+                    >
+                      <Info className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
+
+                {isAdminView && showEquation && (
+                  <div className="rounded-lg border border-gray-300 bg-gray-50 p-3 text-xs text-black">
+                    <p className="font-semibold text-gray-900">
+                      Holiday Balance Calculation
+                    </p>
+                    <p className="mt-1.5">
+                      <span className="font-semibold">C + H = O</span> &rarr;
+                      Carry Forward + Holiday Accrued = the Opening
+                      balance for this year.
+                    </p>
+                    <p className="mt-1">
+                      <span className="font-semibold">
+                        O − (T + B) = Balance Remaining
+                      </span>{' '}
+                      &rarr; Opening balance - (Taken + Booked hours)
+                      =  Remaining Balance.
+                    </p>
+                  </div>
+                )}
 
                 <div className="overflow-x-auto">
                   <Table>
