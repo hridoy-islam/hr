@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Shield, Plus, Search, Upload, FileText, Trash2 } from 'lucide-react';
+import { Shield, Plus, Upload, FileText, Trash2 } from 'lucide-react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { z } from 'zod';
@@ -9,6 +9,7 @@ import moment from '@/lib/moment-setup';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Table,
   TableBody,
@@ -58,11 +59,13 @@ const createHealthSafetySchema = z
     companyId: z
       .string({ required_error: 'Company ID is missing' })
       .min(1, { message: 'Company ID cannot be empty' }),
-    document: z.array(z.string()).optional()
+    document: z.array(z.string()).optional(),
+    remarks: z.string().optional(),
+    figure: z.string().optional(),
+    others: z.string().optional()
   })
   .refine(
     (data) => {
-      // Only validate expiry > start if both dates are provided
       if (data.startDate && data.expiryDate) {
         return data.expiryDate > data.startDate;
       }
@@ -74,7 +77,6 @@ const createHealthSafetySchema = z
     }
   );
 
-// Interface mapping to Backend Schema
 interface HealthSafetyRecord {
   _id: string;
   title: string;
@@ -82,6 +84,9 @@ interface HealthSafetyRecord {
   expiryDate?: string;
   document: string[];
   updatedBy: string;
+  remarks?: string;
+  figure?: string;
+  others?: string;
 }
 
 export default function HealthAndSafetyPage() {
@@ -89,7 +94,6 @@ export default function HealthAndSafetyPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Mocking user for the document upload entityId
   const user = useSelector((state: any) => state.auth.user);
   
   // Data States
@@ -111,6 +115,9 @@ export default function HealthAndSafetyPage() {
   const [recordTitle, setRecordTitle] = useState('');
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [expiryDate, setExpiryDate] = useState<Date | null>(null);
+  const [remarks, setRemarks] = useState('');
+  const [figure, setFigure] = useState('');
+  const [others, setOthers] = useState('');
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   // File Upload States & Refs
@@ -131,7 +138,7 @@ export default function HealthAndSafetyPage() {
       }
     } catch (err) {
       console.error('Error fetching schedule settings:', err);
-      setHealthSafetyCheckInterval(30); // Fallback on error
+      setHealthSafetyCheckInterval(30);
     }
   };
 
@@ -139,9 +146,7 @@ export default function HealthAndSafetyPage() {
     fetchScheduleSettings();
   }, [id]);
 
-  // Dynamic status calculation per record
   const getStatusBadge = (expiryDateString?: string) => {
-    // If no expiry date is set, the record is considered Active
     if (!expiryDateString) {
       return (
         <Badge className="bg-green-100 px-3 py-1 text-green-800 hover:bg-green-100">
@@ -175,7 +180,6 @@ export default function HealthAndSafetyPage() {
     }
   };
 
-  // Fetch Health & Safety Records List
   const fetchRecords = async (page: number, limit: number, search = '') => {
     try {
       if (initialLoading) setInitialLoading(true);
@@ -204,10 +208,12 @@ export default function HealthAndSafetyPage() {
 
   useEffect(() => {
     if (dialogOpen) {
-      // Reset all form fields, errors, and files when dialog opens
       setRecordTitle('');
       setStartDate(null);
       setExpiryDate(null);
+      setRemarks('');
+      setFigure('');
+      setOthers('');
       setFormErrors({});
       setUploadedFiles([]);
       setUploadError(null);
@@ -219,7 +225,6 @@ export default function HealthAndSafetyPage() {
     fetchRecords(currentPage, entriesPerPage, searchTerm);
   };
 
-  // --- File Upload Handlers ---
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
     if (!files.length) return;
@@ -233,7 +238,7 @@ export default function HealthAndSafetyPage() {
 
     setIsUploading(true);
     setUploadError(null);
-    setFormErrors((prev) => ({ ...prev, uploadedFiles: undefined }));
+    setFormErrors((prev) => ({ ...prev, uploadedFiles: '' }));
 
     try {
       const uploadPromises = files.map(async (file) => {
@@ -265,11 +270,10 @@ export default function HealthAndSafetyPage() {
     );
   };
 
-  // --- Submit Handler ---
   const handleCreateRecord = async () => {
     setFormErrors({});
     const normalizeDate = (date: Date | null) => {
-      if (!date) return null; // Pass null if date is not selected
+      if (!date) return null;
       return new Date(
         Date.UTC(
           date.getFullYear(),
@@ -289,7 +293,10 @@ export default function HealthAndSafetyPage() {
       expiryDate: normalizeDate(expiryDate),
       updatedBy: user?._id || 'unknown',
       companyId: id || '',
-      document: uploadedFiles.map((file) => file.url) // Matches the Mongoose 'document' field
+      document: uploadedFiles.map((file) => file.url),
+      remarks: remarks || undefined,
+      figure: figure || undefined,
+      others: others || undefined
     };
 
     const validation = createHealthSafetySchema.safeParse(rawPayload);
@@ -330,7 +337,6 @@ export default function HealthAndSafetyPage() {
     }
   };
 
-  // --- Delete Handler ---
   const handleDeleteRecord = async (recordId: string) => {
     try {
       const response = await axiosInstance.delete(
@@ -488,17 +494,17 @@ export default function HealthAndSafetyPage() {
 
       {/* Create Record Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="flex max-h-[95vh] max-w-2xl flex-col overflow-y-auto p-4 sm:p-6 md:p-8">
-          <DialogHeader className="mb-4">
+        <DialogContent className="flex max-h-[95vh] max-w-6xl flex-col overflow-y-auto p-4 sm:p-6 md:p-8">
+          <DialogHeader className="">
             <DialogTitle className="text-xl font-bold sm:text-2xl">
               Create New Record
             </DialogTitle>
           </DialogHeader>
 
-          <div className="mt-2 flex-1 space-y-6 overflow-y-auto">
+          <div className=" flex-1 space-y-3 overflow-y-auto">
             {/* Record Title */}
             <div className="space-y-1">
-              <label className="text-sm font-semibold">Title</label>
+              <Label className="text-sm font-semibold">Title</Label>
               <Input
                 className={`h-11 rounded-lg border transition-colors sm:h-12 ${
                   formErrors.title
@@ -524,7 +530,7 @@ export default function HealthAndSafetyPage() {
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               {/* Start Date */}
               <div className="flex flex-col space-y-1">
-                <label className="text-sm font-semibold">Start Date </label>
+                <Label className="text-sm font-semibold">Start Date</Label>
                 <div className="relative">
                   <DatePicker
                     selected={startDate}
@@ -558,7 +564,7 @@ export default function HealthAndSafetyPage() {
 
               {/* Expiry Date */}
               <div className="flex flex-col space-y-1">
-                <label className="text-sm font-semibold">Expiry Date </label>
+                <Label className="text-sm font-semibold">Expiry Date</Label>
                 <div className="relative">
                   <DatePicker
                     selected={expiryDate}
@@ -579,7 +585,6 @@ export default function HealthAndSafetyPage() {
                     showYearDropdown
                     isClearable
                     dropdownMode="select"
-                    // minDate={startDate || undefined}
                     popperProps={{ strategy: 'fixed' }}
                     popperClassName="z-[9999]"
                   />
@@ -591,6 +596,51 @@ export default function HealthAndSafetyPage() {
                 )}
               </div>
             </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-1">
+              <Label className="text-sm font-semibold">
+                Remarks <span className="font-normal text-gray-400">(Optional)</span>
+              </Label>
+              <Textarea
+                value={remarks}
+                onChange={(e) => setRemarks(e.target.value)}
+                placeholder="Enter remarks..."
+                className="border-gray-200"
+                rows={3}
+              />
+            </div>
+
+            {/* Figure Textarea */}
+            <div className="space-y-1">
+              <Label className="text-sm font-semibold">
+                Figure <span className="font-normal text-gray-400">(Optional)</span>
+              </Label>
+              <Textarea
+                value={figure}
+                onChange={(e) => setFigure(e.target.value)}
+                placeholder="Enter figure details..."
+                className="border-gray-200"
+                rows={3}
+              />
+            </div>
+
+            {/* Others Textarea */}
+            <div className="space-y-1">
+              <Label className="text-sm font-semibold">
+                Others <span className="font-normal text-gray-400">(Optional)</span>
+              </Label>
+              <Textarea
+                value={others}
+                onChange={(e) => setOthers(e.target.value)}
+                placeholder="Enter additional information..."
+                className="border-gray-200"
+                rows={3}
+              />
+            </div>
+            </div>
+
+            {/* Remarks Textarea */}
+            
 
             {/* Attachments Section */}
             <div className="space-y-2">
@@ -600,7 +650,7 @@ export default function HealthAndSafetyPage() {
               </Label>
               <div
                 className={cn(
-                  'relative flex  h-[120px] flex-col items-center justify-center rounded-xl border-2 border-dashed p-4 transition-all sm:p-6',
+                  'relative flex h-[120px] flex-col items-center justify-center rounded-xl border-2 border-dashed p-4 transition-all sm:p-6',
                   isUploading
                     ? 'border-theme bg-theme/5'
                     : formErrors.uploadedFiles
@@ -625,7 +675,7 @@ export default function HealthAndSafetyPage() {
                   </div>
                 ) : (
                   <div className="pointer-events-none flex flex-col items-center gap-1 text-center">
-                    <div className=" flex h-5 w-10 items-center justify-center ">
+                    <div className="flex h-5 w-10 items-center justify-center">
                       <Upload
                         className={cn(
                           'h-5 w-5',

@@ -30,6 +30,7 @@ import moment from '@/lib/moment-setup';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
   DialogContent,
@@ -57,6 +58,9 @@ interface HealthSafetyData {
   startDate: string;
   expiryDate: string;
   document?: string[];
+  remarks?: string;
+  figure?: string;
+  others?: string;
   logs?: LogEntry[];
 }
 
@@ -90,6 +94,9 @@ function HealthAndSafetyDetails() {
     null
   );
   const [currentDocuments, setCurrentDocuments] = useState<string[]>([]);
+  const [currentRemarks, setCurrentRemarks] = useState<string>('');
+  const [currentFigure, setCurrentFigure] = useState<string>('');
+  const [currentOthers, setCurrentOthers] = useState<string>('');
   const [history, setHistory] = useState<LogEntry[]>([]);
 
   // Modal & Form State
@@ -99,6 +106,9 @@ function HealthAndSafetyDetails() {
   const [newTitle, setNewTitle] = useState<string>('');
   const [newStartDate, setNewStartDate] = useState<Date | null>(null);
   const [newExpiryDate, setNewExpiryDate] = useState<Date | null>(null);
+  const [newRemarks, setNewRemarks] = useState<string>('');
+  const [newFigure, setNewFigure] = useState<string>('');
+  const [newOthers, setNewOthers] = useState<string>('');
 
   // File Upload State
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
@@ -234,6 +244,9 @@ function HealthAndSafetyDetails() {
         setCurrentStartDate(data.startDate);
         setCurrentExpiryDate(data.expiryDate);
         setCurrentDocuments(data.document || []);
+        setCurrentRemarks(data.remarks || '');
+        setCurrentFigure(data.figure || '');
+        setCurrentOthers(data.others || '');
         setHistory(data.logs || []);
       }
     } catch (err) {
@@ -351,6 +364,9 @@ function HealthAndSafetyDetails() {
     setNewTitle(currentTitle || '');
     setNewStartDate(currentStartDate ? new Date(currentStartDate) : null);
     setNewExpiryDate(currentExpiryDate ? new Date(currentExpiryDate) : null);
+    setNewRemarks(currentRemarks || '');
+    setNewFigure(currentFigure || '');
+    setNewOthers(currentOthers || '');
     setUploadedFiles([]);
     setUploadError(null);
     setShowUpdateModal(true);
@@ -380,7 +396,10 @@ function HealthAndSafetyDetails() {
       title: newTitle,
       startDate: normalizeDate(newStartDate),
       expiryDate: normalizeDate(newExpiryDate),
-      document: uploadedFiles.map((f) => f.url)
+      document: uploadedFiles.map((f) => f.url),
+      remarks: newRemarks || undefined,
+      figure: newFigure || undefined,
+      others: newOthers || undefined
     };
 
     try {
@@ -433,17 +452,17 @@ function HealthAndSafetyDetails() {
             <div className="space-y-6">
               {/* Title */}
               <div className="space-y-1">
-                <Label className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                <Label className="text-xs font-semibold uppercase tracking-wide text-black">
                   Record Title
                 </Label>
-                <div className="text-lg font-semibold text-gray-900">
+                <div className="  text-gray-900">
                   {currentTitle || 'Not Set'}
                 </div>
               </div>
 
               {/* Start Date */}
               <div className="space-y-1">
-                <Label className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                <Label className="text-xs font-semibold uppercase tracking-wide text-black">
                   Start Date
                 </Label>
                 <div className="text-md font-medium text-gray-800">
@@ -455,7 +474,7 @@ function HealthAndSafetyDetails() {
 
               {/* Expiry Date */}
               <div className="space-y-1">
-                <Label className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                <Label className="text-xs font-semibold uppercase tracking-wide text-black">
                   Expiry Date
                 </Label>
                 <div className="text-lg font-bold text-gray-900">
@@ -465,10 +484,40 @@ function HealthAndSafetyDetails() {
                 </div>
               </div>
 
+              {/* Remarks */}
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold uppercase tracking-wide text-black">
+                  Remarks
+                </Label>
+                <div className="whitespace-pre-wrap text-sm text-gray-800">
+                  {currentRemarks || '-'}
+                </div>
+              </div>
+
+              {/* Figure */}
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold uppercase tracking-wide text-black">
+                  Figure
+                </Label>
+                <div className="whitespace-pre-wrap text-sm text-gray-800">
+                  {currentFigure || '-'}
+                </div>
+              </div>
+
+              {/* Others */}
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold uppercase tracking-wide text-black">
+                  Others
+                </Label>
+                <div className="whitespace-pre-wrap text-sm  text-gray-800">
+                  {currentOthers || '-'}
+                </div>
+              </div>
+
               {/* Current Documents (if any) */}
               {currentDocuments.length > 0 && (
                 <div className="space-y-1">
-                  <Label className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                  <Label className="text-xs font-semibold  uppercase tracking-wide text-black">
                     Active Documents
                   </Label>
                   <div className="flex flex-col gap-2 pt-1">
@@ -593,12 +642,12 @@ function HealthAndSafetyDetails() {
 
       {/* Update Dialog */}
       <Dialog open={showUpdateModal} onOpenChange={setShowUpdateModal}>
-        <DialogContent className="sm:max-w-3xl">
+        <DialogContent className="sm:max-w-4xl max-h-[96vh] overflow-auto">
           <DialogHeader>
             <DialogTitle>Update Health & Safety Details</DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-4 py-4">
+          <div className="space-y-2">
             {/* Context Alert */}
             {currentExpiryDate && (
               <div className="flex items-start gap-2 rounded-md bg-blue-50 p-3 text-sm text-blue-700">
@@ -615,7 +664,7 @@ function HealthAndSafetyDetails() {
 
             {/* Title */}
             <div className="space-y-2">
-              <Label className="text-sm font-medium text-gray-700">
+              <Label className="text-sm font-semibold text-black">
                 Record Title <span className="text-red-500">*</span>
               </Label>
               <Input
@@ -628,7 +677,7 @@ function HealthAndSafetyDetails() {
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               {/* Start Date */}
               <div className="flex flex-col space-y-2">
-                <Label className="text-sm font-medium text-gray-700">
+                <Label className="text-sm font-semibold text-black">
                   Start Date
                 </Label>
                 <DatePicker
@@ -645,8 +694,8 @@ function HealthAndSafetyDetails() {
 
               {/* Expiry Date */}
               <div className="flex flex-col space-y-2">
-                <Label className="text-sm font-medium text-gray-700">
-                  Expiry Date 
+                <Label className="text-sm font-semibold text-black">
+                  Expiry Date
                 </Label>
                 <DatePicker
                   selected={newExpiryDate}
@@ -662,9 +711,50 @@ function HealthAndSafetyDetails() {
               </div>
             </div>
 
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {/* Remarks */}
+              <div className="space-y-2">
+                <Label className="text-sm font-semibold text-black">
+                  Remarks
+                </Label>
+                <Textarea
+                  value={newRemarks}
+                  onChange={(e) => setNewRemarks(e.target.value)}
+                  placeholder="Enter remarks..."
+                  rows={3}
+                />
+              </div>
+
+              {/* Figure */}
+              <div className="space-y-2">
+                <Label className="text-sm font-semibold text-black">
+                  Figure
+                </Label>
+                <Textarea
+                  value={newFigure}
+                  onChange={(e) => setNewFigure(e.target.value)}
+                  placeholder="Enter figure details..."
+                  rows={3}
+                />
+              </div>
+
+              {/* Others */}
+              <div className="space-y-2">
+                <Label className="text-sm font-semibold text-black">
+                  Others
+                </Label>
+                <Textarea
+                  value={newOthers}
+                  onChange={(e) => setNewOthers(e.target.value)}
+                  placeholder="Enter additional information..."
+                  rows={3}
+                />
+              </div>
+            </div>
+
             {/* Document Upload */}
-            <div className="space-y-3 pt-2">
-              <Label className="text-sm font-medium text-gray-700">
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold text-black">
                 Document(s)
               </Label>
 
