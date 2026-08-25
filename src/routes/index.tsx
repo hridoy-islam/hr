@@ -20,6 +20,11 @@ import Recruitment from '@/pages/company/Recruitment';
 import Settings from '@/pages/Hr/Settings';
 import HrLayout from '@/components/layout/hr-layout';
 import Department from '@/pages/company/Department';
+import PresetTask from '@/pages/company/PresetTask';
+import ManageEmployee from '@/pages/company/PresetTask/manageEmployee';
+import CompanyDailyWorkFlow from '@/pages/company/dailyWorkFlow';
+import CompanyDailyWorkFlowDetails from '@/pages/company/dailyWorkFlow/details';
+import CompanyDailyWorkFlowCreate from '@/pages/company/dailyWorkFlow/create';
 import AuditTypePage from '@/pages/company/auditTypePage';
 import Shift from '@/pages/company/Shift';
 import Designation from '@/pages/company/Designation';
@@ -88,6 +93,7 @@ import StaffDashboardPage from '@/pages/Dashboard/StaffDashboard';
 import UpcomingShiftPage from '@/pages/staff/upcoming-shifts';
 import StaffNoticeBoard from '@/pages/staff/notice';
 import HolidayPage from '@/pages/staff/holiday';
+import DailyWorkFlowPage from '@/pages/staff/dailyWorkFlow';
 import CompanyLeaveApprovalPage from '@/pages/company/LeaveApproval';
 import StaffProfile from '@/pages/staff/profile';
 import AttendanceLayout from '@/components/layout/attendance-layout';
@@ -264,6 +270,20 @@ export default function AppRouter() {
         { path: 'employee/:eid/rtw', element: <RtwPage /> },
 
         { path: 'department', element: <Department /> },
+        { path: 'preset-task', element: <PresetTask /> },
+        {
+          path: 'preset-task/manage-employee',
+          element: <ManageEmployee />
+        },
+        { path: 'employee-daily-work-flow', element: <CompanyDailyWorkFlow /> },
+        {
+          path: 'employee-daily-work-flow/create',
+          element: <CompanyDailyWorkFlowCreate />
+        },
+        {
+          path: 'employee-daily-work-flow/:wid',
+          element: <CompanyDailyWorkFlowDetails />
+        },
         { path: 'audit-type', element: <AuditTypePage /> },
 
         { path: 'rota', element: <CompanyRota /> },
@@ -393,6 +413,7 @@ export default function AppRouter() {
         { path: 'upcoming-shifts', element: <UpcomingShiftPage /> },
         { path: 'notice', element: <StaffNoticeBoard /> },
         { path: 'holiday', element: <HolidayPage /> },
+        { path: 'daily-work-flow', element: <DailyWorkFlowPage /> },
         { path: 'profile', element: <StaffProfile /> },
         { path: 'attendance', element: <StaffAttendancePage /> },
         { path: 'document-request', element: <StaffRequestDocumentPage /> },

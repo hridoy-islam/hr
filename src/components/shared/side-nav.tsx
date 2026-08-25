@@ -61,7 +61,9 @@ import {
   CalendarMinus2,
   File,
   Grid3X3,
-  Search
+  Search,
+  ClipboardList,
+  ListTodo
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Link, useNavigate, useLocation, useParams } from 'react-router-dom';
@@ -92,6 +94,13 @@ const navItems = [
     label: 'Holiday',
     href: 'holiday',
     roles: ['employee']
+  },
+  {
+    icon: ListTodo,
+    label: 'Daily Work Flow',
+    href: 'daily-work-flow',
+    roles: ['employee'],
+    requiresWorkFlowAccess: true
   },
   {
     icon: AlertCircle,
@@ -316,6 +325,12 @@ const navItems = [
     href: 'company-policy',
     roles: ['company', 'companyAdmin'],
     badgeKey: 'policy'
+  },
+  {
+    icon: ListTodo,
+    label: 'Daily Work Flow',
+    href: 'employee-daily-work-flow',
+    roles: ['company', 'companyAdmin']
   },  {
     icon: Search  ,
     label: 'Audit',
@@ -468,6 +483,13 @@ const navItems = [
         icon: Building2,
         label: 'Department',
         href: 'department',
+        roles: ['company', 'companyAdmin'],
+        accessKey: 'setting'
+      },
+      {
+        icon: ClipboardList,
+        label: 'Preset for Task',
+        href: 'preset-task',
         roles: ['company', 'companyAdmin'],
         accessKey: 'setting'
       },
@@ -670,6 +692,9 @@ export function SideNav() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [userData, setUserData] = useState(null);
   const [companyThemeColor, setCompanyThemeColor] = useState<string>('');
+  const [workFlowAccessEmployees, setWorkFlowAccessEmployees] = useState<
+    string[]
+  >([]);
   const { id } = useParams();
 
   const { hasAccess } = useCompanyAccess(); // Fetch access utility for filtering
@@ -684,6 +709,35 @@ export function SideNav() {
     }
     return null;
   };
+
+  useEffect(() => {
+    const fetchWorkFlowAccess = async () => {
+      if (userRole !== 'employee' || !user?.company) {
+        setWorkFlowAccessEmployees([]);
+        return;
+      }
+      try {
+        const response = await axiosInstance.get(
+          `/manage-employee/company/${user.company}`
+        );
+        const access = response.data?.data;
+        if (access && access.isActive && Array.isArray(access.employees)) {
+          setWorkFlowAccessEmployees(
+            access.employees.map((emp: any) =>
+              typeof emp === 'object' && emp?._id ? emp._id : emp
+            )
+          );
+        } else {
+          setWorkFlowAccessEmployees([]);
+        }
+      } catch (error) {
+        console.error('Error fetching daily work flow access:', error);
+        setWorkFlowAccessEmployees([]);
+      }
+    };
+
+    fetchWorkFlowAccess();
+  }, [userRole, user?.company]);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('themeColor');
@@ -810,7 +864,18 @@ export function SideNav() {
   const effectiveRole = isAdminViewingCompany ? 'company' : userRole;
   
   // Use updated filter using the hasAccess validation 
-  const filteredNavItems = filterNavItemsByRole(navItems, effectiveRole, hasAccess);
+  const filteredNavItems = filterNavItemsByRole(
+    navItems,
+    effectiveRole,
+    hasAccess
+  ).filter((item: any) => {
+    if (!item.requiresWorkFlowAccess) return true;
+    return (
+      userRole === 'employee' &&
+      !!user?._id &&
+      workFlowAccessEmployees.includes(user._id)
+    );
+  });
 
   const sidebarContent = (
     <div className="flex h-full flex-col">

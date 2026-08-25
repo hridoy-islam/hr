@@ -37,6 +37,13 @@ import {
   AlertDialogTrigger
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/components/ui/use-toast';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 import { DynamicPagination } from '@/components/shared/DynamicPagination';
 import axiosInstance from '@/lib/axios';
@@ -106,6 +113,12 @@ export default function HealthAndSafetyPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [entriesPerPage, setEntriesPerPage] = useState(50);
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchTick, setSearchTick] = useState(0);
+
+  // Filter States
+  const [filterStartDate, setFilterStartDate] = useState<Date | null>(null);
+  const [filterExpiryDate, setFilterExpiryDate] = useState<Date | null>(null);
+  const [statusFilter, setStatusFilter] = useState('all');
 
   // Dialog States
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -180,7 +193,7 @@ export default function HealthAndSafetyPage() {
     }
   };
 
-  const fetchRecords = async (page: number, limit: number, search = '') => {
+  const fetchRecords = async (page: number, limit: number) => {
     try {
       if (initialLoading) setInitialLoading(true);
 
@@ -189,7 +202,16 @@ export default function HealthAndSafetyPage() {
           page,
           limit,
           companyId: id,
-          ...(search ? { searchTerm: search } : {})
+          ...(searchTerm ? { searchTerm } : {}),
+          ...(filterStartDate
+            ? { startDate: moment(filterStartDate).format('YYYY-MM-DD') }
+            : {}),
+          ...(filterExpiryDate
+            ? { expiryDate: moment(filterExpiryDate).format('YYYY-MM-DD') }
+            : {}),
+          ...(statusFilter && statusFilter !== 'all'
+            ? { status: statusFilter }
+            : {})
         }
       });
 
@@ -204,7 +226,7 @@ export default function HealthAndSafetyPage() {
 
   useEffect(() => {
     fetchRecords(currentPage, entriesPerPage);
-  }, [currentPage, entriesPerPage]);
+  }, [currentPage, entriesPerPage, searchTick]);
 
   useEffect(() => {
     if (dialogOpen) {
@@ -222,7 +244,23 @@ export default function HealthAndSafetyPage() {
   }, [dialogOpen]);
 
   const handleSearch = () => {
-    fetchRecords(currentPage, entriesPerPage, searchTerm);
+    if (currentPage !== 1) {
+      setCurrentPage(1);
+    } else {
+      setSearchTick((tick) => tick + 1);
+    }
+  };
+
+  const handleResetFilters = () => {
+    setSearchTerm('');
+    setFilterStartDate(null);
+    setFilterExpiryDate(null);
+    setStatusFilter('all');
+    if (currentPage !== 1) {
+      setCurrentPage(1);
+    } else {
+      setSearchTick((tick) => tick + 1);
+    }
   };
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -366,24 +404,6 @@ export default function HealthAndSafetyPage() {
             <Shield className="h-6 w-6" />
             Health & Safety
           </h2>
-
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <Input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search record title..."
-              className="h-9 w-full min-w-0 sm:min-w-[250px]"
-            />
-
-            <Button
-              onClick={handleSearch}
-              size="sm"
-              className="h-9 w-full min-w-[100px] border-none bg-theme text-white hover:bg-theme/90 sm:w-auto"
-            >
-              Search
-            </Button>
-          </div>
         </div>
 
         <Button
@@ -394,6 +414,100 @@ export default function HealthAndSafetyPage() {
           <Plus className="mr-2 h-4 w-4" />
           Create Record
         </Button>
+      </div>
+
+      {/* Grid Filters Section */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-12 lg:items-end">
+        {/* Search Term Input */}
+        <div className="space-y-1 lg:col-span-3">
+          <Label className="block text-xs font-semibold uppercase tracking-wider text-gray-600">
+            Search
+          </Label>
+          <Input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search record title..."
+            className="h-9 w-full"
+          />
+        </div>
+
+        {/* Start Date */}
+        <div className="space-y-1 lg:col-span-2">
+          <Label className="block text-xs font-semibold uppercase tracking-wider text-gray-600">
+            Start Date
+          </Label>
+          <DatePicker
+            selected={filterStartDate}
+            onChange={(date: Date | null) => setFilterStartDate(date)}
+            dateFormat="dd-MM-yyyy"
+            placeholderText="Start Date"
+            className="flex h-9 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-theme"
+            showMonthDropdown
+            showYearDropdown
+            isClearable
+            dropdownMode="select"
+            popperProps={{ strategy: 'fixed' }}
+            popperClassName="z-[9999]"
+          />
+        </div>
+
+        {/* Expiry Date */}
+        <div className="space-y-1 lg:col-span-2">
+          <Label className="block text-xs font-semibold uppercase tracking-wider text-gray-600">
+            Expiry Date
+          </Label>
+          <DatePicker
+            selected={filterExpiryDate}
+            onChange={(date: Date | null) => setFilterExpiryDate(date)}
+            dateFormat="dd-MM-yyyy"
+            placeholderText="Expiry Date"
+            className="flex h-9 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-theme"
+            showMonthDropdown
+            showYearDropdown
+            isClearable
+            dropdownMode="select"
+            popperProps={{ strategy: 'fixed' }}
+            popperClassName="z-[9999]"
+          />
+        </div>
+
+        {/* Status Select */}
+        <div className="space-y-1 lg:col-span-2">
+          <Label className="block text-xs font-semibold uppercase tracking-wider text-gray-600">
+            Status
+          </Label>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="h-9 w-full bg-white">
+              <SelectValue placeholder="All Statuses" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Statuses</SelectItem>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="expiry soon">Expiring Soon</SelectItem>
+              <SelectItem value="expired">Expired</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex items-center gap-2 lg:col-span-3">
+          <Button
+            onClick={handleSearch}
+            size="sm"
+            className="h-9 flex-1 border-none bg-theme text-white hover:bg-theme/90"
+          >
+            Search
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 flex-1"
+            onClick={handleResetFilters}
+          >
+            Reset
+          </Button>
+        </div>
       </div>
 
       {/* Table Section */}
@@ -495,13 +609,13 @@ export default function HealthAndSafetyPage() {
       {/* Create Record Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="flex max-h-[95vh] max-w-6xl flex-col overflow-y-auto p-4 sm:p-6 md:p-8">
-          <DialogHeader className="">
+          <DialogHeader>
             <DialogTitle className="text-xl font-bold sm:text-2xl">
               Create New Record
             </DialogTitle>
           </DialogHeader>
 
-          <div className=" flex-1 space-y-3 overflow-y-auto">
+          <div className="flex-1 space-y-3 overflow-y-auto">
             {/* Record Title */}
             <div className="space-y-1">
               <Label className="text-sm font-semibold">Title</Label>
@@ -596,51 +710,49 @@ export default function HealthAndSafetyPage() {
                 )}
               </div>
             </div>
+
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-1">
-              <Label className="text-sm font-semibold">
-                Remarks <span className="font-normal text-gray-400">(Optional)</span>
-              </Label>
-              <Textarea
-                value={remarks}
-                onChange={(e) => setRemarks(e.target.value)}
-                placeholder="Enter remarks..."
-                className="border-gray-200"
-                rows={3}
-              />
-            </div>
+                <Label className="text-sm font-semibold">
+                  Remarks <span className="font-normal text-gray-400">(Optional)</span>
+                </Label>
+                <Textarea
+                  value={remarks}
+                  onChange={(e) => setRemarks(e.target.value)}
+                  placeholder="Enter remarks..."
+                  className="border-gray-200"
+                  rows={3}
+                />
+              </div>
 
-            {/* Figure Textarea */}
-            <div className="space-y-1">
-              <Label className="text-sm font-semibold">
-                Figure <span className="font-normal text-gray-400">(Optional)</span>
-              </Label>
-              <Textarea
-                value={figure}
-                onChange={(e) => setFigure(e.target.value)}
-                placeholder="Enter figure details..."
-                className="border-gray-200"
-                rows={3}
-              />
-            </div>
+              {/* Figure Textarea */}
+              <div className="space-y-1">
+                <Label className="text-sm font-semibold">
+                  Figure <span className="font-normal text-gray-400">(Optional)</span>
+                </Label>
+                <Textarea
+                  value={figure}
+                  onChange={(e) => setFigure(e.target.value)}
+                  placeholder="Enter figure details..."
+                  className="border-gray-200"
+                  rows={3}
+                />
+              </div>
 
-            {/* Others Textarea */}
-            <div className="space-y-1">
-              <Label className="text-sm font-semibold">
-                Others <span className="font-normal text-gray-400">(Optional)</span>
-              </Label>
-              <Textarea
-                value={others}
-                onChange={(e) => setOthers(e.target.value)}
-                placeholder="Enter additional information..."
-                className="border-gray-200"
-                rows={3}
-              />
+              {/* Others Textarea */}
+              <div className="space-y-1">
+                <Label className="text-sm font-semibold">
+                  Others <span className="font-normal text-gray-400">(Optional)</span>
+                </Label>
+                <Textarea
+                  value={others}
+                  onChange={(e) => setOthers(e.target.value)}
+                  placeholder="Enter additional information..."
+                  className="border-gray-200"
+                  rows={3}
+                />
+              </div>
             </div>
-            </div>
-
-            {/* Remarks Textarea */}
-            
 
             {/* Attachments Section */}
             <div className="space-y-2">
