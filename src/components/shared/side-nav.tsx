@@ -488,7 +488,7 @@ const navItems = [
       },
       {
         icon: ClipboardList,
-        label: 'Preset for Task',
+        label: 'Daily Work Flow',
         href: 'preset-task',
         roles: ['company', 'companyAdmin'],
         accessKey: 'setting'

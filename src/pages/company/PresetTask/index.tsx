@@ -156,7 +156,7 @@ variant:'destructive'      });
         <div className="flex flex-row items-center gap-4">
           <h2 className="flex items-center gap-2 text-2xl font-bold text-gray-900">
             <ClipboardList className="h-6 w-6" />
-            Preset for Task
+           Daily Work Flow Settings
           </h2>
           <div className="flex items-center space-x-4">
             <Input

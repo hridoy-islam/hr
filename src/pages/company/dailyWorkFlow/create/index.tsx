@@ -1,5 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import {
+  ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
   ClipboardList,
   ListTodo,
   NotebookText,
@@ -116,14 +119,12 @@ const DailyWorkFlowCreatePage: React.FC = () => {
       if (!companyId) return;
       try {
         const [empRes, presetRes] = await Promise.all([
-          axiosInstance.get(
-            `/users?company=${companyId}&status=active&role=employee&limit=all`
-          ),
+          axiosInstance.get(`/manage-employee/company/${companyId}`),
           axiosInstance.get(`/preset-task`, {
             params: { page: 1, limit: 500, companyId }
           })
         ]);
-        setEmployees(empRes.data?.data?.result || []);
+        setEmployees(empRes.data?.data?.employees || []);
         setPresetTasks(presetRes.data?.data?.result || []);
       } catch (error) {
         console.error('Error loading create form data:', error);
@@ -235,7 +236,7 @@ const DailyWorkFlowCreatePage: React.FC = () => {
                 ...task,
                 taskName: task.taskName || '',
                 isOther: true,
-                isSelecting: false, // Set to false after selection
+                isSelecting: false,
                 startTime: task.startTime || '',
                 endTime: task.endTime || ''
               }
@@ -253,7 +254,7 @@ const DailyWorkFlowCreatePage: React.FC = () => {
                 startTime: preset.startTime || task.startTime || '',
                 endTime: preset.endTime || task.endTime || '',
                 isOther: false,
-                isSelecting: false // Set to false after selection
+                isSelecting: false
               }
             : task
         )
@@ -378,10 +379,10 @@ const DailyWorkFlowCreatePage: React.FC = () => {
             presetData: preset
           }))
           .find(
-          (opt) =>
-            opt.label.trim().toLowerCase() ===
-            task.taskName.trim().toLowerCase()
-        ) || (task.taskName ? { label: task.taskName, value: task.taskName } : null);
+            (opt) =>
+              opt.label.trim().toLowerCase() ===
+              task.taskName.trim().toLowerCase()
+          ) || (task.taskName ? { label: task.taskName, value: task.taskName } : null);
 
     return (
       <div className="space-y-2">
@@ -439,14 +440,22 @@ const DailyWorkFlowCreatePage: React.FC = () => {
   };
 
   return (
-    <div className="w-full space-y-4 rounded-md bg-white pb-20 md:pb-0">
+    <div className="w-full space-y-4 rounded-md bg-white pb-20 md:pb-0 max-md:mt-8">
       {/* Header Banner */}
       <div className="rounded-t-md border-b border-slate-100 bg-gradient-to-r from-theme/5 to-transparent p-4">
         <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
           <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-theme">
+            <Button
+              size="icon"
+              onClick={() => navigate(-1)}
+              title="Back"
+              className='h-12 w-12'
+            >
+              <ChevronLeft className="h-7 w-8" />
+            </Button>
+            {/* <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-theme">
               <ListTodo className="h-6 w-6 text-white" />
-            </div>
+            </div> */}
             <div>
               <h1 className="break-words text-lg font-semibold text-black">
                 Create Daily Work Flow
@@ -467,7 +476,7 @@ const DailyWorkFlowCreatePage: React.FC = () => {
                 <ReactSelect
                   options={employees.map((emp) => ({
                     value: emp._id,
-                    label: `${emp.firstName} ${emp.lastName}`
+                    label: `${emp.firstName ?? ''} ${emp.lastName ?? ''}`.trim()
                   }))}
                   value={selectedEmployee}
                   onChange={(option: any) => {
