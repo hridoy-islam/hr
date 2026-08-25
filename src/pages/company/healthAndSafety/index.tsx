@@ -449,6 +449,8 @@ export default function HealthAndSafetyPage() {
             dropdownMode="select"
             popperProps={{ strategy: 'fixed' }}
             popperClassName="z-[9999]"
+                        wrapperClassName='w-full'
+
           />
         </div>
 
@@ -469,6 +471,7 @@ export default function HealthAndSafetyPage() {
             dropdownMode="select"
             popperProps={{ strategy: 'fixed' }}
             popperClassName="z-[9999]"
+            wrapperClassName='w-full'
           />
         </div>
 
