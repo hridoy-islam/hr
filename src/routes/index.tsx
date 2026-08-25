@@ -134,6 +134,7 @@ import CompanyAuditPage from '@/pages/company/auditPage';
 import CreateAuditPage from '@/pages/company/auditPage/create';
 import ViewAuditPage from '@/pages/company/auditPage/view';
 import EmployeeMatrixPage from '@/pages/company/EmployeeMatrix';
+import CompanyPayslipDocPage from '@/pages/company/payslipDoc';
 
 const SignInPage = lazy(() => import('@/pages/auth/signin'));
 
@@ -319,6 +320,7 @@ export default function AppRouter() {
         // { path: 'staff-attendance', element: <StaffAttendancePage /> },
         { path: 'attendance-report', element: <AttendanceReport /> },
 
+        { path: 'payslip-document', element: <CompanyPayslipDocPage /> },
         { path: 'payroll', element: <CompanyPayRoll /> },
         { path: 'payroll/batch-details', element: <BatchPayrollDetails /> },
         { path: 'payroll/:pid', element: <ViewPayroll /> },

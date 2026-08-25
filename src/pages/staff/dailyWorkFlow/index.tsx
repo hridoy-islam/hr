@@ -4,6 +4,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ClipboardList,
+  Clock,
   ListTodo,
   Loader2,
   NotebookText,
@@ -16,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
   DialogContent,
@@ -36,6 +38,7 @@ interface WorkFlowTask {
   taskName: string;
   startTime: string;
   endTime: string;
+  duration?: string;
   note?: string;
   isOther?: boolean;
   isSelecting?: boolean;
@@ -47,9 +50,51 @@ interface SelectOption {
   presetData?: any;
 }
 
+// Duration suggestions (stored/passed in total minutes)
+const DURATION_PRESETS = [
+  { label: '15m', minutes: '15' },
+  { label: '30m', minutes: '30' },
+  { label: '45m', minutes: '45' },
+  { label: '1h', minutes: '60' },
+  // { label: '2h', minutes: '120' },
+];
+
+// Helper to compute minutes between HH:MM time strings
+const calculateDurationInMinutes = (start: string, end: string): string => {
+  const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
+  if (!timeRegex.test(start) || !timeRegex.test(end)) return '';
+
+  const [sH, sM] = start.split(':').map(Number);
+  const [eH, eM] = end.split(':').map(Number);
+
+  let startTotal = sH * 60 + sM;
+  let endTotal = eH * 60 + eM;
+
+  if (endTotal < startTotal) {
+    endTotal += 24 * 60; // Overnight handling
+  }
+
+  return `${endTotal - startTotal}`;
+};
+
 // ─── Zod Schema ───────────────────────────────────────────────────────────────
 
 const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
+// Allow only numbers with a single decimal point (max 2 decimal places)
+const sanitizeDurationInput = (value: string): string => {
+  let val = value.replace(/[^0-9.]/g, '');
+  const dotIndex = val.indexOf('.');
+  if (dotIndex !== -1) {
+    val =
+      val.slice(0, dotIndex + 1) +
+      val
+        .slice(dotIndex + 1)
+        .replace(/\./g, '')
+        .slice(0, 2);
+  }
+  return val;
+};
 
 const workFlowTaskSchema = z.object({
   taskName: z
@@ -58,11 +103,23 @@ const workFlowTaskSchema = z.object({
     .min(1, { message: 'Task name is required' })
     .max(200, { message: 'Task name cannot exceed 200 characters' }),
   startTime: z
-    .string({ required_error: 'Start time is required' })
-    .regex(timeRegex, { message: 'Enter a valid start time (HH:MM)' }),
+    .string()
+    .optional()
+    .refine((val) => !val || timeRegex.test(val), {
+      message: 'Enter a valid start time (HH:MM)'
+    }),
   endTime: z
-    .string({ required_error: 'End time is required' })
-    .regex(timeRegex, { message: 'Enter a valid end time (HH:MM)' }),
+    .string()
+    .optional()
+    .refine((val) => !val || timeRegex.test(val), {
+      message: 'Enter a valid end time (HH:MM)'
+    }),
+  duration: z
+    .string()
+    .optional()
+    .refine((val) => !val || /^\d+(\.\d{1,2})?$/.test(val), {
+      message: 'Duration must be a number with up to 2 decimal places'
+    }),
   note: z.string().optional()
 });
 
@@ -79,7 +136,6 @@ const normalizeToUTCDate = (date: Date) =>
     Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())
   ).toISOString();
 
-// Helper to check if task name matches any preset task title
 const isPresetMatch = (taskName: string, presets: any[]) => {
   if (!taskName) return false;
   return presets.some(
@@ -92,7 +148,6 @@ const DailyWorkFlowPage: React.FC = () => {
   const { id: companyId, eid } = useParams();
   const [searchParams] = useSearchParams();
 
-  // ── State ──
   const getInitialDate = (): Date => {
     const dateParam = searchParams.get('date');
     if (dateParam) {
@@ -115,11 +170,8 @@ const DailyWorkFlowPage: React.FC = () => {
   const [fetchingTasks, setFetchingTasks] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Note Dialog State
   const [activeNoteIndex, setActiveNoteIndex] = useState<number | null>(null);
   const [tempNoteText, setTempNoteText] = useState('');
-
-  // Delete Confirmation Dialog State
   const [deleteIndex, setDeleteIndex] = useState<number | null>(null);
 
   // ── Fetch Presets ──
@@ -194,6 +246,14 @@ const DailyWorkFlowPage: React.FC = () => {
                 taskName: t.taskName || '',
                 startTime: t.startTime || '',
                 endTime: t.endTime || '',
+                // If duration is missing in the response, auto-calculate
+                // it from the start/end times
+                duration:
+                  t.duration ||
+                  calculateDurationInMinutes(
+                    t.startTime || '',
+                    t.endTime || ''
+                  ),
                 note: t.note || '',
                 isOther: !matched,
                 isSelecting: false
@@ -216,7 +276,6 @@ const DailyWorkFlowPage: React.FC = () => {
     fetchDailyWorkFlow();
   }, [eid, companyId, appliedDate, presetTasks]);
 
-  // Options for React Select (exclude presets already picked by other rows)
   const getAvailablePresetOptions = (currentIndex: number): SelectOption[] => {
     const takenTitles = new Set(
       tasks
@@ -239,7 +298,6 @@ const DailyWorkFlowPage: React.FC = () => {
     ];
   };
 
-  // ── Date Navigation Handlers ──
   const handlePrevDay = () => {
     const prev = new Date(appliedDate);
     prev.setDate(prev.getDate() - 1);
@@ -269,7 +327,6 @@ const DailyWorkFlowPage: React.FC = () => {
     }
   };
 
-  // ── Task Handlers ──
   const handleAddTask = () => {
     setFormErrors((prev) => ({ ...prev, tasks: '' }));
     setTasks((prev) => [
@@ -278,6 +335,7 @@ const DailyWorkFlowPage: React.FC = () => {
         taskName: '',
         startTime: '',
         endTime: '',
+        duration: '',
         note: '',
         isOther: false,
         isSelecting: true
@@ -314,8 +372,26 @@ const DailyWorkFlowPage: React.FC = () => {
     if (formErrors[errorKey]) {
       setFormErrors((prev) => ({ ...prev, [errorKey]: '' }));
     }
+
     setTasks((prev) =>
-      prev.map((task, i) => (i === index ? { ...task, [field]: value } : task))
+      prev.map((task, i) => {
+        if (i !== index) return task;
+
+        const updatedTask = { ...task, [field]: value };
+
+        // Auto-calculate duration (in mins) from startTime & endTime.
+        // If either time is missing/invalid, reset it so the
+        // duration quick-add badges show up again.
+        if (field === 'startTime' || field === 'endTime') {
+          const start = field === 'startTime' ? value : task.startTime;
+          const end = field === 'endTime' ? value : task.endTime;
+
+          updatedTask.duration =
+            start && end ? calculateDurationInMinutes(start, end) : '';
+        }
+
+        return updatedTask;
+      })
     );
   };
 
@@ -332,21 +408,28 @@ const DailyWorkFlowPage: React.FC = () => {
                 isOther: true,
                 isSelecting: task.isSelecting,
                 startTime: task.startTime || '',
-                endTime: task.endTime || ''
+                endTime: task.endTime || '',
+                duration: task.duration || ''
               }
             : task
         )
       );
     } else {
       const preset = option.presetData;
+      const start = preset.startTime || tasks[index].startTime || '';
+      const end = preset.endTime || tasks[index].endTime || '';
+      const computedDuration =
+        start && end ? calculateDurationInMinutes(start, end) : preset.duration || '';
+
       setTasks((prev) =>
         prev.map((task, i) =>
           i === index
             ? {
                 ...task,
                 taskName: preset.title || option.label,
-                startTime: preset.startTime || task.startTime || '',
-                endTime: preset.endTime || task.endTime || '',
+                startTime: start,
+                endTime: end,
+                duration: computedDuration,
                 isOther: false,
                 isSelecting: false
               }
@@ -373,7 +456,6 @@ const DailyWorkFlowPage: React.FC = () => {
     updater(`${hour}:${minute}`);
   };
 
-  // ── Note Modal Handlers ──
   const handleOpenNoteModal = (index: number) => {
     setActiveNoteIndex(index);
     setTempNoteText(tasks[index].note || '');
@@ -386,7 +468,6 @@ const DailyWorkFlowPage: React.FC = () => {
     setActiveNoteIndex(null);
   };
 
-  // ── Submit ──
   const handleSave = async () => {
     setFormErrors({});
 
@@ -412,8 +493,9 @@ const DailyWorkFlowPage: React.FC = () => {
         date: normalizeToUTCDate(appliedDate),
         tasks: validation.data.tasks.map((task) => ({
           taskName: task.taskName,
-          startTime: task.startTime,
-          endTime: task.endTime,
+          ...(task.startTime ? { startTime: task.startTime } : {}),
+          ...(task.endTime ? { endTime: task.endTime } : {}),
+          ...(task.duration ? { duration: task.duration } : {}),
           ...(task.note ? { note: task.note } : {})
         }))
       };
@@ -477,7 +559,6 @@ const DailyWorkFlowPage: React.FC = () => {
     );
   }
 
-  // Helper component to render Task Name Selection/Input
   const renderTaskNameField = (task: WorkFlowTask, index: number) => {
     const selectedOption = task.isOther
       ? { label: 'Other', value: 'OTHER' }
@@ -488,10 +569,10 @@ const DailyWorkFlowPage: React.FC = () => {
             presetData: preset
           }))
           .find(
-          (opt) =>
-            opt.label.trim().toLowerCase() ===
-            task.taskName.trim().toLowerCase()
-        ) || (task.taskName ? { label: task.taskName, value: task.taskName } : null);
+            (opt) =>
+              opt.label.trim().toLowerCase() ===
+              task.taskName.trim().toLowerCase()
+          ) || (task.taskName ? { label: task.taskName, value: task.taskName } : null);
 
     return (
       <div className="space-y-2">
@@ -548,6 +629,40 @@ const DailyWorkFlowPage: React.FC = () => {
     );
   };
 
+  // Render suggested badges when start/end time are omitted
+  const renderDurationBadges = (index: number, currentDuration?: string) => {
+    return (
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        <span className="text-[11px] font-medium text-gray-500 flex items-center gap-1">
+          <Clock className="w-3 h-3" /> Quick Add:
+        </span>
+        {DURATION_PRESETS.map((preset) => {
+          const isSelected = currentDuration === preset.minutes;
+          return (
+            <Badge
+              key={preset.minutes}
+              variant={isSelected ? 'default' : 'outline'}
+              className={`cursor-pointer text-xs px-2 py-0.5 transition-all select-none ${
+                isSelected
+                  ? 'bg-theme text-white hover:bg-theme/90'
+                  : 'hover:bg-theme/10 hover:border-theme text-gray-700 border-gray-300'
+              }`}
+              onClick={() =>
+                handleTaskChange(
+                  index,
+                  'duration',
+                  isSelected ? '' : preset.minutes
+                )
+              }
+            >
+              {preset.label}
+            </Badge>
+          );
+        })}
+      </div>
+    );
+  };
+
   return (
     <div className="w-full space-y-4 rounded-md bg-white">
       {/* Header Banner */}
@@ -569,7 +684,6 @@ const DailyWorkFlowPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Controls for Date Navigation & Selection */}
           <div className="w-full md:w-auto">
             <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-black">
               Select Date (DD-MM-YYYY)
@@ -601,7 +715,7 @@ const DailyWorkFlowPage: React.FC = () => {
                     popperProps={{ strategy: 'fixed' }}
                     popperClassName="z-[9999]"
                     portalId="root"
-                    wrapperClassName='w-full'
+                    wrapperClassName="w-full"
                   />
                 </div>
 
@@ -645,7 +759,7 @@ const DailyWorkFlowPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Main Container */}
+      {/* Main Content */}
       <div className="p-4">
         <Card className="border-0 shadow-none">
           <CardContent className="p-0">
@@ -667,168 +781,33 @@ const DailyWorkFlowPage: React.FC = () => {
               </div>
             ) : (
               <>
-                {/* Mobile View: Cards */}
+                {/* Mobile View */}
                 <div className="space-y-4 md:hidden">
-                  {tasks.map((task, index) => (
-                    <div
-                      key={index}
-                      className="rounded-lg border border-slate-200 bg-slate-50/50 p-4 space-y-3"
-                    >
-                      {/* Task Name Field */}
-                      <div>
-                        <label className="text-xs font-semibold text-black uppercase tracking-wider block mb-1">
-                          Task Name
-                        </label>
-                        {renderTaskNameField(task, index)}
-                      </div>
-
-                      {/* Start and End Times */}
-                      <div className="grid grid-cols-2 gap-3">
+                  {tasks.map((task, index) => {
+                    const hasTimes = Boolean(task.startTime && task.endTime);
+                    return (
+                      <div
+                        key={index}
+                        className="rounded-lg border border-slate-200 bg-slate-50/50 p-4 space-y-3"
+                      >
                         <div>
                           <label className="text-xs font-semibold text-black uppercase tracking-wider block mb-1">
-                            Start Time
+                            Task Name
                           </label>
-                          <Input
-                            value={task.startTime}
-                            placeholder="09:00"
-                            maxLength={5}
-                            className={`font-mono text-sm bg-white ${
-                              formErrors[`tasks.${index}.startTime`]
-                                ? 'border-red-500'
-                                : ''
-                            }`}
-                            onChange={(e) => {
-                              let val = e.target.value
-                                .replace(/[^0-9:]/g, '')
-                                .slice(0, 5);
-                              const current = task.startTime;
-                              if (
-                                val.length === 2 &&
-                                current.length === 1 &&
-                                !val.includes(':')
-                              )
-                                val += ':';
-                              handleTaskChange(index, 'startTime', val);
-                            }}
-                            onBlur={(e) =>
-                              handleTimeBlur(e.target.value, (val) =>
-                                handleTaskChange(index, 'startTime', val)
-                              )
-                            }
-                          />
-                          {formErrors[`tasks.${index}.startTime`] && (
-                            <p className="mt-1 text-xs font-medium text-red-500">
-                              {formErrors[`tasks.${index}.startTime`]}
-                            </p>
-                          )}
+                          {renderTaskNameField(task, index)}
                         </div>
 
-                        <div>
-                          <label className="text-xs font-semibold text-black uppercase tracking-wider block mb-1">
-                            End Time
-                          </label>
-                          <Input
-                            value={task.endTime}
-                            placeholder="17:00"
-                            maxLength={5}
-                            className={`font-mono text-sm bg-white ${
-                              formErrors[`tasks.${index}.endTime`]
-                                ? 'border-red-500'
-                                : ''
-                            }`}
-                            onChange={(e) => {
-                              let val = e.target.value
-                                .replace(/[^0-9:]/g, '')
-                                .slice(0, 5);
-                              const current = task.endTime;
-                              if (
-                                val.length === 2 &&
-                                current.length === 1 &&
-                                !val.includes(':')
-                              )
-                                val += ':';
-                              handleTaskChange(index, 'endTime', val);
-                            }}
-                            onBlur={(e) =>
-                              handleTimeBlur(e.target.value, (val) =>
-                                handleTaskChange(index, 'endTime', val)
-                              )
-                            }
-                          />
-                          {formErrors[`tasks.${index}.endTime`] && (
-                            <p className="mt-1 text-xs font-medium text-red-500">
-                              {formErrors[`tasks.${index}.endTime`]}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Bottom Actions Row: Note, Edit Selection, and Remove */}
-                      <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-200/60">
-                        
-
-                        <div className="flex items-center gap-1 shrink-0">
-                          <Button
-                          type="button"
-                          size="sm"
-                          onClick={() => handleOpenNoteModal(index)}
-                          className="flex-1  text-xs h-9"
-                        >
-                          <NotebookText className="mr-2 h-4 w-4" />
-                          {task.note ? 'Edit Note' : 'Add Note'}
-                        </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            onClick={() => handleToggleEditTaskSelection(index)}
-                            title="Change Task Selection"
-                            className="h-9 w-9"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="destructive"
-                            size="icon"
-                            onClick={() => setDeleteIndex(index)}
-                            title="Remove Task"
-                            className="h-9 w-9"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Desktop View: Table */}
-                <div className="hidden md:block overflow-x-auto">
-                  <table className="w-full text-left text-sm">
-                    <thead className="bg-slate-50 text-xs uppercase text-gray-700">
-                      <tr>
-                        <th className="w-[55%] px-4 py-3 min-w-[260px]">Task Name</th>
-                        <th className="px-4 py-3 min-w-[140px]">Start Time</th>
-                        <th className="px-4 py-3 min-w-[140px]">End Time</th>
-                        <th className="px-4 py-3 text-center min-w-[80px]">Note</th>
-                        <th className="px-4 py-3 text-right min-w-[110px]">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {tasks.map((task, index) => (
-                        <tr key={index} className="hover:bg-slate-50/50">
-                          {/* Task Name Column */}
-                          <td className="w-[45%] pr-2 py-3 align-top">
-                            {renderTaskNameField(task, index)}
-                          </td>
-
-                          {/* Start Time Column */}
-                          <td className="px-2 py-3 align-top">
+                        {/* Optional Times */}
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-xs font-semibold text-black uppercase tracking-wider block mb-1">
+                              Start Time <span className="text-gray-400 font-normal">(Optional)</span>
+                            </label>
                             <Input
-                              value={task.startTime}
+                              value={task.startTime || ''}
                               placeholder="09:00"
                               maxLength={5}
-                              className={`font-mono text-sm ${
+                              className={`font-mono text-sm bg-white ${
                                 formErrors[`tasks.${index}.startTime`]
                                   ? 'border-red-500'
                                   : ''
@@ -837,7 +816,7 @@ const DailyWorkFlowPage: React.FC = () => {
                                 let val = e.target.value
                                   .replace(/[^0-9:]/g, '')
                                   .slice(0, 5);
-                                const current = task.startTime;
+                                const current = task.startTime || '';
                                 if (
                                   val.length === 2 &&
                                   current.length === 1 &&
@@ -852,20 +831,17 @@ const DailyWorkFlowPage: React.FC = () => {
                                 )
                               }
                             />
-                            {formErrors[`tasks.${index}.startTime`] && (
-                              <p className="mt-1 text-xs font-medium text-red-500">
-                                {formErrors[`tasks.${index}.startTime`]}
-                              </p>
-                            )}
-                          </td>
+                          </div>
 
-                          {/* End Time Column */}
-                          <td className="px-2 py-3 align-top">
+                          <div>
+                            <label className="text-xs font-semibold text-black uppercase tracking-wider block mb-1">
+                              End Time <span className="text-gray-400 font-normal">(Optional)</span>
+                            </label>
                             <Input
-                              value={task.endTime}
+                              value={task.endTime || ''}
                               placeholder="17:00"
                               maxLength={5}
-                              className={`font-mono text-sm ${
+                              className={`font-mono text-sm bg-white ${
                                 formErrors[`tasks.${index}.endTime`]
                                   ? 'border-red-500'
                                   : ''
@@ -874,7 +850,7 @@ const DailyWorkFlowPage: React.FC = () => {
                                 let val = e.target.value
                                   .replace(/[^0-9:]/g, '')
                                   .slice(0, 5);
-                                const current = task.endTime;
+                                const current = task.endTime || '';
                                 if (
                                   val.length === 2 &&
                                   current.length === 1 &&
@@ -889,50 +865,233 @@ const DailyWorkFlowPage: React.FC = () => {
                                 )
                               }
                             />
-                            {formErrors[`tasks.${index}.endTime`] && (
-                              <p className="mt-1 text-xs font-medium text-red-500">
-                                {formErrors[`tasks.${index}.endTime`]}
-                              </p>
-                            )}
-                          </td>
+                          </div>
+                        </div>
 
-                          {/* Note Icon Button Column */}
-                          <td className="px-4 py-3 text-center align-top">
+                        {/* Duration Field and Badges */}
+                        <div>
+                          <label className="text-xs font-semibold text-black uppercase tracking-wider block mb-1">
+                            Duration (Minutes)
+                          </label>
+                          <Input
+                            type="text"
+                            inputMode="decimal"
+                            value={task.duration || ''}
+                            placeholder="e.g. 30"
+                            readOnly={hasTimes}
+                            className={`text-sm bg-white ${
+                              hasTimes
+                                ? 'bg-gray-100 text-gray-700 cursor-not-allowed'
+                                : ''
+                            } ${
+                              formErrors[`tasks.${index}.duration`]
+                                ? 'border-red-500'
+                                : ''
+                            }`}
+                            onChange={(e) =>
+                              handleTaskChange(
+                                index,
+                                'duration',
+                                sanitizeDurationInput(e.target.value)
+                              )
+                            }
+                          />
+                          {formErrors[`tasks.${index}.duration`] && (
+                            <p className="mt-1 text-xs font-medium text-red-500">
+                              {formErrors[`tasks.${index}.duration`]}
+                            </p>
+                          )}
+                          {!hasTimes && !task.duration &&
+                            renderDurationBadges(index, task.duration)}
+                        </div>
+
+                        <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-200/60">
+                          <div className="flex items-center gap-1 shrink-0">
                             <Button
                               type="button"
                               size="sm"
                               onClick={() => handleOpenNoteModal(index)}
-                              title={task.note ? 'Edit Note' : 'Add Note'}
+                              className="flex-1 text-xs h-9"
                             >
-                              <NotebookText className="h-5 w-5 mr-2" />Note
+                              <NotebookText className="mr-2 h-4 w-4" />
+                              {task.note ? 'Edit Note' : 'Add Note'}
                             </Button>
-                          </td>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              onClick={() => handleToggleEditTaskSelection(index)}
+                              className="h-9 w-9"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="icon"
+                              onClick={() => setDeleteIndex(index)}
+                              className="h-9 w-9"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
 
-                          {/* Action Column */}
-                          <td className="px-4 py-3 text-right align-top">
-                            <div className="flex items-center justify-end gap-1">
+                {/* Desktop View Table */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-slate-50 text-xs uppercase text-gray-700">
+                      <tr>
+                        <th className="w-[30%] px-4 py-3 min-w-[200px]">Task Name</th>
+                        <th className="px-4 py-3 min-w-[130px]">Start Time</th>
+                        <th className="px-4 py-3 min-w-[130px]">End Time</th>
+                        <th className="px-4 py-3 min-w-[220px]">Duration (Mins)</th>
+                        <th className="px-4 py-3 text-center min-w-[80px]">Note</th>
+                        <th className="px-4 py-3 text-right min-w-[110px]">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {tasks.map((task, index) => {
+                        const hasTimes = Boolean(task.startTime && task.endTime);
+                        return (
+                          <tr key={index} className="hover:bg-slate-50/50">
+                            <td className="w-[30%] pr-2 py-3 align-top">
+                              {renderTaskNameField(task, index)}
+                            </td>
+
+                            <td className="px-2 py-3 align-top">
+                              <Input
+                                value={task.startTime || ''}
+                                placeholder="09:00"
+                                maxLength={5}
+                                className={`font-mono text-sm ${
+                                  formErrors[`tasks.${index}.startTime`]
+                                    ? 'border-red-500'
+                                    : ''
+                                }`}
+                                onChange={(e) => {
+                                  let val = e.target.value
+                                    .replace(/[^0-9:]/g, '')
+                                    .slice(0, 5);
+                                  const current = task.startTime || '';
+                                  if (
+                                    val.length === 2 &&
+                                    current.length === 1 &&
+                                    !val.includes(':')
+                                  )
+                                    val += ':';
+                                  handleTaskChange(index, 'startTime', val);
+                                }}
+                                onBlur={(e) =>
+                                  handleTimeBlur(e.target.value, (val) =>
+                                    handleTaskChange(index, 'startTime', val)
+                                  )
+                                }
+                              />
+                            </td>
+
+                            <td className="px-2 py-3 align-top">
+                              <Input
+                                value={task.endTime || ''}
+                                placeholder="17:00"
+                                maxLength={5}
+                                className={`font-mono text-sm ${
+                                  formErrors[`tasks.${index}.endTime`]
+                                    ? 'border-red-500'
+                                    : ''
+                                }`}
+                                onChange={(e) => {
+                                  let val = e.target.value
+                                    .replace(/[^0-9:]/g, '')
+                                    .slice(0, 5);
+                                  const current = task.endTime || '';
+                                  if (
+                                    val.length === 2 &&
+                                    current.length === 1 &&
+                                    !val.includes(':')
+                                  )
+                                    val += ':';
+                                  handleTaskChange(index, 'endTime', val);
+                                }}
+                                onBlur={(e) =>
+                                  handleTimeBlur(e.target.value, (val) =>
+                                    handleTaskChange(index, 'endTime', val)
+                                  )
+                                }
+                              />
+                            </td>
+
+                            <td className="px-2 py-3 align-top">
+                              <Input
+                                type="text"
+                                inputMode="decimal"
+                                value={task.duration || ''}
+                                placeholder="Minutes (e.g. 45)"
+                                readOnly={hasTimes}
+                                className={`text-sm ${
+                                  hasTimes
+                                    ? 'bg-gray-100 text-gray-700 cursor-not-allowed font-mono'
+                                    : ''
+                                } ${
+                                  formErrors[`tasks.${index}.duration`]
+                                    ? 'border-red-500'
+                                    : ''
+                                }`}
+                                onChange={(e) =>
+                                  handleTaskChange(
+                                    index,
+                                    'duration',
+                                    sanitizeDurationInput(e.target.value)
+                                  )
+                                }
+                              />
+                              {formErrors[`tasks.${index}.duration`] && (
+                                <p className="mt-1 text-xs font-medium text-red-500">
+                                  {formErrors[`tasks.${index}.duration`]}
+                                </p>
+                              )}
+                              {!hasTimes && !task.duration &&
+                                renderDurationBadges(index, task.duration)}
+                            </td>
+
+                            <td className="px-4 py-3 text-center align-top">
                               <Button
                                 type="button"
-                                variant="outline"
-                                size="icon"
-                                onClick={() => handleToggleEditTaskSelection(index)}
-                                title="Change Task Selection"
+                                size="sm"
+                                onClick={() => handleOpenNoteModal(index)}
+                                title={task.note ? 'Edit Note' : 'Add Note'}
                               >
-                                <Pencil className="h-4 w-4" />
+                                <NotebookText className="h-5 w-5 mr-2" />
+                                Note
                               </Button>
-                              <Button
-                                variant="destructive"
-                                size="icon"
-                                onClick={() => setDeleteIndex(index)}
-                                title="Remove Task"
-                                className="h-9 w-9"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
+                            </td>
+
+                            <td className="px-4 py-3 text-right align-top">
+                              <div className="flex items-center justify-end gap-1">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="icon"
+                                  onClick={() => handleToggleEditTaskSelection(index)}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="destructive"
+                                  size="icon"
+                                  onClick={() => setDeleteIndex(index)}
+                                  className="h-9 w-9"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -945,7 +1104,6 @@ const DailyWorkFlowPage: React.FC = () => {
               </p>
             )}
 
-            {/* Bottom Actions */}
             <div className="mt-4 flex flex-col sm:flex-row justify-between gap-2 pt-4">
               <Button
                 type="button"
@@ -1010,6 +1168,7 @@ const DailyWorkFlowPage: React.FC = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
       {/* Delete Confirmation Dialog */}
       <Dialog
         open={deleteIndex !== null}

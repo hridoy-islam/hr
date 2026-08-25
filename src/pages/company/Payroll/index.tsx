@@ -283,14 +283,23 @@ const CompanyPayRoll = () => {
               <h2 className="text-2xl font-bold text-gray-900">Payroll Management</h2>
             </div>
           </div>
+<div className='space-x-2'>
 
+          <Button
+            onClick={() => navigate(`/company/${companyId}/payslip-document`)}
+            className="bg-theme text-white hover:bg-theme/90"
+            >
+            <Plus className="mr-2 h-4 w-4" />
+            Payslip
+          </Button>
           <Button
             onClick={() => setShowPayloadDialog(true)}
             className="bg-theme text-white hover:bg-theme/90"
-          >
+            >
             <Plus className="mr-2 h-4 w-4" />
             Generate Payroll
           </Button>
+            </div>
         </div>
 
         {/* ── Table ── */}

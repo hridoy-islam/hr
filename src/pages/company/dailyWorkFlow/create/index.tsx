@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import {
-  ArrowLeft,
   ChevronLeft,
-  ChevronRight,
   ClipboardList,
+  Clock,
   ListTodo,
   NotebookText,
   Pencil,
@@ -11,6 +10,7 @@ import {
   Trash2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -35,6 +35,7 @@ interface WorkFlowTask {
   taskName: string;
   startTime: string;
   endTime: string;
+  duration?: string;
   note?: string;
   isOther?: boolean;
   isSelecting?: boolean;
@@ -50,6 +51,46 @@ interface SelectOption {
 
 const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
+// Duration suggestions (stored/passed in total minutes)
+const DURATION_PRESETS = [
+  { label: '15m', minutes: '15' },
+  { label: '30m', minutes: '30' },
+  { label: '45m', minutes: '45' },
+  { label: '1h', minutes: '60' }
+];
+
+// Helper to compute minutes between HH:MM time strings
+const calculateDurationInMinutes = (start: string, end: string): string => {
+  if (!timeRegex.test(start) || !timeRegex.test(end)) return '';
+
+  const [sH, sM] = start.split(':').map(Number);
+  const [eH, eM] = end.split(':').map(Number);
+
+  let startTotal = sH * 60 + sM;
+  let endTotal = eH * 60 + eM;
+
+  if (endTotal < startTotal) {
+    endTotal += 24 * 60; // Overnight handling
+  }
+
+  return `${endTotal - startTotal}`;
+};
+
+// Allow only numbers with a single decimal point (max 2 decimal places)
+const sanitizeDurationInput = (value: string): string => {
+  let val = value.replace(/[^0-9.]/g, '');
+  const dotIndex = val.indexOf('.');
+  if (dotIndex !== -1) {
+    val =
+      val.slice(0, dotIndex + 1) +
+      val
+        .slice(dotIndex + 1)
+        .replace(/\./g, '')
+        .slice(0, 2);
+  }
+  return val;
+};
+
 const workFlowTaskSchema = z.object({
   taskName: z
     .string({ required_error: 'Task name is required' })
@@ -62,6 +103,12 @@ const workFlowTaskSchema = z.object({
   endTime: z
     .string({ required_error: 'End time is required' })
     .regex(timeRegex, { message: 'Enter a valid end time (HH:MM)' }),
+  duration: z
+    .string()
+    .optional()
+    .refine((val) => !val || /^\d+(\.\d{1,2})?$/.test(val), {
+      message: 'Duration must be a number with up to 2 decimal places'
+    }),
   note: z.string().optional()
 });
 
@@ -184,6 +231,7 @@ const DailyWorkFlowCreatePage: React.FC = () => {
         taskName: '',
         startTime: '',
         endTime: '',
+        duration: '',
         note: '',
         isOther: false,
         isSelecting: true
@@ -221,7 +269,24 @@ const DailyWorkFlowCreatePage: React.FC = () => {
       setFormErrors((prev) => ({ ...prev, [errorKey]: '' }));
     }
     setTasks((prev) =>
-      prev.map((task, i) => (i === index ? { ...task, [field]: value } : task))
+      prev.map((task, i) => {
+        if (i !== index) return task;
+
+        const updatedTask = { ...task, [field]: value };
+
+        // Auto-calculate duration (in mins) from startTime & endTime.
+        // If either time is missing/invalid, reset it so the
+        // duration quick-add badges show up again.
+        if (field === 'startTime' || field === 'endTime') {
+          const start = field === 'startTime' ? value : task.startTime;
+          const end = field === 'endTime' ? value : task.endTime;
+
+          updatedTask.duration =
+            start && end ? calculateDurationInMinutes(start, end) : '';
+        }
+
+        return updatedTask;
+      })
     );
   };
 
@@ -238,7 +303,8 @@ const DailyWorkFlowCreatePage: React.FC = () => {
                 isOther: true,
                 isSelecting: false,
                 startTime: task.startTime || '',
-                endTime: task.endTime || ''
+                endTime: task.endTime || '',
+                duration: task.duration || ''
               }
             : task
         )
@@ -246,18 +312,26 @@ const DailyWorkFlowCreatePage: React.FC = () => {
     } else {
       const preset = option.presetData;
       setTasks((prev) =>
-        prev.map((task, i) =>
-          i === index
-            ? {
-                ...task,
-                taskName: preset.title || option.label,
-                startTime: preset.startTime || task.startTime || '',
-                endTime: preset.endTime || task.endTime || '',
-                isOther: false,
-                isSelecting: false
-              }
-            : task
-        )
+        prev.map((task, i) => {
+          if (i !== index) return task;
+
+          const start = preset.startTime || task.startTime || '';
+          const end = preset.endTime || task.endTime || '';
+          const duration =
+            start && end
+              ? calculateDurationInMinutes(start, end)
+              : preset.duration || task.duration || '';
+
+          return {
+            ...task,
+            taskName: preset.title || option.label,
+            startTime: start,
+            endTime: end,
+            duration,
+            isOther: false,
+            isSelecting: false
+          };
+        })
       );
     }
   };
@@ -323,6 +397,7 @@ const DailyWorkFlowCreatePage: React.FC = () => {
           taskName: task.taskName,
           startTime: task.startTime,
           endTime: task.endTime,
+          ...(task.duration ? { duration: task.duration } : {}),
           ...(task.note ? { note: task.note } : {})
         }))
       };
@@ -435,6 +510,40 @@ const DailyWorkFlowCreatePage: React.FC = () => {
             )}
           </div>
         )}
+      </div>
+    );
+  };
+
+  // Render suggested badges when start/end time are omitted
+  const renderDurationBadges = (index: number, currentDuration?: string) => {
+    return (
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        <span className="text-[11px] font-medium text-gray-500 flex items-center gap-1">
+          <Clock className="w-3 h-3" /> Quick Add:
+        </span>
+        {DURATION_PRESETS.map((preset) => {
+          const isSelected = currentDuration === preset.minutes;
+          return (
+            <Badge
+              key={preset.minutes}
+              variant={isSelected ? 'default' : 'outline'}
+              className={`cursor-pointer text-xs px-2 py-0.5 transition-all select-none ${
+                isSelected
+                  ? 'bg-theme text-white hover:bg-theme/90'
+                  : 'hover:bg-theme/10 hover:border-theme text-gray-700 border-gray-300'
+              }`}
+              onClick={() =>
+                handleTaskChange(
+                  index,
+                  'duration',
+                  isSelected ? '' : preset.minutes
+                )
+              }
+            >
+              {preset.label}
+            </Badge>
+          );
+        })}
       </div>
     );
   };
@@ -562,7 +671,9 @@ const DailyWorkFlowCreatePage: React.FC = () => {
               <>
                 {/* Mobile View: Cards */}
                 <div className="space-y-4 md:hidden">
-                  {tasks.map((task, index) => (
+                  {tasks.map((task, index) => {
+                    const hasTimes = Boolean(task.startTime && task.endTime);
+                    return (
                     <div
                       key={index}
                       className="rounded-lg border border-slate-200 bg-slate-50/50 p-4 space-y-3"
@@ -656,6 +767,43 @@ const DailyWorkFlowCreatePage: React.FC = () => {
                         </div>
                       </div>
 
+                      {/* Duration Field and Badges */}
+                      <div>
+                        <label className="text-xs font-semibold text-black uppercase tracking-wider block mb-1">
+                          Duration (Minutes)
+                        </label>
+                        <Input
+                          type="text"
+                          inputMode="decimal"
+                          value={task.duration || ''}
+                          placeholder="e.g. 30"
+                          readOnly={hasTimes}
+                          className={`text-sm bg-white ${
+                            hasTimes
+                              ? 'bg-gray-100 text-gray-700 cursor-not-allowed'
+                              : ''
+                          } ${
+                            formErrors[`tasks.${index}.duration`]
+                              ? 'border-red-500'
+                              : ''
+                          }`}
+                          onChange={(e) =>
+                            handleTaskChange(
+                              index,
+                              'duration',
+                              sanitizeDurationInput(e.target.value)
+                            )
+                          }
+                        />
+                        {formErrors[`tasks.${index}.duration`] && (
+                          <p className="mt-1 text-xs font-medium text-red-500">
+                            {formErrors[`tasks.${index}.duration`]}
+                          </p>
+                        )}
+                        {!hasTimes && !task.duration &&
+                          renderDurationBadges(index, task.duration)}
+                      </div>
+
                       {/* Bottom Actions Row: Note, Edit Selection, and Remove */}
                       <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-200/60">
                         <div className="flex items-center gap-1 shrink-0">
@@ -690,7 +838,8 @@ const DailyWorkFlowCreatePage: React.FC = () => {
                         </div>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 {/* Desktop View: Table */}
@@ -701,12 +850,15 @@ const DailyWorkFlowCreatePage: React.FC = () => {
                         <th className="w-[55%] px-4 py-3 min-w-[260px]">Task Name</th>
                         <th className="px-4 py-3 min-w-[140px]">Start Time</th>
                         <th className="px-4 py-3 min-w-[140px]">End Time</th>
+                        <th className="px-4 py-3 min-w-[220px]">Duration (Mins)</th>
                         <th className="px-4 py-3 text-center min-w-[80px]">Note</th>
                         <th className="px-4 py-3 text-right min-w-[110px]">Action</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {tasks.map((task, index) => (
+                      {tasks.map((task, index) => {
+                        const hasTimes = Boolean(task.startTime && task.endTime);
+                        return (
                         <tr key={index} className="hover:bg-slate-50/50">
                           {/* Task Name Column */}
                           <td className="w-[45%] pr-2 py-3 align-top">
@@ -787,6 +939,40 @@ const DailyWorkFlowCreatePage: React.FC = () => {
                             )}
                           </td>
 
+                          {/* Duration Column */}
+                          <td className="px-2 py-3 align-top">
+                            <Input
+                              type="text"
+                              inputMode="decimal"
+                              value={task.duration || ''}
+                              placeholder="Minutes (e.g. 45)"
+                              readOnly={hasTimes}
+                              className={`text-sm ${
+                                hasTimes
+                                  ? 'bg-gray-100 text-gray-700 cursor-not-allowed font-mono'
+                                  : ''
+                              } ${
+                                formErrors[`tasks.${index}.duration`]
+                                  ? 'border-red-500'
+                                  : ''
+                              }`}
+                              onChange={(e) =>
+                                handleTaskChange(
+                                  index,
+                                  'duration',
+                                  sanitizeDurationInput(e.target.value)
+                                )
+                              }
+                            />
+                            {formErrors[`tasks.${index}.duration`] && (
+                              <p className="mt-1 text-xs font-medium text-red-500">
+                                {formErrors[`tasks.${index}.duration`]}
+                              </p>
+                            )}
+                            {!hasTimes && !task.duration &&
+                              renderDurationBadges(index, task.duration)}
+                          </td>
+
                           {/* Note Icon Button Column */}
                           <td className="px-4 py-3 text-center align-top">
                             <Button
@@ -823,7 +1009,8 @@ const DailyWorkFlowCreatePage: React.FC = () => {
                             </div>
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

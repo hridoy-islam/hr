@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import axiosInstance from "@/lib/axios";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,7 +15,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -33,7 +32,7 @@ import {
   FolderOpen,
   FileText,
   FileImage,
-  File,
+  File as FileIcon,
   MoreVertical,
   Plus,
   Upload,
@@ -48,19 +47,29 @@ import {
   FolderPlus,
   Loader2,
   ArrowLeft,
+  MoveLeft,
+  ClipboardPaste,
+  Copy,
+  FolderInput,
 } from "lucide-react";
 import { BlinkingDots } from "@/components/shared/blinking-dots";
 import { useToast } from "@/components/ui/use-toast";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type AuditType = "folder" | "file";
+type PayslipDocType = "folder" | "file";
 
-interface TAudit {
+interface TPayslipDoc {
   _id: string;
   companyId: string;
   documentTitle: string;
   title: string[];
-  type: AuditType;
+  type: PayslipDocType;
   parentId: string | null;
   ancestors: string[];
   documentUrl?: string;
@@ -75,7 +84,7 @@ interface BreadcrumbItem {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function getFileIcon(url?: string) {
-  if (!url) return <File className="h28 w-28 text-gray-400" />;
+  if (!url) return <FileIcon className="h28 w-28 text-gray-400" />;
   const lower = url.toLowerCase();
   if (lower.match(/\.(jpeg|jpg|gif|png|webp)/))
     return <FileImage className="h-28 w-28 text-blue-400" />;
@@ -83,11 +92,11 @@ function getFileIcon(url?: string) {
     return <FileText className="h-28 w-28 text-red-400" />;
   if (lower.match(/\.(docx|doc)/))
     return <FileText className="h-28 w-28 text-blue-600" />;
-  return <File className="h-28 w-28 text-gray-400" />;
+  return <FileIcon className="h-28 w-28 text-gray-400" />;
 }
 
 function getFileIconForList(url?: string) {
-  if (!url) return <File className="h-10 w-10 text-gray-400" />;
+  if (!url) return <FileIcon className="h-10 w-10 text-gray-400" />;
   const lower = url.toLowerCase();
   if (lower.match(/\.(jpeg|jpg|gif|png|webp)/))
     return <FileImage className="h-10 w-10 text-blue-400" />;
@@ -95,7 +104,7 @@ function getFileIconForList(url?: string) {
     return <FileText className="h-10 w-10 text-red-400" />;
   if (lower.match(/\.(docx|doc)/))
     return <FileText className="h-10 w-10 text-blue-600" />;
-  return <File className="h-10 w-10 text-gray-400" />;
+  return <FileIcon className="h-10 w-10 text-gray-400" />;
 }
 
 function formatDate(dateStr: string) {
@@ -107,16 +116,16 @@ function formatDate(dateStr: string) {
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-export default function CompanyAuditPage() {
+export default function CompanyPayslipDocPage() {
   const { id: companyId } = useParams<{ id: string }>();
   const { toast } = useToast(); // 🌟 Initialized Custom Hook
 
   // ── State ──
-  const [items, setItems] = useState<TAudit[]>([]);
+  const [items, setItems] = useState<TPayslipDoc[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [breadcrumbs, setBreadcrumbs] = useState<BreadcrumbItem[]>([
-    { _id: null, name: "Audit" },
+    { _id: null, name: "Payslip" },
   ]);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
@@ -139,19 +148,31 @@ export default function CompanyAuditPage() {
   const [capturedImagePreview, setCapturedImagePreview] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-
+  const navigate = useNavigate()
   // ── Rename ──
   const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
-  const [renamingItem, setRenamingItem] = useState<TAudit | null>(null);
+  const [renamingItem, setRenamingItem] = useState<TPayslipDoc | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [isRenaming, setIsRenaming] = useState(false);
 
   // ── Delete ──
-  const [deleteConfirmItem, setDeleteConfirmItem] = useState<TAudit | null>(null);
+  const [deleteConfirmItem, setDeleteConfirmItem] = useState<TPayslipDoc | null>(null);
 
   // ── Preview ──
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+
+  // ── Clipboard (Copy / Move) ──
+  const [clipboard, setClipboard] = useState<{
+    itemId: string;
+    mode: "copy" | "move";
+  } | null>(null);
+  const [isPasting, setIsPasting] = useState(false);
+
+  // ── Right-click Context Menu ──
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(
+    null
+  );
 
   // ─── Fetch Items ─────────────────────────────────────────────────────────
   const fetchItems = useCallback(
@@ -162,7 +183,7 @@ export default function CompanyAuditPage() {
           companyId: companyId!,
           parentId: folderId || "null",
         };
-        const res = await axiosInstance.get("/audit?limit=all", { params });
+        const res = await axiosInstance.get("/payslip-doc?limit=all", { params });
         setItems(res.data?.data?.result || []);
       } catch {
         toast({ title: "Error", description: "Failed to load files", variant: "destructive" });
@@ -176,6 +197,21 @@ export default function CompanyAuditPage() {
   useEffect(() => {
     fetchItems(currentFolderId);
   }, [currentFolderId, fetchItems]);
+
+  // ─── Close Right-click Menu on outside click / scroll / Escape ──────────
+  useEffect(() => {
+    if (!contextMenu) return;
+    const close = () => setContextMenu(null);
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && close();
+    window.addEventListener("click", close);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("click", close);
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [contextMenu]);
 
   // ─── Camera Cleanup ───────────────────────────────────────────────────────
   useEffect(() => {
@@ -279,7 +315,7 @@ export default function CompanyAuditPage() {
       try {
         const formData = new FormData();
         formData.append("entityId", companyId);
-        formData.append("file_type", "auditDoc");
+        formData.append("file_type", "payslipDoc");
         formData.append("file", file);
 
         const res = await axiosInstance.post("/documents", formData, {
@@ -298,7 +334,7 @@ export default function CompanyAuditPage() {
         const url = res.data?.data?.fileUrl;
         if (!url) throw new Error("No file URL returned");
 
-        await axiosInstance.post("/audit", {
+        await axiosInstance.post("/payslip-doc", {
           companyId,
           documentTitle: file.name,
           title: [file.name],
@@ -349,7 +385,7 @@ export default function CompanyAuditPage() {
     if (!folderName.trim() || !companyId) return;
     setIsCreatingFolder(true);
     try {
-      await axiosInstance.post("/audit", {
+      await axiosInstance.post("/payslip-doc", {
         companyId,
         documentTitle: folderName.trim(),
         title: [folderName.trim()],
@@ -368,7 +404,7 @@ export default function CompanyAuditPage() {
   };
 
   // ─── Navigate into folder ─────────────────────────────────────────────────
-  const handleOpenFolder = (folder: TAudit) => {
+  const handleOpenFolder = (folder: TPayslipDoc) => {
     setCurrentFolderId(folder._id);
     setBreadcrumbs((prev) => [...prev, { _id: folder._id, name: folder.documentTitle }]);
   };
@@ -380,7 +416,7 @@ export default function CompanyAuditPage() {
   };
 
   // ─── Rename ───────────────────────────────────────────────────────────────
-  const openRename = (item: TAudit) => {
+  const openRename = (item: TPayslipDoc) => {
     setRenamingItem(item);
     setRenameValue(item.documentTitle);
     setIsRenameDialogOpen(true);
@@ -390,7 +426,7 @@ export default function CompanyAuditPage() {
     if (!renamingItem || !renameValue.trim()) return;
     setIsRenaming(true);
     try {
-      await axiosInstance.patch(`/audit/${renamingItem._id}`, {
+      await axiosInstance.patch(`/payslip-doc/${renamingItem._id}`, {
         documentTitle: renameValue.trim(),
         title: [renameValue.trim()],
       });
@@ -405,18 +441,64 @@ export default function CompanyAuditPage() {
   };
 
   // ─── Delete ───────────────────────────────────────────────────────────────
-  const handleDelete = async (item: TAudit) => {
+  const handleDelete = async (item: TPayslipDoc) => {
     // 🌟 Optimistic UI update: Immediately slice from local state layout, bypassing loading variables
     setItems((prev) => prev.filter((i) => i._id !== item._id));
     setDeleteConfirmItem(null);
 
     try {
-      await axiosInstance.delete(`/audit/${item._id}`);
+      await axiosInstance.delete(`/payslip-doc/${item._id}`);
       toast({ title: "Deleted", description: `"${item.documentTitle}" deleted successfully` });
     } catch {
       toast({ title: "Error", description: "Failed to delete item", variant: "destructive" });
       // Re-fetch fallback structure if database rejection occurs
       fetchItems(currentFolderId);
+    }
+  };
+
+  // ─── Copy / Move (Clipboard) ─────────────────────────────────────────────
+  const handleCopyItem = (item: TPayslipDoc) => {
+    setClipboard({ itemId: item._id, mode: "copy" });
+    toast({
+      title: `Copied`,
+      description: "Open a folder and click Paste.",
+    });
+  };
+
+  const handleMoveItem = (item: TPayslipDoc) => {
+    setClipboard({ itemId: item._id, mode: "move" });
+    toast({
+      title: `Ready to move`,
+      description: "Open a folder and click Paste.",
+    });
+  };
+
+  const handlePaste = async () => {
+    if (!clipboard || !companyId) return;
+    setIsPasting(true);
+    try {
+      if (clipboard.mode === "copy") {
+        await axiosInstance.post(`/payslip-doc/copy/${clipboard.itemId}`, {
+          targetFolderId: currentFolderId,
+        });
+        toast({ title: "Pasted successfully" });
+      } else {
+        await axiosInstance.patch(`/payslip-doc/move/${clipboard.itemId}`, {
+          targetFolderId: currentFolderId,
+        });
+        toast({ title: "Moved successfully" });
+      }
+      setClipboard(null);
+      fetchItems(currentFolderId);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description:
+          error.response?.data?.message || "Failed to paste item",
+        variant: "destructive",
+      });
+    } finally {
+      setIsPasting(false);
     }
   };
 
@@ -494,7 +576,7 @@ export default function CompanyAuditPage() {
   };
 
   // ─── Item Context Menu ────────────────────────────────────────────────────
-  const ItemMenu = ({ item }: { item: TAudit }) => (
+  const ItemMenu = ({ item }: { item: TPayslipDoc }) => (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
@@ -530,6 +612,36 @@ export default function CompanyAuditPage() {
             </DropdownMenuItem>
           </>
         )}
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleCopyItem(item);
+                }}
+              >
+                <Copy className="mr-2 h-4 w-4" />
+                Copy
+              </DropdownMenuItem>
+            </TooltipTrigger>
+           
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleMoveItem(item);
+                }}
+              >
+                <FolderInput className="mr-2 h-4 w-4" />
+                Move
+              </DropdownMenuItem>
+            </TooltipTrigger>
+           
+          </Tooltip>
+        </TooltipProvider>
         <DropdownMenuItem
           onClick={(e) => {
             e.stopPropagation();
@@ -554,16 +666,17 @@ export default function CompanyAuditPage() {
   );
 
   // ─── Grid Item ────────────────────────────────────────────────────────────
-  const GridItem = ({ item }: { item: TAudit }) => {
+  const GridItem = ({ item }: { item: TPayslipDoc }) => {
     // Check if the current object contains an image file reference
     const isImageFile = item.type === "file" && item.documentUrl?.toLowerCase().match(/\.(jpeg|jpg|gif|png|webp)(\?|$)/);
 
     return (
       <div
         className="group relative flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-gray-100 bg-white p-3 sm:p-4 shadow-sm transition-all hover:border-blue-200 hover:shadow-md"
-        onDoubleClick={() => item.type === "folder" && handleOpenFolder(item)}
         onClick={() => {
-          if (item.type === "file" && item.documentUrl) {
+          if (item.type === "folder") {
+            handleOpenFolder(item);
+          } else if (item.documentUrl) {
             setPreviewUrl(item.documentUrl);
             setIsPreviewOpen(true);
           }
@@ -595,12 +708,13 @@ export default function CompanyAuditPage() {
   };
 
   // ─── List Item ────────────────────────────────────────────────────────────
-  const ListItem = ({ item }: { item: TAudit }) => (
+  const ListItem = ({ item }: { item: TPayslipDoc }) => (
     <div
       className="group flex cursor-pointer items-center gap-2 sm:gap-3 rounded-lg border border-gray-100 bg-white px-3 py-2 sm:px-4 sm:py-3 transition-all hover:border-blue-200 hover:shadow-sm"
-      onDoubleClick={() => item.type === "folder" && handleOpenFolder(item)}
       onClick={() => {
-        if (item.type === "file" && item.documentUrl) {
+        if (item.type === "folder") {
+          handleOpenFolder(item);
+        } else if (item.documentUrl) {
           setPreviewUrl(item.documentUrl);
           setIsPreviewOpen(true);
         }
@@ -677,7 +791,13 @@ export default function CompanyAuditPage() {
 
           <div className="flex items-center gap-2 flex-wrap">
             {/* View Mode Controls */}
+              <Button size="sm" onClick={()=>{navigate(-1)}} className="text-xs sm:text-sm">
+              <MoveLeft className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+              Back
+            </Button>
             <div className="flex rounded-lg border border-gray-200 bg-gray-50 p-0.5">
+             
+             
               <button
                 className={`rounded-md p-1.5 text-xs transition-colors ${
                   viewMode === "grid" ? "bg-white shadow-sm text-gray-900" : "text-gray-400"
@@ -697,6 +817,29 @@ export default function CompanyAuditPage() {
                 ≡
               </button>
             </div>
+
+            {clipboard && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handlePaste}
+                      disabled={isPasting}
+                      className="text-xs sm:text-sm"
+                    >
+                      <ClipboardPaste className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                      {isPasting ? "Pasting..." : "Paste"}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {clipboard.mode === "copy" ? "Paste a copy of the clipped item" : "Move the clipped item"} into{" "}
+                    {currentFolderId ? "this folder" : "home"}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
 
             <Button
               variant="outline"
@@ -731,7 +874,14 @@ export default function CompanyAuditPage() {
       </div>
 
       {/* ── Content Body ── */}
-      <div className="flex-1  py-4 sm:py-6">
+      <div
+        className="flex-1  py-4 sm:py-6"
+        onContextMenu={(e) => {
+          if (!clipboard) return;
+          e.preventDefault();
+          setContextMenu({ x: e.clientX, y: e.clientY });
+        }}
+      >
         {isLoading ? (
           <div className="flex items-center justify-center py-32">
             <BlinkingDots color="bg-theme"/>
@@ -766,6 +916,40 @@ export default function CompanyAuditPage() {
           </div>
         )}
       </div>
+
+      {/* ══════════════════════════════════════════════════════════
+          RIGHT-CLICK PASTE MENU
+      ══════════════════════════════════════════════════════════ */}
+      {contextMenu && clipboard && (
+        <div
+          className="fixed z-[9999] min-w-[180px] rounded-md border border-gray-200 bg-white p-1 shadow-lg"
+          style={{
+            top: Math.min(contextMenu.y, window.innerHeight - 120),
+            left: Math.min(contextMenu.x, window.innerWidth - 200),
+          }}
+        >
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  disabled={isPasting}
+                  className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+                  onClick={handlePaste}
+                >
+                  <ClipboardPaste className="h-4 w-4" />
+                  {isPasting ? "Pasting..." : "Paste"}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                {clipboard.mode === "copy"
+                  ? "Paste a copy into this folder"
+                  : "Move the item into this folder"}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+      )}
 
       {/* ══════════════════════════════════════════════════════════
           CREATE FOLDER DIALOG
