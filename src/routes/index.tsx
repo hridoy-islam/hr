@@ -119,6 +119,8 @@ import BatchPayrollDetails from '@/pages/company/Payroll/batch-payroll';
 import MissingAttendancePage from '@/pages/company/MissingAttendance';
 import UnscheduleAttendancePage from '@/pages/company/Attendance/UnscheduleAttendance';
 import MissingAttendanceCalendarPage from '@/pages/company/MissingAttendance/MissingShiftCalendar';
+import JobBoardPage from '@/pages/company/jobBoard';
+import JobBoardDetailsPage from '@/pages/company/jobBoard/jobBoardDetails/JobBoardDetailsPage';
 import OfficeMeetingPage from '@/pages/company/officeMeeting';
 import MeetingDetailsPage from '@/pages/company/officeMeeting/meetingDetails/MeetingDetailsPage';
 import StaffMeetingPage from '@/pages/staff/Meeting';
@@ -387,6 +389,8 @@ export default function AppRouter() {
         { path: 'company-policy/:pid', element: <PolicyDetails /> },
         { path: 'health-and-safety', element: <HealthAndSafetyPage /> },
         { path: 'health-and-safety/:hid', element: <HealthAndSafetyDetails /> },
+        { path: 'job-board', element: <JobBoardPage /> },
+        { path: 'job-board/:jid', element: <JobBoardDetailsPage /> },
       ]
     }
   ];

@@ -313,6 +313,12 @@ const navItems = [
     badgeKey: 'meeting'
   },
   {
+    icon: ClipboardList,
+    label: 'Job Board',
+    href: 'job-board',
+    roles: ['company', 'companyAdmin']
+  },
+  {
     icon: Heart,
     label: 'Health and Safety',
     href: 'health-and-safety',
