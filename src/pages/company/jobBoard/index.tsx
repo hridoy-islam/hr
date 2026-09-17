@@ -346,7 +346,7 @@ export default function JobBoardPage() {
           <BlinkingDots size="large" color="bg-theme" />
         </div>
       ) : jobBoards.length === 0 ? (
-        <div className="flex min-h-[320px] flex-col items-center justify-center rounded-sm border-2 border-theme/15 bg-white px-6 py-14 text-center">
+        <div className="flex min-h-[320px] flex-col items-center justify-center rounded-sm border-2 border-gray-200 bg-white px-6 py-14 text-center">
           <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-sm bg-theme/10">
             <ClipboardList className="h-7 w-7 text-theme" />
           </div>
