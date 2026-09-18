@@ -13,14 +13,17 @@ import {
   Download,
   Pencil,
   Plus,
-  RotateCcw,
   Trash2,
   Upload,
   UserPlus,
   Users2,
   X,
-  CheckCircle2
+  CheckCircle2,
+  Clock,
+  Search,
+  Eye
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { z } from 'zod';
@@ -30,6 +33,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Dialog,
   DialogContent,
@@ -52,7 +56,7 @@ import { BlinkingDots } from '@/components/shared/blinking-dots';
 import axiosInstance from '@/lib/axios';
 import moment from '@/lib/moment-setup';
 import { cn } from '@/lib/utils';
-import { employeeInitials, employeeName } from '..';
+import { employeeName } from '..';
 
 const taskSchema = z.object({
   taskName: z
@@ -159,6 +163,9 @@ export default function JobBoardDetailsPage() {
   >([]);
   const [isUploading, setIsUploading] = useState(false);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  // Worked by is editable from the task dialog once the task is completed
+  const [editDoneByIds, setEditDoneByIds] = useState<string[]>([]);
+  const [editDoneBySearch, setEditDoneBySearch] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Employee assignment
@@ -180,6 +187,15 @@ export default function JobBoardDetailsPage() {
   // Who completed the task - asked for when a task is marked as done
   const [doneByIds, setDoneByIds] = useState<string[]>([]);
   const [doneByError, setDoneByError] = useState('');
+  const [doneBySearch, setDoneBySearch] = useState('');
+
+  // Full task details
+  const [viewingTask, setViewingTask] = useState<TaskRecord | null>(null);
+
+  // Day list scrolling - the list opens on today, not on the 1st
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const dayRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const scrolledRangeRef = useRef('');
 
   const fetchJobBoard = async () => {
     try {
@@ -249,13 +265,78 @@ export default function JobBoardDetailsPage() {
       groups.set(key, [...(groups.get(key) || []), task]);
     });
 
-    // Today's group leads, the remaining days follow newest first
-    return Array.from(groups.entries()).sort(([a], [b]) => {
-      if (a === todayKey) return -1;
-      if (b === todayKey) return 1;
-      return a < b ? 1 : -1;
+    // Every day of the selected range gets its own row, so the whole month
+    // is listed even on the days that carry no task
+    const days = new Map<string, TaskRecord[]>();
+
+    if (fromDate && toDate) {
+      const cursor = new Date(
+        fromDate.getFullYear(),
+        fromDate.getMonth(),
+        fromDate.getDate()
+      );
+      const last = new Date(
+        toDate.getFullYear(),
+        toDate.getMonth(),
+        toDate.getDate()
+      );
+
+      while (cursor <= last && days.size < 400) {
+        const key = toApiDate(cursor);
+        days.set(key, groups.get(key) || []);
+        cursor.setDate(cursor.getDate() + 1);
+      }
+    }
+
+    // A task landing outside the range still needs a day of its own
+    groups.forEach((dayTasks, key) => {
+      if (!days.has(key)) days.set(key, dayTasks);
     });
-  }, [tasks, todayKey]);
+
+    // Oldest day first, so the month reads top to bottom
+    return Array.from(days.entries()).sort(([a], [b]) => (a < b ? -1 : 1));
+  }, [tasks, fromDate, toDate]);
+
+  const rangeKey = `${fromDate ? toApiDate(fromDate) : ''}|${
+    toDate ? toApiDate(toDate) : ''
+  }`;
+
+  // Opens the list on the current day - only once per range, so a refetch
+  // after saving does not yank the user back
+  useEffect(() => {
+    if (loading || groupedTasks.length === 0) return;
+    if (scrolledRangeRef.current === rangeKey) return;
+
+    const viewport = scrollAreaRef.current?.querySelector<HTMLElement>(
+      '[data-radix-scroll-area-viewport]'
+    );
+    if (!viewport) return;
+
+    const frame = requestAnimationFrame(() => {
+      const target = dayRefs.current[todayKey];
+
+      if (target) {
+        const offset =
+          target.getBoundingClientRect().top -
+          viewport.getBoundingClientRect().top +
+          viewport.scrollTop;
+        viewport.scrollTop = Math.max(offset - 8, 0);
+      } else {
+        viewport.scrollTop = 0;
+      }
+
+      scrolledRangeRef.current = rangeKey;
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [loading, groupedTasks, rangeKey, todayKey]);
+
+  // Keeps the open details dialog in step with the list after an update
+  useEffect(() => {
+    setViewingTask((current) =>
+      current ? tasks.find((task) => task._id === current._id) || null : null
+    );
+  }, [tasks]);
 
   const resetTaskForm = () => {
     setEditingTask(null);
@@ -264,6 +345,8 @@ export default function JobBoardDetailsPage() {
     setNote('');
     setUploadedFiles([]);
     setFormErrors({});
+    setEditDoneByIds([]);
+    setEditDoneBySearch('');
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -279,6 +362,8 @@ export default function JobBoardDetailsPage() {
       }))
     );
     setFormErrors({});
+    setEditDoneByIds((task.taskDoneBy || []).map((emp) => emp._id));
+    setEditDoneBySearch('');
     setTaskDialogOpen(true);
   };
 
@@ -346,6 +431,14 @@ export default function JobBoardDetailsPage() {
       return;
     }
 
+    // A completed task must keep at least one person on its worked-by list
+    if (editingTask?.isCompleted && editDoneByIds.length === 0) {
+      setFormErrors({
+        taskDoneBy: 'At least one person is required'
+      });
+      return;
+    }
+
     // Keep the chosen day intact once axios serialises the date
     const picked = validation.data.taskDate;
     const utcSafeDate = new Date(
@@ -356,7 +449,9 @@ export default function JobBoardDetailsPage() {
       ...validation.data,
       taskDate: utcSafeDate,
       companyId: id,
-      jobBoardId: jid
+      jobBoardId: jid,
+      // A completed task can have its worked-by list corrected from here
+      ...(editingTask?.isCompleted ? { taskDoneBy: editDoneByIds } : {})
     };
 
     try {
@@ -417,9 +512,7 @@ export default function JobBoardDetailsPage() {
             : 'Task marked as completed',
           className: 'bg-theme border-none text-white'
         });
-        setTaskToToggle(null);
-        setDoneByIds([]);
-        setDoneByError('');
+        closeDoneDialog();
         fetchTasks();
       }
     } catch (error: any) {
@@ -565,220 +658,272 @@ export default function JobBoardDetailsPage() {
   const openDoneDialog = (task: TaskRecord) => {
     setDoneByIds((task.taskDoneBy || []).map((emp) => emp._id));
     setDoneByError('');
+    setDoneBySearch('');
     setTaskToToggle(task);
   };
 
-  const renderPerson = (employee: EmployeeRecord, muted = false) => (
+  const closeDoneDialog = () => {
+    setTaskToToggle(null);
+    setDoneByIds([]);
+    setDoneByError('');
+    setDoneBySearch('');
+  };
+
+  // Narrows the employee list by a search box
+  const searchEmployees = (term: string) =>
+    (employees || []).filter((employee) => {
+      const needle = term.trim().toLowerCase();
+      if (!needle) return true;
+      return (
+        employeeName(employee).toLowerCase().includes(needle) ||
+        (employee.email || '').toLowerCase().includes(needle)
+      );
+    });
+
+  const doneByEmployees = searchEmployees(doneBySearch);
+  const editDoneByEmployees = searchEmployees(editDoneBySearch);
+
+  const renderDetail = (label: string, value: React.ReactNode) => (
+    <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-[0_1px_2px_rgba(16,24,40,0.05)] transition-colors hover:border-theme/40">
+      <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-black">
+        {label}
+      </p>
+      <div className="mt-1.5 text-sm font-semibold leading-snug text-black">
+        {value}
+      </div>
+    </div>
+  );
+
+  // Small labelled divider heading each block of the details dialog
+  const renderSectionLabel = (label: string, Icon: LucideIcon) => (
+    <div className="flex items-center gap-2">
+      <Icon className="h-3.5 w-3.5 text-theme" />
+      <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-black">
+        {label}
+      </p>
+      <span className="h-px flex-1 bg-gray-200" />
+    </div>
+  );
+
+  const renderPersonChip = (employee: EmployeeRecord) => (
     <span
       key={employee._id}
-      className="inline-flex items-center gap-2 rounded-lg bg-black/[0.03] py-1 pl-1 pr-3"
+      className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white py-1 px-2"
     >
-      <span
-        className={cn(
-          'flex h-6 w-6 items-center justify-center rounded-lg text-[10px] font-extrabold',
-          muted ? 'bg-black text-white' : 'bg-theme text-white'
-        )}
-      >
+      {/* <span className="flex h-6 w-6 items-center justify-center rounded-full bg-theme/10 text-[10px] font-bold uppercase text-theme">
         {employeeInitials(employee)}
-      </span>
-      <span className="flex flex-col leading-none">
-        <span className="text-[11px] font-bold text-black">
-          {employeeName(employee)}
-        </span>
-        {employee.email && (
-          <span className="mt-0.5 text-[10px] font-medium text-black">
-            {employee.email}
-          </span>
-        )}
+      </span> */}
+      <span className="text-xs font-semibold text-black">
+        {employeeName(employee)}
       </span>
     </span>
   );
 
-const renderTaskCard = (task: TaskRecord) => (
-  <div
-    key={task._id}
-    className={cn(
-      'group relative overflow-hidden rounded-xl bg-white',
-      'border border-gray-200/80',
-      'shadow-sm shadow-gray-100/50',
-      'transition-all duration-200 ease-out',
-      'hover:border-gray-300 hover:shadow-md hover:shadow-gray-200/60',
-      task.isCompleted && 'opacity-80 hover:opacity-100'
-    )}
-  >
-    {/* Accent edge */}
+  const renderPerson = (employee: EmployeeRecord, muted = false) => (
     <span
+      key={employee._id}
+      className="inline-flex items-center gap-2 rounded-lg"
+    >
+      
+      <span className="flex flex-col leading-none">
+        <span className="text-sm font-medium text-black">
+          {employeeName(employee)}
+        </span>
+       
+      </span>
+    </span>
+  );
+
+  const renderTaskCard = (task: TaskRecord) => (
+    <div
+      key={task._id}
       className={cn(
-        'absolute inset-y-0 left-0 w-[3px] transition-colors duration-300',
-        task.isCompleted ? 'bg-emerald-400/60' : 'bg-theme'
+        'group relative overflow-hidden rounded-xl bg-white pb-0',
+        'transition-all duration-200 ease-out',
+        'w-full'
       )}
-    />
+    >
+      {/* Accent edge */}
+      {/* <span
+        className={cn(
+          'absolute inset-y-0 left-0 w-[3px] transition-colors duration-300',
+          task.isCompleted ? 'bg-emerald-400/60' : 'bg-theme'
+        )}
+      /> */}
 
-    <div className="flex flex-col gap-3 py-3.5 pl-5 pr-3.5 sm:flex-row sm:items-start">
-      {/* Main content */}
-      <div className="min-w-0 flex-1">
-        {/* Header row */}
-        <div className="flex flex-wrap items-center gap-2">
-          <h4
-            className={cn(
-              'text-[13px] font-semibold leading-snug tracking-tight text-black',
-              'transition-all duration-200',
-              task.isCompleted && 'line-through decoration-black/40 decoration-[1.5px]'
-            )}
-          >
-            {task.taskName}
-          </h4>
-
-          {/* Status badge */}
-          {task.isCompleted && (
-            <span
+      <div className="flex flex-col gap-3 py-1 pl-2 pr-3.5 sm:flex-row sm:items-center sm:justify-between w-full">
+        {/* Main content */}
+        <div
+          className="min-w-0 cursor-pointer"
+          role="button"
+          tabIndex={0}
+          title="View task details"
+          onClick={() => setViewingTask(task)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              setViewingTask(task);
+            }
+          }}
+        >
+          {/* Header row */}
+          <div className="flex flex-wrap items-center gap-2">
+            <h4
               className={cn(
-                'inline-flex items-center gap-1 rounded-md px-1.5 py-0.5',
-                'bg-emerald-50 text-[10px] font-semibold uppercase tracking-wide text-black',
-                'ring-1 ring-inset ring-emerald-200/60'
+                'text-md font-semibold leading-snug tracking-tight text-black',
+                'transition-all duration-200'
               )}
             >
-              <CheckCircle2 className="h-3 w-3" />
-              Done
-            </span>
-          )}
-        </div>
+              {task.taskName}
+            </h4>
 
-        {/* Note */}
-        {task.note && (
-          <p className="mt-1.5 text-[12px] font-normal leading-relaxed text-black">
-            {task.note}
-          </p>
-        )}
-
-        {/* Metadata row */}
-        {Boolean(
-          task.taskDoneBy?.length ||
-          (task.isCompleted && task.completedBy) ||
-          task.documents?.length
-        ) && (
-          <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2.5">
-            {/* Done by */}
-            {Boolean(task.taskDoneBy?.length) && (
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-black">
-                  Done by
-                </span>
-                <div className="flex items-center gap-1">
-                  {task.taskDoneBy?.map((employee) => renderPerson(employee))}
-                </div>
-              </div>
-            )}
-
-            {/* Completed by */}
-            {task.isCompleted && task.completedBy && (
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-black">
-                  Completed by
-                </span>
-                <div className="flex items-center gap-1">
-                  {renderPerson(task.completedBy, true)}
-                </div>
-              </div>
-            )}
-
-            {/* Documents */}
-            {Boolean(task.documents?.length) && (
-              <div className="flex flex-wrap items-center gap-1.5">
-                {task.documents?.map((doc, index) => (
-                  <button
-                    key={`${task._id}-doc-${index}`}
-                    type="button"
-                    title={docFileName(doc)}
-                    onClick={() => openDocument(doc)}
-                    className={cn(
-                      'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1',
-                      'bg-gray-50 text-[11px] font-medium text-black',
-                      'ring-1 ring-inset ring-gray-200/80',
-                      'transition-all duration-150',
-                      'hover:bg-theme hover:text-white hover:ring-theme',
-                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme focus-visible:ring-offset-1'
-                    )}
-                  >
-                    <Paperclip className="h-3 w-3" />
-                    <span>Doc {index + 1}</span>
-                  </button>
-                ))}
-              </div>
-            )}
+            {/* Status badge */}
           </div>
-        )}
-      </div>
 
-      {/* Actions */}
-      <div
-        className={cn(
-          'flex shrink-0 items-center gap-1',
-          'sm:opacity-0 sm:transition-opacity sm:duration-200',
-          'sm:group-hover:opacity-100 sm:focus-within:opacity-100'
-        )}
-      >
-        {task.isCompleted ? (
+          {/* Note */}
+          {/* {task.note && (
+            <p className="mt-1.5 text-[12px] font-normal leading-relaxed text-black">
+              {task.note}
+            </p>
+          )} */}
+
+          {/* Metadata row */}
+          {/* {Boolean(
+            task.taskDoneBy?.length ||
+              (task.isCompleted && task.completedBy) ||
+              task.documents?.length
+          ) && (
+            <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2.5">
+              {Boolean(task.taskDoneBy?.length) && (
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-black">
+                    Done by
+                  </span>
+                  <div className="flex items-center gap-1">
+                    {task.taskDoneBy?.map((employee) => renderPerson(employee))}
+                  </div>
+                </div>
+              )}
+
+              {task.isCompleted && task.completedBy && (
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-black">
+                    Completed by
+                  </span>
+                  <div className="flex items-center gap-1">
+                    {renderPerson(task.completedBy, true)}
+                  </div>
+                </div>
+              )}
+
+              {Boolean(task.documents?.length) && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {task.documents?.map((doc, index) => (
+                    <button
+                      key={`${task._id}-doc-${index}`}
+                      type="button"
+                      title={docFileName(doc)}
+                      onClick={() => openDocument(doc)}
+                      className={cn(
+                        'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1',
+                        'bg-gray-50 text-[11px] font-medium text-black',
+                        'ring-1 ring-inset ring-gray-200/80',
+                        'transition-all duration-150',
+                        'hover:bg-theme hover:text-white hover:ring-theme',
+                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme focus-visible:ring-offset-1'
+                      )}
+                    >
+                      <Paperclip className="h-3 w-3" />
+                      <span>Doc {index + 1}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )} */}
+        </div>
+        
+
+             
+        {/* Actions */}
+        <div className={cn('flex shrink-0 items-center gap-1')}>
+          <div
+            className="flex items-center gap-2 mr-4 cursor-pointer"
+            title="View task details"
+            onClick={() => setViewingTask(task)}
+          >
+          <span className="text-sm font-medium  tracking-wider text-black">
+            Created At
+          </span>
+          <div className="flex items-center gap-1 text-sm font-medium">
+            {moment(task.createdAt).format('DD MMM YYYY')}
+          </div>
+        </div>
+        {Boolean(task.taskDoneBy?.length) && (
+                <div
+                  className="flex items-center gap-2  mr-4 cursor-pointer"
+                  title="View task details"
+                  onClick={() => setViewingTask(task)}
+                >
+                  <span className="text-sm font-medium  tracking-wider text-black">
+                    Worked by
+                  </span>
+                  <div className="flex items-center gap-1">
+                    {task.taskDoneBy?.map((employee) => renderPerson(employee))}
+                  </div>
+                </div>
+              )}
+
+          {!task.isCompleted &&  (
+            <Button
+              size="sm"
+              className={cn(
+                'h-8 gap-1.5 rounded-lg px-3',
+                'bg-theme text-[11px] font-semibold text-white',
+                'shadow-sm shadow-theme/20',
+                'transition-all duration-150',
+                'hover:bg-theme/90 hover:shadow-md hover:shadow-theme/25',
+                'focus-visible:ring-2 focus-visible:ring-theme focus-visible:ring-offset-1',
+                'active:scale-[0.97]'
+              )}
+              onClick={() => openDoneDialog(task)}
+            >
+              <Check className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Complete</span>
+            </Button>
+          )}
+
+          
+
           <Button
             size="sm"
             variant="outline"
-          
-            onClick={() => openDoneDialog(task)}
+            title="View task details"
+            onClick={() => setViewingTask(task)}
           >
-            <RotateCcw className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Reopen</span>
+            <Eye className="h-4 w-4 mr-1 " /> View
           </Button>
-        ) : (
           <Button
             size="sm"
-            className={cn(
-              'h-8 gap-1.5 rounded-lg px-3',
-              'bg-theme text-[11px] font-semibold text-white',
-              'shadow-sm shadow-theme/20',
-              'transition-all duration-150',
-              'hover:bg-theme/90 hover:shadow-md hover:shadow-theme/25',
-              'focus-visible:ring-2 focus-visible:ring-theme focus-visible:ring-offset-1',
-              'active:scale-[0.97]'
-            )}
-            onClick={() => openDoneDialog(task)}
+            title="Edit task"
+            onClick={() => openEditTask(task)}
           >
-            <Check className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Complete</span>
+            <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
           </Button>
-        )}
 
-        <Button
-          size="icon"
-          variant="ghost"
-          className={cn(
-            'h-8 w-8 rounded-lg',
-            'text-black transition-all duration-150',
-          
-          )}
-          title="Edit task"
-          onClick={() => openEditTask(task)}
-        >
-          <Pencil className="h-3.5 w-3.5" />
-        </Button>
-
-        <Button
-          size="icon"
-          variant="ghost"
-          className={cn(
-            'h-8 w-8 rounded-lg',
-            'text-black transition-all duration-150',
-            'hover:bg-red-50 hover:text-red-500',
-            'focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-1'
-          )}
-          title="Delete task"
-          onClick={() => setTaskToDelete(task)}
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </Button>
+          <Button
+            size="sm"
+            variant="destructive"
+            title="Delete task"
+            onClick={() => setTaskToDelete(task)}
+          >
+            <Trash2 className="mr-2 h-3.5 w-3.5" />
+            Delete
+          </Button>
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
 
   if (loading && !jobBoard) {
     return (
@@ -789,20 +934,11 @@ const renderTaskCard = (task: TaskRecord) => (
   }
 
   return (
-    <div className="space-y-5 rounded-md bg-white p-5 shadow-sm">
+    <div className="space-y-5 rounded-md bg-white p-5 shadow-sm h-[97vh]">
       {/* Header */}
       <div>
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div className="space-y-2">
-            <Button
-              size="sm"
-              className="mr-2 gap-2 "
-              onClick={() => navigate(`/company/${id}/job-board`)}
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Back 
-            </Button>
-
             <h2 className="flex items-center gap-2 text-2xl font-bold text-black">
               <ClipboardList className="h-6 w-6" />
               {jobBoard?.title}
@@ -812,30 +948,64 @@ const renderTaskCard = (task: TaskRecord) => (
             )}
           </div>
 
-          <Button
-            className="bg-theme text-white hover:bg-theme/90"
-            size="sm"
-            onClick={() => {
-              resetTaskForm();
-              setTaskDialogOpen(true);
-            }}
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Add Task
-          </Button>
-        </div>
+          {/* Date range filter */}
+          <div className="">
+            <div className="flex flex-col items-center gap-2">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  title="Previous month"
+                  className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-black text-theme transition-all hover:border-theme hover:bg-theme hover:text-white focus:outline-none focus-visible:border-theme"
+                  onClick={() => shiftMonth(-1)}
+                >
+                  <ChevronLeft className="h-6 w-6" strokeWidth={4} />
+                </button>
 
-        {/* Assigned employees */}
-        <div className="mt-5 border-t border-gray-200 pt-4">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 text-sm font-semibold text-black">
-              <Users2 className="h-4 w-4" />
-              Assigned Employees ({jobBoard?.employeeId?.length || 0})
+                <div className="relative">
+                  <CalendarDays className="pointer-events-none absolute left-4 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-theme" />
+                  <DatePicker
+                    selectsRange
+                    startDate={fromDate}
+                    endDate={toDate}
+                    onChange={(dates) => {
+                      const [start, end] = dates as [Date | null, Date | null];
+                      setFromDate(start);
+                      setToDate(end);
+                    }}
+                    showYearDropdown
+                    showMonthDropdown
+                    dropdownMode='select'
+                    dateFormat="dd MMM yyyy"
+                    placeholderText="Select date range"
+                    className="h-10 w-full rounded-full border-2 border-black pl-11 pr-4 text-center text-sm font-medium text-black transition-colors focus:border-theme focus:outline-none sm:w-[300px]"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  title="Next month"
+                  className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-black text-theme transition-all hover:border-theme hover:bg-theme hover:text-white focus:outline-none focus-visible:border-theme"
+                  onClick={() => shiftMonth(1)}
+                >
+                  <ChevronRight className="h-6 w-6" strokeWidth={4}/>
+                </button>
+              </div>
             </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              size="sm"
+              className=" gap-2 "
+              onClick={() => navigate(`/company/${id}/job-board`)}
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </Button>
 
             <Button
               size="sm"
-              className="gap-1.5"
+              className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700 "
               onClick={() => {
                 setAssignIds([]);
                 setAssignSearch('');
@@ -845,88 +1015,61 @@ const renderTaskCard = (task: TaskRecord) => (
               <UserPlus className="h-4 w-4" />
               Add Employee
             </Button>
-          </div>
 
-          <div className="flex flex-wrap gap-2">
-            {jobBoard?.employeeId?.length ? (
-              jobBoard.employeeId.map((employee) => (
-                <div
-                  key={employee._id}
-                  className="group/emp flex items-center gap-2 rounded-full border border-gray-200 py-1 pl-1 pr-1.5 transition-colors hover:border-theme"
-                >
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-theme text-[10px] font-bold text-white">
-                    {employeeInitials(employee)}
-                  </span>
-                  <div className="flex flex-col leading-tight">
-                    <span className="text-xs font-semibold text-black">
-                      {employeeName(employee)}
-                    </span>
-                    <span className="text-[10px] text-black">
-                      {employee.email || '-'}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    title="Remove employee"
-                    className="ml-1 rounded-full p-1 text-black transition-colors hover:bg-red-50 hover:text-red-600"
-                    onClick={() => setEmployeeToRemove(employee)}
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-              ))
-            ) : (
-              <span className="text-xs italic text-black">
-                No employee assigned yet.
-              </span>
-            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                resetTaskForm();
+                setTaskDialogOpen(true);
+              }}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Add Task
+            </Button>
           </div>
         </div>
-      </div>
 
-      {/* Date range filter */}
-      <div className="border-t border-gray-200 pt-5">
-        <div className="flex flex-col items-center gap-2">
-         
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              title="Previous month"
-              className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-gray-200 text-theme transition-all hover:border-theme hover:bg-theme hover:text-white focus:outline-none focus-visible:border-theme"
-              onClick={() => shiftMonth(-1)}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-
-            <div className="relative">
-              <CalendarDays className="pointer-events-none absolute left-4 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-theme" />
-              <DatePicker
-                selectsRange
-                startDate={fromDate}
-                endDate={toDate}
-                onChange={(dates) => {
-                  const [start, end] = dates as [Date | null, Date | null];
-                  setFromDate(start);
-                  setToDate(end);
-                }}
-                dateFormat="dd MMM yyyy"
-                placeholderText="Select date range"
-                className="h-10 w-full rounded-full border-2 border-gray-200 pl-11 pr-4 text-center text-sm font-medium text-black transition-colors focus:border-theme focus:outline-none sm:w-[300px]"
-              />
+        {/* Assigned employees */}
+        <div className="mt-2">
+          <div className="mb-2 flex items-center justify-start gap-2">
+            <div className="flex items-center gap-2 text-sm font-semibold text-black">
+              <Users2 className="h-4 w-4" />
+              Employee ({jobBoard?.employeeId?.length || 0})
             </div>
 
-            <button
-              type="button"
-              title="Next month"
-              className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-gray-200 text-theme transition-all hover:border-theme hover:bg-theme hover:text-white focus:outline-none focus-visible:border-theme"
-              onClick={() => shiftMonth(1)}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
+            <div className="flex flex-wrap gap-2">
+              {jobBoard?.employeeId?.length ? (
+                jobBoard.employeeId.map((employee) => (
+                  <div
+                    key={employee._id}
+                    className="group/emp flex items-center gap-2 rounded-full border border-black py-1 pl-1 pr-1.5 transition-colors hover:border-theme"
+                  >
+                    <div className="ml-2 flex flex-col leading-tight">
+                      <span className="text-xs font-semibold text-black">
+                        {employeeName(employee)}
+                      </span>
+                      {/* <span className="text-[10px] text-black">
+                      {employee.email || '-'}
+                    </span> */}
+                    </div>
+                    <button
+                      type="button"
+                      title="Remove employee"
+                      className="ml-1 rounded-full p-1 text-black transition-colors hover:bg-red-50 hover:text-red-600"
+                      onClick={() => setEmployeeToRemove(employee)}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <span className="text-xs italic text-black">
+                  No employee assigned yet.
+                </span>
+              )}
+            </div>
           </div>
-
-         
         </div>
       </div>
 
@@ -950,53 +1093,57 @@ const renderTaskCard = (task: TaskRecord) => (
             </p>
           </div>
         ) : (
-          <div className="relative space-y-8 pl-7">
-            {/* Timeline rail */}
-            <span className="absolute bottom-2 left-[7px] top-2 w-px bg-gray-200" />
+          <ScrollArea
+            ref={scrollAreaRef}
+            className="h-[calc(100vh-170px)] min-h-[450px] pr-3"
+          >
+            <div className="relative space-y-2 ">
+              {groupedTasks.map(([dateKey, dateTasks]) => {
+                const isToday = dateKey === todayKey;
+                const date = moment(dateKey, 'YYYY-MM-DD');
 
-            {groupedTasks.map(([dateKey, dateTasks]) => {
-              const isToday = dateKey === todayKey;
-              const date = moment(dateKey, 'YYYY-MM-DD');
+                return (
+                  <div
+                    key={dateKey}
+                    ref={(node) => {
+                      dayRefs.current[dateKey] = node;
+                    }}
+                    className={cn('relative space-y-3',)}
+                  >
+                    <div className={cn('flex flex-wrap items-center gap-2 rounded-lg bg-gray-200 p-2', isToday ? 'bg-theme text-white' : 'border-gray-200')}>
+                      <span className="text-sm font-medium tracking-[0.12em] ">
+                        {date.format('DD MMM YYYY')}
+                      </span>
 
-              return (
-                <div key={dateKey} className="relative space-y-3">
-                  {/* Day marker */}
-                  <span
-                    className={cn(
-                      'absolute -left-7 top-1 h-3.5 w-3.5 rounded-full border-2 bg-white',
-                      isToday ? 'border-theme bg-theme' : 'border-gray-200'
-                    )}
-                  />
+                      <span
+                        className={cn(
+                          'rounded-full px-2.5 py-0.5 text-sm font-medium  tracking-[0.12em]',
+                         
+                        )}
+                      >
+                        {isToday ? 'Today' : date.format('dddd')}
+                      </span>
 
-                  <div className="flex flex-wrap items-center gap-3">
-                    <span className="text-xs font-extrabold uppercase tracking-[0.12em] text-black">
-                      {date.format('DD MMM YYYY')}
-                    </span>
+                      <span className="text-sm font-semibold ">
+                        {dateTasks.length}{' '}
+                        {dateTasks.length === 1 ? 'task' : 'tasks'}
+                      </span>
+                    </div>
 
-                    <span
-                      className={cn(
-                        'rounded-full px-2.5 py-0.5 text-[9px] font-extrabold uppercase tracking-[0.12em]',
-                        isToday
-                          ? 'bg-theme text-white'
-                          : 'bg-black/[0.04] text-black'
+                    <div className="space-y-1">
+                      {dateTasks.length === 0 ? (
+                        <p className="px-2 pb-1 text-sm font-medium italic text-black">
+                          No task on this day
+                        </p>
+                      ) : (
+                        dateTasks.map((task) => renderTaskCard(task))
                       )}
-                    >
-                      {isToday ? 'Today' : date.format('dddd')}
-                    </span>
-
-                    <span className="text-[11px] font-bold text-black">
-                      {dateTasks.length}{' '}
-                      {dateTasks.length === 1 ? 'task' : 'tasks'}
-                    </span>
+                    </div>
                   </div>
-
-                  <div className="space-y-2.5">
-                    {dateTasks.map((task) => renderTaskCard(task))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          </ScrollArea>
         )}
       </div>
 
@@ -1049,7 +1196,7 @@ const renderTaskCard = (task: TaskRecord) => (
                   }}
                   dateFormat="dd-MM-yyyy"
                   placeholderText="Select date"
-                  wrapperClassName='w-full'
+                  wrapperClassName="w-full"
                   showMonthDropdown
                   showYearDropdown
                   dropdownMode="select"
@@ -1068,6 +1215,8 @@ const renderTaskCard = (task: TaskRecord) => (
               </div>
             </div>
 
+        
+
             <div className="space-y-2">
               <Label className="text-sm font-semibold text-black">Note</Label>
               <Textarea
@@ -1077,7 +1226,7 @@ const renderTaskCard = (task: TaskRecord) => (
                 className="min-h-[80px] resize-none"
               />
             </div>
-
+   
             <div className="space-y-2">
               <Label className="text-sm font-semibold text-black">
                 Documents
@@ -1133,6 +1282,85 @@ const renderTaskCard = (task: TaskRecord) => (
                 )}
               </div>
             </div>
+
+
+             {editingTask?.isCompleted && (
+              <div className="space-y-2">
+                <Label className="text-sm font-semibold text-black">
+                  Worked By*
+                </Label>
+
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-black" />
+                  <Input
+                    value={editDoneBySearch}
+                    onChange={(e) => setEditDoneBySearch(e.target.value)}
+                    placeholder="Search employee by name or email..."
+                    className="h-9 pl-9"
+                  />
+                </div>
+
+                {editDoneByIds.length > 0 && (
+                  <p className="text-[11px] font-semibold text-black">
+                    {editDoneByIds.length} selected
+                  </p>
+                )}
+
+                <div
+                  className={cn(
+                    'max-h-[180px] space-y-1 overflow-y-auto rounded-md border p-2',
+                    formErrors.taskDoneBy ? 'border-red-500' : 'border-gray-200'
+                  )}
+                >
+                  {(employees || []).length === 0 ? (
+                    <p className="p-2 text-sm italic text-black">
+                      No employee is assigned to this job board yet.
+                    </p>
+                  ) : editDoneByEmployees.length === 0 ? (
+                    <p className="p-2 text-sm italic text-black">
+                      No employee matches this search.
+                    </p>
+                  ) : (
+                    editDoneByEmployees.map((employee) => (
+                      <label
+                        key={employee._id}
+                        className="flex cursor-pointer items-center gap-3 rounded-sm p-2 transition-colors hover:bg-theme/5"
+                      >
+                        <Checkbox
+                          checked={editDoneByIds.includes(employee._id)}
+                          onCheckedChange={() => {
+                            setFormErrors((prev) => ({
+                              ...prev,
+                              taskDoneBy: ''
+                            }));
+                            setEditDoneByIds((prev) =>
+                              prev.includes(employee._id)
+                                ? prev.filter((item) => item !== employee._id)
+                                : [...prev, employee._id]
+                            );
+                          }}
+                        />
+
+                        <div className="flex flex-col">
+                          <span className="text-sm font-medium text-black">
+                            {employeeName(employee)}
+                          </span>
+                          <span className="text-[11px] text-black">
+                            {employee.email || '-'}
+                          </span>
+                        </div>
+                      </label>
+                    ))
+                  )}
+                </div>
+
+                {formErrors.taskDoneBy && (
+                  <p className="text-xs font-medium text-red-500">
+                    {formErrors.taskDoneBy}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           <DialogFooter className="gap-2 border-t border-gray-200 pt-4">
@@ -1262,11 +1490,7 @@ const renderTaskCard = (task: TaskRecord) => (
       <Dialog
         open={!!taskToToggle}
         onOpenChange={(open) => {
-          if (!open) {
-            setTaskToToggle(null);
-            setDoneByIds([]);
-            setDoneByError('');
-          }
+          if (!open) closeDoneDialog();
         }}
       >
         <DialogContent className="w-[95vw] max-w-lg">
@@ -1294,13 +1518,33 @@ const renderTaskCard = (task: TaskRecord) => (
                 . You can pick more than one person.
               </p>
 
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-black" />
+                <Input
+                  value={doneBySearch}
+                  onChange={(e) => setDoneBySearch(e.target.value)}
+                  placeholder="Search employee by name or email..."
+                  className="h-9 pl-9"
+                />
+              </div>
+
+              {doneByIds.length > 0 && (
+                <p className="text-[11px] font-semibold text-black">
+                  {doneByIds.length} selected
+                </p>
+              )}
+
               <div className="max-h-[260px] space-y-1 overflow-y-auto rounded-sm border border-gray-200 p-2">
-                {(jobBoard?.employeeId || []).length === 0 ? (
+                {(employees || []).length === 0 ? (
                   <p className="p-2 text-sm italic text-black">
                     No employee is assigned to this job board yet.
                   </p>
+                ) : doneByEmployees.length === 0 ? (
+                  <p className="p-2 text-sm italic text-black">
+                    No employee matches this search.
+                  </p>
                 ) : (
-                  (jobBoard?.employeeId || []).map((employee) => (
+                  doneByEmployees.map((employee) => (
                     <label
                       key={employee._id}
                       className="flex cursor-pointer items-center gap-3 rounded-sm p-2 transition-colors hover:bg-theme/5"
@@ -1316,7 +1560,7 @@ const renderTaskCard = (task: TaskRecord) => (
                           );
                         }}
                       />
-                     
+
                       <div className="flex flex-col">
                         <span className="text-sm font-medium text-black">
                           {employeeName(employee)}
@@ -1342,7 +1586,7 @@ const renderTaskCard = (task: TaskRecord) => (
             <Button
               variant="outline"
               disabled={isToggling}
-              onClick={() => setTaskToToggle(null)}
+              onClick={closeDoneDialog}
             >
               Cancel
             </Button>
@@ -1356,6 +1600,193 @@ const renderTaskCard = (task: TaskRecord) => (
                 : taskToToggle?.isCompleted
                   ? 'Reopen Task'
                   : 'Mark as Done'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* --- Task details --- */}
+      <Dialog
+        open={!!viewingTask}
+        onOpenChange={(open) => {
+          if (!open) setViewingTask(null);
+        }}
+      >
+        <DialogContent className="flex max-h-[88vh] min-h-[60vh] w-[95vw] max-w-2xl flex-col gap-0 overflow-hidden border border-gray-200 p-0 shadow-xl sm:rounded-2xl">
+          <DialogHeader className="shrink-0 space-y-0 border-b border-gray-200 bg-gradient-to-r from-theme/[0.07] via-white to-white px-6 py-4 pr-14 text-left">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="flex min-w-0 items-start gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-theme/10 text-theme">
+                  <ClipboardList className="h-5 w-5" />
+                </span>
+
+                <div className="min-w-0 space-y-1">
+                  <DialogTitle className="truncate text-lg font-bold leading-tight text-black">
+                    {viewingTask?.taskName}
+                  </DialogTitle>
+                  <p className="flex items-center gap-1.5 text-xs font-medium text-black">
+                    <CalendarDays className="h-3.5 w-3.5 text-theme" />
+                    {viewingTask
+                      ? moment(viewingTask.taskDate).format('dddd, DD MMM YYYY')
+                      : ''}
+                  </p>
+                </div>
+              </div>
+
+              <span
+                className={cn(
+                  'inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold shadow-sm ring-1 ring-inset',
+                  viewingTask?.isCompleted
+                    ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
+                    : 'bg-amber-50 text-amber-700 ring-amber-200'
+                )}
+              >
+                {viewingTask?.isCompleted ? (
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                ) : (
+                  <Clock className="h-3.5 w-3.5" />
+                )}
+                {viewingTask?.isCompleted ? 'Completed' : 'Pending'}
+              </span>
+            </div>
+          </DialogHeader>
+
+          {/* min-h-0 lets this flex child shrink, so a long task scrolls
+              here instead of pushing the footer out of the dialog */}
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+            <div className="space-y-6 px-6 py-5">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {renderDetail(
+                  'Task Date',
+                  viewingTask
+                    ? moment(viewingTask.taskDate).format('DD MMM YYYY')
+                    : '-'
+                )}
+                {renderDetail(
+                  'Created At',
+                  viewingTask
+                    ? moment(viewingTask.createdAt).format(
+                        'DD MMM YYYY'
+                      )
+                    : '-'
+                )}
+                {viewingTask?.isCompleted &&
+                  renderDetail(
+                    'Completed At',
+                    viewingTask?.completedAt
+                      ? moment(viewingTask.completedAt).format(
+                          'DD MMM YYYY'
+                        )
+                      : '-'
+                  )}
+                {viewingTask?.isCompleted &&
+                  renderDetail(
+                    'Completed By',
+                    viewingTask?.completedBy
+                      ? employeeName(viewingTask.completedBy)
+                      : '-'
+                  )}
+              </div>
+
+              {/* Nobody is recorded until the task is signed off */}
+              {viewingTask?.isCompleted && (
+                <div className="space-y-3">
+                  {renderSectionLabel('Worked By', Users2)}
+
+                  {viewingTask?.taskDoneBy?.length ? (
+                    <div className="flex flex-wrap gap-2">
+                      {viewingTask.taskDoneBy.map((employee) =>
+                        renderPersonChip(employee)
+                      )}
+                    </div>
+                  ) : (
+                    <p className="rounded-xl border border-dashed border-gray-200 px-4 py-3 text-sm italic text-black">
+                      Nobody has been recorded on this task yet.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <div className="space-y-3">
+                {renderSectionLabel('Note', FileText)}
+
+                {viewingTask?.note ? (
+                  <p className="whitespace-pre-wrap rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm leading-relaxed text-black">
+                    {viewingTask.note}
+                  </p>
+                ) : (
+                  <p className="rounded-xl border border-dashed border-gray-200 px-4 py-3 text-sm italic text-black">
+                    No note on this task.
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-3">
+                {renderSectionLabel(
+                  'Documents (' + (viewingTask?.documents?.length || 0) + ')',
+                  Paperclip
+                )}
+
+                {viewingTask?.documents?.length ? (
+                  <div className="flex flex-wrap gap-2">
+                    {viewingTask.documents.map((doc, index) => (
+                      <button
+                        key={viewingTask._id + '-view-doc-' + index}
+                        type="button"
+                        title={docFileName(doc)}
+                        onClick={() => openDocument(doc)}
+                        className={cn(
+                          'inline-flex items-center gap-1.5 rounded-lg px-3 py-2',
+                          'bg-gray-50 text-xs font-semibold text-black',
+                          'ring-1 ring-inset ring-gray-200',
+                          'transition-all duration-150',
+                          'hover:bg-theme hover:text-white hover:ring-theme',
+                          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme focus-visible:ring-offset-1'
+                        )}
+                      >
+                        <Paperclip className="h-3.5 w-3.5" />
+                        Doc {index + 1}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="rounded-xl border border-dashed border-gray-200 px-4 py-3 text-sm italic text-black">
+                    No document attached.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="shrink-0 gap-2 border-t border-gray-200 bg-gray-50/70 px-6 py-3.5">
+            <Button variant="outline" onClick={() => setViewingTask(null)}>
+              Close
+            </Button>
+
+            {viewingTask && !viewingTask.isCompleted && (
+              <Button
+                className="gap-1.5 bg-theme text-white hover:bg-theme/90"
+                onClick={() => {
+                  const task = viewingTask;
+                  setViewingTask(null);
+                  openDoneDialog(task);
+                }}
+              >
+                <Check className="h-4 w-4" />
+                Complete
+              </Button>
+            )}
+
+            <Button
+              className="gap-1.5"
+              onClick={() => {
+                const task = viewingTask;
+                setViewingTask(null);
+                if (task) openEditTask(task);
+              }}
+            >
+              <Pencil className="h-3.5 w-3.5" />
+              Edit Task
             </Button>
           </DialogFooter>
         </DialogContent>

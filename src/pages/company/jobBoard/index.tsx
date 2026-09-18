@@ -363,67 +363,104 @@ export default function JobBoardPage() {
       ) : (
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
           {jobBoards.map((board) => (
-            <div
-              key={board._id}
-              role="button"
-              tabIndex={0}
-              onClick={() => navigate(`${board._id}`)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  navigate(`${board._id}`);
-                }
-              }}
-              className="group relative flex cursor-pointer flex-col rounded-2xl border border-gray-200 bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-theme/40 hover:shadow-xl hover:shadow-theme/5  "
-            >
-              {/* Edit + delete buttons */}
-              <div className="absolute right-4 top-4 flex items-center gap-1 opacity-0 transition-all duration-200 focus-within:opacity-100 group-hover:opacity-100">
-                <button
-                  type="button"
-                  title="Edit job board"
-                  className="rounded-xl p-2 text-gray-400 transition-all duration-200 hover:bg-theme/10 hover:text-theme focus:outline-none focus-visible:ring-2 focus-visible:ring-theme/40"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openEditDialog(board);
-                  }}
-                >
-                  <Pencil className="h-4 w-4" />
-                </button>
+           <div
+  key={board._id}
+  role="button"
+  tabIndex={0}
+  onClick={() => navigate(`${board._id}`)}
+  onKeyDown={(e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      navigate(`${board._id}`);
+    }
+  }}
+  className="group relative flex cursor-pointer flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+>
+  {/* Top colorful section */}
+  <div className="relative min-h-[230px] bg-gradient-to-br from-theme/40 via-theme/10 to-theme/30 p-6">
+    
+    {/* Edit + Delete */}
+    <div className="absolute right-4 top-4 z-10 flex items-center gap-1 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+      {/* <button
+        type="button"
+        title="Edit job board"
+        className="rounded-lg bg-white/80 p-2 text-gray-500 shadow-sm backdrop-blur-sm transition hover:bg-white hover:text-theme"
+        onClick={(e) => {
+          e.stopPropagation();
+          openEditDialog(board);
+        }}
+      >
+        <Pencil className="h-4 w-4" />
+      </button> */}
 
-                <button
-                  type="button"
-                  title="Delete job board"
-                  className="rounded-xl p-2 text-gray-400 transition-all duration-200 hover:bg-red-50 hover:text-red-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setBoardToDelete(board);
-                  }}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
+      <button
+        type="button"
+        title="Delete job board"
+className="rounded-lg border border-transparent bg-white/80 p-2 text-gray-500 shadow-sm backdrop-blur-sm transition-all duration-300 ease-out hover:scale-110  hover:border-red-500 hover:bg-red-50 hover:text-red-500 hover:shadow-md active:scale-95"        onClick={(e) => {
+          e.stopPropagation();
+          setBoardToDelete(board);
+        }}
+      >
+        <Trash2 className="h-4 w-4" />
+      </button>
+    </div>
 
-              {/* Icon */}
-              <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-theme/10 to-theme/5 text-theme ring-1 ring-inset ring-theme/10 transition-all duration-300 group-hover:from-theme group-hover:to-theme/90 group-hover:text-white group-hover:shadow-lg group-hover:shadow-theme/20 group-hover:ring-theme/20">
-                <ClipboardList className="h-5 w-5" />
-              </div>
 
-              {/* Title */}
-              <h3 className="text-base font-semibold tracking-tight text-gray-900 transition-colors duration-200 group-hover:text-theme">
-                {board.title}
-              </h3>
 
-              {/* Description */}
-              <p className="mt-2 line-clamp-2 text-sm leading-6 text-gray-800">
-                {board.description || ''}
-              </p>
+    {/* Small label */}
+    <div className="text-xs font-bold tracking-tight text-gray-800">
+      JOB BOARD
+    </div>
 
-              {/* CTA */}
-              <div className="mt-6 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-theme/70 transition-colors duration-200 group-hover:text-theme">
-                View tasks
-                <ArrowRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-1" />
-              </div>
-            </div>
+    {/* Title */}
+    <h3 className="mt-7 max-w-[85%] text-[26px] font-medium leading-[1.15] tracking-tight text-gray-900">
+      {board.title}
+    </h3>
+
+    {/* Description */}
+    {board.description && (
+      <p className="mt-3 line-clamp-2 max-w-[90%] text-sm leading-5 text-gray-800">
+        {board.description}
+      </p>
+    )}
+
+    {/* Arrow */}
+    <div className="absolute bottom-8 right-6">
+      <ArrowRight
+        className="h-5 w-5 text-gray-800 transition-transform duration-300 group-hover:translate-x-1"
+      />
+    </div>
+
+  </div>
+
+  {/* Bottom information section */}
+  <div className="flex min-h-[76px] items-center justify-between gap-3 bg-white px-5 py-4">
+    
+  <button
+     type="button"
+        title="Edit job board"
+         onClick={(e) => {
+          e.stopPropagation();
+          openEditDialog(board);
+        }}
+      className="shrink-0 rounded-full bg-black px-5 py-2.5 text-xs font-semibold text-white transition-all duration-200 hover:bg-black/90 hover:shadow-md"
+    >
+      Edit
+    </button>
+
+    {/* View button */}
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        navigate(`${board._id}`);
+      }}
+      className="shrink-0 rounded-full bg-theme px-5 py-2.5 text-xs font-semibold text-white transition-all duration-200 hover:bg-theme/90 hover:shadow-md"
+    >
+      View
+    </button>
+  </div>
+</div>
           ))}
         </div>
       )}
