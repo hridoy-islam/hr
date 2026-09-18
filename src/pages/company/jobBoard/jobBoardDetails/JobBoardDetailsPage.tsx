@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
+import type { LucideIcon } from 'lucide-react';
 import {
   ArrowLeft,
   CalendarDays,
+  History,
   ChevronLeft,
   ChevronRight,
   Check,
@@ -23,7 +25,6 @@ import {
   Search,
   Eye
 } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { z } from 'zod';
@@ -87,6 +88,23 @@ interface JobBoardRecord {
   employeeId: EmployeeRecord[];
 }
 
+type TaskLogAction = 'create' | 'update' | 'complete' | 'reopen';
+
+interface TaskLogChange {
+  field: string;
+  from?: string;
+  to?: string;
+}
+
+interface TaskLogRecord {
+  _id?: string;
+  title: string;
+  date: string;
+  action: TaskLogAction;
+  updatedBy?: EmployeeRecord;
+  changes?: TaskLogChange[];
+}
+
 interface TaskRecord {
   _id: string;
   taskName: string;
@@ -98,7 +116,32 @@ interface TaskRecord {
   completedBy?: EmployeeRecord;
   completedAt?: string;
   isCompleted: boolean;
+  logs?: TaskLogRecord[];
 }
+
+// Each kind of history entry carries its own marker colour
+const LOG_ACTION_DOT: Record<TaskLogAction, string> = {
+  create: 'bg-sky-500',
+  update: 'bg-sky-500',
+  complete: 'bg-sky-500',
+  reopen: 'bg-sky-500'
+};
+
+// The whole entry as one run of text, so every log reads the same way.
+// The changed fields are left off on purpose - add changeText back below
+// to show them.
+const logLine = (log: TaskLogRecord) => {
+  // const changeText = (log.changes || [])
+  //   .map(
+  //     (change) => `${change.field}: ${change.from || '-'} → ${change.to || '-'}`
+  //   )
+  //   .join('; ');
+
+  // Older entries were saved before the API wrote the time into the title
+  return /\d{1,2}:\d{2}\s?(AM|PM)/i.test(log.title)
+    ? log.title
+    : `${log.title} on ${moment(log.date).format('DD MMM YYYY, h:mm A')}`;
+};
 
 // Built from local date parts, so the picker and the API always agree on the
 // day - going through the app timezone pushed the month end onto the 1st of
@@ -683,18 +726,29 @@ export default function JobBoardDetailsPage() {
   const doneByEmployees = searchEmployees(doneBySearch);
   const editDoneByEmployees = searchEmployees(editDoneBySearch);
 
-  const renderDetail = (label: string, value: React.ReactNode) => (
-    <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-[0_1px_2px_rgba(16,24,40,0.05)] transition-colors hover:border-theme/40">
+  // Newest entry first, without mutating what the API sent
+  const taskLogs = [...(viewingTask?.logs || [])].sort(
+    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+  );
+
+  // A plain property: label above, value underneath. `wide` lets a long
+  // value run the full width of the grid
+  const renderDetail = (
+    label: string,
+    value: React.ReactNode,
+    wide = false
+  ) => (
+    <div className={cn('min-w-0', wide && 'sm:col-span-2')}>
       <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-black">
         {label}
       </p>
-      <div className="mt-1.5 text-sm font-semibold leading-snug text-black">
+      <div className="mt-1 whitespace-pre-wrap break-words text-[13px] font-normal leading-relaxed text-black">
         {value}
       </div>
     </div>
   );
 
-  // Small labelled divider heading each block of the details dialog
+  // Labelled divider heading each block of the details dialog
   const renderSectionLabel = (label: string, Icon: LucideIcon) => (
     <div className="flex items-center gap-2">
       <Icon className="h-3.5 w-3.5 text-theme" />
@@ -703,20 +757,6 @@ export default function JobBoardDetailsPage() {
       </p>
       <span className="h-px flex-1 bg-gray-200" />
     </div>
-  );
-
-  const renderPersonChip = (employee: EmployeeRecord) => (
-    <span
-      key={employee._id}
-      className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white py-1 px-2"
-    >
-      {/* <span className="flex h-6 w-6 items-center justify-center rounded-full bg-theme/10 text-[10px] font-bold uppercase text-theme">
-        {employeeInitials(employee)}
-      </span> */}
-      <span className="text-xs font-semibold text-black">
-        {employeeName(employee)}
-      </span>
-    </span>
   );
 
   const renderPerson = (employee: EmployeeRecord, muted = false) => (
@@ -868,8 +908,20 @@ export default function JobBoardDetailsPage() {
                   <span className="text-sm font-medium  tracking-wider text-black">
                     Worked by
                   </span>
-                  <div className="flex items-center gap-1">
-                    {task.taskDoneBy?.map((employee) => renderPerson(employee))}
+                  <div className="flex flex-wrap items-center gap-1">
+                    {task.taskDoneBy?.map((employee, index) => (
+                      <span
+                        key={`${task._id}-done-${employee._id}`}
+                        className="flex items-center"
+                      >
+                        {renderPerson(employee)}
+                        {index < (task.taskDoneBy?.length || 0) - 1 && (
+                          <span className="text-sm font-medium text-black">
+                            ,
+                          </span>
+                        )}
+                      </span>
+                    ))}
                   </div>
                 </div>
               )}
@@ -1612,116 +1664,83 @@ export default function JobBoardDetailsPage() {
           if (!open) setViewingTask(null);
         }}
       >
-        <DialogContent className="flex max-h-[88vh] min-h-[60vh] w-[95vw] max-w-2xl flex-col gap-0 overflow-hidden border border-gray-200 p-0 shadow-xl sm:rounded-2xl">
-          <DialogHeader className="shrink-0 space-y-0 border-b border-gray-200 bg-gradient-to-r from-theme/[0.07] via-white to-white px-6 py-4 pr-14 text-left">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="flex min-w-0 items-start gap-3">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-theme/10 text-theme">
-                  <ClipboardList className="h-5 w-5" />
-                </span>
-
-                <div className="min-w-0 space-y-1">
-                  <DialogTitle className="truncate text-lg font-bold leading-tight text-black">
-                    {viewingTask?.taskName}
-                  </DialogTitle>
-                  <p className="flex items-center gap-1.5 text-xs font-medium text-black">
-                    <CalendarDays className="h-3.5 w-3.5 text-theme" />
-                    {viewingTask
-                      ? moment(viewingTask.taskDate).format('dddd, DD MMM YYYY')
-                      : ''}
-                  </p>
-                </div>
+        <DialogContent className="flex h-[85vh] max-h-[85vh] w-[95vw] max-w-6xl flex-col gap-0 overflow-hidden border-0 bg-white p-0 shadow-2xl sm:rounded-xl">
+          <DialogHeader className="shrink-0 space-y-0 border-b border-gray-200 px-5 py-3.5 pr-14 text-left">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="min-w-0">
+                <DialogTitle className="truncate text-[17px] font-bold leading-tight text-black">
+                  {viewingTask?.taskName}
+                </DialogTitle>
+               
               </div>
 
               <span
                 className={cn(
-                  'inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold shadow-sm ring-1 ring-inset',
+                  'inline-flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.1em]',
                   viewingTask?.isCompleted
-                    ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
-                    : 'bg-amber-50 text-amber-700 ring-amber-200'
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-amber-500 text-white'
                 )}
               >
                 {viewingTask?.isCompleted ? (
-                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  <CheckCircle2 className="h-3 w-3" />
                 ) : (
-                  <Clock className="h-3.5 w-3.5" />
+                  <Clock className="h-3 w-3" />
                 )}
                 {viewingTask?.isCompleted ? 'Completed' : 'Pending'}
               </span>
             </div>
           </DialogHeader>
 
-          {/* min-h-0 lets this flex child shrink, so a long task scrolls
-              here instead of pushing the footer out of the dialog */}
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-            <div className="space-y-6 px-6 py-5">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {renderDetail(
-                  'Task Date',
-                  viewingTask
-                    ? moment(viewingTask.taskDate).format('DD MMM YYYY')
-                    : '-'
-                )}
-                {renderDetail(
-                  'Created At',
-                  viewingTask
-                    ? moment(viewingTask.createdAt).format(
-                        'DD MMM YYYY'
-                      )
-                    : '-'
-                )}
-                {viewingTask?.isCompleted &&
-                  renderDetail(
-                    'Completed At',
-                    viewingTask?.completedAt
-                      ? moment(viewingTask.completedAt).format(
-                          'DD MMM YYYY'
-                        )
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain md:overflow-hidden">
+            <div className="grid grid-cols-1 md:h-full md:grid-cols-12 md:divide-x md:divide-gray-200">
+              {/* Details */}
+              <div className="min-h-0 space-y-3 px-5 py-4 md:col-span-5 md:h-full md:overflow-y-auto md:overscroll-contain">
+                {renderSectionLabel('Details', ClipboardList)}
+
+                <div className="grid grid-cols-1 gap-x-6 gap-y-3.5 sm:grid-cols-2">
+                  {renderDetail(
+                    'Task Date',
+                    viewingTask
+                      ? moment(viewingTask.taskDate).format('DD MMM YYYY')
                       : '-'
                   )}
-                {viewingTask?.isCompleted &&
-                  renderDetail(
-                    'Completed By',
-                    viewingTask?.completedBy
-                      ? employeeName(viewingTask.completedBy)
+                  {renderDetail(
+                    'Created At',
+                    viewingTask
+                      ? moment(viewingTask.createdAt).format('DD MMM YYYY')
                       : '-'
                   )}
-              </div>
-
-              {/* Nobody is recorded until the task is signed off */}
-              {viewingTask?.isCompleted && (
-                <div className="space-y-3">
-                  {renderSectionLabel('Worked By', Users2)}
-
-                  {viewingTask?.taskDoneBy?.length ? (
-                    <div className="flex flex-wrap gap-2">
-                      {viewingTask.taskDoneBy.map((employee) =>
-                        renderPersonChip(employee)
-                      )}
-                    </div>
-                  ) : (
-                    <p className="rounded-xl border border-dashed border-gray-200 px-4 py-3 text-sm italic text-black">
-                      Nobody has been recorded on this task yet.
-                    </p>
-                  )}
+                  {viewingTask?.isCompleted &&
+                    renderDetail(
+                      'Completed At',
+                      viewingTask?.completedAt
+                        ? moment(viewingTask.completedAt).format('DD MMM YYYY')
+                        : '-'
+                    )}
+                  {viewingTask?.isCompleted &&
+                    renderDetail(
+                      'Completed By',
+                      viewingTask?.completedBy
+                        ? employeeName(viewingTask.completedBy)
+                        : '-'
+                    )}
+                  {viewingTask?.isCompleted &&
+                    renderDetail(
+                      'Worked By',
+                      viewingTask?.taskDoneBy?.length
+                        ? viewingTask.taskDoneBy
+                            .map((employee) => employeeName(employee))
+                            .join(', ')
+                        : '-',
+                      true
+                    )}
+                  {renderDetail('Note', viewingTask?.note || '-', true)}
                 </div>
-              )}
-
-              <div className="space-y-3">
-                {renderSectionLabel('Note', FileText)}
-
-                {viewingTask?.note ? (
-                  <p className="whitespace-pre-wrap rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm leading-relaxed text-black">
-                    {viewingTask.note}
-                  </p>
-                ) : (
-                  <p className="rounded-xl border border-dashed border-gray-200 px-4 py-3 text-sm italic text-black">
-                    No note on this task.
-                  </p>
-                )}
               </div>
 
-              <div className="space-y-3">
+              {/* Documents */}
+              <div className="min-h-0 space-y-3 px-5 py-4 md:col-span-2 md:h-full md:overflow-y-auto md:overscroll-contain">
                 {renderSectionLabel(
                   'Documents (' + (viewingTask?.documents?.length || 0) + ')',
                   Paperclip
@@ -1755,16 +1774,54 @@ export default function JobBoardDetailsPage() {
                   </p>
                 )}
               </div>
+
+              {/* Activity */}
+              <div className="min-h-0 space-y-3 px-5 py-4 md:col-span-5 md:h-full md:overflow-y-auto md:overscroll-contain">
+                {renderSectionLabel(
+                  'Activity (' + taskLogs.length + ')',
+                  History
+                )}
+
+                {taskLogs.length ? (
+                  <ol className="-mx-2">
+                    {taskLogs.map((log, index) => (
+                      <li
+                        key={log._id || `${log.date}-${index}`}
+                        className="flex items-start gap-2.5 rounded-md border-b border-gray-100 px-2 py-2 transition-colors last:border-0 hover:bg-gray-50"
+                      >
+                        <span
+                          className={cn(
+                            'mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full',
+                            LOG_ACTION_DOT[log.action] || LOG_ACTION_DOT.update
+                          )}
+                        />
+                        <span className="min-w-0 flex-1 break-words text-[11px] font-medium leading-relaxed text-black">
+                          {logLine(log)}
+                        </span>
+                      </li>
+                    ))}
+                  </ol>
+                ) : (
+                  <p className="rounded-xl border border-dashed border-gray-200 px-4 py-3 text-sm italic text-black">
+                    No activity recorded yet.
+                  </p>
+                )}
+              </div>
             </div>
           </div>
 
-          <DialogFooter className="shrink-0 gap-2 border-t border-gray-200 bg-gray-50/70 px-6 py-3.5">
-            <Button variant="outline" onClick={() => setViewingTask(null)}>
+          <DialogFooter className="shrink-0 gap-2 border-t border-gray-200 px-5 py-2.5">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setViewingTask(null)}
+            >
               Close
             </Button>
 
             {viewingTask && !viewingTask.isCompleted && (
               <Button
+                size="sm"
                 className="gap-1.5 bg-theme text-white hover:bg-theme/90"
                 onClick={() => {
                   const task = viewingTask;
@@ -1772,12 +1829,13 @@ export default function JobBoardDetailsPage() {
                   openDoneDialog(task);
                 }}
               >
-                <Check className="h-4 w-4" />
+                <Check className="h-3.5 w-3.5" />
                 Complete
               </Button>
             )}
 
             <Button
+              size="sm"
               className="gap-1.5"
               onClick={() => {
                 const task = viewingTask;
@@ -1787,21 +1845,21 @@ export default function JobBoardDetailsPage() {
             >
               <Pencil className="h-3.5 w-3.5" />
               Edit Task
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-      {/* --- Document preview --- */}
-      <Dialog
-        open={!!viewingDoc}
-        onOpenChange={(open) => {
-          if (!open) {
-            setViewingDoc(null);
-            setPreviewFailed(false);
-          }
-        }}
-      >
+        {/* --- Document preview --- */}
+        <Dialog
+          open={!!viewingDoc}
+          onOpenChange={(open) => {
+            if (!open) {
+              setViewingDoc(null);
+              setPreviewFailed(false);
+            }
+          }}
+        >
         <DialogContent className="flex h-[85vh] w-[95vw] max-w-5xl flex-col gap-0 p-0">
           <DialogHeader className="flex flex-row items-center justify-between gap-3 border-b border-gray-200 px-5 py-3">
             <DialogTitle className="truncate text-sm font-semibold">
