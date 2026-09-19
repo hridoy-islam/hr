@@ -332,45 +332,62 @@ const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
 
   const holidayYears = useMemo(() => generateHolidayYears(20, 50), []);
 
-  const allowanceStatsList = useMemo(
+  const allowanceStatsList: {
+    label: string;
+    code?: string;
+    formula?: string;
+    value: number;
+    color: string;
+    isBold?: boolean;
+  }[] = useMemo(
     () => [
       {
         label: 'Carry Forward From Last Year',
+        code: 'C',
         value: leaveAllowance.carryForward,
-        color: 'text-gray-800'
+        color: 'text-black'
       },
       {
         label: 'Present Year Holiday Entitlement',
+        code: 'E',
         value: leaveAllowance.holidayEntitlement,
-        color: 'text-gray-800'
+        color: 'text-black'
       },
       {
         label: 'Opening This Year',
+        code: 'O',
+        formula: 'C + H',
         value: leaveAllowance.holidayAllowance,
         color: 'text-red-800'
       },
       {
         label: 'Holiday Accrued',
+        code: 'H',
         value: leaveAllowance.holidayAccured,
-        color: 'text-gray-800'
+        color: 'text-black'
       },
       {
         label: 'Taken',
+        code: 'T',
         value: leaveAllowance.usedHours,
         color: 'text-green-600'
       },
       {
         label: 'Booked',
+        code: 'B',
         value: leaveAllowance.bookedHours,
         color: 'text-orange-600'
       },
       {
         label: 'Requested',
+        code: 'R',
         value: leaveAllowance.requestedHours,
         color: 'text-yellow-600'
       },
       {
         label: 'Balance Remaining',
+        code: 'BR',
+        formula: 'O − (T + B)',
         value: leaveAllowance.remainingHours,
         color: 'text-red-600',
         isBold: true
@@ -482,49 +499,6 @@ const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
                   </div>
                 </div>
 
-                {isAdminView && (
-                  <div className="flex items-start justify-between gap-3 rounded-lg border border-gray-200 bg-white p-3">
-                    <p className="text-xs leading-relaxed text-black">
-  <span className="font-semibold">Calculation:</span>{" "}
-  Carry Forward = C | Holiday Accrued = H | Opening This Year (C + H = O) |
-  Taken = T | Booked = B | Balance Remaining = O − (T + B)
-</p>
-                    <button
-                      type="button"
-                      onClick={() => setShowEquation((prev) => !prev)}
-                      className="shrink-0 rounded-full border border-gray-300 bg-white p-1 text-gray-900 shadow-sm transition-colors hover:bg-gray-100"
-                      title={
-                        showEquation
-                          ? 'Hide formula'
-                          : 'Show holiday balance formula'
-                      }
-                      aria-label="Show holiday balance formula"
-                    >
-                      <Info className="h-4 w-4" />
-                    </button>
-                  </div>
-                )}
-
-                {isAdminView && showEquation && (
-                  <div className="rounded-lg border border-gray-300 bg-gray-50 p-3 text-xs text-black">
-                    <p className="font-semibold text-gray-900">
-                      Holiday Balance Calculation
-                    </p>
-                    <p className="mt-1.5">
-                      <span className="font-semibold">C + H = O</span> &rarr;
-                      Carry Forward + Holiday Accrued = the Opening
-                      balance for this year.
-                    </p>
-                    <p className="mt-1">
-                      <span className="font-semibold">
-                        O − (T + B) = Balance Remaining
-                      </span>{' '}
-                      &rarr; Opening balance - (Taken + Booked hours)
-                      =  Remaining Balance.
-                    </p>
-                  </div>
-                )}
-
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
@@ -595,17 +569,74 @@ const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
 
             <CardContent>
               <div className="space-y-4">
-                {allowanceStatsList.map(({ label, value, color }) => (
+                {isAdminView && (
+                  <div className="flex items-start justify-between gap-3 rounded-lg border border-gray-200 bg-white p-3">
+                    <p className="text-xs leading-relaxed text-black">
+                      <span className="font-semibold">Calculation:</span>{' '}
+                      Carry Forward = C | Holiday Accrued = H | Opening This Year
+                      (C + H = O) | Taken = T | Booked = B | Balance Remaining =
+                      O − (T + B)
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setShowEquation((prev) => !prev)}
+                      className="shrink-0 rounded-full border border-gray-300 bg-white p-1 text-black shadow-sm transition-colors hover:bg-gray-100"
+                      title={
+                        showEquation
+                          ? 'Hide formula'
+                          : 'Show holiday balance formula'
+                      }
+                      aria-label="Show holiday balance formula"
+                    >
+                      <Info className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
+
+                {isAdminView && showEquation && (
+                  <div className="rounded-lg border border-gray-300 bg-gray-50 p-3 text-xs text-black">
+                    <p className="font-semibold text-black">
+                      Holiday Balance Calculation
+                    </p>
+                    <p className="mt-1.5">
+                      <span className="font-semibold">C + H = O</span> &rarr;
+                      Carry Forward + Holiday Accrued = the Opening
+                      balance for this year.
+                    </p>
+                    <p className="mt-1">
+                      <span className="font-semibold">
+                        O − (T + B) = Balance Remaining
+                      </span>{' '}
+                      &rarr; Opening balance - (Taken + Booked hours)
+                      =  Remaining Balance.
+                    </p>
+                  </div>
+                )}
+
+                {allowanceStatsList.map(({ label, code, formula, value, color }) => (
                   <div
                     key={label}
-                    className="flex items-center justify-between border-b border-gray-300 py-2"
+                    className="flex items-start justify-between gap-2 border-b border-gray-300 py-2"
                   >
-                    <span
-                      className={`max-w-[60%] text-gray-600 ${label === 'Balance Remaining' ? 'font-bold text-gray-900' : ''}`}
-                    >
-                      {label}
+                    <span className="max-w-[65%]">
+                      <span
+                        className={`text-black ${label === 'Balance Remaining' ? 'font-bold' : ''}`}
+                      >
+                        {label}
+                      </span>
+                      {code && (
+                        <span className="font-semibold text-black">
+                          {' '}
+                          ({code})
+                        </span>
+                      )}
+                      {formula && (
+                        <span className="block text-xs text-black">
+                          {code} = {formula}
+                        </span>
+                      )}
                     </span>
-                    <span className={`font-semibold ${color}`}>
+                    <span className={`shrink-0 font-semibold ${color}`}>
                       {value.toFixed(2)} h
                     </span>
                   </div>
@@ -614,6 +645,7 @@ const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
               </div>
             </CardContent>
           </Card>
+
         </div>
       </div>
 
