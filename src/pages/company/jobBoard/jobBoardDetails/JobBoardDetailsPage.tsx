@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -23,7 +23,9 @@ import {
   CheckCircle2,
   Clock,
   Search,
-  Eye
+  Eye,
+  Camera,
+  RefreshCw
 } from 'lucide-react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
@@ -69,6 +71,10 @@ const taskSchema = z.object({
     invalid_type_error: 'Please select a valid date'
   }),
   note: z.string().trim().optional(),
+  remarks: z.string().trim().optional(),
+  figure: z.string().trim().optional(),
+  concernPartyName: z.string().trim().optional(),
+  others: z.string().trim().optional(),
   documents: z.array(z.string()).optional()
 });
 
@@ -112,6 +118,10 @@ interface TaskRecord {
   createdAt: string;
   documents?: string[];
   note?: string;
+  remarks?: string;
+  figure?: string;
+  concernPartyName?: string;
+  others?: string;
   taskDoneBy?: EmployeeRecord[];
   completedBy?: EmployeeRecord;
   completedAt?: string;
@@ -182,8 +192,21 @@ const docKind = (url: string): 'image' | 'pdf' | 'other' => {
 export default function JobBoardDetailsPage() {
   const { id, jid } = useParams(); // companyId, jobBoardId
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const { user } = useSelector((state: any) => state.auth);
+
+  // An assigned employee works the tasks but does not own the board, so the
+  // board's own controls are hidden from them
+  const isEmployee = user?.role === 'employee';
+
+  // The page is mounted under the company route and under the staff route,
+  // so the list sits one segment up whichever way it was reached
+  const jobBoardListPath = location.pathname
+    .replace(/\/+$/, '')
+    .split('/')
+    .slice(0, -1)
+    .join('/');
 
   const [jobBoard, setJobBoard] = useState<JobBoardRecord | null>(null);
   const [tasks, setTasks] = useState<TaskRecord[]>([]);
@@ -201,6 +224,10 @@ export default function JobBoardDetailsPage() {
   const [taskName, setTaskName] = useState('');
   const [taskDate, setTaskDate] = useState<Date | null>(new Date());
   const [note, setNote] = useState('');
+  const [remarks, setRemarks] = useState('');
+  const [figure, setFigure] = useState('');
+  const [concernPartyName, setConcernPartyName] = useState('');
+  const [others, setOthers] = useState('');
   const [uploadedFiles, setUploadedFiles] = useState<
     { name: string; url: string }[]
   >([]);
@@ -210,6 +237,16 @@ export default function JobBoardDetailsPage() {
   const [editDoneByIds, setEditDoneByIds] = useState<string[]>([]);
   const [editDoneBySearch, setEditDoneBySearch] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Camera capture - the photo is previewed before it is uploaded
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const cameraStreamRef = useRef<MediaStream | null>(null);
+  const [capturedImageFile, setCapturedImageFile] = useState<File | null>(null);
+  const [capturedImagePreview, setCapturedImagePreview] = useState<
+    string | null
+  >(null);
 
   // Employee assignment
   const [assignOpen, setAssignOpen] = useState(false);
@@ -374,6 +411,15 @@ export default function JobBoardDetailsPage() {
     return () => cancelAnimationFrame(frame);
   }, [loading, groupedTasks, rangeKey, todayKey]);
 
+  // The camera must never outlive the page
+  useEffect(() => {
+    return () => {
+      stopCamera();
+      clearCaptureState();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Keeps the open details dialog in step with the list after an update
   useEffect(() => {
     setViewingTask((current) =>
@@ -386,7 +432,13 @@ export default function JobBoardDetailsPage() {
     setTaskName('');
     setTaskDate(new Date());
     setNote('');
+    setRemarks('');
+    setFigure('');
+    setConcernPartyName('');
+    setOthers('');
     setUploadedFiles([]);
+    stopCamera();
+    clearCaptureState();
     setFormErrors({});
     setEditDoneByIds([]);
     setEditDoneBySearch('');
@@ -398,6 +450,12 @@ export default function JobBoardDetailsPage() {
     setTaskName(task.taskName);
     setTaskDate(task.taskDate ? moment(task.taskDate).toDate() : new Date());
     setNote(task.note || '');
+    setRemarks(task.remarks || '');
+    setFigure(task.figure || '');
+    setConcernPartyName(task.concernPartyName || '');
+    setOthers(task.others || '');
+    stopCamera();
+    clearCaptureState();
     setUploadedFiles(
       (task.documents || []).map((url) => ({
         name: url.split('/').pop() || 'Document',
@@ -410,10 +468,87 @@ export default function JobBoardDetailsPage() {
     setTaskDialogOpen(true);
   };
 
-  const handleFileSelect = async (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const files = Array.from(event.target.files || []);
+  // --- Camera capture ---
+  const clearCaptureState = () => {
+    setCapturedImageFile(null);
+    setCapturedImagePreview((current) => {
+      if (current) URL.revokeObjectURL(current);
+      return null;
+    });
+  };
+
+  const startCamera = async () => {
+    clearCaptureState();
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' }
+      });
+
+      cameraStreamRef.current = stream;
+      setIsCameraOpen(true);
+
+      // The video element only exists once the camera view has rendered
+      setTimeout(() => {
+        if (videoRef.current) videoRef.current.srcObject = stream;
+      }, 100);
+    } catch (error) {
+      toast({
+        title: 'Camera access denied. Please check your browser permissions.',
+        className: 'bg-red-500 border-none text-white'
+      });
+    }
+  };
+
+  const stopCamera = () => {
+    cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+    cameraStreamRef.current = null;
+    if (videoRef.current) videoRef.current.srcObject = null;
+    setIsCameraOpen(false);
+  };
+
+  const capturePhoto = () => {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas) return;
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d')?.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) return;
+
+        setCapturedImageFile(
+          new File([blob], `capture-${Date.now()}.jpg`, {
+            type: 'image/jpeg'
+          })
+        );
+        setCapturedImagePreview(URL.createObjectURL(blob));
+        stopCamera();
+      },
+      'image/jpeg',
+      0.9
+    );
+  };
+
+  const retakePhoto = () => {
+    clearCaptureState();
+    startCamera();
+  };
+
+  const acceptPhoto = async () => {
+    if (!capturedImageFile) return;
+
+    const file = capturedImageFile;
+    clearCaptureState();
+    await uploadFiles([file]);
+  };
+
+  // Shared by the file picker and the camera, so both go through the
+  // same size check and the same upload endpoint
+  const uploadFiles = async (files: File[]) => {
     if (!files.length) return;
 
     for (const file of files) {
@@ -454,6 +589,12 @@ export default function JobBoardDetailsPage() {
     }
   };
 
+  const handleFileSelect = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    await uploadFiles(Array.from(event.target.files || []));
+  };
+
   const handleSaveTask = async () => {
     setFormErrors({});
 
@@ -461,6 +602,10 @@ export default function JobBoardDetailsPage() {
       taskName,
       taskDate,
       note,
+      remarks,
+      figure,
+      concernPartyName,
+      others,
       documents: uploadedFiles.map((file) => file.url)
     });
 
@@ -766,7 +911,7 @@ export default function JobBoardDetailsPage() {
     >
       
       <span className="flex flex-col leading-none">
-        <span className="text-sm font-medium text-black">
+        <span className="text-xs sm:text-sm font-medium text-black">
           {employeeName(employee)}
         </span>
        
@@ -791,7 +936,7 @@ export default function JobBoardDetailsPage() {
         )}
       /> */}
 
-      <div className="flex flex-col gap-3 py-1 pl-2 pr-3.5 sm:flex-row sm:items-center sm:justify-between w-full">
+      <div className="flex w-full flex-col gap-2 px-2 py-2 lg:flex-row lg:items-center lg:justify-between lg:gap-3 lg:py-1 lg:pl-2 lg:pr-3.5">
         {/* Main content */}
         <div
           className="min-w-0 cursor-pointer"
@@ -810,7 +955,7 @@ export default function JobBoardDetailsPage() {
           <div className="flex flex-wrap items-center gap-2">
             <h4
               className={cn(
-                'text-md font-semibold leading-snug tracking-tight text-black',
+                'text-md break-words font-semibold leading-snug tracking-tight text-black',
                 'transition-all duration-200'
               )}
             >
@@ -886,26 +1031,30 @@ export default function JobBoardDetailsPage() {
 
              
         {/* Actions */}
-        <div className={cn('flex shrink-0 items-center gap-1')}>
+        <div
+          className={cn(
+            'flex flex-wrap items-center gap-2 lg:shrink-0 lg:gap-1'
+          )}
+        >
           <div
-            className="flex items-center gap-2 mr-4 cursor-pointer"
+            className="flex w-full items-center gap-2 cursor-pointer lg:mr-4 lg:w-auto"
             title="View task details"
             onClick={() => setViewingTask(task)}
           >
-          <span className="text-sm font-medium  tracking-wider text-black">
+          <span className="text-xs sm:text-sm font-medium  tracking-wider text-black">
             Created At
           </span>
-          <div className="flex items-center gap-1 text-sm font-medium">
+          <div className="flex items-center gap-1 text-xs sm:text-sm font-medium">
             {moment(task.createdAt).format('DD MMM YYYY')}
           </div>
         </div>
         {Boolean(task.taskDoneBy?.length) && (
                 <div
-                  className="flex items-center gap-2  mr-4 cursor-pointer"
+                  className="flex w-full items-center gap-2 cursor-pointer lg:mr-4 lg:w-auto"
                   title="View task details"
                   onClick={() => setViewingTask(task)}
                 >
-                  <span className="text-sm font-medium  tracking-wider text-black">
+                  <span className="text-xs sm:text-sm font-medium  tracking-wider text-black">
                     Worked by
                   </span>
                   <div className="flex flex-wrap items-center gap-1">
@@ -916,7 +1065,7 @@ export default function JobBoardDetailsPage() {
                       >
                         {renderPerson(employee)}
                         {index < (task.taskDoneBy?.length || 0) - 1 && (
-                          <span className="text-sm font-medium text-black">
+                          <span className="text-xs sm:text-sm font-medium text-black">
                             ,
                           </span>
                         )}
@@ -941,7 +1090,7 @@ export default function JobBoardDetailsPage() {
               onClick={() => openDoneDialog(task)}
             >
               <Check className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Complete</span>
+              <span>Complete</span>
             </Button>
           )}
 
@@ -963,15 +1112,17 @@ export default function JobBoardDetailsPage() {
             <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
           </Button>
 
-          <Button
-            size="sm"
-            variant="destructive"
-            title="Delete task"
-            onClick={() => setTaskToDelete(task)}
-          >
-            <Trash2 className="mr-2 h-3.5 w-3.5" />
-            Delete
-          </Button>
+          {!isEmployee && (
+            <Button
+              size="sm"
+              variant="destructive"
+              title="Delete task"
+              onClick={() => setTaskToDelete(task)}
+            >
+              <Trash2 className="mr-2 h-3.5 w-3.5" />
+              Delete
+            </Button>
+          )}
         </div>
       </div>
     </div>
@@ -986,34 +1137,34 @@ export default function JobBoardDetailsPage() {
   }
 
   return (
-    <div className="space-y-5 rounded-md bg-white p-5 shadow-sm h-[97vh]">
+    <div className="min-h-[97vh] space-y-4 rounded-md bg-white p-3 shadow-sm sm:p-4 lg:h-[97vh] lg:min-h-0 lg:space-y-5 lg:p-5   max-md:mt-8">
       {/* Header */}
       <div>
-        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div className="space-y-2">
-            <h2 className="flex items-center gap-2 text-2xl font-bold text-black">
-              <ClipboardList className="h-6 w-6" />
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0 space-y-2">
+            <h2 className="flex items-start gap-2 break-words text-xl font-bold text-black lg:items-center lg:text-2xl">
+              <ClipboardList className="mt-0.5 h-5 w-5 shrink-0 lg:mt-0 lg:h-6 lg:w-6" />
               {jobBoard?.title}
             </h2>
             {jobBoard?.description && (
-              <p className="text-sm text-black">{jobBoard.description}</p>
+              <p className="text-xs sm:text-sm text-black">{jobBoard.description}</p>
             )}
           </div>
 
           {/* Date range filter */}
-          <div className="">
+          <div className="w-full lg:w-auto">
             <div className="flex flex-col items-center gap-2">
-              <div className="flex items-center gap-2">
+              <div className="flex w-full items-center justify-center gap-2">
                 <button
                   type="button"
                   title="Previous month"
-                  className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-black text-theme transition-all hover:border-theme hover:bg-theme hover:text-white focus:outline-none focus-visible:border-theme"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-black text-theme transition-all hover:border-theme hover:bg-theme hover:text-white focus:outline-none focus-visible:border-theme lg:h-10 lg:w-10"
                   onClick={() => shiftMonth(-1)}
                 >
-                  <ChevronLeft className="h-6 w-6" strokeWidth={4} />
+                  <ChevronLeft className="h-5 w-5 lg:h-6 lg:w-6" strokeWidth={4} />
                 </button>
 
-                <div className="relative">
+                <div className="relative min-w-0 flex-1 lg:flex-none">
                   <CalendarDays className="pointer-events-none absolute left-4 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-theme" />
                   <DatePicker
                     selectsRange
@@ -1029,48 +1180,52 @@ export default function JobBoardDetailsPage() {
                     dropdownMode='select'
                     dateFormat="dd MMM yyyy"
                     placeholderText="Select date range"
-                    className="h-10 w-full rounded-full border-2 border-black pl-11 pr-4 text-center text-sm font-medium text-black transition-colors focus:border-theme focus:outline-none sm:w-[300px]"
+                    wrapperClassName="w-full"
+                    className="h-10 w-full rounded-full border-2 border-black pl-11 pr-4 text-center text-xs sm:text-sm font-medium text-black transition-colors focus:border-theme focus:outline-none lg:w-[300px]"
                   />
                 </div>
 
                 <button
                   type="button"
                   title="Next month"
-                  className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-black text-theme transition-all hover:border-theme hover:bg-theme hover:text-white focus:outline-none focus-visible:border-theme"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-black text-theme transition-all hover:border-theme hover:bg-theme hover:text-white focus:outline-none focus-visible:border-theme lg:h-10 lg:w-10"
                   onClick={() => shiftMonth(1)}
                 >
-                  <ChevronRight className="h-6 w-6" strokeWidth={4}/>
+                  <ChevronRight className="h-5 w-5 lg:h-6 lg:w-6" strokeWidth={4}/>
                 </button>
               </div>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex w-full flex-wrap items-center gap-2 lg:w-auto">
             <Button
               size="sm"
-              className=" gap-2 "
-              onClick={() => navigate(`/company/${id}/job-board`)}
+              className="flex-1 gap-2 sm:flex-none"
+              onClick={() => navigate(jobBoardListPath)}
             >
               <ArrowLeft className="h-4 w-4" />
               Back
             </Button>
 
-            <Button
-              size="sm"
-              className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700 "
-              onClick={() => {
-                setAssignIds([]);
-                setAssignSearch('');
-                setAssignOpen(true);
-              }}
-            >
-              <UserPlus className="h-4 w-4" />
-              Add Employee
-            </Button>
+            {!isEmployee && (
+              <Button
+                size="sm"
+                className="flex-1 gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700 sm:flex-none"
+                onClick={() => {
+                  setAssignIds([]);
+                  setAssignSearch('');
+                  setAssignOpen(true);
+                }}
+              >
+                <UserPlus className="h-4 w-4" />
+                Add Employee
+              </Button>
+            )}
 
             <Button
               variant="outline"
               size="sm"
+              className="flex-1 sm:flex-none"
               onClick={() => {
                 resetTaskForm();
                 setTaskDialogOpen(true);
@@ -1084,8 +1239,8 @@ export default function JobBoardDetailsPage() {
 
         {/* Assigned employees */}
         <div className="mt-2">
-          <div className="mb-2 flex items-center justify-start gap-2">
-            <div className="flex items-center gap-2 text-sm font-semibold text-black">
+          <div className="mb-2 flex flex-col items-start gap-2 lg:flex-row lg:items-center lg:justify-start">
+            <div className="flex shrink-0 items-center gap-2 text-xs sm:text-sm font-semibold text-black">
               <Users2 className="h-4 w-4" />
               Employee ({jobBoard?.employeeId?.length || 0})
             </div>
@@ -1105,14 +1260,16 @@ export default function JobBoardDetailsPage() {
                       {employee.email || '-'}
                     </span> */}
                     </div>
-                    <button
-                      type="button"
-                      title="Remove employee"
-                      className="ml-1 rounded-full p-1 text-black transition-colors hover:bg-red-50 hover:text-red-600"
-                      onClick={() => setEmployeeToRemove(employee)}
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
+                    {!isEmployee && (
+                      <button
+                        type="button"
+                        title="Remove employee"
+                        className="ml-1 rounded-full p-1 text-black transition-colors hover:bg-red-50 hover:text-red-600"
+                        onClick={() => setEmployeeToRemove(employee)}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    )}
                   </div>
                 ))
               ) : (
@@ -1136,7 +1293,7 @@ export default function JobBoardDetailsPage() {
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-theme/10">
               <ClipboardList className="h-6 w-6 text-theme" />
             </div>
-            <p className="text-sm font-extrabold text-black">
+            <p className="text-xs sm:text-sm font-extrabold text-black">
               No task in this date range
             </p>
             <p className="max-w-lg text-xs font-medium text-black">
@@ -1147,7 +1304,7 @@ export default function JobBoardDetailsPage() {
         ) : (
           <ScrollArea
             ref={scrollAreaRef}
-            className="h-[calc(100vh-170px)] min-h-[450px] pr-3"
+            className="h-[calc(100vh-330px)] min-h-[340px] pr-0 sm:pr-2 lg:h-[calc(100vh-170px)] lg:min-h-[450px] lg:pr-3"
           >
             <div className="relative space-y-2 ">
               {groupedTasks.map(([dateKey, dateTasks]) => {
@@ -1163,20 +1320,20 @@ export default function JobBoardDetailsPage() {
                     className={cn('relative space-y-3',)}
                   >
                     <div className={cn('flex flex-wrap items-center gap-2 rounded-lg bg-gray-200 p-2', isToday ? 'bg-theme text-white' : 'border-gray-200')}>
-                      <span className="text-sm font-medium tracking-[0.12em] ">
+                      <span className="text-xs sm:text-sm font-medium tracking-[0.12em] ">
                         {date.format('DD MMM YYYY')}
                       </span>
 
                       <span
                         className={cn(
-                          'rounded-full px-2.5 py-0.5 text-sm font-medium  tracking-[0.12em]',
+                          'rounded-full px-2.5 py-0.5 text-xs sm:text-sm font-medium  tracking-[0.12em]',
                          
                         )}
                       >
                         {isToday ? 'Today' : date.format('dddd')}
                       </span>
 
-                      <span className="text-sm font-semibold ">
+                      <span className="text-xs sm:text-sm font-semibold ">
                         {dateTasks.length}{' '}
                         {dateTasks.length === 1 ? 'task' : 'tasks'}
                       </span>
@@ -1184,7 +1341,7 @@ export default function JobBoardDetailsPage() {
 
                     <div className="space-y-1">
                       {dateTasks.length === 0 ? (
-                        <p className="px-2 pb-1 text-sm font-medium italic text-black">
+                        <p className="px-2 pb-1 text-xs sm:text-sm font-medium italic text-black">
                           No task on this day
                         </p>
                       ) : (
@@ -1207,7 +1364,7 @@ export default function JobBoardDetailsPage() {
           if (!open) resetTaskForm();
         }}
       >
-        <DialogContent className="max-h-[90vh] w-[95vw] max-w-3xl overflow-y-auto">
+        <DialogContent className="max-h-[92vh] w-[95vw] max-w-3xl overflow-y-auto p-4 sm:max-h-[90vh] sm:p-6">
           <DialogHeader className="border-b border-gray-200 pb-4">
             <DialogTitle className="text-lg font-bold">
               {editingTask ? 'Edit Task' : 'Add Task'}
@@ -1217,7 +1374,7 @@ export default function JobBoardDetailsPage() {
           <div className="space-y-4 py-2">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label className="text-sm font-semibold text-black">
+                <Label className="text-xs sm:text-sm font-semibold text-black">
                   Task Name*
                 </Label>
                 <Input
@@ -1237,7 +1394,7 @@ export default function JobBoardDetailsPage() {
               </div>
 
               <div className="space-y-2">
-                <Label className="text-sm font-semibold text-black">
+                <Label className="text-xs sm:text-sm font-semibold text-black">
                   Task Date* (DD-MM-YYYY)
                 </Label>
                 <DatePicker
@@ -1253,7 +1410,7 @@ export default function JobBoardDetailsPage() {
                   showYearDropdown
                   dropdownMode="select"
                   className={cn(
-                    'flex h-10 w-full rounded-md border px-3 text-sm focus:outline-none',
+                    'flex h-10 w-full rounded-md border px-3 text-xs sm:text-sm focus:outline-none',
                     formErrors.taskDate
                       ? 'border-red-500'
                       : 'border-gray-200 focus:border-theme'
@@ -1270,17 +1427,67 @@ export default function JobBoardDetailsPage() {
         
 
             <div className="space-y-2">
-              <Label className="text-sm font-semibold text-black">Note</Label>
+              <Label className="text-xs sm:text-sm font-semibold text-black">Note</Label>
               <Textarea
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 placeholder="Add a note for this task..."
-                className="min-h-[80px] resize-none"
+                className="min-h-[80px] resize-y"
               />
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label className="text-xs sm:text-sm font-semibold text-black">
+                  Remarks
+                </Label>
+                <Textarea
+                  value={remarks}
+                  onChange={(e) => setRemarks(e.target.value)}
+                  placeholder="Add remarks for this task..."
+                  className="min-h-[80px] resize-y"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs sm:text-sm font-semibold text-black">
+                  Figure
+                </Label>
+                <Textarea
+                  value={figure}
+                  onChange={(e) => setFigure(e.target.value)}
+                  placeholder="Add a figure for this task..."
+                  className="min-h-[80px] resize-y"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs sm:text-sm font-semibold text-black">
+                  Resident/Staff/Concern Party Name
+                </Label>
+                <Textarea
+                  value={concernPartyName}
+                  onChange={(e) => setConcernPartyName(e.target.value)}
+                  placeholder="Add the resident, staff or concern party name..."
+                  className="min-h-[80px] resize-y"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs sm:text-sm font-semibold text-black">
+                  Others
+                </Label>
+                <Textarea
+                  value={others}
+                  onChange={(e) => setOthers(e.target.value)}
+                  placeholder="Anything else about this task..."
+                  className="min-h-[80px] resize-y"
+                />
+              </div>
             </div>
    
             <div className="space-y-2">
-              <Label className="text-sm font-semibold text-black">
+              <Label className="text-xs sm:text-sm font-semibold text-black">
                 Documents
               </Label>
               <div className="rounded-lg border border-dashed border-gray-200 p-4">
@@ -1290,20 +1497,105 @@ export default function JobBoardDetailsPage() {
                   multiple
                   className="hidden"
                   onChange={handleFileSelect}
+                  disabled={isUploading || isCameraOpen}
                 />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5"
-                  disabled={isUploading}
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <Upload className="h-4 w-4" />
-                  {isUploading ? 'Uploading...' : 'Upload Documents'}
-                </Button>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                    disabled={isUploading || isCameraOpen}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Upload className="h-4 w-4" />
+                    {isUploading ? 'Uploading...' : 'Upload Documents'}
+                  </Button>
+
+                  {!isCameraOpen && !capturedImagePreview && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5"
+                      disabled={isUploading}
+                      onClick={startCamera}
+                    >
+                      <Camera className="h-4 w-4" />
+                      Take Photo
+                    </Button>
+                  )}
+                </div>
+
+                {/* Live camera, then the shot itself before it is uploaded */}
+                {isCameraOpen && (
+                  <div className="relative mt-3 flex flex-col items-center justify-center overflow-hidden rounded-lg bg-black text-center shadow-inner">
+                    <video
+                      ref={videoRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      className="h-auto max-h-[240px] w-full object-cover sm:max-h-[350px]"
+                    />
+                    <canvas ref={canvasRef} className="hidden" />
+
+                    <div className="absolute bottom-4 flex gap-3">
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        onClick={stopCamera}
+                      >
+                        <X className="mr-1 h-4 w-4" /> Cancel
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="bg-white font-semibold text-black hover:bg-gray-200"
+                        onClick={capturePhoto}
+                      >
+                        <Camera className="mr-2 h-4 w-4" /> Capture
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {!isCameraOpen && capturedImagePreview && (
+                  <div className="relative mt-3 flex flex-col items-center justify-center overflow-hidden rounded-lg bg-gray-900 p-2 text-center shadow-inner">
+                    <img
+                      src={capturedImagePreview}
+                      alt="Captured preview"
+                      className="h-auto max-h-[240px] w-full rounded-md object-contain sm:max-h-[350px]"
+                    />
+
+                    <div className="absolute bottom-4 flex gap-3">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        className="bg-white/90 text-gray-900 backdrop-blur-sm hover:bg-white"
+                        disabled={isUploading}
+                        onClick={retakePhoto}
+                      >
+                        <RefreshCw className="mr-2 h-4 w-4" /> Retake
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="bg-theme text-white shadow-md hover:bg-theme/90"
+                        disabled={isUploading}
+                        onClick={acceptPhoto}
+                      >
+                        <Check className="mr-2 h-4 w-4" /> Accept & Upload
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
                 <p className="mt-2 text-[11px] text-black">
-                  You can attach as many documents as you need. Max 20MB each.
+                  You can attach as many documents as you need, or take a photo
+                  with your camera. Max 20MB each.
                 </p>
 
                 {uploadedFiles.length > 0 && (
@@ -1338,7 +1630,7 @@ export default function JobBoardDetailsPage() {
 
              {editingTask?.isCompleted && (
               <div className="space-y-2">
-                <Label className="text-sm font-semibold text-black">
+                <Label className="text-xs sm:text-sm font-semibold text-black">
                   Worked By*
                 </Label>
 
@@ -1365,11 +1657,11 @@ export default function JobBoardDetailsPage() {
                   )}
                 >
                   {(employees || []).length === 0 ? (
-                    <p className="p-2 text-sm italic text-black">
+                    <p className="p-2 text-xs sm:text-sm italic text-black">
                       No employee is assigned to this job board yet.
                     </p>
                   ) : editDoneByEmployees.length === 0 ? (
-                    <p className="p-2 text-sm italic text-black">
+                    <p className="p-2 text-xs sm:text-sm italic text-black">
                       No employee matches this search.
                     </p>
                   ) : (
@@ -1394,7 +1686,7 @@ export default function JobBoardDetailsPage() {
                         />
 
                         <div className="flex flex-col">
-                          <span className="text-sm font-medium text-black">
+                          <span className="text-xs sm:text-sm font-medium text-black">
                             {employeeName(employee)}
                           </span>
                           <span className="text-[11px] text-black">
@@ -1416,11 +1708,15 @@ export default function JobBoardDetailsPage() {
           </div>
 
           <DialogFooter className="gap-2 border-t border-gray-200 pt-4">
-            <Button variant="outline" onClick={() => setTaskDialogOpen(false)}>
+            <Button
+              variant="outline"
+              className="w-full sm:w-auto"
+              onClick={() => setTaskDialogOpen(false)}
+            >
               Cancel
             </Button>
             <Button
-              className="bg-theme text-white hover:bg-theme/90"
+              className="w-full bg-theme text-white hover:bg-theme/90 sm:w-auto"
               disabled={isSubmitting || isUploading}
               onClick={handleSaveTask}
             >
@@ -1436,7 +1732,7 @@ export default function JobBoardDetailsPage() {
 
       {/* --- Assign employee dialog --- */}
       <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
-        <DialogContent className="max-h-[90vh] w-[95vw] max-w-2xl overflow-y-auto">
+        <DialogContent className="max-h-[92vh] w-[95vw] max-w-2xl overflow-y-auto p-4 sm:max-h-[90vh] sm:p-6">
           <DialogHeader className="border-b border-gray-200 pb-4">
             <DialogTitle className="text-lg font-bold">
               Add Employee to {jobBoard?.title}
@@ -1453,7 +1749,7 @@ export default function JobBoardDetailsPage() {
 
             <div className="max-h-[300px] space-y-1 overflow-y-auto rounded-lg border border-gray-200 p-2">
               {assignableEmployees.length === 0 ? (
-                <p className="p-2 text-sm italic text-black">
+                <p className="p-2 text-xs sm:text-sm italic text-black">
                   Every employee is already assigned.
                 </p>
               ) : (
@@ -1473,7 +1769,7 @@ export default function JobBoardDetailsPage() {
                       }
                     />
                     <div className="flex flex-col">
-                      <span className="text-sm font-medium">
+                      <span className="text-xs sm:text-sm font-medium">
                         {employeeName(employee)}
                       </span>
                       <span className="text-[11px] text-black">
@@ -1487,11 +1783,15 @@ export default function JobBoardDetailsPage() {
           </div>
 
           <DialogFooter className="gap-2 border-t border-gray-200 pt-4">
-            <Button variant="outline" onClick={() => setAssignOpen(false)}>
+            <Button
+              variant="outline"
+              className="w-full sm:w-auto"
+              onClick={() => setAssignOpen(false)}
+            >
               Cancel
             </Button>
             <Button
-              className="bg-theme text-white hover:bg-theme/90"
+              className="w-full bg-theme text-white hover:bg-theme/90 sm:w-auto"
               disabled={isAssigning || assignIds.length === 0}
               onClick={handleAssignEmployees}
             >
@@ -1545,7 +1845,7 @@ export default function JobBoardDetailsPage() {
           if (!open) closeDoneDialog();
         }}
       >
-        <DialogContent className="w-[95vw] max-w-lg">
+        <DialogContent className="max-h-[92vh] w-[95vw] max-w-lg overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle className="text-lg font-bold">
               {taskToToggle?.isCompleted
@@ -1555,14 +1855,14 @@ export default function JobBoardDetailsPage() {
           </DialogHeader>
 
           {taskToToggle?.isCompleted ? (
-            <p className="py-2 text-sm text-black">
+            <p className="py-2 text-xs sm:text-sm text-black">
               Reopen{' '}
               <span className="font-semibold">{taskToToggle?.taskName}</span>?
               The sign-off on it will be cleared.
             </p>
           ) : (
             <div className="space-y-3 py-2">
-              <p className="text-sm text-black">
+              <p className="text-xs sm:text-sm text-black">
                 Select everyone who worked on{' '}
                 <span className="font-semibold text-black">
                   {taskToToggle?.taskName}
@@ -1588,11 +1888,11 @@ export default function JobBoardDetailsPage() {
 
               <div className="max-h-[260px] space-y-1 overflow-y-auto rounded-sm border border-gray-200 p-2">
                 {(employees || []).length === 0 ? (
-                  <p className="p-2 text-sm italic text-black">
+                  <p className="p-2 text-xs sm:text-sm italic text-black">
                     No employee is assigned to this job board yet.
                   </p>
                 ) : doneByEmployees.length === 0 ? (
-                  <p className="p-2 text-sm italic text-black">
+                  <p className="p-2 text-xs sm:text-sm italic text-black">
                     No employee matches this search.
                   </p>
                 ) : (
@@ -1614,7 +1914,7 @@ export default function JobBoardDetailsPage() {
                       />
 
                       <div className="flex flex-col">
-                        <span className="text-sm font-medium text-black">
+                        <span className="text-xs sm:text-sm font-medium text-black">
                           {employeeName(employee)}
                         </span>
                         <span className="text-[11px] text-black">
@@ -1637,13 +1937,14 @@ export default function JobBoardDetailsPage() {
           <DialogFooter className="gap-2">
             <Button
               variant="outline"
+              className="w-full sm:w-auto"
               disabled={isToggling}
               onClick={closeDoneDialog}
             >
               Cancel
             </Button>
             <Button
-              className="bg-theme text-white hover:bg-theme/90"
+              className="w-full bg-theme text-white hover:bg-theme/90 sm:w-auto"
               disabled={isToggling}
               onClick={handleToggleComplete}
             >
@@ -1664,8 +1965,8 @@ export default function JobBoardDetailsPage() {
           if (!open) setViewingTask(null);
         }}
       >
-        <DialogContent className="flex h-[85vh] max-h-[85vh] w-[95vw] max-w-6xl flex-col gap-0 overflow-hidden border-0 bg-white p-0 shadow-2xl sm:rounded-xl">
-          <DialogHeader className="shrink-0 space-y-0 border-b border-gray-200 px-5 py-3.5 pr-14 text-left">
+        <DialogContent className="flex h-[92vh] max-h-[92vh] w-[95vw] max-w-6xl flex-col gap-0 overflow-hidden border-0 bg-white p-0 shadow-2xl sm:h-[85vh] sm:max-h-[85vh] sm:rounded-xl">
+          <DialogHeader className="shrink-0 space-y-0 border-b border-gray-200 px-4 py-3.5 pr-12 text-left sm:px-5 sm:pr-14">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="min-w-0">
                 <DialogTitle className="truncate text-[17px] font-bold leading-tight text-black">
@@ -1692,10 +1993,10 @@ export default function JobBoardDetailsPage() {
             </div>
           </DialogHeader>
 
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain md:overflow-hidden">
-            <div className="grid grid-cols-1 md:h-full md:grid-cols-12 md:divide-x md:divide-gray-200">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain lg:overflow-hidden">
+            <div className="grid grid-cols-1 divide-y divide-gray-200 lg:h-full lg:grid-cols-12 lg:divide-x lg:divide-y-0">
               {/* Details */}
-              <div className="min-h-0 space-y-3 px-5 py-4 md:col-span-5 md:h-full md:overflow-y-auto md:overscroll-contain">
+              <div className="min-h-0 space-y-3 px-4 py-4 lg:col-span-5 lg:h-full lg:overflow-y-auto lg:overscroll-contain lg:px-5">
                 {renderSectionLabel('Details', ClipboardList)}
 
                 <div className="grid grid-cols-1 gap-x-6 gap-y-3.5 sm:grid-cols-2">
@@ -1736,11 +2037,18 @@ export default function JobBoardDetailsPage() {
                       true
                     )}
                   {renderDetail('Note', viewingTask?.note || '-', true)}
+                  {renderDetail('Remarks', viewingTask?.remarks || '-', true)}
+                  {renderDetail('Figure', viewingTask?.figure || '-')}
+                  {renderDetail(
+                    'Resident/Staff/Concern Party Name',
+                    viewingTask?.concernPartyName || '-'
+                  )}
+                  {renderDetail('Others', viewingTask?.others || '-', true)}
                 </div>
               </div>
 
               {/* Documents */}
-              <div className="min-h-0 space-y-3 px-5 py-4 md:col-span-2 md:h-full md:overflow-y-auto md:overscroll-contain">
+              <div className="min-h-0 space-y-3 px-4 py-4 lg:col-span-2 lg:h-full lg:overflow-y-auto lg:overscroll-contain lg:px-5">
                 {renderSectionLabel(
                   'Documents (' + (viewingTask?.documents?.length || 0) + ')',
                   Paperclip
@@ -1769,14 +2077,14 @@ export default function JobBoardDetailsPage() {
                     ))}
                   </div>
                 ) : (
-                  <p className="rounded-xl border border-dashed border-gray-200 px-4 py-3 text-sm italic text-black">
+                  <p className="rounded-xl border border-dashed border-gray-200 px-4 py-3 text-xs sm:text-sm italic text-black">
                     No document attached.
                   </p>
                 )}
               </div>
 
               {/* Activity */}
-              <div className="min-h-0 space-y-3 px-5 py-4 md:col-span-5 md:h-full md:overflow-y-auto md:overscroll-contain">
+              <div className="min-h-0 space-y-3 px-4 py-4 lg:col-span-5 lg:h-full lg:overflow-y-auto lg:overscroll-contain lg:px-5">
                 {renderSectionLabel(
                   'Activity (' + taskLogs.length + ')',
                   History
@@ -1802,7 +2110,7 @@ export default function JobBoardDetailsPage() {
                     ))}
                   </ol>
                 ) : (
-                  <p className="rounded-xl border border-dashed border-gray-200 px-4 py-3 text-sm italic text-black">
+                  <p className="rounded-xl border border-dashed border-gray-200 px-4 py-3 text-xs sm:text-sm italic text-black">
                     No activity recorded yet.
                   </p>
                 )}
@@ -1810,10 +2118,11 @@ export default function JobBoardDetailsPage() {
             </div>
           </div>
 
-          <DialogFooter className="shrink-0 gap-2 border-t border-gray-200 px-5 py-2.5">
+          <DialogFooter className="shrink-0 gap-2 border-t border-gray-200 px-4 py-2.5 sm:px-5">
             <Button
               size="sm"
               variant="outline"
+              className="w-full sm:w-auto"
               onClick={() => setViewingTask(null)}
             >
               Close
@@ -1822,7 +2131,7 @@ export default function JobBoardDetailsPage() {
             {viewingTask && !viewingTask.isCompleted && (
               <Button
                 size="sm"
-                className="gap-1.5 bg-theme text-white hover:bg-theme/90"
+                className="w-full gap-1.5 bg-theme text-white hover:bg-theme/90 sm:w-auto"
                 onClick={() => {
                   const task = viewingTask;
                   setViewingTask(null);
@@ -1836,7 +2145,7 @@ export default function JobBoardDetailsPage() {
 
             <Button
               size="sm"
-              className="gap-1.5"
+              className="w-full gap-1.5 sm:w-auto"
               onClick={() => {
                 const task = viewingTask;
                 setViewingTask(null);
@@ -1860,9 +2169,9 @@ export default function JobBoardDetailsPage() {
             }
           }}
         >
-        <DialogContent className="flex h-[85vh] w-[95vw] max-w-5xl flex-col gap-0 p-0">
-          <DialogHeader className="flex flex-row items-center justify-between gap-3 border-b border-gray-200 px-5 py-3">
-            <DialogTitle className="truncate text-sm font-semibold">
+        <DialogContent className="flex h-[92vh] w-[95vw] max-w-5xl flex-col gap-0 p-0 sm:h-[85vh]">
+          <DialogHeader className="flex flex-row flex-wrap items-center justify-between gap-3 space-y-0 border-b border-gray-200 px-4 py-3 pr-12 sm:px-5 sm:pr-5">
+            <DialogTitle className="truncate text-xs sm:text-sm font-semibold">
               {viewingDoc ? docFileName(viewingDoc) : 'Document'}
             </DialogTitle>
 
@@ -1876,13 +2185,13 @@ export default function JobBoardDetailsPage() {
             </Button>
           </DialogHeader>
 
-          <div className="flex flex-1 items-center justify-center overflow-auto bg-black/5 p-4">
+          <div className="flex flex-1 items-center justify-center overflow-auto bg-black/5 p-2 sm:p-4">
             {!viewingDoc ? null : previewFailed ? (
               <div className="flex flex-col items-center gap-3 text-center">
                 <div className="flex h-14 w-14 items-center justify-center rounded-full bg-theme/10">
                   <FileText className="h-6 w-6 text-theme" />
                 </div>
-                <p className="text-sm font-semibold text-black">
+                <p className="text-xs sm:text-sm font-semibold text-black">
                   This document cannot be previewed
                 </p>
                 <p className="max-w-sm text-xs text-black">

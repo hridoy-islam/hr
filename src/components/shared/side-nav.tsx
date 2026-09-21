@@ -126,6 +126,13 @@ const navItems = [
     href: 'meeting',
     roles: ['employee']
   },
+  {
+    icon: ClipboardList,
+    label: 'Job Board',
+    href: 'job-board',
+    roles: ['employee'],
+    requiresJobBoardAccess: true
+  },
 
   // --- Admin Specific ---
   {
@@ -701,6 +708,7 @@ export function SideNav() {
   const [workFlowAccessEmployees, setWorkFlowAccessEmployees] = useState<
     string[]
   >([]);
+  const [hasJobBoardAccess, setHasJobBoardAccess] = useState(false);
   const { id } = useParams();
 
   const { hasAccess } = useCompanyAccess(); // Fetch access utility for filtering
@@ -744,6 +752,26 @@ export function SideNav() {
 
     fetchWorkFlowAccess();
   }, [userRole, user?.company]);
+
+  // The job board entry stays hidden until the employee is assigned to one
+  useEffect(() => {
+    const fetchJobBoardAccess = async () => {
+      if (userRole !== 'employee') {
+        setHasJobBoardAccess(false);
+        return;
+      }
+
+      try {
+        const response = await axiosInstance.get('/job-board/staff-access');
+        setHasJobBoardAccess(Boolean(response.data?.data?.hasJobBoard));
+      } catch (error) {
+        console.error('Error fetching job board access:', error);
+        setHasJobBoardAccess(false);
+      }
+    };
+
+    fetchJobBoardAccess();
+  }, [userRole, user?._id]);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('themeColor');
@@ -874,14 +902,19 @@ export function SideNav() {
     navItems,
     effectiveRole,
     hasAccess
-  ).filter((item: any) => {
-    if (!item.requiresWorkFlowAccess) return true;
-    return (
-      userRole === 'employee' &&
-      !!user?._id &&
-      workFlowAccessEmployees.includes(user._id)
-    );
-  });
+  )
+    .filter((item: any) => {
+      if (!item.requiresWorkFlowAccess) return true;
+      return (
+        userRole === 'employee' &&
+        !!user?._id &&
+        workFlowAccessEmployees.includes(user._id)
+      );
+    })
+    .filter((item: any) => {
+      if (!item.requiresJobBoardAccess) return true;
+      return userRole === 'employee' && hasJobBoardAccess;
+    });
 
   const sidebarContent = (
     <div className="flex h-full flex-col">

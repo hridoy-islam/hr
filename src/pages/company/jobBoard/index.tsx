@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import {
   ClipboardList,
   Plus,
@@ -93,6 +94,12 @@ export default function JobBoardPage() {
   const { id } = useParams(); // companyId
   const navigate = useNavigate();
   const { toast } = useToast();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { user } = useSelector((state: any) => state.auth);
+
+  // An assigned employee reads their own boards and nothing else - no
+  // creating, no editing, no deleting
+  const isEmployee = user?.role === 'employee';
 
   const [jobBoards, setJobBoards] = useState<JobBoardRecord[]>([]);
   const [employees, setEmployees] = useState<EmployeeRecord[]>([]);
@@ -139,6 +146,8 @@ export default function JobBoardPage() {
   };
 
   const fetchEmployees = async () => {
+    if (isEmployee) return;
+
     try {
       const response = await axiosInstance.get(`/users`, {
         params: {
@@ -327,17 +336,19 @@ export default function JobBoardPage() {
           </div>
         </div>
 
-        <Button
-          className="w-full bg-theme text-white hover:bg-theme/90 md:w-auto"
-          size="sm"
-          onClick={() => {
-            resetCreateForm();
-            setDialogOpen(true);
-          }}
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Create Job Board
-        </Button>
+        {!isEmployee && (
+          <Button
+            className="w-full bg-theme text-white hover:bg-theme/90 md:w-auto"
+            size="sm"
+            onClick={() => {
+              resetCreateForm();
+              setDialogOpen(true);
+            }}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Create Job Board
+          </Button>
+        )}
       </div>
 
       {/* Board grid */}
@@ -356,8 +367,9 @@ export default function JobBoardPage() {
           </h3>
 
           <p className="mt-2 max-w-md text-sm leading-6 text-black/60">
-            No job boards are available at the moment. Once a job board is
-            created, it will appear here.
+            {isEmployee
+              ? 'You have not been assigned to a job board yet. Once you are, it will appear here.'
+              : 'No job boards are available at the moment. Once a job board is created, it will appear here.'}
           </p>
         </div>
       ) : (
@@ -380,6 +392,7 @@ export default function JobBoardPage() {
   <div className="relative min-h-[230px] bg-gradient-to-br from-theme/40 via-theme/10 to-theme/30 p-6">
     
     {/* Edit + Delete */}
+    {!isEmployee && (
     <div className="absolute right-4 top-4 z-10 flex items-center gap-1 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
       {/* <button
         type="button"
@@ -404,6 +417,7 @@ className="rounded-lg border border-transparent bg-white/80 p-2 text-gray-500 sh
         <Trash2 className="h-4 w-4" />
       </button>
     </div>
+    )}
 
 
 
@@ -434,19 +448,21 @@ className="rounded-lg border border-transparent bg-white/80 p-2 text-gray-500 sh
   </div>
 
   {/* Bottom information section */}
-  <div className="flex min-h-[76px] items-center justify-between gap-3 bg-white px-5 py-4">
+  <div className="flex min-h-[76px] items-center justify-end gap-3 bg-white px-5 py-4">
     
-  <button
+  {!isEmployee && (
+    <button
      type="button"
         title="Edit job board"
          onClick={(e) => {
           e.stopPropagation();
           openEditDialog(board);
         }}
-      className="shrink-0 rounded-full bg-black px-5 py-2.5 text-xs font-semibold text-white transition-all duration-200 hover:bg-black/90 hover:shadow-md"
+      className="mr-auto shrink-0 rounded-full bg-black px-5 py-2.5 text-xs font-semibold text-white transition-all duration-200 hover:bg-black/90 hover:shadow-md"
     >
       Edit
     </button>
+  )}
 
     {/* View button */}
     <button

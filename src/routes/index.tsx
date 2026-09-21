@@ -424,7 +424,9 @@ export default function AppRouter() {
         { path: 'attendance', element: <StaffAttendancePage /> },
         { path: 'document-request', element: <StaffRequestDocumentPage /> },
         { path: 'meeting', element: <StaffMeetingPage /> },
-        { path: 'meeting/:mid', element: <StaffMeetingDetailsPage /> }
+        { path: 'meeting/:mid', element: <StaffMeetingDetailsPage /> },
+        { path: 'job-board', element: <JobBoardPage /> },
+        { path: 'job-board/:jid', element: <JobBoardDetailsPage /> }
       ]
     }
   ];
