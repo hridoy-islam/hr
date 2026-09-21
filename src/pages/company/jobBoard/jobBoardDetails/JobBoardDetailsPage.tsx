@@ -1364,7 +1364,7 @@ export default function JobBoardDetailsPage() {
           if (!open) resetTaskForm();
         }}
       >
-        <DialogContent className="max-h-[92vh] w-[95vw] max-w-3xl overflow-y-auto p-4 sm:max-h-[90vh] sm:p-6">
+        <DialogContent className="max-h-[78vh] w-[95vw] max-w-3xl overflow-y-auto p-4 sm:max-h-[90vh] sm:p-6">
           <DialogHeader className="border-b border-gray-200 pb-4">
             <DialogTitle className="text-lg font-bold">
               {editingTask ? 'Edit Task' : 'Add Task'}
@@ -1732,7 +1732,7 @@ export default function JobBoardDetailsPage() {
 
       {/* --- Assign employee dialog --- */}
       <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
-        <DialogContent className="max-h-[92vh] w-[95vw] max-w-2xl overflow-y-auto p-4 sm:max-h-[90vh] sm:p-6">
+        <DialogContent className="max-h-[78vh] w-[95vw] max-w-2xl overflow-y-auto p-4 sm:max-h-[90vh] sm:p-6">
           <DialogHeader className="border-b border-gray-200 pb-4">
             <DialogTitle className="text-lg font-bold">
               Add Employee to {jobBoard?.title}
@@ -1845,7 +1845,7 @@ export default function JobBoardDetailsPage() {
           if (!open) closeDoneDialog();
         }}
       >
-        <DialogContent className="max-h-[92vh] w-[95vw] max-w-lg overflow-y-auto p-4 sm:p-6">
+        <DialogContent className="max-h-[78vh] w-[95vw] max-w-lg overflow-y-auto p-4 sm:max-h-[92vh] sm:p-6">
           <DialogHeader>
             <DialogTitle className="text-lg font-bold">
               {taskToToggle?.isCompleted
@@ -1965,7 +1965,7 @@ export default function JobBoardDetailsPage() {
           if (!open) setViewingTask(null);
         }}
       >
-        <DialogContent className="flex h-[92vh] max-h-[92vh] w-[95vw] max-w-6xl flex-col gap-0 overflow-hidden border-0 bg-white p-0 shadow-2xl sm:h-[85vh] sm:max-h-[85vh] sm:rounded-xl">
+        <DialogContent className="flex h-[72vh] max-h-[72vh] w-[95vw] max-w-6xl flex-col gap-0 overflow-hidden border-0 bg-white p-0 shadow-2xl sm:h-[85vh] sm:max-h-[85vh] sm:rounded-xl">
           <DialogHeader className="shrink-0 space-y-0 border-b border-gray-200 px-4 py-3.5 pr-12 text-left sm:px-5 sm:pr-14">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="min-w-0">
@@ -2169,7 +2169,7 @@ export default function JobBoardDetailsPage() {
             }
           }}
         >
-        <DialogContent className="flex h-[92vh] w-[95vw] max-w-5xl flex-col gap-0 p-0 sm:h-[85vh]">
+        <DialogContent className="flex h-[72vh] w-[95vw] max-w-5xl flex-col gap-0 p-0 sm:h-[85vh]">
           <DialogHeader className="flex flex-row flex-wrap items-center justify-between gap-3 space-y-0 border-b border-gray-200 px-4 py-3 pr-12 sm:px-5 sm:pr-5">
             <DialogTitle className="truncate text-xs sm:text-sm font-semibold">
               {viewingDoc ? docFileName(viewingDoc) : 'Document'}
