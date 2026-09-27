@@ -63,7 +63,8 @@ import {
   Grid3X3,
   Search,
   ClipboardList,
-  ListTodo
+  ListTodo,
+  SprayCan
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Link, useNavigate, useLocation, useParams } from 'react-router-dom';
@@ -132,6 +133,13 @@ const navItems = [
     href: 'job-board',
     roles: ['employee'],
     requiresJobBoardAccess: true
+  },
+  {
+    icon: SprayCan,
+    label: 'Cleaning Logs',
+    href: 'cleaning-log',
+    roles: ['employee'],
+    requiresCleaningAccess: true
   },
 
   // --- Admin Specific ---
@@ -323,6 +331,12 @@ const navItems = [
     icon: ClipboardList,
     label: 'Job Board',
     href: 'job-board',
+    roles: ['company', 'companyAdmin']
+  },
+  {
+    icon: SprayCan,
+    label: 'Cleaning Logs',
+    href: 'cleaning-log',
     roles: ['company', 'companyAdmin']
   },
   {
@@ -709,6 +723,7 @@ export function SideNav() {
     string[]
   >([]);
   const [hasJobBoardAccess, setHasJobBoardAccess] = useState(false);
+  const [hasCleaningAccess, setHasCleaningAccess] = useState(false);
   const { id } = useParams();
 
   const { hasAccess } = useCompanyAccess(); // Fetch access utility for filtering
@@ -771,6 +786,26 @@ export function SideNav() {
     };
 
     fetchJobBoardAccess();
+  }, [userRole, user?._id]);
+
+  // Cleaning logs only show once the company adds the employee to the module
+  useEffect(() => {
+    const fetchCleaningAccess = async () => {
+      if (userRole !== 'employee') {
+        setHasCleaningAccess(false);
+        return;
+      }
+
+      try {
+        const response = await axiosInstance.get('/cleaning-access/staff-access');
+        setHasCleaningAccess(Boolean(response.data?.data?.hasCleaningAccess));
+      } catch (error) {
+        console.error('Error fetching cleaning log access:', error);
+        setHasCleaningAccess(false);
+      }
+    };
+
+    fetchCleaningAccess();
   }, [userRole, user?._id]);
 
   useEffect(() => {
@@ -914,6 +949,10 @@ export function SideNav() {
     .filter((item: any) => {
       if (!item.requiresJobBoardAccess) return true;
       return userRole === 'employee' && hasJobBoardAccess;
+    })
+    .filter((item: any) => {
+      if (!item.requiresCleaningAccess) return true;
+      return userRole === 'employee' && hasCleaningAccess;
     });
 
   const sidebarContent = (

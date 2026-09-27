@@ -121,6 +121,13 @@ import UnscheduleAttendancePage from '@/pages/company/Attendance/UnscheduleAtten
 import MissingAttendanceCalendarPage from '@/pages/company/MissingAttendance/MissingShiftCalendar';
 import JobBoardPage from '@/pages/company/jobBoard';
 import JobBoardDetailsPage from '@/pages/company/jobBoard/jobBoardDetails/JobBoardDetailsPage';
+import CleaningLogPage from '@/pages/company/cleaningLog';
+import CleaningLogFormPage from '@/pages/company/cleaningLog/CleaningLogFormPage';
+import CleaningLogDetailsPage from '@/pages/company/cleaningLog/CleaningLogDetailsPage';
+import CleaningAreaPage from '@/pages/company/cleaningLog/areas';
+import AreaElementsPage from '@/pages/company/cleaningLog/areas/AreaElementsPage';
+import StaffCleaningLogPage from '@/pages/staff/cleaningLog';
+import StaffCleaningReportPage from '@/pages/staff/cleaningLog/reportPage';
 import OfficeMeetingPage from '@/pages/company/officeMeeting';
 import MeetingDetailsPage from '@/pages/company/officeMeeting/meetingDetails/MeetingDetailsPage';
 import StaffMeetingPage from '@/pages/staff/Meeting';
@@ -391,6 +398,12 @@ export default function AppRouter() {
         { path: 'health-and-safety/:hid', element: <HealthAndSafetyDetails /> },
         { path: 'job-board', element: <JobBoardPage /> },
         { path: 'job-board/:jid', element: <JobBoardDetailsPage /> },
+        { path: 'cleaning-log', element: <CleaningLogPage /> },
+        { path: 'cleaning-log/create', element: <CleaningLogFormPage /> },
+        { path: 'cleaning-log/:lid', element: <CleaningLogDetailsPage /> },
+        { path: 'cleaning-log/:lid/edit', element: <CleaningLogFormPage /> },
+        { path: 'cleaning-log/areas', element: <CleaningAreaPage /> },
+        { path: 'cleaning-log/areas/:aid', element: <AreaElementsPage /> },
       ]
     }
   ];
@@ -426,7 +439,9 @@ export default function AppRouter() {
         { path: 'meeting', element: <StaffMeetingPage /> },
         { path: 'meeting/:mid', element: <StaffMeetingDetailsPage /> },
         { path: 'job-board', element: <JobBoardPage /> },
-        { path: 'job-board/:jid', element: <JobBoardDetailsPage /> }
+        { path: 'job-board/:jid', element: <JobBoardDetailsPage /> },
+        { path: 'cleaning-log', element: <StaffCleaningLogPage /> },
+        { path: 'cleaning-log/report', element: <StaffCleaningReportPage /> }
       ]
     }
   ];
