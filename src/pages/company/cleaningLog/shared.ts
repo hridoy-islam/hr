@@ -1,4 +1,5 @@
 import type { StylesConfig } from 'react-select';
+import { z } from 'zod';
 import moment from '@/lib/moment-setup';
 
 export type CleaningType = 'daily' | 'monthly';
@@ -55,6 +56,8 @@ export interface CleaningLogRecord {
   items: CleaningLogItem[];
   signatureUrl: string;
   signedAt: string;
+  startTime?: string;
+  endTime?: string;
   createdBy?: CleaningEmployee;
   updatedBy?: CleaningEmployee;
   logs?: CleaningLogHistory[];
@@ -89,6 +92,39 @@ export const personName = (person?: CleaningEmployee) => {
 
 export const areaLabel = (area: { areaName: string; roomNumber?: string }) =>
   area.roomNumber ? `${area.areaName} (Room ${area.roomNumber})` : area.areaName;
+
+// Room number ascending (numeric-aware, so 2 comes before 10); areas with
+// no room number go last, in name order
+export const sortAreasByRoom = <T extends { areaName: string; roomNumber?: string }>(
+  areas: T[]
+): T[] =>
+  [...areas].sort((a, b) => {
+    const roomA = (a.roomNumber || '').trim();
+    const roomB = (b.roomNumber || '').trim();
+    if (!roomA !== !roomB) return roomA ? -1 : 1;
+    return (
+      roomA.localeCompare(roomB, undefined, { numeric: true, sensitivity: 'base' }) ||
+      a.areaName.localeCompare(b.areaName)
+    );
+  });
+
+// A 24-hour clock time, e.g. 09:00 or 17:30
+export const timeSchema = z
+  .string()
+  .trim()
+  .min(1, { message: 'Time is required' })
+  .regex(/^([01]\d|2[0-3]):[0-5]\d$/, { message: 'Invalid time (HH:MM)' });
+
+// Completes a typed time on blur, e.g. 9 -> 09:00, 930 -> 09:30; anything
+// it cannot read is left as typed for the schema to flag
+export const formatTime = (value: string): string => {
+  let cleanValue = value.trim();
+  if (cleanValue) {
+    const m = moment(cleanValue, ['HH:mm', 'H:mm', 'HHmm', 'Hmm', 'H']);
+    if (m.isValid()) cleanValue = m.format('HH:mm');
+  }
+  return cleanValue;
+};
 
 export const completion = (items: CleaningLogItem[] = []) => {
   const total = items.length;

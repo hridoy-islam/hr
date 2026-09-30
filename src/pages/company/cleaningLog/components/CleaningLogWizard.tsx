@@ -1,23 +1,28 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 import Select from 'react-select';
 import {
-  ArrowLeft,
-  ArrowRight,
   CalendarDays,
   CalendarRange,
   Check,
   CheckCheck,
+  CheckCircle2,
   DoorOpen,
+  Info,
   Loader2,
   MapPin,
-  Search,
-  Send
+  RefreshCw,
+  Search
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger
+} from '@/components/ui/popover';
 import { useToast } from '@/components/ui/use-toast';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 import axiosInstance from '@/lib/axios';
@@ -29,28 +34,14 @@ import {
   CleaningEmployee,
   CleaningLogRecord,
   CleaningType,
+  formatTime,
   personName,
   SelectOption,
-  selectStyles
+  selectStyles,
+  sortAreasByRoom,
+  timeSchema
 } from '../shared';
-import { SignaturePad } from './SignaturePad';
-
-type StepKey =
-  | 'details'
-  | 'employee'
-  | 'type'
-  | 'area'
-  | 'elements'
-  | 'signature';
-
-const STEP_LABEL: Record<StepKey, string> = {
-  details: 'Employee, Type & Area',
-  employee: 'Select Employee',
-  type: 'Cleaning Type',
-  area: 'Select Area',
-  elements: 'Check Elements',
-  signature: 'Sign & Submit'
-};
+import { SignaturePad, SignaturePadHandle } from './SignaturePad';
 
 interface ChecklistRow {
   elementId: string;
@@ -58,9 +49,11 @@ interface ChecklistRow {
   performanceParameter: string;
 }
 
+type TimeField = 'startTime' | 'endTime';
+
 interface CleaningLogWizardProps {
   companyId: string;
-  // An admin logs on behalf of an employee and picks the type in the wizard;
+  // An admin logs on behalf of an employee and picks the type in the form;
   // an employee arrives with the type already chosen
   mode: 'admin' | 'employee';
   type?: CleaningType;
@@ -68,6 +61,29 @@ interface CleaningLogWizardProps {
   onSubmitted: (log: CleaningLogRecord) => void;
   onCancel?: () => void;
 }
+
+const TIME_LABEL: Record<TimeField, string> = {
+  startTime: 'Start time',
+  endTime: 'End time'
+};
+
+const validateTime = (field: TimeField, value: string) => {
+  if (!value.trim()) return `${TIME_LABEL[field]} is required`;
+  const result = timeSchema.safeParse(value);
+  return result.success ? '' : result.error.issues[0].message;
+};
+
+// Both fields together, so the end time can be checked against the start
+const validateTimes = (
+  times: Record<TimeField, string>
+): Record<TimeField, string> => {
+  const startTime = validateTime('startTime', times.startTime);
+  let endTime = validateTime('endTime', times.endTime);
+  // HH:MM strings sort the same way the times do
+  if (!startTime && !endTime && times.endTime < times.startTime)
+    endTime = 'End time cannot be earlier than start time';
+  return { startTime, endTime };
+};
 
 export function CleaningLogWizard({
   companyId,
@@ -79,21 +95,15 @@ export function CleaningLogWizard({
 }: CleaningLogWizardProps) {
   const { toast } = useToast();
   const { user } = useSelector((state: any) => state.auth);
-  const isEdit = Boolean(log);
-
-  const steps: StepKey[] =
-    mode === 'admin'
-      ? ['details', 'elements', 'signature']
-      : ['area', 'elements', 'signature'];
-
-  const [stepIndex, setStepIndex] = useState(0);
-  const step = steps[stepIndex];
+  const signatureRef = useRef<SignaturePadHandle>(null);
 
   const [employeeId, setEmployeeId] = useState(log?.employeeId?._id || '');
   const [type, setType] = useState<CleaningType | ''>(
     log?.type || fixedType || ''
   );
   const [areaId, setAreaId] = useState(log?.areaId || '');
+  // Once an area is picked the list folds away; "Change" brings it back
+  const [pickingArea, setPickingArea] = useState(!log?.areaId);
   const [checkedIds, setCheckedIds] = useState<Set<string>>(
     new Set(
       (log?.items || [])
@@ -101,10 +111,14 @@ export function CleaningLogWizard({
         .map((item) => String(item.elementId))
     )
   );
-  const [signatureUrl, setSignatureUrl] = useState(log?.signatureUrl || '');
-  const [signedAt, setSignedAt] = useState<string | null>(
-    log?.signedAt || null
-  );
+  const [times, setTimes] = useState<Record<TimeField, string>>({
+    startTime: log?.startTime || '',
+    endTime: log?.endTime || ''
+  });
+  const [timeErrors, setTimeErrors] = useState<Record<TimeField, string>>({
+    startTime: '',
+    endTime: ''
+  });
 
   const [employees, setEmployees] = useState<CleaningEmployee[]>([]);
   const [areas, setAreas] = useState<CleaningArea[]>([]);
@@ -113,15 +127,20 @@ export function CleaningLogWizard({
   const [loadingAreas, setLoadingAreas] = useState(false);
   const [loadingRows, setLoadingRows] = useState(false);
   const [error, setError] = useState('');
+  const [signatureError, setSignatureError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // The type buttons outside the wizard can change it for an employee
+  const resetArea = () => {
+    setAreaId('');
+    setCheckedIds(new Set());
+    setPickingArea(true);
+  };
+
+  // The type buttons outside the form can change it for an employee
   useEffect(() => {
     if (fixedType && fixedType !== type) {
       setType(fixedType);
-      setAreaId('');
-      setCheckedIds(new Set());
-      setStepIndex(0);
+      resetArea();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fixedType]);
@@ -144,7 +163,7 @@ export function CleaningLogWizard({
       .get('/cleaning-area', {
         params: { companyId, type, limit: 'all', sort: 'areaName' }
       })
-      .then((res) => setAreas(res.data?.data?.result || []))
+      .then((res) => setAreas(sortAreasByRoom(res.data?.data?.result || [])))
       .catch(() => setAreas([]))
       .finally(() => setLoadingAreas(false));
   }, [companyId, type]);
@@ -189,10 +208,10 @@ export function CleaningLogWizard({
     label: personName(employee)
   }));
 
-  const selectedEmployee = employees.find((emp) => emp._id === employeeId);
   const selectedArea = areas.find((area) => area._id === areaId);
   const selectedAreaName = selectedArea?.areaName || log?.areaName || '';
   const selectedRoom = selectedArea ? selectedArea.roomNumber : log?.roomNumber;
+  const selectedTotal = selectedArea?.totalElement ?? rows.length;
 
   const filteredAreas = useMemo(() => {
     const needle = areaSearch.trim().toLowerCase();
@@ -204,6 +223,8 @@ export function CleaningLogWizard({
     );
   }, [areas, areaSearch]);
 
+  const showChecklist = Boolean(areaId) && !pickingArea;
+
   const toggleRow = (elementId: string) =>
     setCheckedIds((current) => {
       const next = new Set(current);
@@ -212,66 +233,98 @@ export function CleaningLogWizard({
       return next;
     });
 
-  const allChecked = rows.length > 0 && rows.every((row) => checkedIds.has(row.elementId));
+  const allChecked =
+    rows.length > 0 && rows.every((row) => checkedIds.has(row.elementId));
 
   const toggleAll = () =>
-    setCheckedIds(allChecked ? new Set() : new Set(rows.map((row) => row.elementId)));
+    setCheckedIds(
+      allChecked ? new Set() : new Set(rows.map((row) => row.elementId))
+    );
 
-  const validateStep = (key: StepKey): string => {
-    // The admin's first step holds the employee, the type and the area
-    if (key === 'details')
-      return (
-        validateStep('employee') || validateStep('type') || validateStep('area')
-      );
-    if (key === 'employee' && !employeeId) return 'Please select an employee';
-    if (key === 'type' && !type) return 'Please choose daily or monthly';
-    if (key === 'area' && !areaId) return 'Please select an area';
-    if (key === 'elements' && rows.length === 0)
+  const updateTime = (field: TimeField, value: string) => {
+    const next = { ...times, [field]: value };
+    setTimes(next);
+    // Once an error shows, it clears as soon as the value turns valid
+    if (timeErrors.startTime || timeErrors.endTime) {
+      const errors = validateTimes(next);
+      setTimeErrors((current) => ({
+        startTime: current.startTime && errors.startTime,
+        endTime: current.endTime && errors.endTime
+      }));
+    }
+  };
+
+  const blurTime = (field: TimeField, value: string) => {
+    const next = { ...times, [field]: formatTime(value) };
+    setTimes(next);
+    const errors = validateTimes(next);
+    // The other field is only flagged once it has been filled in
+    setTimeErrors((current) => ({
+      ...current,
+      [field]: errors[field],
+      endTime:
+        field === 'endTime' || next.endTime ? errors.endTime : current.endTime
+    }));
+  };
+
+  const validate = (): string => {
+    if (mode === 'admin' && !employeeId) return 'Please select an employee';
+    if (!type) return 'Please choose daily or monthly';
+    if (!areaId) return 'Please select an area';
+    if (rows.length === 0)
       return 'This area has no elements yet. Ask an admin to add them first.';
-    if (key === 'signature' && !signatureUrl)
-      return 'Please sign and save your signature';
+
+    const nextTimeErrors = validateTimes(times);
+    setTimeErrors(nextTimeErrors);
+    if (nextTimeErrors.startTime || nextTimeErrors.endTime)
+      return 'Please enter a valid start and end time';
+
+    if (signatureRef.current?.isEmpty() ?? true) {
+      setSignatureError('Please sign inside the box');
+      return 'Please sign before completing';
+    }
     return '';
   };
 
-  const goNext = () => {
-    const message = validateStep(step);
+  const handleComplete = async () => {
+    const message = validate();
     if (message) {
       setError(message);
       return;
     }
     setError('');
-    setStepIndex((index) => Math.min(index + 1, steps.length - 1));
-  };
-
-  const goBack = () => {
-    setError('');
-    setStepIndex((index) => Math.max(index - 1, 0));
-  };
-
-  const handleSubmit = async () => {
-    for (const key of steps) {
-      const message = validateStep(key);
-      if (message) {
-        setError(message);
-        setStepIndex(steps.indexOf(key));
-        return;
-      }
-    }
-
-    const payload = {
-      companyId,
-      ...(mode === 'admin' ? { employeeId } : {}),
-      areaId,
-      items: rows.map((row) => ({
-        elementId: row.elementId,
-        checked: checkedIds.has(row.elementId)
-      })),
-      signatureUrl,
-      signedAt
-    };
+    setSignatureError('');
 
     try {
       setIsSubmitting(true);
+
+      // The signature is uploaded first; the log is only saved once its url
+      // is back
+      let signature;
+      try {
+        signature = await signatureRef.current!.save();
+      } catch {
+        toast({
+          title: 'Failed to save the signature. Please try again.',
+          className: 'bg-red-500 border-none text-white'
+        });
+        return;
+      }
+
+      const payload = {
+        companyId,
+        ...(mode === 'admin' ? { employeeId } : {}),
+        areaId,
+        items: rows.map((row) => ({
+          elementId: row.elementId,
+          checked: checkedIds.has(row.elementId)
+        })),
+        startTime: times.startTime,
+        endTime: times.endTime,
+        signatureUrl: signature.signatureUrl,
+        signedAt: signature.signedAt
+      };
+
       const response = log
         ? await axiosInstance.patch(`/cleaning-log/${log._id}`, payload)
         : await axiosInstance.post('/cleaning-log', payload);
@@ -293,74 +346,11 @@ export function CleaningLogWizard({
     }
   };
 
-  const renderStepper = () => (
-    <div className="border-b border-gray-100 px-4 py-4 sm:px-6">
-      {/* Phones get a compact progress bar, wider screens the full stepper */}
-      <div className="sm:hidden">
-        <div className="flex items-center justify-between text-xs font-semibold text-black">
-          <span>
-            Step {stepIndex + 1} of {steps.length}
-          </span>
-          <span className="text-theme">{STEP_LABEL[step]}</span>
-        </div>
-        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-100">
-          <div
-            className="h-full rounded-full bg-theme transition-all duration-300"
-            style={{ width: `${((stepIndex + 1) / steps.length) * 100}%` }}
-          />
-        </div>
-      </div>
-
-      <ol className="hidden items-center sm:flex">
-        {steps.map((key, index) => {
-          const isDone = index < stepIndex;
-          const isCurrent = index === stepIndex;
-          return (
-            <li
-              key={key}
-              className={cn('flex items-center', index < steps.length - 1 && 'flex-1')}
-            >
-              <button
-                type="button"
-                disabled={index > stepIndex}
-                onClick={() => {
-                  setError('');
-                  setStepIndex(index);
-                }}
-                className="flex items-center gap-2 disabled:cursor-not-allowed"
-              >
-                <span
-                  className={cn(
-                    'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold transition-colors',
-                    isDone && 'bg-theme text-white',
-                    isCurrent && 'bg-theme text-white ring-4 ring-theme/20',
-                    !isDone && !isCurrent && 'bg-gray-100 text-black'
-                  )}
-                >
-                  {isDone ? <Check className="h-4 w-4" /> : index + 1}
-                </span>
-                <span
-                  className={cn(
-                    'whitespace-nowrap text-xs font-semibold lg:text-sm',
-                    isCurrent || isDone ? 'text-black' : 'text-black'
-                  )}
-                >
-                  {STEP_LABEL[key]}
-                </span>
-              </button>
-              {index < steps.length - 1 && (
-                <span
-                  className={cn(
-                    'mx-3 h-0.5 flex-1 rounded-full',
-                    isDone ? 'bg-theme' : 'bg-gray-200'
-                  )}
-                />
-              )}
-            </li>
-          );
-        })}
-      </ol>
-    </div>
+  const renderSection = (title: string, children: React.ReactNode) => (
+    <section className="space-y-3">
+      <h3 className="text-sm font-bold text-black sm:text-base">{title}</h3>
+      {children}
+    </section>
   );
 
   const renderTypeCard = (value: CleaningType) => {
@@ -373,8 +363,7 @@ export function CleaningLogWizard({
         onClick={() => {
           if (type !== value) {
             setType(value);
-            setAreaId('');
-            setCheckedIds(new Set());
+            resetArea();
           }
           setError('');
         }}
@@ -408,294 +397,307 @@ export function CleaningLogWizard({
     );
   };
 
-  const renderStepBody = (key: StepKey = step): React.ReactNode => {
-    switch (key) {
-      case 'details':
-        return (
-          <div className="space-y-6">
-            {renderStepBody('employee')}
+  const renderAreaCard = (
+    area: { _id?: string; areaName: string; roomNumber?: string; totalElement?: number },
+    active: boolean,
+    onClick?: () => void
+  ) => (
+    <button
+      key={area._id}
+      type="button"
+      onClick={onClick}
+      disabled={!onClick}
+      className={cn(
+        'flex w-full items-start gap-3 rounded-xl border-2 p-4 text-left transition-all disabled:cursor-default',
+        active
+          ? 'border-theme bg-theme/5 shadow-sm'
+          : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+      )}
+    >
+      <span
+        className={cn(
+          'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg',
+          active ? 'bg-theme text-white' : 'bg-gray-100 text-black'
+        )}
+      >
+        <MapPin className="h-5 w-5" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block break-words text-sm font-semibold text-black">
+          {area.areaName}
+        </span>
+        <span className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-black">
+          {area.roomNumber && (
+            <span className="inline-flex items-center gap-1">
+              <DoorOpen className="h-3 w-3" /> Room {area.roomNumber}
+            </span>
+          )}
+          <span>
+            {area.totalElement || 0}{' '}
+            {area.totalElement === 1 ? 'element' : 'elements'}
+          </span>
+        </span>
+      </span>
+      {active && <Check className="h-5 w-5 shrink-0 text-theme" />}
+    </button>
+  );
 
-            <div className="space-y-2">
-              <p className="text-sm font-semibold text-black">Cleaning Type*</p>
-              {renderStepBody('type')}
-            </div>
+  const renderAreaPicker = () => {
+    if (!type) {
+      return (
+        <div className="rounded-xl border border-dashed border-gray-200 py-8 text-center text-sm text-black">
+          Choose daily or monthly to see its areas.
+        </div>
+      );
+    }
 
-            <div className="space-y-2">
-              <p className="text-sm font-semibold text-black">Area*</p>
-              {type ? (
-                renderStepBody('area')
-              ) : (
-                <div className="rounded-xl border border-dashed border-gray-200 py-8 text-center text-sm text-black">
-                  Choose daily or monthly to see its areas.
-                </div>
-              )}
-            </div>
-          </div>
-        );
-
-      case 'employee':
-        return (
-          <div className="max-w-lg space-y-2">
-            <p className="text-sm font-semibold text-black">Employee*</p>
-            <Select
-              options={employeeOptions}
-              value={employeeOptions.find((opt) => opt.value === employeeId) || null}
-              onChange={(option: any) => {
-                setEmployeeId(option?.value || '');
-                setError('');
-              }}
-              placeholder="Search and select an employee..."
-              styles={selectStyles}
-              menuPortalTarget={document.body}
-              noOptionsMessage={() =>
-                'No employee is assigned to the cleaning module yet'
-              }
-            />
-            <p className="text-xs text-black">
-              Only employees added to the cleaning module are listed.
-            </p>
-          </div>
-        );
-
-      case 'type':
-        return (
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            {renderTypeCard('daily')}
-            {renderTypeCard('monthly')}
-          </div>
-        );
-
-      case 'area':
-        return (
-          <div className="space-y-3">
-            <div className="relative max-w-md">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-black" />
-              <Input
-                value={areaSearch}
-                onChange={(e) => setAreaSearch(e.target.value)}
-                placeholder="Search area or room..."
-                className="pl-9"
-              />
-            </div>
-
-            {loadingAreas ? (
-              <div className="flex justify-center py-10">
-                <BlinkingDots size="large" color="bg-theme" />
-              </div>
-            ) : filteredAreas.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-gray-200 py-10 text-center text-sm text-black">
-                {areas.length === 0
-                  ? `No ${type ? CLEANING_TYPE_LABEL[type].toLowerCase() : ''} area has been set up yet.`
-                  : 'No area matches this search.'}
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                {filteredAreas.map((area) => {
-                  const active = area._id === areaId;
-                  return (
-                    <button
-                      key={area._id}
-                      type="button"
-                      onClick={() => {
-                        if (area._id !== areaId) {
-                          setAreaId(area._id);
-                          setCheckedIds(new Set());
-                        }
-                        setError('');
-                      }}
-                      className={cn(
-                        'flex items-start gap-3 rounded-xl border-2 p-4 text-left transition-all',
-                        active
-                          ? 'border-theme bg-theme/5 shadow-sm'
-                          : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg',
-                          active ? 'bg-theme text-white' : 'bg-gray-100 text-black'
-                        )}
-                      >
-                        <MapPin className="h-5 w-5" />
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block break-words text-sm font-semibold text-black">
-                          {area.areaName}
-                        </span>
-                        <span className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-black">
-                          {area.roomNumber && (
-                            <span className="inline-flex items-center gap-1">
-                              <DoorOpen className="h-3 w-3" /> Room {area.roomNumber}
-                            </span>
-                          )}
-                          <span>
-                            {area.totalElement || 0}{' '}
-                            {area.totalElement === 1 ? 'element' : 'elements'}
-                          </span>
-                        </span>
-                      </span>
-                      {active && <Check className="h-5 w-5 shrink-0 text-theme" />}
-                    </button>
-                  );
-                })}
-              </div>
+    // Picked: only the chosen area stays on screen
+    if (showChecklist) {
+      return (
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="min-w-0 flex-1 sm:max-w-md">
+            {renderAreaCard(
+              {
+                areaName: selectedAreaName,
+                roomNumber: selectedRoom,
+                totalElement: selectedTotal
+              },
+              true
             )}
           </div>
-        );
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={isSubmitting}
+            onClick={() => setPickingArea(true)}
+          >
+            <RefreshCw className="mr-1.5 h-4 w-4" /> Change area
+          </Button>
+        </div>
+      );
+    }
 
-      case 'elements':
-        return loadingRows ? (
+    return (
+      <div className="space-y-3">
+        <div className="relative max-w-md">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-black" />
+          <Input
+            value={areaSearch}
+            onChange={(e) => setAreaSearch(e.target.value)}
+            placeholder="Search area or room..."
+            className="pl-9"
+          />
+        </div>
+
+        {loadingAreas ? (
           <div className="flex justify-center py-10">
             <BlinkingDots size="large" color="bg-theme" />
           </div>
-        ) : rows.length === 0 ? (
+        ) : filteredAreas.length === 0 ? (
           <div className="rounded-xl border border-dashed border-gray-200 py-10 text-center text-sm text-black">
-            This area has no elements yet.
+            {areas.length === 0
+              ? `No ${CLEANING_TYPE_LABEL[type].toLowerCase()} area has been set up yet.`
+              : 'No area matches this search.'}
           </div>
         ) : (
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-sm text-black">
-                <span className="font-semibold">{checkedIds.size}</span> of{' '}
-                {rows.length} checked
-                <span className="ml-1 text-xs text-black">
-                  (tick the elements you have cleaned)
-                </span>
-              </p>
-              <Button type="button" variant="outline" size="sm" onClick={toggleAll}>
-                <CheckCheck className="mr-1.5 h-4 w-4" />
-                {allChecked ? 'Uncheck all' : 'Check all'}
-              </Button>
-            </div>
-
-            <div className="overflow-hidden rounded-xl border border-gray-200">
-              <div className="hidden grid-cols-[48px_minmax(0,2fr)_minmax(0,3fr)] bg-gray-50 text-xs font-bold uppercase tracking-wider text-black md:grid">
-                <span className="px-3 py-2.5" />
-                <span className="px-3 py-2.5">Element</span>
-                <span className="px-3 py-2.5">Performance Parameter</span>
-              </div>
-              <ul className="divide-y divide-gray-100">
-                {rows.map((row) => {
-                  const checked = checkedIds.has(row.elementId);
-                  return (
-                    <li key={row.elementId}>
-                      <label
-                        className={cn(
-                          'grid cursor-pointer grid-cols-[40px_minmax(0,1fr)] gap-y-1 px-1 py-3 transition-colors md:grid-cols-[48px_minmax(0,2fr)_minmax(0,3fr)] md:px-0',
-                          checked ? 'bg-emerald-50/60' : 'hover:bg-gray-50'
-                        )}
-                      >
-                        <span className="flex justify-center pt-0.5">
-                          <Checkbox
-                            checked={checked}
-                            onCheckedChange={() => toggleRow(row.elementId)}
-                          />
-                        </span>
-                        <span className="px-2 text-sm font-semibold text-black md:px-3">
-                          {row.element}
-                        </span>
-                        <span className="col-start-2 whitespace-pre-wrap px-2 text-xs leading-relaxed text-black md:col-start-3 md:px-3 md:text-sm">
-                          {row.performanceParameter}
-                        </span>
-                      </label>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {filteredAreas.map((area) =>
+              renderAreaCard(area, area._id === areaId, () => {
+                if (area._id !== areaId) {
+                  setAreaId(area._id);
+                  setCheckedIds(new Set());
+                }
+                setPickingArea(false);
+                setAreaSearch('');
+                setError('');
+              })
+            )}
           </div>
-        );
-
-      case 'signature':
-        return (
-          <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
-            <div className="space-y-3 rounded-xl bg-gray-50 p-4">
-              <p className="text-xs font-bold uppercase tracking-wider text-black">
-                Summary
-              </p>
-              <dl className="space-y-2 text-sm">
-                {mode === 'admin' && (
-                  <div className="flex justify-between gap-3">
-                    <dt className="text-black">Employee</dt>
-                    <dd className="text-right font-medium text-black">
-                      {selectedEmployee
-                        ? personName(selectedEmployee)
-                        : personName(log?.employeeId)}
-                    </dd>
-                  </div>
-                )}
-                <div className="flex justify-between gap-3">
-                  <dt className="text-black">Type</dt>
-                  <dd className="font-medium text-black">
-                    {type ? CLEANING_TYPE_LABEL[type] : '-'}
-                  </dd>
-                </div>
-                <div className="flex justify-between gap-3">
-                  <dt className="text-black">Area</dt>
-                  <dd className="text-right font-medium text-black">
-                    {selectedAreaName || '-'}
-                  </dd>
-                </div>
-                {selectedRoom && (
-                  <div className="flex justify-between gap-3">
-                    <dt className="text-black">Room</dt>
-                    <dd className="font-medium text-black">{selectedRoom}</dd>
-                  </div>
-                )}
-                <div className="flex justify-between gap-3">
-                  <dt className="text-black">Checked</dt>
-                  <dd className="font-medium text-black">
-                    {checkedIds.size} / {rows.length}
-                  </dd>
-                </div>
-              </dl>
-            </div>
-
-            <div className="space-y-2">
-              <p className="text-sm font-semibold text-black">Signature*</p>
-              <SignaturePad
-                entityId={user?._id || companyId}
-                signatureUrl={signatureUrl}
-                signedAt={signedAt}
-                onChange={(url, at) => {
-                  setSignatureUrl(url);
-                  setSignedAt(at);
-                  setError('');
-                }}
-              />
-            </div>
-          </div>
-        );
-
-      default:
-        return null;
-    }
+        )}
+      </div>
+    );
   };
 
-  const isLastStep = stepIndex === steps.length - 1;
+  const renderElements = () =>
+    loadingRows ? (
+      <div className="flex justify-center py-10">
+        <BlinkingDots size="large" color="bg-theme" />
+      </div>
+    ) : rows.length === 0 ? (
+      <div className="rounded-xl border border-dashed border-gray-200 py-10 text-center text-sm text-black">
+        This area has no elements yet.
+      </div>
+    ) : (
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm text-black">
+            <span className="font-semibold">{checkedIds.size}</span> of{' '}
+            {rows.length} checked
+            <span className="ml-1 text-xs text-black">
+              (tick the elements you have cleaned)
+            </span>
+          </p>
+          <Button type="button" variant="outline" size="sm" onClick={toggleAll}>
+            <CheckCheck className="mr-1.5 h-4 w-4" />
+            {allChecked ? 'Uncheck all' : 'Check all'}
+          </Button>
+        </div>
+
+        <ul className="grid grid-cols-1 gap-2 md:grid-cols-2">
+          {rows.map((row) => {
+            const checked = checkedIds.has(row.elementId);
+            return (
+              <li
+                key={row.elementId}
+                className={cn(
+                  'flex items-center gap-2 rounded-xl border px-3 py-2.5 transition-colors',
+                  checked
+                    ? 'border-emerald-200 bg-emerald-50/60'
+                    : 'border-gray-200 hover:bg-gray-50'
+                )}
+              >
+                <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3">
+                  <Checkbox
+                    checked={checked}
+                    onCheckedChange={() => toggleRow(row.elementId)}
+                  />
+                  <span className="break-words text-sm font-semibold text-black">
+                    {row.element}
+                  </span>
+                </label>
+
+                {row.performanceParameter && (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        aria-label={`Performance parameter for ${row.element}`}
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-black transition-colors hover:bg-theme/10 hover:text-theme"
+                      >
+                        <Info className="h-4 w-4" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      side="top"
+                      align="end"
+                      className="w-72 max-w-[calc(100vw-2rem)] bg-white p-3 text-black"
+                    >
+                      <p className="text-xs font-bold uppercase tracking-wider text-black">
+                        Performance Parameter
+                      </p>
+                      <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-black">
+                        {row.performanceParameter}
+                      </p>
+                    </PopoverContent>
+                  </Popover>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    );
+
+  const renderTimeInput = (field: TimeField, label: string, placeholder: string) => (
+    <div className="space-y-1.5">
+      <p className="text-sm font-semibold text-black">{label}*</p>
+      <Input
+        value={times[field]}
+        placeholder={placeholder}
+        maxLength={5}
+        disabled={isSubmitting}
+        className={`mt-1 font-mono ${timeErrors[field] ? 'border-red-500' : ''}`}
+        onChange={(e) => {
+          let val = e.target.value.replace(/[^0-9:]/g, '').slice(0, 5);
+          if (
+            val.length === 2 &&
+            times[field].length === 1 &&
+            !val.includes(':')
+          )
+            val += ':';
+          updateTime(field, val);
+        }}
+        onBlur={(e) => blurTime(field, e.target.value)}
+      />
+      {timeErrors[field] && (
+        <p className="text-xs font-medium text-red-500">{timeErrors[field]}</p>
+      )}
+    </div>
+  );
+
+  const renderSignature = () => (
+    <div className="space-y-4">
+      <div className="grid max-w-md grid-cols-2 gap-3">
+        {renderTimeInput('startTime', 'Start Time (HH:MM)', '09:00')}
+        {renderTimeInput('endTime', 'End Time (HH:MM)', '10:00')}
+      </div>
+
+      <div className="max-w-xl space-y-2">
+        <p className="text-sm font-semibold text-black">Signature*</p>
+        <SignaturePad
+          ref={signatureRef}
+          entityId={user?._id || companyId}
+          signatureUrl={log?.signatureUrl || ''}
+          signedAt={log?.signedAt || null}
+          disabled={isSubmitting}
+          error={signatureError}
+          onDraw={() => setSignatureError('')}
+        />
+      </div>
+    </div>
+  );
 
   return (
     <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-      {renderStepper()}
+      <div className="space-y-6 px-4 py-5 sm:px-6">
+        {mode === 'admin' && (
+          <>
+            {renderSection(
+              'Employee*',
+              <div className="max-w-lg space-y-2">
+                <Select
+                  options={employeeOptions}
+                  value={
+                    employeeOptions.find((opt) => opt.value === employeeId) || null
+                  }
+                  onChange={(option: any) => {
+                    setEmployeeId(option?.value || '');
+                    setError('');
+                  }}
+                  placeholder="Search and select an employee..."
+                  styles={selectStyles}
+                  menuPortalTarget={document.body}
+                  noOptionsMessage={() =>
+                    'No employee is assigned to the cleaning module yet'
+                  }
+                />
+                <p className="text-xs text-black">
+                  Only employees added to the cleaning module are listed.
+                </p>
+              </div>
+            )}
 
-      <div className="px-4 py-5 sm:px-6">
-        <div className="mb-4">
-          <h3 className="text-base font-bold text-black sm:text-lg">
-            {STEP_LABEL[step]}
-          </h3>
-          {selectedAreaName && (step === 'elements' || step === 'signature') && (
-            <p className="text-xs text-black sm:text-sm">
-              {selectedAreaName}
-              {selectedRoom ? ` · Room ${selectedRoom}` : ''}
-              {type ? ` · ${CLEANING_TYPE_LABEL[type]}` : ''}
-            </p>
-          )}
-        </div>
+            {renderSection(
+              'Cleaning Type*',
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                {renderTypeCard('daily')}
+                {renderTypeCard('monthly')}
+              </div>
+            )}
+          </>
+        )}
 
-        {renderStepBody()}
+        {renderSection('Area*', renderAreaPicker())}
+
+        {showChecklist && renderSection('Check Elements', renderElements())}
+
+        {showChecklist &&
+          rows.length > 0 &&
+          renderSection('Sign & Complete', renderSignature())}
 
         {error && (
-          <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-600 sm:text-sm">
+          <p className="rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-600 sm:text-sm">
             {error}
           </p>
         )}
@@ -703,36 +705,25 @@ export function CleaningLogWizard({
 
       <div className="flex flex-col-reverse gap-2 border-t border-gray-100 bg-gray-50/60 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <div className="flex gap-2">
-          {stepIndex > 0 ? (
+          {/* {onCancel && (
             <Button
               type="button"
               variant="outline"
               className="flex-1 sm:flex-none"
-              onClick={goBack}
               disabled={isSubmitting}
+              onClick={onCancel}
             >
-              <ArrowLeft className="mr-1.5 h-4 w-4" /> Back
+              Cancel
             </Button>
-          ) : (
-            onCancel && (
-              <Button
-                type="button"
-                variant="outline"
-                className="flex-1 sm:flex-none"
-                onClick={onCancel}
-              >
-                Cancel
-              </Button>
-            )
-          )}
+          )} */}
         </div>
 
-        {isLastStep ? (
+        {showChecklist && rows.length > 0 && (
           <Button
             type="button"
             className="bg-theme text-white hover:bg-theme/90"
             disabled={isSubmitting}
-            onClick={handleSubmit}
+            onClick={handleComplete}
           >
             {isSubmitting ? (
               <>
@@ -740,18 +731,9 @@ export function CleaningLogWizard({
               </>
             ) : (
               <>
-                <Send className="mr-1.5 h-4 w-4" />
-                {isEdit ? 'Update Log' : 'Submit Log'}
+                <CheckCircle2 className="mr-1.5 h-4 w-4" /> Complete
               </>
             )}
-          </Button>
-        ) : (
-          <Button
-            type="button"
-            className="bg-theme text-white hover:bg-theme/90"
-            onClick={goNext}
-          >
-            Next <ArrowRight className="ml-1.5 h-4 w-4" />
           </Button>
         )}
       </div>

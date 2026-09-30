@@ -6,6 +6,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Eye,
+  ListChecks,
   Pencil,
   SprayCan,
   Trash2
@@ -50,6 +51,27 @@ export const CheckDot = ({ log }: { log: CleaningLogRecord }) => {
           : 'bg-yellow-400 ring-yellow-100'
       )}
     />
+  );
+};
+
+// How much of the checklist was ticked, e.g. "2/4"
+export const ChecklistStatus = ({ log }: { log: CleaningLogRecord }) => {
+  const { done, total } = completion(log.items);
+  const allChecked = total > 0 && done === total;
+
+  return (
+    <span
+      title={`${done} of ${total} elements checked`}
+      className={cn(
+        'inline-flex items-center gap-1 text-xs font-semibold sm:text-sm',
+        allChecked ? 'text-emerald-600' : 'text-amber-600'
+      )}
+    >
+      <ListChecks className="h-4 w-4 shrink-0" />
+      <span className="tabular-nums">
+        {done}/{total}
+      </span>
+    </span>
   );
 };
 
@@ -212,9 +234,12 @@ export function CleaningLogTimeline({
 
         {/* Details and actions */}
         <div className="flex flex-wrap items-center gap-2 lg:shrink-0 lg:gap-1">
-          <div className="flex w-full items-center gap-2 text-xs font-medium text-black sm:text-sm lg:mr-4 lg:w-auto">
-            <span className="tracking-wider">Signed At</span>
-            <span>{moment(log.signedAt).format('h:mm A')}</span>
+          <div className="flex w-full items-center gap-4 text-xs font-medium text-black sm:text-sm lg:mr-4 lg:w-auto">
+            <ChecklistStatus log={log} />
+            <span className="flex items-center gap-2">
+              <span className="tracking-wider">Signed At</span>
+              <span>{moment(log.signedAt).format('h:mm A')}</span>
+            </span>
           </div>
 
           {showEmployee && (

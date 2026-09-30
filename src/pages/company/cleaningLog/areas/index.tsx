@@ -44,7 +44,13 @@ import { useToast } from '@/components/ui/use-toast';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 import axiosInstance from '@/lib/axios';
 import { cn } from '@/lib/utils';
-import { apiError, CLEANING_TYPE_LABEL, CleaningArea, CleaningType } from '../shared';
+import {
+  apiError,
+  CLEANING_TYPE_LABEL,
+  CleaningArea,
+  CleaningType,
+  sortAreasByRoom
+} from '../shared';
 
 const areaSchema = z.object({
   areaName: z
@@ -79,7 +85,7 @@ export default function CleaningAreaPage() {
       const response = await axiosInstance.get('/cleaning-area', {
         params: { companyId: id, limit: 'all', sort: 'areaName' }
       });
-      setAreas(response.data?.data?.result || []);
+      setAreas(sortAreasByRoom(response.data?.data?.result || []));
     } catch (error) {
       console.error('Error fetching areas:', error);
     } finally {
