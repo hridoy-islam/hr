@@ -18,6 +18,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Popover,
   PopoverContent,
@@ -115,6 +116,7 @@ export function CleaningLogWizard({
     startTime: log?.startTime || '',
     endTime: log?.endTime || ''
   });
+  const [note, setNote] = useState(log?.note || '');
   const [timeErrors, setTimeErrors] = useState<Record<TimeField, string>>({
     startTime: '',
     endTime: ''
@@ -321,6 +323,7 @@ export function CleaningLogWizard({
         })),
         startTime: times.startTime,
         endTime: times.endTime,
+        note: note.trim(),
         signatureUrl: signature.signatureUrl,
         signedAt: signature.signedAt
       };
@@ -631,6 +634,16 @@ export function CleaningLogWizard({
       <div className="grid max-w-md grid-cols-2 gap-3">
         {renderTimeInput('startTime', 'Start Time (HH:MM)', '09:00')}
         {renderTimeInput('endTime', 'End Time (HH:MM)', '10:00')}
+      </div>
+
+      <div className="max-w-xl space-y-2">
+        <p className="text-sm font-semibold text-black">Note</p>
+        <Textarea
+          value={note}
+          placeholder="Add a note (optional)..."
+          disabled={isSubmitting}
+          onChange={(e) => setNote(e.target.value)}
+        />
       </div>
 
       <div className="max-w-xl space-y-2">

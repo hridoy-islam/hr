@@ -122,6 +122,17 @@ export function CleaningLogDetailsBody({ log }: { log: CleaningLogRecord }) {
         </div>
       </div>
 
+      {log.note && (
+        <div className="space-y-2">
+          <p className="text-xs font-bold uppercase tracking-wider text-black">
+            Note
+          </p>
+          <p className="whitespace-pre-wrap line-clamp-2 rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm text-black">
+            {log.note}
+          </p>
+        </div>
+      )}
+
       <div className="space-y-2">
         <p className="text-xs font-bold uppercase tracking-wider text-black">
           Signature

@@ -55,6 +55,7 @@ export interface CleaningLogRecord {
   type: CleaningType;
   items: CleaningLogItem[];
   signatureUrl: string;
+  note?: string;
   signedAt: string;
   startTime?: string;
   endTime?: string;
