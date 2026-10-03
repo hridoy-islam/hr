@@ -28,6 +28,27 @@ export const CleaningLogTitle = ({ log }: { log: CleaningLogRecord }) => (
   </>
 );
 
+function formatTime(timeStr?: string): string {
+  if (!timeStr) return '';
+
+  // If already in 24-hour "HH:mm" format (e.g. "03:00"), return it directly
+  if (/^\d{2}:\d{2}$/.test(timeStr)) {
+    return timeStr;
+  }
+
+  // If it's a full ISO date string, format to 24-hour time (HH:mm) without AM/PM
+  const date = new Date(timeStr);
+  if (!isNaN(date.getTime())) {
+    return date.toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
+  }
+
+  return formatDateTime(timeStr);
+}
+
 // Details, checklist and signature - shared by the employee's popup and the
 // admin's details page
 export function CleaningLogDetailsBody({ log }: { log: CleaningLogRecord }) {
@@ -50,7 +71,10 @@ export function CleaningLogDetailsBody({ log }: { log: CleaningLogRecord }) {
     <div className="space-y-5">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {renderDetail('Employee', personName(log.employeeId))}
+        {log.startTime && renderDetail('Start Time', formatTime(log.startTime))}
+        {log.endTime && renderDetail('End Time', formatTime(log.endTime))}
         {renderDetail('Signed At', formatDateTime(log.signedAt))}
+
         {renderDetail('Submitted At', formatDateTime(log.createdAt))}
         {filedByOther && renderDetail('Created By', personName(log.createdBy))}
         {log.updatedBy &&
@@ -76,8 +100,7 @@ export function CleaningLogDetailsBody({ log }: { log: CleaningLogRecord }) {
               <li
                 key={`${item.elementId || index}`}
                 className={cn(
-                  'grid grid-cols-[36px_minmax(0,1fr)] gap-y-1 py-2.5 sm:grid-cols-[40px_minmax(0,2fr)_minmax(0,3fr)]',
-                 
+                  'grid grid-cols-[36px_minmax(0,1fr)] gap-y-1 py-2.5 sm:grid-cols-[40px_minmax(0,2fr)_minmax(0,3fr)]'
                 )}
               >
                 <span className="flex justify-center pt-0.5">

@@ -132,6 +132,8 @@ export const completion = (items: CleaningLogItem[] = []) => {
   return { done, total, percent: total ? Math.round((done / total) * 100) : 0 };
 };
 
+
+
 export const formatDateTime = (date?: string | Date) =>
   date ? moment(date).format('DD MMM YYYY, h:mm A') : '-';
 
