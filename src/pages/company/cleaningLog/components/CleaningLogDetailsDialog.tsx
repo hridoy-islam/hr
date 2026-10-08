@@ -73,16 +73,16 @@ export function CleaningLogDetailsBody({ log }: { log: CleaningLogRecord }) {
         {renderDetail('Employee', personName(log.employeeId))}
         {log.startTime && renderDetail('Start Time', formatTime(log.startTime))}
         {log.endTime && renderDetail('End Time', formatTime(log.endTime))}
-        {renderDetail('Signed At', formatDateTime(log.signedAt))}
+        {/* {renderDetail('Signed At', formatDateTime(log.signedAt))}
 
-        {renderDetail('Submitted At', formatDateTime(log.createdAt))}
-        {filedByOther && renderDetail('Created By', personName(log.createdBy))}
+        {renderDetail('Submitted At', formatDateTime(log.createdAt))} */}
+        {/* {filedByOther && renderDetail('Created By', personName(log.createdBy))} */}
         {log.updatedBy &&
           renderDetail(
             'Last Edited',
             `${personName(log.updatedBy)} · ${formatDateTime(log.updatedAt)}`
           )}
-        {renderDetail('Checked', `${done} of ${total} elements`)}
+        {/* {renderDetail('Checked', `${done} of ${total} elements`)} */}
       </div>
 
       <div className="space-y-2">

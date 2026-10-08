@@ -21,6 +21,13 @@ export interface CleaningArea {
   type: CleaningType;
   roomNumber?: string;
   totalElement?: number;
+  // Only sent to the log form: the log that already covers this area today
+  // (daily) or this month (monthly)
+  completion?: {
+    logId: string;
+    employeeId?: CleaningEmployee;
+    completedAt: string;
+  } | null;
 }
 
 export interface CleaningElement {

@@ -8,6 +8,7 @@ import {
   CheckCheck,
   CheckCircle2,
   DoorOpen,
+  Lock,
   Info,
   Loader2,
   MapPin,
@@ -35,6 +36,7 @@ import {
   CleaningEmployee,
   CleaningLogRecord,
   CleaningType,
+  formatDateTime,
   formatTime,
   personName,
   SelectOption,
@@ -163,12 +165,23 @@ export function CleaningLogWizard({
     setLoadingAreas(true);
     axiosInstance
       .get('/cleaning-area', {
-        params: { companyId, type, limit: 'all', sort: 'areaName' }
+        params: {
+          companyId,
+          type,
+          limit: 'all',
+          sort: 'areaName',
+          // Marks areas already done this day / month; a log being edited
+          // is judged against its own period and does not block itself
+          withCompletion: true,
+          ...(log
+            ? { completionDate: log.createdAt, excludeLogId: log._id }
+            : {})
+        }
       })
       .then((res) => setAreas(sortAreasByRoom(res.data?.data?.result || [])))
       .catch(() => setAreas([]))
       .finally(() => setLoadingAreas(false));
-  }, [companyId, type]);
+  }, [companyId, type, log]);
 
   // A log being edited keeps the checklist it was signed against; a new
   // area always reads its current elements
@@ -401,49 +414,84 @@ export function CleaningLogWizard({
   };
 
   const renderAreaCard = (
-    area: { _id?: string; areaName: string; roomNumber?: string; totalElement?: number },
+    area: Pick<
+      CleaningArea,
+      'areaName' | 'roomNumber' | 'totalElement' | 'completion'
+    > & {
+      _id?: string;
+    },
     active: boolean,
     onClick?: () => void
-  ) => (
-    <button
-      key={area._id}
-      type="button"
-      onClick={onClick}
-      disabled={!onClick}
-      className={cn(
-        'flex w-full items-start gap-3 rounded-xl border-2 p-4 text-left transition-all disabled:cursor-default',
-        active
-          ? 'border-theme bg-theme/5 shadow-sm'
-          : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-      )}
-    >
-      <span
+  ) => {
+    // Done for this day / month: shown, but it cannot be picked again
+    const completed = Boolean(area.completion);
+    return (
+      <button
+        key={area._id}
+        type="button"
+        onClick={completed ? undefined : onClick}
+        disabled={!onClick || completed}
+        title={
+          completed
+            ? `Completed by ${personName(area.completion?.employeeId)} · ${formatDateTime(area.completion?.completedAt)}`
+            : undefined
+        }
         className={cn(
-          'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg',
-          active ? 'bg-theme text-white' : 'bg-gray-100 text-black'
+          'flex w-full items-start gap-3 rounded-xl border-2 p-4 text-left transition-all disabled:cursor-default',
+          completed
+            ? 'cursor-not-allowed border-emerald-200 bg-emerald-50/60 opacity-80'
+            : active
+              ? 'border-theme bg-theme/5 shadow-sm'
+              : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
         )}
       >
-        <MapPin className="h-5 w-5" />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block break-words text-sm font-semibold text-black">
-          {area.areaName}
+        <span
+          className={cn(
+            'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg',
+            completed
+              ? 'bg-emerald-100 text-emerald-700'
+              : active
+                ? 'bg-theme text-white'
+                : 'bg-gray-100 text-black'
+          )}
+        >
+          {completed ? (
+            <Lock className="h-5 w-5" />
+          ) : (
+            <MapPin className="h-5 w-5" />
+          )}
         </span>
-        <span className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-black">
-          {area.roomNumber && (
-            <span className="inline-flex items-center gap-1">
-              <DoorOpen className="h-3 w-3" /> Room {area.roomNumber}
+        <span className="min-w-0 flex-1">
+          <span className="block break-words text-sm font-semibold text-black">
+            {area.areaName}
+          </span>
+          <span className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-black">
+            {area.roomNumber && (
+              <span className="inline-flex items-center gap-1">
+                <DoorOpen className="h-3 w-3" /> Room {area.roomNumber}
+              </span>
+            )}
+            <span>
+              {area.totalElement || 0}{' '}
+              {area.totalElement === 1 ? 'element' : 'elements'}
+            </span>
+          </span>
+          {completed && (
+            <span className="mt-1 block text-xs text-black">
+              By {personName(area.completion?.employeeId)}
             </span>
           )}
-          <span>
-            {area.totalElement || 0}{' '}
-            {area.totalElement === 1 ? 'element' : 'elements'}
-          </span>
         </span>
-      </span>
-      {active && <Check className="h-5 w-5 shrink-0 text-theme" />}
-    </button>
-  );
+        {completed ? (
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
+            <CheckCircle2 className="h-3 w-3" /> Completed
+          </span>
+        ) : (
+          active && <Check className="h-5 w-5 shrink-0 text-theme" />
+        )}
+      </button>
+    );
+  };
 
   const renderAreaPicker = () => {
     if (!type) {
@@ -602,7 +650,11 @@ export function CleaningLogWizard({
       </div>
     );
 
-  const renderTimeInput = (field: TimeField, label: string, placeholder: string) => (
+  const renderTimeInput = (
+    field: TimeField,
+    label: string,
+    placeholder: string
+  ) => (
     <div className="space-y-1.5">
       <p className="text-sm font-semibold text-black">{label}*</p>
       <Input
@@ -672,7 +724,8 @@ export function CleaningLogWizard({
                 <Select
                   options={employeeOptions}
                   value={
-                    employeeOptions.find((opt) => opt.value === employeeId) || null
+                    employeeOptions.find((opt) => opt.value === employeeId) ||
+                    null
                   }
                   onChange={(option: any) => {
                     setEmployeeId(option?.value || '');
