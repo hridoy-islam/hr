@@ -79,6 +79,8 @@ interface CleaningLogWizardProps {
   onSubmitted: (log: CleaningLogRecord) => void;
   // Any start / pause / resume / stop / discard
   onSessionChange?: () => void;
+  // The session on screen right now, or null when none is open
+  onOpenDraftChange?: (logId: string | null) => void;
   onCancel?: () => void;
 }
 
@@ -136,7 +138,8 @@ export function CleaningLogWizard({
   log,
   draft: initialDraft,
   onSubmitted,
-  onSessionChange
+  onSessionChange,
+  onOpenDraftChange
 }: CleaningLogWizardProps) {
   const { toast } = useToast();
   const { user } = useSelector((state: any) => state.auth);
@@ -319,6 +322,15 @@ export function CleaningLogWizard({
   }, [areas, areaSearch]);
 
   const areaPicked = Boolean(areaId) && !pickingArea;
+
+  // Lets the page mark which unfinished session is the one on screen
+  const openDraftId = areaPicked && draft ? draft._id : null;
+  useEffect(() => {
+    onOpenDraftChange?.(openDraftId);
+    // Cleared when the form closes, so no card claims to be open below
+    return () => onOpenDraftChange?.(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openDraftId]);
   const draftStatus = draft?.status as CleaningLogStatus | undefined;
   // The company side goes straight to the checklist and signature; an
   // employee ticks during the session and signs once it is stopped

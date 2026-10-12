@@ -118,6 +118,8 @@ export default function StaffCleaningLogPage() {
   // Sessions started but not completed yet, and the one opened from them
   const [active, setActive] = useState<CleaningLogRecord[]>([]);
   const [resumeDraft, setResumeDraft] = useState<CleaningLogRecord | null>(null);
+  // The session the form below has open, however it was opened
+  const [openDraftId, setOpenDraftId] = useState<string | null>(null);
 
   const continueSession = (log: CleaningLogRecord) => {
     setSubmitted(null);
@@ -204,11 +206,7 @@ export default function StaffCleaningLogPage() {
               <ActiveSessionCard
                 key={log._id}
                 log={log}
-                current={
-                  running
-                    ? running._id === log._id
-                    : resumeDraft?._id === log._id && !submitted
-                }
+                current={!submitted && openDraftId === log._id}
                 locked={Boolean(running) && running?._id !== log._id}
                 onContinue={() => continueSession(log)}
               />
@@ -291,6 +289,7 @@ export default function StaffCleaningLogPage() {
           draft={resumeDraft}
           onSubmitted={setSubmitted}
           onSessionChange={fetchActive}
+          onOpenDraftChange={setOpenDraftId}
           onCancel={() => startNew(null)}
         />
       ) : (

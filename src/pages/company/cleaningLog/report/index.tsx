@@ -181,7 +181,11 @@ export default function CleaningReportPage() {
         <CalendarDays className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-theme" />
         <DatePicker
           selected={value}
-          onChange={onChange}
+          onChange={(date) => {
+            onChange(date);
+            // A message about the old filters goes as soon as they change
+            setError('');
+          }}
           showMonthDropdown
           showYearDropdown
           dropdownMode="select"
@@ -353,7 +357,10 @@ export default function CleaningReportPage() {
           <Select
             options={TYPE_OPTIONS}
             value={TYPE_OPTIONS.find((opt) => opt.value === type) || null}
-            onChange={(option: any) => setType(option?.value || null)}
+            onChange={(option: any) => {
+              setType(option?.value || null);
+              setError('');
+            }}
             placeholder="Select type"
             isSearchable={false}
             styles={selectStyles}
@@ -365,7 +372,10 @@ export default function CleaningReportPage() {
           <Select
             options={employeeOptions}
             value={employee}
-            onChange={(option: any) => setEmployee(option || ALL_EMPLOYEES)}
+            onChange={(option: any) => {
+              setEmployee(option || ALL_EMPLOYEES);
+              setError('');
+            }}
             styles={selectStyles}
             menuPortalTarget={document.body}
           />
