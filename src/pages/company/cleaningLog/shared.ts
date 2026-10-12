@@ -1,8 +1,10 @@
 import type { StylesConfig } from 'react-select';
-import { z } from 'zod';
 import moment from '@/lib/moment-setup';
 
 export type CleaningType = 'daily' | 'monthly';
+
+// A log is a session: in_progress <-> paused -> stopped -> completed
+export type CleaningLogStatus = 'in_progress' | 'paused' | 'stopped' | 'completed';
 
 export interface CleaningEmployee {
   _id: string;
@@ -28,6 +30,13 @@ export interface CleaningArea {
     employeeId?: CleaningEmployee;
     completedAt: string;
   } | null;
+  // Only sent to the log form: a session someone is still working on
+  inProgress?: {
+    logId: string;
+    employeeId?: CleaningEmployee;
+    status: CleaningLogStatus;
+    startedAt: string;
+  } | null;
 }
 
 export interface CleaningElement {
@@ -47,9 +56,14 @@ export interface CleaningLogItem {
 export interface CleaningLogHistory {
   _id?: string;
   title: string;
-  action: 'create' | 'update';
+  action: 'create' | 'update' | 'start' | 'pause' | 'resume' | 'stop';
   updatedBy?: CleaningEmployee;
   date: string;
+}
+
+export interface CleaningLogSession {
+  startedAt: string;
+  endedAt?: string;
 }
 
 export interface CleaningLogRecord {
@@ -60,12 +74,18 @@ export interface CleaningLogRecord {
   areaName: string;
   roomNumber?: string;
   type: CleaningType;
+  // Older logs have no status and are completed
+  status?: CleaningLogStatus;
   items: CleaningLogItem[];
-  signatureUrl: string;
+  sessions?: CleaningLogSession[];
+  durationSeconds?: number;
+  signatureUrl?: string;
   note?: string;
-  signedAt: string;
+  signedAt?: string;
+  // UK clock times (HH:MM) of the start and the stop, set by the server
   startTime?: string;
   endTime?: string;
+  completedAt?: string;
   createdBy?: CleaningEmployee;
   updatedBy?: CleaningEmployee;
   logs?: CleaningLogHistory[];
@@ -116,22 +136,38 @@ export const sortAreasByRoom = <T extends { areaName: string; roomNumber?: strin
     );
   });
 
-// A 24-hour clock time, e.g. 09:00 or 17:30
-export const timeSchema = z
-  .string()
-  .trim()
-  .min(1, { message: 'Time is required' })
-  .regex(/^([01]\d|2[0-3]):[0-5]\d$/, { message: 'Invalid time (HH:MM)' });
+export const LOG_STATUS_LABEL: Record<CleaningLogStatus, string> = {
+  in_progress: 'In Progress',
+  paused: 'Paused',
+  stopped: 'Awaiting Completion',
+  completed: 'Completed'
+};
 
-// Completes a typed time on blur, e.g. 9 -> 09:00, 930 -> 09:30; anything
-// it cannot read is left as typed for the schema to flag
-export const formatTime = (value: string): string => {
-  let cleanValue = value.trim();
-  if (cleanValue) {
-    const m = moment(cleanValue, ['HH:mm', 'H:mm', 'HHmm', 'Hmm', 'H']);
-    if (m.isValid()) cleanValue = m.format('HH:mm');
-  }
-  return cleanValue;
+export const LOG_STATUS_BADGE: Record<CleaningLogStatus, string> = {
+  in_progress: 'bg-amber-50 text-amber-700 ring-amber-200',
+  paused: 'bg-slate-100 text-slate-700 ring-slate-300',
+  stopped: 'bg-sky-50 text-sky-700 ring-sky-200',
+  completed: 'bg-emerald-50 text-emerald-700 ring-emerald-200'
+};
+
+// Seconds worked so far: the closed sessions plus the one still running
+export const elapsedSeconds = (
+  log: Pick<CleaningLogRecord, 'sessions' | 'durationSeconds'>,
+  now: number = Date.now()
+) => {
+  const running = (log.sessions || []).find((session) => !session.endedAt);
+  const live = running
+    ? Math.max(0, (now - new Date(running.startedAt).getTime()) / 1000)
+    : 0;
+  return Math.floor((log.durationSeconds || 0) + live);
+};
+
+// 3725 -> 01:02:05
+export const formatDuration = (seconds: number) => {
+  const total = Math.max(0, Math.floor(seconds));
+  return [Math.floor(total / 3600), Math.floor((total % 3600) / 60), total % 60]
+    .map((part) => String(part).padStart(2, '0'))
+    .join(':');
 };
 
 export const completion = (items: CleaningLogItem[] = []) => {

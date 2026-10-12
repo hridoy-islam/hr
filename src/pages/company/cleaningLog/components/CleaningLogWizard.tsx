@@ -13,7 +13,9 @@ import {
   Loader2,
   MapPin,
   RefreshCw,
-  Search
+  Search,
+  Timer,
+  Trash2
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -25,9 +27,20 @@ import {
   PopoverContent,
   PopoverTrigger
 } from '@/components/ui/popover';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from '@/components/ui/alert-dialog';
 import { useToast } from '@/components/ui/use-toast';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 import axiosInstance from '@/lib/axios';
+import moment from '@/lib/moment-setup';
 import { cn } from '@/lib/utils';
 import {
   apiError,
@@ -35,16 +48,17 @@ import {
   CleaningArea,
   CleaningEmployee,
   CleaningLogRecord,
+  CleaningLogStatus,
   CleaningType,
   formatDateTime,
-  formatTime,
+  LOG_STATUS_LABEL,
   personName,
   SelectOption,
   selectStyles,
-  sortAreasByRoom,
-  timeSchema
+  sortAreasByRoom
 } from '../shared';
 import { SignaturePad, SignaturePadHandle } from './SignaturePad';
+import { CleaningSession, SessionAction, StatusBadge } from './CleaningSession';
 
 interface ChecklistRow {
   elementId: string;
@@ -52,77 +66,122 @@ interface ChecklistRow {
   performanceParameter: string;
 }
 
-type TimeField = 'startTime' | 'endTime';
-
 interface CleaningLogWizardProps {
   companyId: string;
-  // An admin logs on behalf of an employee and picks the type in the form;
+  // An admin works on behalf of an employee and picks the type in the form;
   // an employee arrives with the type already chosen
   mode: 'admin' | 'employee';
   type?: CleaningType;
+  // A completed log being corrected from the company side
   log?: CleaningLogRecord | null;
+  // An unfinished session to pick straight back up
+  draft?: CleaningLogRecord | null;
   onSubmitted: (log: CleaningLogRecord) => void;
+  // Any start / pause / resume / stop / discard
+  onSessionChange?: () => void;
   onCancel?: () => void;
 }
+
+const SESSION_TOAST: Record<SessionAction, string> = {
+  start: 'Cleaning started',
+  pause: 'Cleaning paused',
+  resume: 'Cleaning resumed',
+  stop: 'Cleaning stopped. Sign and complete to submit.',
+  discard: 'Session discarded'
+};
+
+type TimeField = 'startTime' | 'endTime';
 
 const TIME_LABEL: Record<TimeField, string> = {
   startTime: 'Start time',
   endTime: 'End time'
 };
 
-const validateTime = (field: TimeField, value: string) => {
-  if (!value.trim()) return `${TIME_LABEL[field]} is required`;
-  const result = timeSchema.safeParse(value);
-  return result.success ? '' : result.error.issues[0].message;
-};
+// A 24-hour clock time, e.g. 09:00 or 17:30
+const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 
-// Both fields together, so the end time can be checked against the start
-const validateTimes = (
-  times: Record<TimeField, string>
-): Record<TimeField, string> => {
-  const startTime = validateTime('startTime', times.startTime);
-  let endTime = validateTime('endTime', times.endTime);
+const validateTimes = (times: Record<TimeField, string>) => {
+  const check = (field: TimeField) => {
+    const value = times[field].trim();
+    if (!value) return `${TIME_LABEL[field]} is required`;
+    return TIME_PATTERN.test(value) ? '' : 'Invalid time (HH:MM)';
+  };
+  const startTime = check('startTime');
+  let endTime = check('endTime');
   // HH:MM strings sort the same way the times do
   if (!startTime && !endTime && times.endTime < times.startTime)
     endTime = 'End time cannot be earlier than start time';
   return { startTime, endTime };
 };
 
+// Completes a typed time on blur, e.g. 9 -> 09:00, 930 -> 09:30
+const formatTime = (value: string) => {
+  const clean = value.trim();
+  if (!clean) return clean;
+  const m = moment(clean, ['HH:mm', 'H:mm', 'HHmm', 'Hmm', 'H'], true);
+  return m.isValid() ? m.format('HH:mm') : clean;
+};
+
+const checkedIdsOf = (record?: CleaningLogRecord | null) =>
+  new Set(
+    (record?.items || [])
+      .filter((item) => item.checked && item.elementId)
+      .map((item) => String(item.elementId))
+  );
+
 export function CleaningLogWizard({
   companyId,
   mode,
   type: fixedType,
   log,
+  draft: initialDraft,
   onSubmitted,
-  onCancel
+  onSessionChange
 }: CleaningLogWizardProps) {
   const { toast } = useToast();
   const { user } = useSelector((state: any) => state.auth);
   const signatureRef = useRef<SignaturePadHandle>(null);
 
-  const [employeeId, setEmployeeId] = useState(log?.employeeId?._id || '');
+  const seed = log || initialDraft;
+  const [employeeId, setEmployeeId] = useState(seed?.employeeId?._id || '');
   const [type, setType] = useState<CleaningType | ''>(
-    log?.type || fixedType || ''
+    seed?.type || fixedType || ''
   );
-  const [areaId, setAreaId] = useState(log?.areaId || '');
+  const [areaId, setAreaId] = useState(seed?.areaId || '');
   // Once an area is picked the list folds away; "Change" brings it back
-  const [pickingArea, setPickingArea] = useState(!log?.areaId);
-  const [checkedIds, setCheckedIds] = useState<Set<string>>(
-    new Set(
-      (log?.items || [])
-        .filter((item) => item.checked && item.elementId)
-        .map((item) => String(item.elementId))
-    )
-  );
+  const [pickingArea, setPickingArea] = useState(!seed?.areaId);
+  const [checkedIds, setCheckedIds] = useState<Set<string>>(checkedIdsOf(seed));
+  const [note, setNote] = useState(seed?.note || '');
+  // The company side types the times in, when creating and when editing; an
+  // employee's session stamps its own
   const [times, setTimes] = useState<Record<TimeField, string>>({
     startTime: log?.startTime || '',
     endTime: log?.endTime || ''
   });
-  const [note, setNote] = useState(log?.note || '');
   const [timeErrors, setTimeErrors] = useState<Record<TimeField, string>>({
     startTime: '',
     endTime: ''
   });
+
+  // The session for the picked area, once it has been started
+  const [draft, setDraft] = useState<CleaningLogRecord | null>(
+    initialDraft || null
+  );
+  const [busyAction, setBusyAction] = useState<SessionAction | null>(null);
+  // Stop and discard cannot be undone, so both ask first
+  const [confirmAction, setConfirmAction] = useState<'stop' | 'discard' | null>(
+    null
+  );
+  const [loadingDraft, setLoadingDraft] = useState(false);
+  const [areasVersion, setAreasVersion] = useState(0);
+  // An employee's unfinished session the company side is about to clear
+  const [clearTarget, setClearTarget] = useState<CleaningArea | null>(null);
+  const [clearing, setClearing] = useState(false);
+  // Ticks waiting to be saved during an employee's session
+  const tickTimer = useRef<number>();
+  const [tickSave, setTickSave] = useState<'idle' | 'saving' | 'saved' | 'error'>(
+    'idle'
+  );
 
   const [employees, setEmployees] = useState<CleaningEmployee[]>([]);
   const [areas, setAreas] = useState<CleaningArea[]>([]);
@@ -134,9 +193,20 @@ export function CleaningLogWizard({
   const [signatureError, setSignatureError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // The company side fills the whole log in by hand; only an employee runs
+  // the timer
+  const isAdmin = mode === 'admin';
+  // Whose sessions this form can pick back up. None on the company side, so
+  // an area someone is working on stays locked there.
+  const actorId = isAdmin ? null : user?._id;
+  // Creating from the company side can finish an employee's open session
+  const canTakeOver = isAdmin && !log;
+
   const resetArea = () => {
     setAreaId('');
+    setDraft(null);
     setCheckedIds(new Set());
+    setNote('');
     setPickingArea(true);
   };
 
@@ -170,8 +240,9 @@ export function CleaningLogWizard({
           type,
           limit: 'all',
           sort: 'areaName',
-          // Marks areas already done this day / month; a log being edited
-          // is judged against its own period and does not block itself
+          // Marks areas already done or being worked on this day / month; a
+          // log being edited is judged against its own period and does not
+          // block itself
           withCompletion: true,
           ...(log
             ? { completionDate: log.createdAt, excludeLogId: log._id }
@@ -181,19 +252,24 @@ export function CleaningLogWizard({
       .then((res) => setAreas(sortAreasByRoom(res.data?.data?.result || [])))
       .catch(() => setAreas([]))
       .finally(() => setLoadingAreas(false));
-  }, [companyId, type, log]);
+  }, [companyId, type, log, areasVersion]);
 
-  // A log being edited keeps the checklist it was signed against; a new
-  // area always reads its current elements
+  // A session works through the checklist it was started with, and a log
+  // being edited keeps the one it was signed against. Only an edit moved to
+  // a new area reads that area's current elements.
+  const checklistSource =
+    draft || (log && String(log.areaId) === String(areaId) ? log : null);
+
   useEffect(() => {
-    if (!areaId) {
+    // An employee sees the checklist once the session exists
+    if (!areaId || (!isAdmin && !draft)) {
       setRows([]);
       return;
     }
 
-    if (log && String(log.areaId) === String(areaId)) {
+    if (checklistSource) {
       setRows(
-        log.items.map((item, index) => ({
+        checklistSource.items.map((item, index) => ({
           elementId: String(item.elementId || index),
           element: item.element,
           performanceParameter: item.performanceParameter
@@ -216,7 +292,8 @@ export function CleaningLogWizard({
       )
       .catch(() => setRows([]))
       .finally(() => setLoadingRows(false));
-  }, [areaId, log]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [areaId, log, draft?._id]);
 
   const employeeOptions: SelectOption[] = employees.map((employee) => ({
     value: employee._id,
@@ -224,8 +301,11 @@ export function CleaningLogWizard({
   }));
 
   const selectedArea = areas.find((area) => area._id === areaId);
-  const selectedAreaName = selectedArea?.areaName || log?.areaName || '';
-  const selectedRoom = selectedArea ? selectedArea.roomNumber : log?.roomNumber;
+  const selectedAreaName =
+    selectedArea?.areaName || draft?.areaName || log?.areaName || '';
+  const selectedRoom = selectedArea
+    ? selectedArea.roomNumber
+    : draft?.roomNumber || log?.roomNumber;
   const selectedTotal = selectedArea?.totalElement ?? rows.length;
 
   const filteredAreas = useMemo(() => {
@@ -238,48 +318,202 @@ export function CleaningLogWizard({
     );
   }, [areas, areaSearch]);
 
-  const showChecklist = Boolean(areaId) && !pickingArea;
+  const areaPicked = Boolean(areaId) && !pickingArea;
+  const draftStatus = draft?.status as CleaningLogStatus | undefined;
+  // The company side goes straight to the checklist and signature; an
+  // employee ticks during the session and signs once it is stopped
+  const showChecklist = areaPicked && (isAdmin || Boolean(draft));
+  const showSign = areaPicked && (isAdmin || draftStatus === 'stopped');
+  const busy = isSubmitting || busyAction !== null;
 
-  const toggleRow = (elementId: string) =>
-    setCheckedIds((current) => {
-      const next = new Set(current);
-      if (next.has(elementId)) next.delete(elementId);
-      else next.add(elementId);
-      return next;
-    });
+  // An employee's ticks are saved as they go, so a reload, another device or
+  // an admin finishing the session all see them. A short pause lets quick
+  // taps go out as one save.
+  const autoSavesTicks = !isAdmin && Boolean(draft);
+
+  const queueTickSave = (next: Set<string>) => {
+    if (!autoSavesTicks || !draft) return;
+    window.clearTimeout(tickTimer.current);
+    setTickSave('saving');
+    const logId = draft._id;
+    const items = rows.map((row) => ({
+      elementId: row.elementId,
+      checked: next.has(row.elementId)
+    }));
+    tickTimer.current = window.setTimeout(async () => {
+      try {
+        await axiosInstance.patch(`/cleaning-log/${logId}/items`, { items });
+        setTickSave('saved');
+      } catch (err) {
+        setTickSave('error');
+        toast({
+          title: apiError(err, 'Failed to save your ticks. Please try again.'),
+          className: 'bg-red-500 border-none text-white'
+        });
+      }
+    }, 500);
+  };
+
+  // Pause, stop and complete send the ticks themselves, so a save still
+  // waiting is dropped rather than racing them
+  const cancelTickSave = () => {
+    window.clearTimeout(tickTimer.current);
+    setTickSave('idle');
+  };
+
+  useEffect(() => () => window.clearTimeout(tickTimer.current), []);
+
+  const updateChecked = (next: Set<string>) => {
+    setCheckedIds(next);
+    queueTickSave(next);
+  };
+
+  const toggleRow = (elementId: string) => {
+    const next = new Set(checkedIds);
+    if (next.has(elementId)) next.delete(elementId);
+    else next.add(elementId);
+    updateChecked(next);
+  };
 
   const allChecked =
     rows.length > 0 && rows.every((row) => checkedIds.has(row.elementId));
 
   const toggleAll = () =>
-    setCheckedIds(
+    updateChecked(
       allChecked ? new Set() : new Set(rows.map((row) => row.elementId))
     );
 
-  const updateTime = (field: TimeField, value: string) => {
-    const next = { ...times, [field]: value };
-    setTimes(next);
-    // Once an error shows, it clears as soon as the value turns valid
-    if (timeErrors.startTime || timeErrors.endTime) {
-      const errors = validateTimes(next);
-      setTimeErrors((current) => ({
-        startTime: current.startTime && errors.startTime,
-        endTime: current.endTime && errors.endTime
-      }));
+  const itemsPayload = () =>
+    rows.map((row) => ({
+      elementId: row.elementId,
+      checked: checkedIds.has(row.elementId)
+    }));
+
+  // A session already open on the area is picked back up: by its own
+  // employee to carry on, or by the company side to finish it off
+  const selectArea = async (area: CleaningArea) => {
+    setError('');
+    setAreaSearch('');
+    setPickingArea(false);
+    if (area._id === areaId) return;
+
+    setAreaId(area._id);
+    setDraft(null);
+    setCheckedIds(new Set());
+    setNote('');
+    // A save still on its way finishes for the area it belongs to; the label
+    // starts fresh for the new one
+    setTickSave('idle');
+    if (canTakeOver) setTimes({ startTime: '', endTime: '' });
+
+    const open = area.inProgress;
+    const ownSession =
+      Boolean(actorId) && String(open?.employeeId?._id) === String(actorId);
+    if (!open || !(ownSession || canTakeOver)) return;
+
+    try {
+      setLoadingDraft(true);
+      const res = await axiosInstance.get(`/cleaning-log/${open.logId}`);
+      const record: CleaningLogRecord = res.data?.data;
+      setDraft(record);
+      setCheckedIds(checkedIdsOf(record));
+      setNote(record?.note || '');
+      if (canTakeOver) {
+        // The log stays the employee's; the start they clocked carries over
+        setEmployeeId(record.employeeId?._id || '');
+        setTimes({
+          startTime: record.startTime || '',
+          endTime: record.endTime || ''
+        });
+      }
+    } catch (err) {
+      toast({
+        title: apiError(err, 'Failed to load this session'),
+        className: 'bg-red-500 border-none text-white'
+      });
+    } finally {
+      setLoadingDraft(false);
     }
   };
 
-  const blurTime = (field: TimeField, value: string) => {
-    const next = { ...times, [field]: formatTime(value) };
-    setTimes(next);
-    const errors = validateTimes(next);
-    // The other field is only flagged once it has been filled in
-    setTimeErrors((current) => ({
-      ...current,
-      [field]: errors[field],
-      endTime:
-        field === 'endTime' || next.endTime ? errors.endTime : current.endTime
-    }));
+  const runSession = async (action: SessionAction) => {
+    if (action === 'start' && mode === 'admin' && !employeeId) {
+      setError('Please select an employee');
+      return;
+    }
+    if ((action === 'stop' || action === 'discard') && confirmAction !== action) {
+      setConfirmAction(action);
+      return;
+    }
+
+    cancelTickSave();
+    setError('');
+    try {
+      setBusyAction(action);
+      let record: CleaningLogRecord | null = null;
+
+      if (action === 'start') {
+        const res = await axiosInstance.post('/cleaning-log/start', {
+          companyId,
+          areaId,
+          ...(mode === 'admin' ? { employeeId } : {})
+        });
+        record = res.data?.data;
+      } else if (action === 'discard') {
+        await axiosInstance.delete(`/cleaning-log/${draft!._id}/discard`);
+      } else {
+        // The ticks so far travel with every move, so nothing is lost when
+        // the employee switches area
+        const res = await axiosInstance.patch(
+          `/cleaning-log/${draft!._id}/${action}`,
+          { items: itemsPayload() }
+        );
+        record = res.data?.data;
+      }
+
+      toast({
+        title: SESSION_TOAST[action],
+        className: 'bg-theme border-none text-white'
+      });
+
+      setConfirmAction(null);
+      if (action === 'discard') resetArea();
+      else setDraft(record);
+      setAreasVersion((version) => version + 1);
+      onSessionChange?.();
+    } catch (err) {
+      toast({
+        title: apiError(err, 'Something went wrong. Please try again.'),
+        className: 'bg-red-500 border-none text-white'
+      });
+      // The area may have just been taken, or the session moved elsewhere
+      setAreasVersion((version) => version + 1);
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  const clearSession = async () => {
+    const open = clearTarget?.inProgress;
+    if (!open) return;
+    try {
+      setClearing(true);
+      await axiosInstance.delete(`/cleaning-log/${open.logId}/discard`);
+      toast({
+        title: `${clearTarget!.areaName} is free again`,
+        className: 'bg-theme border-none text-white'
+      });
+      setClearTarget(null);
+    } catch (err) {
+      toast({
+        title: apiError(err, 'Failed to clear the session'),
+        className: 'bg-red-500 border-none text-white'
+      });
+    } finally {
+      setClearing(false);
+      // Reloaded either way: the session may have been completed meanwhile
+      setAreasVersion((version) => version + 1);
+    }
   };
 
   const validate = (): string => {
@@ -288,11 +522,15 @@ export function CleaningLogWizard({
     if (!areaId) return 'Please select an area';
     if (rows.length === 0)
       return 'This area has no elements yet. Ask an admin to add them first.';
+    if (!isAdmin && draftStatus !== 'stopped')
+      return 'Please stop the area before completing it';
 
-    const nextTimeErrors = validateTimes(times);
-    setTimeErrors(nextTimeErrors);
-    if (nextTimeErrors.startTime || nextTimeErrors.endTime)
-      return 'Please enter a valid start and end time';
+    if (isAdmin) {
+      const nextTimeErrors = validateTimes(times);
+      setTimeErrors(nextTimeErrors);
+      if (nextTimeErrors.startTime || nextTimeErrors.endTime)
+        return 'Please enter a valid start and end time';
+    }
 
     if (signatureRef.current?.isEmpty() ?? true) {
       setSignatureError('Please sign inside the box');
@@ -307,6 +545,7 @@ export function CleaningLogWizard({
       setError(message);
       return;
     }
+    cancelTickSave();
     setError('');
     setSignatureError('');
 
@@ -327,30 +566,51 @@ export function CleaningLogWizard({
       }
 
       const payload = {
-        companyId,
-        ...(mode === 'admin' ? { employeeId } : {}),
-        areaId,
-        items: rows.map((row) => ({
-          elementId: row.elementId,
-          checked: checkedIds.has(row.elementId)
-        })),
-        startTime: times.startTime,
-        endTime: times.endTime,
+        items: itemsPayload(),
         note: note.trim(),
         signatureUrl: signature.signatureUrl,
         signedAt: signature.signedAt
       };
 
+      const adminPayload = {
+        ...payload,
+        employeeId,
+        areaId,
+        startTime: times.startTime,
+        endTime: times.endTime
+      };
+
+      // Edit a finished log, finish an employee's open session, create a new
+      // log by hand, or (employee) complete their own stopped session
       const response = log
-        ? await axiosInstance.patch(`/cleaning-log/${log._id}`, payload)
-        : await axiosInstance.post('/cleaning-log', payload);
+        ? await axiosInstance.patch(`/cleaning-log/${log._id}`, adminPayload)
+        : draft
+          ? await axiosInstance.patch(
+              `/cleaning-log/${draft._id}/complete`,
+              isAdmin
+                ? {
+                    ...payload,
+                    startTime: times.startTime,
+                    endTime: times.endTime
+                  }
+                : payload
+            )
+          : await axiosInstance.post('/cleaning-log', {
+              ...adminPayload,
+              companyId
+            });
 
       toast({
         title: log
           ? 'Cleaning log updated successfully'
-          : 'Cleaning log submitted successfully',
+          : isAdmin
+            ? draft
+              ? 'Cleaning log completed successfully'
+              : 'Cleaning log created successfully'
+            : 'Cleaning log submitted successfully',
         className: 'bg-theme border-none text-white'
       });
+      onSessionChange?.();
       onSubmitted(response.data?.data);
     } catch (err) {
       toast({
@@ -376,6 +636,9 @@ export function CleaningLogWizard({
       <button
         key={value}
         type="button"
+        // Only shown on the company side, which is never held up by an
+        // employee's running timer
+        disabled={busy}
         onClick={() => {
           if (type !== value) {
             setType(value);
@@ -384,10 +647,10 @@ export function CleaningLogWizard({
           setError('');
         }}
         className={cn(
-          'flex items-center gap-4 rounded-xl border-2 p-4 text-left transition-all',
+          'flex items-center gap-4 rounded-xl border-2 p-4 text-left transition-all disabled:cursor-not-allowed',
           active
             ? 'border-theme bg-theme/5 shadow-sm'
-            : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+            : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50 disabled:opacity-60'
         )}
       >
         <span
@@ -416,7 +679,7 @@ export function CleaningLogWizard({
   const renderAreaCard = (
     area: Pick<
       CleaningArea,
-      'areaName' | 'roomNumber' | 'totalElement' | 'completion'
+      'areaName' | 'roomNumber' | 'totalElement' | 'completion' | 'inProgress'
     > & {
       _id?: string;
     },
@@ -425,24 +688,42 @@ export function CleaningLogWizard({
   ) => {
     // Done for this day / month: shown, but it cannot be picked again
     const completed = Boolean(area.completion);
+    // Someone else's session holds the area until they complete or discard it
+    const open = area.inProgress;
+    const mine =
+      Boolean(open) &&
+      Boolean(actorId) &&
+      String(open?.employeeId?._id) === String(actorId);
+    const held = Boolean(open) && !mine;
+    // The company side can open someone else's session to finish it
+    const finishable = held && canTakeOver;
+    const locked = completed || (held && !finishable);
     return (
       <button
         key={area._id}
         type="button"
-        onClick={completed ? undefined : onClick}
-        disabled={!onClick || completed}
+        onClick={locked ? undefined : onClick}
+        disabled={!onClick || locked}
         title={
           completed
             ? `Completed by ${personName(area.completion?.employeeId)} · ${formatDateTime(area.completion?.completedAt)}`
-            : undefined
+            : held
+              ? `${LOG_STATUS_LABEL[open!.status]} · ${personName(open?.employeeId)}`
+              : undefined
         }
         className={cn(
           'flex w-full items-start gap-3 rounded-xl border-2 p-4 text-left transition-all disabled:cursor-default',
           completed
             ? 'cursor-not-allowed border-emerald-200 bg-emerald-50/60 opacity-80'
-            : active
-              ? 'border-theme bg-theme/5 shadow-sm'
-              : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+            : held
+              ? finishable
+                ? 'border-amber-300 bg-amber-50/60 hover:border-amber-400 hover:bg-amber-50'
+                : 'cursor-not-allowed border-amber-200 bg-amber-50/60'
+              : active
+                ? 'border-theme bg-theme/5 shadow-sm'
+                : mine
+                  ? 'border-theme/40 bg-theme/5 hover:border-theme'
+                  : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
         )}
       >
         <span
@@ -450,13 +731,17 @@ export function CleaningLogWizard({
             'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg',
             completed
               ? 'bg-emerald-100 text-emerald-700'
-              : active
-                ? 'bg-theme text-white'
-                : 'bg-gray-100 text-black'
+              : held
+                ? 'bg-amber-100 text-amber-700'
+                : active || mine
+                  ? 'bg-theme text-white'
+                  : 'bg-gray-100 text-black'
           )}
         >
-          {completed ? (
+          {locked ? (
             <Lock className="h-5 w-5" />
+          ) : mine || finishable ? (
+            <Timer className="h-5 w-5" />
           ) : (
             <MapPin className="h-5 w-5" />
           )}
@@ -481,11 +766,22 @@ export function CleaningLogWizard({
               By {personName(area.completion?.employeeId)}
             </span>
           )}
+          {open && (
+            <span className="mt-1 block text-xs text-black">
+              {mine
+                ? 'Your session · tap to continue'
+                : finishable
+                  ? `By ${personName(open.employeeId)} · tap to finish`
+                  : `By ${personName(open.employeeId)}`}
+            </span>
+          )}
         </span>
         {completed ? (
           <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
             <CheckCircle2 className="h-3 w-3" /> Completed
           </span>
+        ) : open ? (
+          <StatusBadge status={open.status} />
         ) : (
           active && <Check className="h-5 w-5 shrink-0 text-theme" />
         )}
@@ -503,7 +799,7 @@ export function CleaningLogWizard({
     }
 
     // Picked: only the chosen area stays on screen
-    if (showChecklist) {
+    if (areaPicked) {
       return (
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <div className="min-w-0 flex-1 sm:max-w-md">
@@ -516,15 +812,26 @@ export function CleaningLogWizard({
               true
             )}
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={isSubmitting}
-            onClick={() => setPickingArea(true)}
-          >
-            <RefreshCw className="mr-1.5 h-4 w-4" /> Change area
-          </Button>
+          <div className="flex flex-col gap-1">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              // An employee pauses their running session before moving on
+              disabled={busy || (!isAdmin && draftStatus === 'in_progress')}
+              onClick={() => {
+                setPickingArea(true);
+                setAreasVersion((version) => version + 1);
+              }}
+            >
+              <RefreshCw className="mr-1.5 h-4 w-4" /> Change area
+            </Button>
+            {!isAdmin && draftStatus === 'in_progress' && (
+              <span className="text-center text-[11px] text-black sm:text-left">
+                Pause to switch area
+              </span>
+            )}
+          </div>
         </div>
       );
     }
@@ -553,17 +860,28 @@ export function CleaningLogWizard({
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {filteredAreas.map((area) =>
-              renderAreaCard(area, area._id === areaId, () => {
-                if (area._id !== areaId) {
-                  setAreaId(area._id);
-                  setCheckedIds(new Set());
-                }
-                setPickingArea(false);
-                setAreaSearch('');
-                setError('');
-              })
-            )}
+            {filteredAreas.map((area) => {
+              const card = renderAreaCard(area, area._id === areaId, () =>
+                selectArea(area)
+              );
+              // The company side can free an area held by a session that was
+              // left running or forgotten
+              if (!isAdmin || !area.inProgress) return card;
+              return (
+                <div key={area._id} className="flex flex-col gap-1.5">
+                  {card}
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={busy}
+                    onClick={() => setClearTarget(area)}
+                    className="border border-red-200 bg-white text-red-600 shadow-none hover:bg-red-50 hover:text-red-700"
+                  >
+                    <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Clear session
+                  </Button>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
@@ -588,6 +906,26 @@ export function CleaningLogWizard({
             <span className="ml-1 text-xs text-black">
               (tick the elements you have cleaned)
             </span>
+            {autoSavesTicks && tickSave !== 'idle' && (
+              <span
+                className={cn(
+                  'ml-2 inline-flex items-center gap-1 text-xs font-medium',
+                  tickSave === 'error' ? 'text-red-600' : 'text-emerald-700'
+                )}
+              >
+                {tickSave === 'saving' ? (
+                  <>
+                    <Loader2 className="h-3 w-3 animate-spin" /> Saving...
+                  </>
+                ) : tickSave === 'saved' ? (
+                  <>
+                    <Check className="h-3 w-3" /> Saved
+                  </>
+                ) : (
+                  'Not saved'
+                )}
+              </span>
+            )}
           </p>
           <Button type="button" variant="outline" size="sm" onClick={toggleAll}>
             <CheckCheck className="mr-1.5 h-4 w-4" />
@@ -650,30 +988,49 @@ export function CleaningLogWizard({
       </div>
     );
 
-  const renderTimeInput = (
-    field: TimeField,
-    label: string,
-    placeholder: string
-  ) => (
+  const updateTime = (field: TimeField, value: string) => {
+    const next = { ...times, [field]: value };
+    setTimes(next);
+    // Once an error shows, it clears as soon as the value turns valid
+    if (timeErrors.startTime || timeErrors.endTime) {
+      const errors = validateTimes(next);
+      setTimeErrors((current) => ({
+        startTime: current.startTime && errors.startTime,
+        endTime: current.endTime && errors.endTime
+      }));
+    }
+  };
+
+  const blurTime = (field: TimeField) => {
+    const next = { ...times, [field]: formatTime(times[field]) };
+    setTimes(next);
+    const errors = validateTimes(next);
+    // The end time is only flagged once it has been filled in
+    setTimeErrors((current) => ({
+      ...current,
+      [field]: errors[field],
+      endTime:
+        field === 'endTime' || next.endTime ? errors.endTime : current.endTime
+    }));
+  };
+
+  const renderTimeInput = (field: TimeField, label: string, placeholder: string) => (
     <div className="space-y-1.5">
       <p className="text-sm font-semibold text-black">{label}*</p>
       <Input
         value={times[field]}
         placeholder={placeholder}
         maxLength={5}
-        disabled={isSubmitting}
-        className={`mt-1 font-mono ${timeErrors[field] ? 'border-red-500' : ''}`}
+        inputMode="numeric"
+        disabled={busy}
+        className={cn('font-mono', timeErrors[field] && 'border-red-500')}
         onChange={(e) => {
           let val = e.target.value.replace(/[^0-9:]/g, '').slice(0, 5);
-          if (
-            val.length === 2 &&
-            times[field].length === 1 &&
-            !val.includes(':')
-          )
+          if (val.length === 2 && times[field].length === 1 && !val.includes(':'))
             val += ':';
           updateTime(field, val);
         }}
-        onBlur={(e) => blurTime(field, e.target.value)}
+        onBlur={() => blurTime(field)}
       />
       {timeErrors[field] && (
         <p className="text-xs font-medium text-red-500">{timeErrors[field]}</p>
@@ -683,17 +1040,31 @@ export function CleaningLogWizard({
 
   const renderSignature = () => (
     <div className="space-y-4">
-      <div className="grid max-w-md grid-cols-2 gap-3">
-        {renderTimeInput('startTime', 'Start Time (HH:MM)', '09:00')}
-        {renderTimeInput('endTime', 'End Time (HH:MM)', '10:00')}
-      </div>
+      {isAdmin && draft && (
+        <p className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-black sm:text-sm">
+          <StatusBadge status={(draft.status || 'in_progress') as CleaningLogStatus} />
+          <span>
+            Finishing{' '}
+            <span className="font-semibold">{personName(draft.employeeId)}</span>
+            &apos;s session, started at{' '}
+            <span className="font-semibold">{draft.startTime || '-'}</span>. Enter
+            the end time, sign and complete.
+          </span>
+        </p>
+      )}
+      {isAdmin && (
+        <div className="grid max-w-md grid-cols-2 gap-3">
+          {renderTimeInput('startTime', 'Start Time (HH:MM)', '09:00')}
+          {renderTimeInput('endTime', 'End Time (HH:MM)', '10:00')}
+        </div>
+      )}
 
       <div className="max-w-xl space-y-2">
         <p className="text-sm font-semibold text-black">Note</p>
         <Textarea
           value={note}
           placeholder="Add a note (optional)..."
-          disabled={isSubmitting}
+          disabled={busy}
           onChange={(e) => setNote(e.target.value)}
         />
       </div>
@@ -705,7 +1076,7 @@ export function CleaningLogWizard({
           entityId={user?._id || companyId}
           signatureUrl={log?.signatureUrl || ''}
           signedAt={log?.signedAt || null}
-          disabled={isSubmitting}
+          disabled={busy}
           error={signatureError}
           onDraw={() => setSignatureError('')}
         />
@@ -729,8 +1100,13 @@ export function CleaningLogWizard({
                   }
                   onChange={(option: any) => {
                     setEmployeeId(option?.value || '');
+                    // Sessions belong to an employee, so a new one starts over
+                    if (!log) resetArea();
                     setError('');
                   }}
+                  // A session being finished stays with the employee who
+                  // started it
+                  isDisabled={busy || Boolean(draft)}
                   placeholder="Search and select an employee..."
                   styles={selectStyles}
                   menuPortalTarget={document.body}
@@ -756,9 +1132,26 @@ export function CleaningLogWizard({
 
         {renderSection('Area*', renderAreaPicker())}
 
+        {areaPicked &&
+          !isAdmin &&
+          renderSection(
+            'Cleaning Session',
+            loadingDraft ? (
+              <div className="flex justify-center py-10">
+                <BlinkingDots size="large" color="bg-theme" />
+              </div>
+            ) : (
+              <CleaningSession
+                draft={draft}
+                busy={busyAction}
+                onAction={runSession}
+              />
+            )
+          )}
+
         {showChecklist && renderSection('Check Elements', renderElements())}
 
-        {showChecklist &&
+        {showSign &&
           rows.length > 0 &&
           renderSection('Sign & Complete', renderSignature())}
 
@@ -769,26 +1162,12 @@ export function CleaningLogWizard({
         )}
       </div>
 
-      <div className="flex flex-col-reverse gap-2 border-t border-gray-100 bg-gray-50/60 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-        <div className="flex gap-2">
-          {/* {onCancel && (
-            <Button
-              type="button"
-              variant="outline"
-              className="flex-1 sm:flex-none"
-              disabled={isSubmitting}
-              onClick={onCancel}
-            >
-              Cancel
-            </Button>
-          )} */}
-        </div>
-
-        {showChecklist && rows.length > 0 && (
+      {showSign && rows.length > 0 && (
+        <div className="flex flex-col gap-2 border-t border-gray-100 bg-gray-50/60 px-4 py-3 sm:flex-row sm:items-center sm:justify-end sm:px-6">
           <Button
             type="button"
-            className="bg-theme text-white hover:bg-theme/90"
-            disabled={isSubmitting}
+            className="h-11 bg-theme text-white hover:bg-theme/90 sm:h-10"
+            disabled={busy}
             onClick={handleComplete}
           >
             {isSubmitting ? (
@@ -801,8 +1180,100 @@ export function CleaningLogWizard({
               </>
             )}
           </Button>
-        )}
-      </div>
+        </div>
+      )}
+
+      <AlertDialog
+        open={clearTarget !== null}
+        onOpenChange={(open) => !open && !clearing && setClearTarget(null)}
+      >
+        <AlertDialogContent className="w-[95vw] max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear this session?</AlertDialogTitle>
+            <AlertDialogDescription className="text-black">
+              <span className="font-semibold">
+                {personName(clearTarget?.inProgress?.employeeId)}
+              </span>
+              &apos;s{' '}
+              {clearTarget?.inProgress
+                ? LOG_STATUS_LABEL[clearTarget.inProgress.status].toLowerCase()
+                : ''}{' '}
+              session on{' '}
+              <span className="font-semibold">{clearTarget?.areaName}</span>{' '}
+              will be deleted, with its time and ticks. The area will be free
+              for anyone to start again.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={clearing}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-500 text-white hover:bg-red-600"
+              disabled={clearing}
+              onClick={(e) => {
+                e.preventDefault();
+                clearSession();
+              }}
+            >
+              {clearing ? 'Clearing...' : 'Clear session'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={confirmAction !== null}
+        onOpenChange={(open) =>
+          !open && busyAction === null && setConfirmAction(null)
+        }
+      >
+        <AlertDialogContent className="w-[95vw] max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {confirmAction === 'stop'
+                ? 'Stop this area?'
+                : 'Discard this session?'}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-black">
+              {confirmAction === 'stop' ? (
+                <>
+                  The timer for{' '}
+                  <span className="font-semibold">{selectedAreaName}</span>{' '}
+                  will end and <span className="font-semibold">cannot be resumed</span>.
+                  You will then sign and complete it. To take a break instead,
+                  use Pause.
+                </>
+              ) : (
+                <>
+                  The time and ticks recorded for{' '}
+                  <span className="font-semibold">{selectedAreaName}</span> will
+                  be thrown away and the area will be free for anyone to start.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busyAction !== null}>
+              Keep working
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-500 text-white hover:bg-red-600"
+              disabled={busyAction !== null}
+              onClick={(e) => {
+                e.preventDefault();
+                if (confirmAction) runSession(confirmAction);
+              }}
+            >
+              {confirmAction === 'stop'
+                ? busyAction === 'stop'
+                  ? 'Stopping...'
+                  : 'Yes, stop'
+                : busyAction === 'discard'
+                  ? 'Discarding...'
+                  : 'Discard'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -11,6 +11,7 @@ import {
   CleaningLogRecord,
   completion,
   formatDateTime,
+  formatDuration,
   personName
 } from '../shared';
 import { CheckDot, TypeBadge } from './CleaningLogList';
@@ -73,6 +74,9 @@ export function CleaningLogDetailsBody({ log }: { log: CleaningLogRecord }) {
         {renderDetail('Employee', personName(log.employeeId))}
         {log.startTime && renderDetail('Start Time', formatTime(log.startTime))}
         {log.endTime && renderDetail('End Time', formatTime(log.endTime))}
+        {/* Only logs worked through the timer have a duration */}
+        {Boolean(log.sessions?.length) &&
+          renderDetail('Time Worked', formatDuration(log.durationSeconds || 0))}
         {/* {renderDetail('Signed At', formatDateTime(log.signedAt))}
 
         {renderDetail('Submitted At', formatDateTime(log.createdAt))} */}

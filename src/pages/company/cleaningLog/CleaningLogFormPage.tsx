@@ -38,7 +38,7 @@ export default function CleaningLogFormPage() {
           </h2>
           <p className="mt-1 text-xs text-black sm:text-sm">
             {lid
-              ? 'Correct the checklist or signature of a submitted log.'
+              ? 'Correct any part of a submitted log, times included.'
               : 'Record a cleaning log on behalf of an employee.'}
           </p>
         </div>

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Select from 'react-select';
 import {
+  FileBarChart2,
   LayoutGrid,
   Plus,
   Search,
@@ -251,6 +252,14 @@ export default function CleaningLogPage() {
             onClick={() => navigate('areas')}
           >
             <LayoutGrid className="mr-1.5 h-4 w-4" /> Area
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="flex-1 sm:flex-none"
+            onClick={() => navigate('report')}
+          >
+            <FileBarChart2 className="mr-1.5 h-4 w-4" /> Generate Report
           </Button>
           <Button
             size="sm"
