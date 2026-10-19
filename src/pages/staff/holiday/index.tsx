@@ -1303,7 +1303,7 @@ const HolidayPage: React.FC = () => {
 
               <CardContent>
                 <div className="space-y-4">
-                  <div className="rounded-lg border border-gray-200 bg-white p-3 text-xs leading-relaxed text-black">
+                  {/* <div className="rounded-lg border border-gray-200 bg-white p-3 text-xs leading-relaxed text-black">
                     <p>
                       <span className="font-semibold">Calculation:</span>{' '}
                       Carry Forward = A | Entitlement = B | Holiday Accrued = C
@@ -1324,7 +1324,7 @@ const HolidayPage: React.FC = () => {
                         Balance Remaining = A + B + C − D − E − F
                       </span>
                     </p>
-                  </div>
+                  </div> */}
 
                   {allowanceStatsList.map(({ label, code, formula, value, color }) => (
                     <div
