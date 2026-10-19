@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react';
 import {
-  Clock3,
   Loader2,
   Pause,
+  PauseCircle,
   Play,
   Square,
-  Timer,
   Trash2
 } from 'lucide-react';
 
@@ -65,11 +64,19 @@ interface CleaningSessionProps {
   draft: CleaningLogRecord | null;
   busy: SessionAction | null;
   onAction: (action: SessionAction) => void;
+  // Something is ticked already: the employee has chosen to work without
+  // the timer, so Start is no longer offered
+  hasTicks?: boolean;
 }
 
-// The timer card: a Start button before the session exists, then the clock
-// with Pause / Resume / Stop
-export function CleaningSession({ draft, busy, onAction }: CleaningSessionProps) {
+// Plain buttons for an untimed log, or, for one started with the timer, the
+// clock with Pause / Resume / Stop
+export function CleaningSession({
+  draft,
+  busy,
+  onAction,
+  hasTicks = false
+}: CleaningSessionProps) {
   const seconds = useElapsed(draft);
   const disabled = busy !== null;
 
@@ -85,7 +92,10 @@ export function CleaningSession({ draft, busy, onAction }: CleaningSessionProps)
       type="button"
       disabled={disabled}
       onClick={() => onAction(action)}
-      className={cn('h-11 flex-1 text-sm font-semibold sm:flex-none sm:px-6', className)}
+      className={cn(
+        'h-11 flex-1 text-sm font-semibold sm:flex-none sm:px-6',
+        className
+      )}
     >
       {busy === action ? (
         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -96,37 +106,90 @@ export function CleaningSession({ draft, busy, onAction }: CleaningSessionProps)
     </Button>
   );
 
-  if (!draft) {
-    return (
-      <div className="flex flex-col items-center gap-4 rounded-2xl border-2 border-dashed border-theme/30 bg-theme/5 px-4 py-6 text-center sm:py-8">
-        <span className="flex h-14 w-14 items-center justify-center rounded-full bg-theme/10 text-theme">
-          <Timer className="h-7 w-7" />
-        </span>
-        <div className="space-y-1">
-          <p className="text-base font-bold text-black">Ready to start?</p>
-          <p className="max-w-sm text-xs text-black sm:text-sm">
-            Starting puts this area on hold for you, so no one else can take it
-            while you work.
-          </p>
-        </div>
-        <Button
-          type="button"
-          disabled={disabled}
-          onClick={() => onAction('start')}
-          className="h-12 w-full max-w-xs bg-theme text-base font-semibold text-white hover:bg-theme/90 hover:text-white"
-        >
-          {busy === 'start' ? (
-            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-          ) : (
-            <Play className="mr-2 h-5 w-5 fill-current" />
+  // Smaller, rounded buttons for the untimed states
+  const pillButton = (
+    action: SessionAction,
+    label: string,
+    Icon: typeof Play,
+    className: string
+  ) => (
+    <Button
+      type="button"
+      disabled={disabled}
+      onClick={() => onAction(action)}
+      className={cn(
+        'h-10 flex-1 rounded-full px-5 font-semibold shadow-sm sm:flex-none',
+        className
+      )}
+    >
+      {busy === action ? (
+        <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+      ) : (
+        <Icon className="mr-1.5 h-4 w-4" />
+      )}
+      {label}
+    </Button>
+  );
+
+  const status = (draft?.status || 'in_progress') as CleaningLogStatus;
+  // A log that never started the timer has no clock to show
+  const timed = (draft?.sessions || []).length > 0;
+
+  // Untimed, the times are typed in below:
+  //   new log            -> Start (until something is ticked) and Pause
+  //   paused, no timer   -> highlighted, Resume only
+  //   resumed, no timer  -> Pause and Discard session
+  // Once Start is pressed the log is timed and gets the full clock card.
+  if (!timed) {
+    const pauseButton = pillButton(
+      'pause',
+      'Pause',
+      Pause,
+      'bg-orange-500 text-white hover:bg-orange-600 hover:text-white'
+    );
+
+    if (status === 'paused') {
+      return (
+        <div className="flex flex-col gap-3 rounded-2xl border border-orange-300 bg-gradient-to-r from-orange-50 to-amber-50 p-3 shadow-sm ring-4 ring-orange-100 sm:flex-row sm:items-center sm:px-4">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-500 text-white shadow-sm">
+              <PauseCircle className="h-5 w-5" />
+            </span>
+            <p className="text-sm font-bold text-black">
+              Paused · not submitted yet
+            </p>
+          </div>
+          {pillButton(
+            'resume',
+            'Resume',
+            Play,
+            'bg-theme text-white hover:bg-theme/90 hover:text-white'
           )}
-          Start
-        </Button>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        {!draft &&
+          !hasTicks &&
+          pillButton(
+            'start',
+            'Start',
+            Play,
+            'bg-theme text-white hover:bg-theme/90 hover:text-white'
+          )}
+        {pauseButton}
+        {draft &&
+          pillButton(
+            'discard',
+            'Discard session',
+            Trash2,
+            'border border-red-200 bg-white text-red-600 shadow-none hover:bg-red-50 hover:text-red-700'
+          )}
       </div>
     );
   }
-
-  const status = (draft.status || 'in_progress') as CleaningLogStatus;
 
   return (
     <div
@@ -135,7 +198,7 @@ export function CleaningSession({ draft, busy, onAction }: CleaningSessionProps)
         status === 'in_progress'
           ? 'border-amber-300 bg-amber-50/40'
           : status === 'paused'
-            ? 'border-slate-300 bg-slate-50'
+            ? 'border-orange-400 bg-orange-50 ring-4 ring-orange-100'
             : 'border-sky-200 bg-sky-50/40'
       )}
     >
@@ -147,16 +210,6 @@ export function CleaningSession({ draft, busy, onAction }: CleaningSessionProps)
             aria-live="off"
           >
             {formatDuration(seconds)}
-          </span>
-          <span className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs text-black sm:justify-start">
-            <span className="inline-flex items-center gap-1">
-              <Clock3 className="h-3.5 w-3.5" /> Started {draft.startTime || '-'}
-            </span>
-            {status === 'stopped' && draft.endTime && (
-              <span className="inline-flex items-center gap-1">
-                <Square className="h-3 w-3" /> Stopped {draft.endTime}
-              </span>
-            )}
           </span>
         </div>
 
@@ -178,7 +231,12 @@ export function CleaningSession({ draft, busy, onAction }: CleaningSessionProps)
                 'border-2 border-theme bg-white text-theme shadow-sm hover:bg-theme hover:text-white'
               )}
             {status !== 'stopped' &&
-              actionButton('stop', 'Stop', Square, 'bg-red-600 text-white hover:bg-red-700 hover:text-white')}
+              actionButton(
+                'stop',
+                'Stop',
+                Square,
+                'bg-red-600 text-white hover:bg-red-700 hover:text-white'
+              )}
           </div>
           <button
             type="button"
@@ -191,11 +249,16 @@ export function CleaningSession({ draft, busy, onAction }: CleaningSessionProps)
         </div>
       </div>
 
-      <p className="border-t border-black/5 bg-white/60 px-4 py-2 text-center text-xs text-black sm:px-6 sm:text-left">
+      <p
+        className={cn(
+          'border-t border-black/5 px-4 py-2 text-center text-xs text-black sm:px-6 sm:text-left',
+          status === 'paused' ? 'bg-orange-100 font-semibold' : 'bg-white/60'
+        )}
+      >
         {status === 'in_progress'
           ? 'Tick the elements as you clean. Pause to switch to another area, or Stop when you are done.'
           : status === 'paused'
-            ? 'Paused. You can start another area now and come back to this one later.'
+            ? 'Paused, not submitted yet. Your ticks and times are saved. Resume to carry on.'
             : 'Stopped. The timer is final. Check the list, sign below and press Complete to submit.'}
       </p>
     </div>

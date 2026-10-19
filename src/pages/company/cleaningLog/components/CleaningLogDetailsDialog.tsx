@@ -15,6 +15,7 @@ import {
   personName
 } from '../shared';
 import { CheckDot, TypeBadge } from './CleaningLogList';
+import { CleaningLogActivity } from './CleaningLogActivity';
 
 export const CleaningLogTitle = ({ log }: { log: CleaningLogRecord }) => (
   <>
@@ -75,17 +76,17 @@ export function CleaningLogDetailsBody({ log }: { log: CleaningLogRecord }) {
         {log.startTime && renderDetail('Start Time', formatTime(log.startTime))}
         {log.endTime && renderDetail('End Time', formatTime(log.endTime))}
         {/* Only logs worked through the timer have a duration */}
-        {Boolean(log.sessions?.length) &&
-          renderDetail('Time Worked', formatDuration(log.durationSeconds || 0))}
+        {/* {Boolean(log.sessions?.length) &&
+          renderDetail('Time Worked', formatDuration(log.durationSeconds || 0))} */}
         {/* {renderDetail('Signed At', formatDateTime(log.signedAt))}
 
         {renderDetail('Submitted At', formatDateTime(log.createdAt))} */}
         {/* {filedByOther && renderDetail('Created By', personName(log.createdBy))} */}
-        {log.updatedBy &&
+        {/* {log.updatedBy &&
           renderDetail(
             'Last Edited',
             `${personName(log.updatedBy)} · ${formatDateTime(log.updatedAt)}`
-          )}
+          )} */}
         {/* {renderDetail('Checked', `${done} of ${total} elements`)} */}
       </div>
 
@@ -131,7 +132,7 @@ export function CleaningLogDetailsBody({ log }: { log: CleaningLogRecord }) {
           <p className="text-xs font-bold uppercase tracking-wider text-black">
             Note
           </p>
-          <p className="whitespace-pre-wrap line-clamp-2 rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm text-black">
+          <p className="line-clamp-2 whitespace-pre-wrap rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm text-black">
             {log.note}
           </p>
         </div>
@@ -177,6 +178,15 @@ export function CleaningLogDetailsDialog({
               </DialogTitle>
             </DialogHeader>
             <CleaningLogDetailsBody log={log} />
+            {/* Every start, pause, resume and submit of this log */}
+            <div className="space-y-2">
+              <p className="text-xs font-bold uppercase tracking-wider text-black">
+                Activity ({log.logs?.length || 0})
+              </p>
+              <div className="rounded-xl border border-gray-200">
+                <CleaningLogActivity logs={log.logs} />
+              </div>
+            </div>
           </>
         )}
       </DialogContent>

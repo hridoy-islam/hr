@@ -44,11 +44,19 @@ function ActiveSessionCard({
   onContinue: () => void;
 }) {
   const seconds = useElapsed(log);
+  // Paused work is still waiting to be submitted, so it stands out
+  const paused = log.status === 'paused';
+  const timed = (log.sessions || []).length > 0;
+  const { done, total } = completion(log.items);
   return (
     <div
       className={cn(
-        'flex min-w-0 flex-col gap-3 rounded-xl border-2 bg-white p-3 sm:flex-row sm:items-center sm:justify-between',
-        current ? 'border-theme' : 'border-gray-200',
+        'flex min-w-0 flex-col gap-3 rounded-xl border-2 p-3 sm:flex-row sm:items-center sm:justify-between',
+        current
+          ? 'border-theme bg-white'
+          : paused
+            ? 'border-orange-400 bg-orange-50 ring-4 ring-orange-100'
+            : 'border-gray-200 bg-white',
         locked && 'opacity-60'
       )}
     >
@@ -60,12 +68,24 @@ function ActiveSessionCard({
           )}
         </p>
         <div className="flex flex-wrap items-center gap-2">
-          <StatusBadge status={(log.status || 'in_progress') as CleaningLogStatus} />
+          <StatusBadge
+            status={(log.status || 'in_progress') as CleaningLogStatus}
+          />
           <TypeBadge type={log.type} />
-          <span className="font-mono text-sm font-semibold tabular-nums text-black">
-            {formatDuration(seconds)}
-          </span>
+          {timed && (
+            <span className="font-mono text-sm font-semibold tabular-nums text-black">
+              {formatDuration(seconds)}
+            </span>
+          )}
         </div>
+        <p className="text-xs text-black">
+          {done} of {total} checked
+          {paused && (
+            <span className="ml-1 font-semibold text-orange-700">
+              · not submitted yet
+            </span>
+          )}
+        </p>
       </div>
       <Button
         size="sm"
@@ -117,7 +137,9 @@ export default function StaffCleaningLogPage() {
   const [submitted, setSubmitted] = useState<CleaningLogRecord | null>(null);
   // Sessions started but not completed yet, and the one opened from them
   const [active, setActive] = useState<CleaningLogRecord[]>([]);
-  const [resumeDraft, setResumeDraft] = useState<CleaningLogRecord | null>(null);
+  const [resumeDraft, setResumeDraft] = useState<CleaningLogRecord | null>(
+    null
+  );
   // The session the form below has open, however it was opened
   const [openDraftId, setOpenDraftId] = useState<string | null>(null);
 
@@ -149,9 +171,25 @@ export default function StaffCleaningLogPage() {
     fetchActive();
   }, [fetchActive]);
 
+  // The wizard hands back each log as it changes, so the list is kept in
+  // step locally rather than fetched again after every tap. A known log keeps
+  // its place so the cards do not jump; a new one goes first, as the server
+  // sends the latest first.
+  const updateActive = useCallback(
+    (logId: string, log: CleaningLogRecord | null) =>
+      setActive((current) => {
+        if (!log) return current.filter((item) => item._id !== logId);
+        return current.some((item) => item._id === logId)
+          ? current.map((item) => (item._id === logId ? log : item))
+          : [log, ...current];
+      }),
+    []
+  );
+
   // While a session runs everything else waits: the employee has to pause or
   // stop it before switching area or type
   const running = active.find((log) => log.status === 'in_progress');
+  const pausedCount = active.filter((log) => log.status === 'paused').length;
 
   const startNew = (nextType: CleaningType | null) => {
     if (running) return;
@@ -170,8 +208,9 @@ export default function StaffCleaningLogPage() {
             Cleaning Logs
           </h2>
           <p className="mt-1 text-xs text-black sm:text-sm">
-            Pick an area and press Start. Pause to switch area, Stop when
-            done, then sign and Complete.
+            Pick an area, tick the elements and enter the start and end time (or
+            use the optional timer). Pause to finish later, then sign and
+            Complete.
           </p>
         </div>
         <Button
@@ -188,8 +227,8 @@ export default function StaffCleaningLogPage() {
         <p className="flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-xs font-medium text-black sm:text-sm">
           <Timer className="mt-0.5 h-4 w-4 shrink-0 animate-pulse text-amber-600" />
           <span>
-            <span className="font-semibold">{running.areaName}</span> is running.
-            Pause or stop it to switch to another area or type.
+            <span className="font-semibold">{running.areaName}</span> is in
+            progress. Pause it to switch to another area or type.
           </span>
         </p>
       )}
@@ -200,6 +239,11 @@ export default function StaffCleaningLogPage() {
           <p className="flex items-center gap-2 text-sm font-bold text-black">
             <Timer className="h-4 w-4" />
             Your unfinished areas ({active.length})
+            {pausedCount > 0 && (
+              <span className="rounded-full bg-orange-500 px-2 py-0.5 text-xs font-semibold text-white">
+                {pausedCount} paused
+              </span>
+            )}
           </p>
           <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
             {active.map((log) => (
@@ -262,7 +306,9 @@ export default function StaffCleaningLogPage() {
       {submitted ? (
         <div className="flex flex-col items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/60 px-4 py-10 text-center">
           <CheckCircle2 className="h-12 w-12 text-emerald-600" />
-          <h3 className="text-lg font-bold text-black">Cleaning log submitted</h3>
+          <h3 className="text-lg font-bold text-black">
+            Cleaning log submitted
+          </h3>
           <p className="max-w-md text-sm text-black">
             {submitted.areaName} · {completion(submitted.items).done} of{' '}
             {completion(submitted.items).total} elements checked · signed at{' '}
@@ -288,7 +334,7 @@ export default function StaffCleaningLogPage() {
           type={type}
           draft={resumeDraft}
           onSubmitted={setSubmitted}
-          onSessionChange={fetchActive}
+          onSessionChange={updateActive}
           onOpenDraftChange={setOpenDraftId}
           onCancel={() => startNew(null)}
         />

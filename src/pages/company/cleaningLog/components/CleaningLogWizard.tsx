@@ -7,7 +7,9 @@ import {
   Check,
   CheckCheck,
   CheckCircle2,
+  ChevronDown,
   DoorOpen,
+  History,
   Lock,
   Info,
   Loader2,
@@ -59,6 +61,7 @@ import {
 } from '../shared';
 import { SignaturePad, SignaturePadHandle } from './SignaturePad';
 import { CleaningSession, SessionAction, StatusBadge } from './CleaningSession';
+import { CleaningLogActivity } from './CleaningLogActivity';
 
 interface ChecklistRow {
   elementId: string;
@@ -77,8 +80,9 @@ interface CleaningLogWizardProps {
   // An unfinished session to pick straight back up
   draft?: CleaningLogRecord | null;
   onSubmitted: (log: CleaningLogRecord) => void;
-  // Any start / pause / resume / stop / discard
-  onSessionChange?: () => void;
+  // Any start / pause / resume / stop with the log as it now stands, or null
+  // once it is discarded or completed, so the page can update without a reload
+  onSessionChange?: (logId: string, log: CleaningLogRecord | null) => void;
   // The session on screen right now, or null when none is open
   onOpenDraftChange?: (logId: string | null) => void;
   onCancel?: () => void;
@@ -86,7 +90,7 @@ interface CleaningLogWizardProps {
 
 const SESSION_TOAST: Record<SessionAction, string> = {
   start: 'Cleaning started',
-  pause: 'Cleaning paused',
+  pause: 'Cleaning paused. Finish it any time from your unfinished areas.',
   resume: 'Cleaning resumed',
   stop: 'Cleaning stopped. Sign and complete to submit.',
   discard: 'Session discarded'
@@ -124,6 +128,17 @@ const formatTime = (value: string) => {
   return m.isValid() ? m.format('HH:mm') : clean;
 };
 
+// Times an open log can keep for now: valid ones, or empty to clear. A half
+// typed one is left out until it is fixed.
+const savableTimes = (times: Record<TimeField, string>) => {
+  const result: Partial<Record<TimeField, string>> = {};
+  (['startTime', 'endTime'] as TimeField[]).forEach((field) => {
+    const value = times[field].trim();
+    if (!value || TIME_PATTERN.test(value)) result[field] = value;
+  });
+  return result;
+};
+
 const checkedIdsOf = (record?: CleaningLogRecord | null) =>
   new Set(
     (record?.items || [])
@@ -155,11 +170,10 @@ export function CleaningLogWizard({
   const [pickingArea, setPickingArea] = useState(!seed?.areaId);
   const [checkedIds, setCheckedIds] = useState<Set<string>>(checkedIdsOf(seed));
   const [note, setNote] = useState(seed?.note || '');
-  // The company side types the times in, when creating and when editing; an
-  // employee's session stamps its own
+  // Typed in by hand, or stamped by an employee's timer and still editable
   const [times, setTimes] = useState<Record<TimeField, string>>({
-    startTime: log?.startTime || '',
-    endTime: log?.endTime || ''
+    startTime: seed?.startTime || '',
+    endTime: seed?.endTime || ''
   });
   const [timeErrors, setTimeErrors] = useState<Record<TimeField, string>>({
     startTime: '',
@@ -180,11 +194,11 @@ export function CleaningLogWizard({
   // An employee's unfinished session the company side is about to clear
   const [clearTarget, setClearTarget] = useState<CleaningArea | null>(null);
   const [clearing, setClearing] = useState(false);
-  // Ticks waiting to be saved during an employee's session
+  // Ticks and times waiting to be saved on an employee's open log
   const tickTimer = useRef<number>();
-  const [tickSave, setTickSave] = useState<'idle' | 'saving' | 'saved' | 'error'>(
-    'idle'
-  );
+  const [tickSave, setTickSave] = useState<
+    'idle' | 'saving' | 'saved' | 'error'
+  >('idle');
 
   const [employees, setEmployees] = useState<CleaningEmployee[]>([]);
   const [areas, setAreas] = useState<CleaningArea[]>([]);
@@ -196,8 +210,8 @@ export function CleaningLogWizard({
   const [signatureError, setSignatureError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // The company side fills the whole log in by hand; only an employee runs
-  // the timer
+  // The company side fills the whole log in by hand; an employee can too, or
+  // run the timer
   const isAdmin = mode === 'admin';
   // Whose sessions this form can pick back up. None on the company side, so
   // an area someone is working on stays locked there.
@@ -210,6 +224,7 @@ export function CleaningLogWizard({
     setDraft(null);
     setCheckedIds(new Set());
     setNote('');
+    if (!log) setTimes({ startTime: '', endTime: '' });
     setPickingArea(true);
   };
 
@@ -264,8 +279,8 @@ export function CleaningLogWizard({
     draft || (log && String(log.areaId) === String(areaId) ? log : null);
 
   useEffect(() => {
-    // An employee sees the checklist once the session exists
-    if (!areaId || (!isAdmin && !draft)) {
+    // Shown as soon as an area is picked: the timer is not needed to work
+    if (!areaId) {
       setRows([]);
       return;
     }
@@ -332,18 +347,21 @@ export function CleaningLogWizard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openDraftId]);
   const draftStatus = draft?.status as CleaningLogStatus | undefined;
-  // The company side goes straight to the checklist and signature; an
-  // employee ticks during the session and signs once it is stopped
-  const showChecklist = areaPicked && (isAdmin || Boolean(draft));
-  const showSign = areaPicked && (isAdmin || draftStatus === 'stopped');
+  // Everyone goes straight to the checklist, times and signature; the timer
+  // is optional
+  const showChecklist = areaPicked;
+  const showSign = areaPicked;
   const busy = isSubmitting || busyAction !== null;
 
-  // An employee's ticks are saved as they go, so a reload, another device or
-  // an admin finishing the session all see them. A short pause lets quick
-  // taps go out as one save.
+  // An employee's ticks and times are saved as they go once the log exists,
+  // so a reload, another device or an admin finishing it all see them. A
+  // short pause lets quick taps go out as one save.
   const autoSavesTicks = !isAdmin && Boolean(draft);
 
-  const queueTickSave = (next: Set<string>) => {
+  const queueTickSave = (
+    next: Set<string>,
+    nextTimes: Record<TimeField, string> = times
+  ) => {
     if (!autoSavesTicks || !draft) return;
     window.clearTimeout(tickTimer.current);
     setTickSave('saving');
@@ -352,10 +370,18 @@ export function CleaningLogWizard({
       elementId: row.elementId,
       checked: next.has(row.elementId)
     }));
+    const body = { items, ...savableTimes(nextTimes) };
     tickTimer.current = window.setTimeout(async () => {
       try {
-        await axiosInstance.patch(`/cleaning-log/${logId}/items`, { items });
+        const res = await axiosInstance.patch(
+          `/cleaning-log/${logId}/items`,
+          body
+        );
         setTickSave('saved');
+        // Keeps the unfinished-areas cards in step without a reload
+        const saved = { ...draft, ...res.data?.data } as CleaningLogRecord;
+        setDraft((current) => (current?._id === logId ? saved : current));
+        onSessionChange?.(logId, saved);
       } catch (err) {
         setTickSave('error');
         toast({
@@ -416,7 +442,7 @@ export function CleaningLogWizard({
     // A save still on its way finishes for the area it belongs to; the label
     // starts fresh for the new one
     setTickSave('idle');
-    if (canTakeOver) setTimes({ startTime: '', endTime: '' });
+    if (!log) setTimes({ startTime: '', endTime: '' });
 
     const open = area.inProgress;
     const ownSession =
@@ -430,14 +456,13 @@ export function CleaningLogWizard({
       setDraft(record);
       setCheckedIds(checkedIdsOf(record));
       setNote(record?.note || '');
-      if (canTakeOver) {
-        // The log stays the employee's; the start they clocked carries over
-        setEmployeeId(record.employeeId?._id || '');
-        setTimes({
-          startTime: record.startTime || '',
-          endTime: record.endTime || ''
-        });
-      }
+      // The times clocked or typed so far carry over
+      setTimes({
+        startTime: record.startTime || '',
+        endTime: record.endTime || ''
+      });
+      // The log stays the employee's
+      if (canTakeOver) setEmployeeId(record.employeeId?._id || '');
     } catch (err) {
       toast({
         title: apiError(err, 'Failed to load this session'),
@@ -448,12 +473,12 @@ export function CleaningLogWizard({
     }
   };
 
+  // Only an employee runs a session; the company side never sees these
   const runSession = async (action: SessionAction) => {
-    if (action === 'start' && mode === 'admin' && !employeeId) {
-      setError('Please select an employee');
-      return;
-    }
-    if ((action === 'stop' || action === 'discard') && confirmAction !== action) {
+    if (
+      (action === 'stop' || action === 'discard') &&
+      confirmAction !== action
+    ) {
       setConfirmAction(action);
       return;
     }
@@ -464,21 +489,25 @@ export function CleaningLogWizard({
       setBusyAction(action);
       let record: CleaningLogRecord | null = null;
 
-      if (action === 'start') {
+      // The ticks and times so far travel with the first save and every
+      // pause, so nothing is lost when the employee switches area
+      const progress = { items: itemsPayload(), ...savableTimes(times) };
+
+      if (!draft && (action === 'start' || action === 'pause')) {
+        // Pausing before any Start keeps the work without running the timer
         const res = await axiosInstance.post('/cleaning-log/start', {
           companyId,
           areaId,
-          ...(mode === 'admin' ? { employeeId } : {})
+          ...progress,
+          ...(action === 'pause' ? { paused: true } : {})
         });
         record = res.data?.data;
       } else if (action === 'discard') {
         await axiosInstance.delete(`/cleaning-log/${draft!._id}/discard`);
       } else {
-        // The ticks so far travel with every move, so nothing is lost when
-        // the employee switches area
         const res = await axiosInstance.patch(
           `/cleaning-log/${draft!._id}/${action}`,
-          { items: itemsPayload() }
+          action === 'pause' ? progress : { items: progress.items }
         );
         record = res.data?.data;
       }
@@ -489,10 +518,22 @@ export function CleaningLogWizard({
       });
 
       setConfirmAction(null);
-      if (action === 'discard') resetArea();
-      else setDraft(record);
-      setAreasVersion((version) => version + 1);
-      onSessionChange?.();
+      if (action === 'discard') {
+        onSessionChange?.(draft!._id, null);
+        resetArea();
+        // The area list is back on screen, with this area free again
+        setAreasVersion((version) => version + 1);
+      } else if (record) {
+        setDraft(record);
+        // The timer stamps a start or stop time the inputs should show
+        setTimes((current) => ({
+          startTime: record!.startTime || current.startTime,
+          endTime: record!.endTime || current.endTime
+        }));
+        // The area list stays folded away and reloads on "Change area", so
+        // it is not fetched again here
+        onSessionChange?.(record._id, record);
+      }
     } catch (err) {
       toast({
         title: apiError(err, 'Something went wrong. Please try again.'),
@@ -534,15 +575,11 @@ export function CleaningLogWizard({
     if (!areaId) return 'Please select an area';
     if (rows.length === 0)
       return 'This area has no elements yet. Ask an admin to add them first.';
-    if (!isAdmin && draftStatus !== 'stopped')
-      return 'Please stop the area before completing it';
-
-    if (isAdmin) {
-      const nextTimeErrors = validateTimes(times);
-      setTimeErrors(nextTimeErrors);
-      if (nextTimeErrors.startTime || nextTimeErrors.endTime)
-        return 'Please enter a valid start and end time';
-    }
+    // Whether timed or typed, both times are needed to submit
+    const nextTimeErrors = validateTimes(times);
+    setTimeErrors(nextTimeErrors);
+    if (nextTimeErrors.startTime || nextTimeErrors.endTime)
+      return 'Please enter a valid start and end time';
 
     if (signatureRef.current?.isEmpty() ?? true) {
       setSignatureError('Please sign inside the box');
@@ -581,34 +618,29 @@ export function CleaningLogWizard({
         items: itemsPayload(),
         note: note.trim(),
         signatureUrl: signature.signatureUrl,
-        signedAt: signature.signedAt
-      };
-
-      const adminPayload = {
-        ...payload,
-        employeeId,
-        areaId,
+        signedAt: signature.signedAt,
         startTime: times.startTime,
         endTime: times.endTime
       };
 
-      // Edit a finished log, finish an employee's open session, create a new
-      // log by hand, or (employee) complete their own stopped session
+      const newLogPayload = {
+        ...payload,
+        areaId,
+        // An employee always files for themselves
+        ...(isAdmin ? { employeeId } : {})
+      };
+
+      // Edit a finished log, complete an open one (paused, stopped or the
+      // company side finishing it), or file a new log in one go
       const response = log
-        ? await axiosInstance.patch(`/cleaning-log/${log._id}`, adminPayload)
+        ? await axiosInstance.patch(`/cleaning-log/${log._id}`, newLogPayload)
         : draft
           ? await axiosInstance.patch(
               `/cleaning-log/${draft._id}/complete`,
-              isAdmin
-                ? {
-                    ...payload,
-                    startTime: times.startTime,
-                    endTime: times.endTime
-                  }
-                : payload
+              payload
             )
           : await axiosInstance.post('/cleaning-log', {
-              ...adminPayload,
+              ...newLogPayload,
               companyId
             });
 
@@ -622,7 +654,7 @@ export function CleaningLogWizard({
             : 'Cleaning log submitted successfully',
         className: 'bg-theme border-none text-white'
       });
-      onSessionChange?.();
+      if (draft) onSessionChange?.(draft._id, null);
       onSubmitted(response.data?.data);
     } catch (err) {
       toast({
@@ -707,6 +739,8 @@ export function CleaningLogWizard({
       Boolean(actorId) &&
       String(open?.employeeId?._id) === String(actorId);
     const held = Boolean(open) && !mine;
+    // The employee's own paused log stands out as work still to finish
+    const minePaused = mine && open?.status === 'paused';
     // The company side can open someone else's session to finish it
     const finishable = held && canTakeOver;
     const locked = completed || (held && !finishable);
@@ -733,9 +767,11 @@ export function CleaningLogWizard({
                 : 'cursor-not-allowed border-amber-200 bg-amber-50/60'
               : active
                 ? 'border-theme bg-theme/5 shadow-sm'
-                : mine
-                  ? 'border-theme/40 bg-theme/5 hover:border-theme'
-                  : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                : minePaused
+                  ? 'border-orange-400 bg-orange-50 ring-4 ring-orange-100 hover:border-orange-500'
+                  : mine
+                    ? 'border-theme/40 bg-theme/5 hover:border-theme'
+                    : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
         )}
       >
         <span
@@ -745,9 +781,11 @@ export function CleaningLogWizard({
               ? 'bg-emerald-100 text-emerald-700'
               : held
                 ? 'bg-amber-100 text-amber-700'
-                : active || mine
-                  ? 'bg-theme text-white'
-                  : 'bg-gray-100 text-black'
+                : minePaused && !active
+                  ? 'bg-orange-500 text-white'
+                  : active || mine
+                    ? 'bg-theme text-white'
+                    : 'bg-gray-100 text-black'
           )}
         >
           {locked ? (
@@ -780,11 +818,13 @@ export function CleaningLogWizard({
           )}
           {open && (
             <span className="mt-1 block text-xs text-black">
-              {mine
-                ? 'Your session · tap to continue'
-                : finishable
-                  ? `By ${personName(open.employeeId)} · tap to finish`
-                  : `By ${personName(open.employeeId)}`}
+              {minePaused
+                ? 'Paused, not submitted · tap to finish'
+                : mine
+                  ? 'Your session · tap to continue'
+                  : finishable
+                    ? `By ${personName(open.employeeId)} · tap to finish`
+                    : `By ${personName(open.employeeId)}`}
             </span>
           )}
         </span>
@@ -1016,6 +1056,8 @@ export function CleaningLogWizard({
   const blurTime = (field: TimeField) => {
     const next = { ...times, [field]: formatTime(times[field]) };
     setTimes(next);
+    // An employee's open log keeps the typed times too
+    if (next[field] !== (draft?.[field] || '')) queueTickSave(checkedIds, next);
     const errors = validateTimes(next);
     // The end time is only flagged once it has been filled in
     setTimeErrors((current) => ({
@@ -1026,7 +1068,11 @@ export function CleaningLogWizard({
     }));
   };
 
-  const renderTimeInput = (field: TimeField, label: string, placeholder: string) => (
+  const renderTimeInput = (
+    field: TimeField,
+    label: string,
+    placeholder: string
+  ) => (
     <div className="space-y-1.5">
       <p className="text-sm font-semibold text-black">{label}*</p>
       <Input
@@ -1038,7 +1084,11 @@ export function CleaningLogWizard({
         className={cn('font-mono', timeErrors[field] && 'border-red-500')}
         onChange={(e) => {
           let val = e.target.value.replace(/[^0-9:]/g, '').slice(0, 5);
-          if (val.length === 2 && times[field].length === 1 && !val.includes(':'))
+          if (
+            val.length === 2 &&
+            times[field].length === 1 &&
+            !val.includes(':')
+          )
             val += ':';
           updateTime(field, val);
         }}
@@ -1052,24 +1102,33 @@ export function CleaningLogWizard({
 
   const renderSignature = () => (
     <div className="space-y-4">
-      {isAdmin && draft && (
+      {/* {isAdmin && draft && (
         <p className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-black sm:text-sm">
-          <StatusBadge status={(draft.status || 'in_progress') as CleaningLogStatus} />
+          <StatusBadge
+            status={(draft.status || 'in_progress') as CleaningLogStatus}
+          />
           <span>
             Finishing{' '}
-            <span className="font-semibold">{personName(draft.employeeId)}</span>
+            <span className="font-semibold">
+              {personName(draft.employeeId)}
+            </span>
             &apos;s session, started at{' '}
-            <span className="font-semibold">{draft.startTime || '-'}</span>. Enter
-            the end time, sign and complete.
+            <span className="font-semibold">{draft.startTime || '-'}</span>.
+            Enter the end time, sign and complete.
           </span>
         </p>
-      )}
-      {isAdmin && (
-        <div className="grid max-w-md grid-cols-2 gap-3">
+      )} */}
+      <div className="max-w-md space-y-1.5">
+        <div className="grid grid-cols-2 gap-3">
           {renderTimeInput('startTime', 'Start Time (HH:MM)', '09:00')}
           {renderTimeInput('endTime', 'End Time (HH:MM)', '10:00')}
         </div>
-      )}
+        {!isAdmin && (
+          <p className="text-xs text-black">
+            Filled in by the timer if you use it. Both are required to submit.
+          </p>
+        )}
+      </div>
 
       <div className="max-w-xl space-y-2">
         <p className="text-sm font-semibold text-black">Note</p>
@@ -1111,9 +1170,10 @@ export function CleaningLogWizard({
                     null
                   }
                   onChange={(option: any) => {
+                    // The picked area, ticks, times and note all stay: the
+                    // company side runs no session, so nothing here belongs
+                    // to the previous employee
                     setEmployeeId(option?.value || '');
-                    // Sessions belong to an employee, so a new one starts over
-                    if (!log) resetArea();
                     setError('');
                   }}
                   // A session being finished stays with the employee who
@@ -1144,22 +1204,38 @@ export function CleaningLogWizard({
 
         {renderSection('Area*', renderAreaPicker())}
 
+        {/* No heading: the slim bar explains itself and saves the space */}
         {areaPicked &&
           !isAdmin &&
-          renderSection(
-            'Cleaning Session',
-            loadingDraft ? (
-              <div className="flex justify-center py-10">
-                <BlinkingDots size="large" color="bg-theme" />
-              </div>
-            ) : (
+          (loadingDraft ? (
+            <div className="flex justify-center py-4">
+              <BlinkingDots size="large" color="bg-theme" />
+            </div>
+          ) : (
+            <div className="space-y-2">
               <CleaningSession
                 draft={draft}
                 busy={busyAction}
                 onAction={runSession}
+                hasTicks={checkedIds.size > 0}
               />
-            )
-          )}
+              {/* Each pause and resume of this log, folded away until asked */}
+              {Boolean(draft?.logs?.length) && (
+                <details className="group rounded-xl border border-gray-200 bg-white">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-xs font-semibold text-black sm:text-sm">
+                    <span className="inline-flex items-center gap-1.5">
+                      <History className="h-4 w-4 text-theme" />
+                      Activity ({draft!.logs!.length})
+                    </span>
+                    <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
+                  </summary>
+                  <div className="max-h-64 overflow-y-auto border-t border-gray-100">
+                    <CleaningLogActivity logs={draft!.logs} />
+                  </div>
+                </details>
+              )}
+            </div>
+          ))}
 
         {showChecklist && renderSection('Check Elements', renderElements())}
 
@@ -1249,10 +1325,11 @@ export function CleaningLogWizard({
               {confirmAction === 'stop' ? (
                 <>
                   The timer for{' '}
-                  <span className="font-semibold">{selectedAreaName}</span>{' '}
-                  will end and <span className="font-semibold">cannot be resumed</span>.
-                  You will then sign and complete it. To take a break instead,
-                  use Pause.
+                  <span className="font-semibold">{selectedAreaName}</span> will
+                  end and{' '}
+                  <span className="font-semibold">cannot be resumed</span>. You
+                  will then sign and complete it. To take a break instead, use
+                  Pause.
                 </>
               ) : (
                 <>

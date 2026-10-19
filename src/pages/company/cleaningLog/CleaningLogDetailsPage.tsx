@@ -17,12 +17,12 @@ import {
 import { useToast } from '@/components/ui/use-toast';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 import axiosInstance from '@/lib/axios';
-import { cn } from '@/lib/utils';
-import { apiError, CleaningLogRecord, formatDateTime } from './shared';
+import { apiError, CleaningLogRecord } from './shared';
 import {
   CleaningLogDetailsBody,
   CleaningLogTitle
 } from './components/CleaningLogDetailsDialog';
+import { CleaningLogActivity } from './components/CleaningLogActivity';
 
 // Admin only: the full log on the left, its activity on the right
 export default function CleaningLogDetailsPage() {
@@ -59,10 +59,7 @@ export default function CleaningLogDetailsPage() {
     }
   };
 
-  // Newest entry first, without mutating what the API sent
-  const history = [...(log?.logs || [])].sort(
-    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-  );
+  const historyCount = log?.logs?.length || 0;
 
   if (loading) {
     return (
@@ -80,12 +77,18 @@ export default function CleaningLogDetailsPage() {
           {log ? (
             <CleaningLogTitle log={log} />
           ) : (
-            <p className="text-lg font-bold text-black">Cleaning log not found</p>
+            <p className="text-lg font-bold text-black">
+              Cleaning log not found
+            </p>
           )}
         </div>
 
         <div className="flex w-full flex-wrap gap-2 lg:w-auto">
-          <Button size="sm" className="flex-1 sm:flex-none" onClick={() => navigate(listPath)}>
+          <Button
+            size="sm"
+            className="flex-1 sm:flex-none"
+            onClick={() => navigate(listPath)}
+          >
             <ArrowLeft className="mr-1.5 h-4 w-4" /> Back
           </Button>
           {log && (
@@ -123,35 +126,12 @@ export default function CleaningLogDetailsPage() {
             <div className="flex items-center gap-2 border-b border-gray-200 px-4 py-3">
               <History className="h-4 w-4 text-theme" />
               <p className="text-xs font-bold uppercase tracking-[0.12em] text-black">
-                Activity ({history.length})
+                Activity ({historyCount})
               </p>
             </div>
 
             <ScrollArea className="h-[320px] lg:h-[calc(100vh-230px)]">
-              {history.length ? (
-                <ol className="p-2">
-                  {history.map((entry, index) => (
-                    <li
-                      key={entry._id || `${entry.date}-${index}`}
-                      className="flex items-start gap-2.5 rounded-md border-b border-gray-100 px-2 py-2.5 transition-colors last:border-0 hover:bg-gray-50"
-                    >
-                      <span
-                        className={cn(
-                          'mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full',
-                          entry.action === 'create' ? 'bg-emerald-500' : 'bg-sky-500'
-                        )}
-                      />
-                      <span className="min-w-0 flex-1 break-words text-xs font-medium leading-relaxed text-black sm:text-sm">
-                        {entry.title} at {formatDateTime(entry.date)}
-                      </span>
-                    </li>
-                  ))}
-                </ol>
-              ) : (
-                <p className="m-3 rounded-xl border border-dashed border-gray-200 px-4 py-3 text-xs italic text-black sm:text-sm">
-                  No activity recorded yet.
-                </p>
-              )}
+              <CleaningLogActivity logs={log.logs} />
             </ScrollArea>
           </aside>
         </div>

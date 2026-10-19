@@ -3,8 +3,13 @@ import moment from '@/lib/moment-setup';
 
 export type CleaningType = 'daily' | 'monthly';
 
-// A log is a session: in_progress <-> paused -> stopped -> completed
-export type CleaningLogStatus = 'in_progress' | 'paused' | 'stopped' | 'completed';
+// A log is a session: in_progress <-> paused -> stopped -> completed. The
+// timer is optional: a log can be paused or completed without ever starting it.
+export type CleaningLogStatus =
+  | 'in_progress'
+  | 'paused'
+  | 'stopped'
+  | 'completed';
 
 export interface CleaningEmployee {
   _id: string;
@@ -119,11 +124,15 @@ export const personName = (person?: CleaningEmployee) => {
 };
 
 export const areaLabel = (area: { areaName: string; roomNumber?: string }) =>
-  area.roomNumber ? `${area.areaName} (Room ${area.roomNumber})` : area.areaName;
+  area.roomNumber
+    ? `${area.areaName} (Room ${area.roomNumber})`
+    : area.areaName;
 
 // Room number ascending (numeric-aware, so 2 comes before 10); areas with
 // no room number go last, in name order
-export const sortAreasByRoom = <T extends { areaName: string; roomNumber?: string }>(
+export const sortAreasByRoom = <
+  T extends { areaName: string; roomNumber?: string }
+>(
   areas: T[]
 ): T[] =>
   [...areas].sort((a, b) => {
@@ -131,8 +140,10 @@ export const sortAreasByRoom = <T extends { areaName: string; roomNumber?: strin
     const roomB = (b.roomNumber || '').trim();
     if (!roomA !== !roomB) return roomA ? -1 : 1;
     return (
-      roomA.localeCompare(roomB, undefined, { numeric: true, sensitivity: 'base' }) ||
-      a.areaName.localeCompare(b.areaName)
+      roomA.localeCompare(roomB, undefined, {
+        numeric: true,
+        sensitivity: 'base'
+      }) || a.areaName.localeCompare(b.areaName)
     );
   });
 
@@ -145,7 +156,8 @@ export const LOG_STATUS_LABEL: Record<CleaningLogStatus, string> = {
 
 export const LOG_STATUS_BADGE: Record<CleaningLogStatus, string> = {
   in_progress: 'bg-amber-50 text-amber-700 ring-amber-200',
-  paused: 'bg-slate-100 text-slate-700 ring-slate-300',
+  // Loud on purpose: a paused log is work still waiting to be finished
+  paused: 'bg-orange-100 text-orange-700 ring-orange-300',
   stopped: 'bg-sky-50 text-sky-700 ring-sky-200',
   completed: 'bg-emerald-50 text-emerald-700 ring-emerald-200'
 };
@@ -175,8 +187,6 @@ export const completion = (items: CleaningLogItem[] = []) => {
   const done = items.filter((item) => item.checked).length;
   return { done, total, percent: total ? Math.round((done / total) * 100) : 0 };
 };
-
-
 
 export const formatDateTime = (date?: string | Date) =>
   date ? moment(date).format('DD MMM YYYY, h:mm A') : '-';
