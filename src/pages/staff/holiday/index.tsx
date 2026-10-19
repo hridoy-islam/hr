@@ -256,6 +256,17 @@ const HolidayPage: React.FC = () => {
         holidayYear: item.holidayYear
       }));
 
+      // Pending first, then Approved, then Rejected
+      const statusOrder: Record<string, number> = {
+        Pending: 0,
+        Approved: 1,
+        Rejected: 2
+      };
+      mappedHolidays.sort(
+        (a: any, b: any) =>
+          (statusOrder[a.status] ?? 0) - (statusOrder[b.status] ?? 0)
+      );
+
       setHolidays(mappedHolidays);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to load leave requests');
@@ -658,46 +669,68 @@ const HolidayPage: React.FC = () => {
 
   const holidayYears = useMemo(() => generateHolidayYears(20, 50), []);
 
-  const allowanceStatsList = useMemo(
+  // Total Allowance = A + C | Eligible Position = A + C − D − E − F
+  // Balance Remaining = A + B + C − D − E − F
+  const totalAllowance =
+    leaveAllowance.carryForward + leaveAllowance.holidayAccured;
+  const usedAndPending =
+    leaveAllowance.usedHours +
+    leaveAllowance.bookedHours +
+    leaveAllowance.requestedHours;
+  const eligiblePosition = totalAllowance - usedAndPending;
+  const balanceRemaining =
+    totalAllowance + leaveAllowance.holidayEntitlement - usedAndPending;
+
+  const allowanceStatsList: {
+    label: string;
+    code?: string;
+    formula?: string;
+    value: number;
+    color: string;
+    isBold?: boolean;
+  }[] = useMemo(
     () => [
       {
         label: 'Carry Forward From Last Year',
+        code: 'A',
         value: leaveAllowance.carryForward,
         color: 'text-gray-800'
       },
       {
         label: 'Present Year Holiday Entitlement',
+        code: 'B',
         value: leaveAllowance.holidayEntitlement,
         color: 'text-gray-800'
       },
       {
-        label: 'Opening This Year',
-        value: leaveAllowance.holidayAllowance,
-        color: 'text-blue-800'
-      },
-      {
         label: 'Holiday Accrued',
+        code: 'C',
         value: leaveAllowance.holidayAccured,
         color: 'text-gray-800'
       },
       {
         label: 'Taken',
+        code: 'D',
         value: leaveAllowance.usedHours,
         color: 'text-green-600'
       },
       {
         label: 'Booked',
+        code: 'E',
         value: leaveAllowance.bookedHours,
         color: 'text-orange-600'
       },
       {
         label: 'Requested',
+        code: 'F',
         value: leaveAllowance.requestedHours,
         color: 'text-yellow-600'
       },
       {
         label: 'Balance Remaining',
-        value: leaveAllowance.remainingHours,
+        code: 'BR',
+        formula: 'A + B + C − D − E − F',
+        value: balanceRemaining,
         color: 'text-red-600',
         isBold: true
       },
@@ -717,7 +750,7 @@ const HolidayPage: React.FC = () => {
         color: 'text-theme'
       }
     ],
-    [leaveAllowance]
+    [leaveAllowance, balanceRemaining]
   );
 
   // ── Submit ──
@@ -1164,33 +1197,39 @@ const HolidayPage: React.FC = () => {
                 </div>
 
                 <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4 rounded-lg bg-blue-50 p-4 md:grid-cols-4">
+                  <div className="grid grid-cols-2 gap-4 rounded-lg bg-blue-50 p-4 md:grid-cols-5">
                     <div className="text-center">
                       <div className="text-2xl font-bold text-gray-800">
-                        {leaveAllowance.holidayAllowance.toFixed(1)} h
+                        {totalAllowance.toFixed(1)} h
                       </div>
                       <div className="text-sm text-gray-600">
-                        Total Allowance
+                        Total Allowance (A+C)
                       </div>
                     </div>
                     <div className="text-center">
                       <div className="text-2xl font-bold text-green-600">
                         {leaveAllowance.usedHours.toFixed(1)} h
                       </div>
-                      <div className="text-sm text-gray-600">Taken</div>
+                      <div className="text-sm text-gray-600">Taken (D)</div>
                     </div>
                     <div className="text-center">
                       <div className="text-2xl font-bold text-orange-600">
                         {leaveAllowance.bookedHours.toFixed(1)} h
                       </div>
-                      <div className="text-sm text-gray-600">Booked</div>
+                      <div className="text-sm text-gray-600">Booked (E)</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-yellow-600">
+                        {leaveAllowance.requestedHours.toFixed(1)} h
+                      </div>
+                      <div className="text-sm text-gray-600">Requested (F)</div>
                     </div>
                     <div className="text-center">
                       <div className="text-2xl font-bold text-purple-600">
-                        {leaveAllowance.remainingHours.toFixed(1)} h
+                        {eligiblePosition.toFixed(1)} h
                       </div>
                       <div className="text-sm text-gray-600">
-                        Remaining Balance
+                        Eligible Position (A+C−D−E−F)
                       </div>
                     </div>
                   </div>
@@ -1264,16 +1303,52 @@ const HolidayPage: React.FC = () => {
 
               <CardContent>
                 <div className="space-y-4">
-                  {allowanceStatsList.map(({ label, value, color }) => (
+                  <div className="rounded-lg border border-gray-200 bg-white p-3 text-xs leading-relaxed text-black">
+                    <p>
+                      <span className="font-semibold">Calculation:</span>{' '}
+                      Carry Forward = A | Entitlement = B | Holiday Accrued = C
+                      | Taken = D | Booked = E | Requested = F
+                    </p>
+                    <p className="mt-1.5">
+                      <span className="font-semibold">
+                        Total Allowance = A + C
+                      </span>
+                    </p>
+                    <p className="mt-1">
+                      <span className="font-semibold">
+                        Eligible Position = A + C − D − E − F
+                      </span>
+                    </p>
+                    <p className="mt-1">
+                      <span className="font-semibold">
+                        Balance Remaining = A + B + C − D − E − F
+                      </span>
+                    </p>
+                  </div>
+
+                  {allowanceStatsList.map(({ label, code, formula, value, color }) => (
                     <div
                       key={label}
-                      className="flex items-center justify-between border-b border-gray-300 py-2 text-sm sm:text-base"
+                      className="flex items-start justify-between gap-2 border-b border-gray-300 py-2 text-sm sm:text-base"
                     >
-                      <span
-                        className={`max-w-[60%] text-gray-600 ${label === 'Balance Remaining' ? 'font-bold text-gray-900' : ''}`}
-                      >
-                        {label}
-                      </span>{' '}
+                      <span className="max-w-[65%]">
+                        <span
+                          className={`text-gray-600 ${label === 'Balance Remaining' ? 'font-bold text-gray-900' : ''}`}
+                        >
+                          {label}
+                        </span>
+                        {code && (
+                          <span className="font-semibold text-gray-900">
+                            {' '}
+                            ({code})
+                          </span>
+                        )}
+                        {formula && (
+                          <span className="block text-xs text-gray-700">
+                            {code} = {formula}
+                          </span>
+                        )}
+                      </span>
                       <span className={`font-semibold ${color}`}>
                         {value.toFixed(1)} h
                       </span>

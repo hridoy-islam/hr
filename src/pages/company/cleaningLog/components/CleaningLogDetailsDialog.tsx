@@ -15,7 +15,6 @@ import {
   personName
 } from '../shared';
 import { CheckDot, TypeBadge } from './CleaningLogList';
-import { CleaningLogActivity } from './CleaningLogActivity';
 
 export const CleaningLogTitle = ({ log }: { log: CleaningLogRecord }) => (
   <>
@@ -178,15 +177,6 @@ export function CleaningLogDetailsDialog({
               </DialogTitle>
             </DialogHeader>
             <CleaningLogDetailsBody log={log} />
-            {/* Every start, pause, resume and submit of this log */}
-            <div className="space-y-2">
-              <p className="text-xs font-bold uppercase tracking-wider text-black">
-                Activity ({log.logs?.length || 0})
-              </p>
-              <div className="rounded-xl border border-gray-200">
-                <CleaningLogActivity logs={log.logs} />
-              </div>
-            </div>
           </>
         )}
       </DialogContent>

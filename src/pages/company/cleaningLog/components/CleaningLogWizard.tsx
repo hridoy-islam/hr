@@ -7,9 +7,7 @@ import {
   Check,
   CheckCheck,
   CheckCircle2,
-  ChevronDown,
   DoorOpen,
-  History,
   Lock,
   Info,
   Loader2,
@@ -61,7 +59,6 @@ import {
 } from '../shared';
 import { SignaturePad, SignaturePadHandle } from './SignaturePad';
 import { CleaningSession, SessionAction, StatusBadge } from './CleaningSession';
-import { CleaningLogActivity } from './CleaningLogActivity';
 
 interface ChecklistRow {
   elementId: string;
@@ -106,16 +103,25 @@ const TIME_LABEL: Record<TimeField, string> = {
 // A 24-hour clock time, e.g. 09:00 or 17:30
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 
+// Both times are optional; one typed in must be valid
 const validateTimes = (times: Record<TimeField, string>) => {
   const check = (field: TimeField) => {
     const value = times[field].trim();
-    if (!value) return `${TIME_LABEL[field]} is required`;
-    return TIME_PATTERN.test(value) ? '' : 'Invalid time (HH:MM)';
+    if (!value) return '';
+    return TIME_PATTERN.test(value)
+      ? ''
+      : `${TIME_LABEL[field]} is invalid (HH:MM)`;
   };
   const startTime = check('startTime');
   let endTime = check('endTime');
   // HH:MM strings sort the same way the times do
-  if (!startTime && !endTime && times.endTime < times.startTime)
+  if (
+    !startTime &&
+    !endTime &&
+    times.startTime &&
+    times.endTime &&
+    times.endTime < times.startTime
+  )
     endTime = 'End time cannot be earlier than start time';
   return { startTime, endTime };
 };
@@ -575,11 +581,14 @@ export function CleaningLogWizard({
     if (!areaId) return 'Please select an area';
     if (rows.length === 0)
       return 'This area has no elements yet. Ask an admin to add them first.';
-    // Whether timed or typed, both times are needed to submit
-    const nextTimeErrors = validateTimes(times);
-    setTimeErrors(nextTimeErrors);
-    if (nextTimeErrors.startTime || nextTimeErrors.endTime)
-      return 'Please enter a valid start and end time';
+    // Optional, and only typed in on the company side; an employee's come
+    // from the timer, if at all
+    if (isAdmin) {
+      const nextTimeErrors = validateTimes(times);
+      setTimeErrors(nextTimeErrors);
+      if (nextTimeErrors.startTime || nextTimeErrors.endTime)
+        return 'Please enter a valid start and end time';
+    }
 
     if (signatureRef.current?.isEmpty() ?? true) {
       setSignatureError('Please sign inside the box');
@@ -1074,7 +1083,7 @@ export function CleaningLogWizard({
     placeholder: string
   ) => (
     <div className="space-y-1.5">
-      <p className="text-sm font-semibold text-black">{label}*</p>
+      <p className="text-sm font-semibold text-black">{label}</p>
       <Input
         value={times[field]}
         placeholder={placeholder}
@@ -1118,17 +1127,16 @@ export function CleaningLogWizard({
           </span>
         </p>
       )} */}
-      <div className="max-w-md space-y-1.5">
-        <div className="grid grid-cols-2 gap-3">
-          {renderTimeInput('startTime', 'Start Time (HH:MM)', '09:00')}
-          {renderTimeInput('endTime', 'End Time (HH:MM)', '10:00')}
+      {/* Optional, and only on the company side */}
+      {isAdmin && (
+        <div className="max-w-md space-y-1.5">
+          <div className="grid grid-cols-2 gap-3">
+            {renderTimeInput('startTime', 'Start Time (HH:MM)', '09:00')}
+            {renderTimeInput('endTime', 'End Time (HH:MM)', '10:00')}
+          </div>
+          <p className="text-xs text-black">Optional.</p>
         </div>
-        {!isAdmin && (
-          <p className="text-xs text-black">
-            Filled in by the timer if you use it. Both are required to submit.
-          </p>
-        )}
-      </div>
+      )}
 
       <div className="max-w-xl space-y-2">
         <p className="text-sm font-semibold text-black">Note</p>
@@ -1212,29 +1220,12 @@ export function CleaningLogWizard({
               <BlinkingDots size="large" color="bg-theme" />
             </div>
           ) : (
-            <div className="space-y-2">
-              <CleaningSession
-                draft={draft}
-                busy={busyAction}
-                onAction={runSession}
-                hasTicks={checkedIds.size > 0}
-              />
-              {/* Each pause and resume of this log, folded away until asked */}
-              {Boolean(draft?.logs?.length) && (
-                <details className="group rounded-xl border border-gray-200 bg-white">
-                  <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-xs font-semibold text-black sm:text-sm">
-                    <span className="inline-flex items-center gap-1.5">
-                      <History className="h-4 w-4 text-theme" />
-                      Activity ({draft!.logs!.length})
-                    </span>
-                    <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
-                  </summary>
-                  <div className="max-h-64 overflow-y-auto border-t border-gray-100">
-                    <CleaningLogActivity logs={draft!.logs} />
-                  </div>
-                </details>
-              )}
-            </div>
+            <CleaningSession
+              draft={draft}
+              busy={busyAction}
+              onAction={runSession}
+              hasTicks={checkedIds.size > 0}
+            />
           ))}
 
         {showChecklist && renderSection('Check Elements', renderElements())}

@@ -200,6 +200,17 @@ const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
         holidayYear: item.holidayYear
       }));
 
+      // Pending first, then Approved, then Rejected
+      const statusOrder: Record<string, number> = {
+        Pending: 0,
+        Approved: 1,
+        Rejected: 2
+      };
+      mappedHolidays.sort(
+        (a: any, b: any) =>
+          (statusOrder[a.status] ?? 0) - (statusOrder[b.status] ?? 0)
+      );
+
       setHolidays(mappedHolidays);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to load leave requests');
@@ -332,6 +343,18 @@ const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
 
   const holidayYears = useMemo(() => generateHolidayYears(20, 50), []);
 
+  // Total Allowance = A + C | Eligible Position = A + C − D − E − F
+  // Balance Remaining = A + B + C − D − E − F
+  const totalAllowance =
+    leaveAllowance.carryForward + leaveAllowance.holidayAccured;
+  const usedAndPending =
+    leaveAllowance.usedHours +
+    leaveAllowance.bookedHours +
+    leaveAllowance.requestedHours;
+  const eligiblePosition = totalAllowance - usedAndPending;
+  const balanceRemaining =
+    totalAllowance + leaveAllowance.holidayEntitlement - usedAndPending;
+
   const allowanceStatsList: {
     label: string;
     code?: string;
@@ -343,52 +366,45 @@ const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
     () => [
       {
         label: 'Carry Forward From Last Year',
-        code: 'C',
+        code: 'A',
         value: leaveAllowance.carryForward,
         color: 'text-black'
       },
       {
         label: 'Present Year Holiday Entitlement',
-        code: 'E',
+        code: 'B',
         value: leaveAllowance.holidayEntitlement,
         color: 'text-black'
       },
       {
-        label: 'Opening This Year',
-        code: 'O',
-        formula: 'C + H',
-        value: leaveAllowance.holidayAllowance,
-        color: 'text-red-800'
-      },
-      {
         label: 'Holiday Accrued',
-        code: 'H',
+        code: 'C',
         value: leaveAllowance.holidayAccured,
         color: 'text-black'
       },
       {
         label: 'Taken',
-        code: 'T',
+        code: 'D',
         value: leaveAllowance.usedHours,
         color: 'text-green-600'
       },
       {
         label: 'Booked',
-        code: 'B',
+        code: 'E',
         value: leaveAllowance.bookedHours,
         color: 'text-orange-600'
       },
       {
         label: 'Requested',
-        code: 'R',
+        code: 'F',
         value: leaveAllowance.requestedHours,
         color: 'text-yellow-600'
       },
       {
         label: 'Balance Remaining',
         code: 'BR',
-        formula: 'O − (T + B)',
-        value: leaveAllowance.remainingHours,
+        formula: 'A + B + C − D − E − F',
+        value: balanceRemaining,
         color: 'text-red-600',
         isBold: true
       },
@@ -408,7 +424,7 @@ const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
         color: 'text-theme'
       }
     ],
-    [leaveAllowance]
+    [leaveAllowance, balanceRemaining]
   );
 
   if (loading) {
@@ -470,31 +486,37 @@ const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
               </div>
 
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4 rounded-lg bg-blue-50 p-4 md:grid-cols-4">
+                <div className="grid grid-cols-2 gap-4 rounded-lg bg-blue-50 p-4 md:grid-cols-5">
                   <div className="text-center">
                     <div className="text-2xl font-bold text-gray-800">
-                      {leaveAllowance.holidayAllowance.toFixed(2)} h
+                      {totalAllowance.toFixed(2)} h
                     </div>
-                    <div className="text-sm text-gray-600">Total Allowance</div>
+                    <div className="text-sm text-gray-600">Total Allowance (A+C)</div>
                   </div>
                   <div className="text-center">
                     <div className="text-2xl font-bold text-green-600">
                       {leaveAllowance.usedHours.toFixed(2)} h
                     </div>
-                    <div className="text-sm text-gray-600">Taken</div>
+                    <div className="text-sm text-gray-600">Taken (D)</div>
                   </div>
                   <div className="text-center">
                     <div className="text-2xl font-bold text-orange-600">
                       {leaveAllowance.bookedHours.toFixed(2)} h
                     </div>
-                    <div className="text-sm text-gray-600">Booked</div>
+                    <div className="text-sm text-gray-600">Booked (E)</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-yellow-600">
+                      {leaveAllowance.requestedHours.toFixed(2)} h
+                    </div>
+                    <div className="text-sm text-gray-600">Requested (F)</div>
                   </div>
                   <div className="text-center">
                     <div className="text-2xl font-bold text-purple-600">
-                      {leaveAllowance.remainingHours.toFixed(2)} h
+                      {eligiblePosition.toFixed(2)} h
                     </div>
                     <div className="text-sm text-gray-600">
-                      Remaining Balance
+                      Eligible Position (A+C−D−E−F)
                     </div>
                   </div>
                 </div>
@@ -573,9 +595,9 @@ const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
                   <div className="flex items-start justify-between gap-3 rounded-lg border border-gray-200 bg-white p-3">
                     <p className="text-xs leading-relaxed text-black">
                       <span className="font-semibold">Calculation:</span>{' '}
-                      Carry Forward = C | Holiday Accrued = H | Opening This Year
-                      (C + H = O) | Taken = T | Booked = B | Balance Remaining =
-                      O − (T + B)
+                      Carry Forward = A | Entitlement = B | Holiday Accrued = C |
+                      Taken = D | Booked = E | Requested = F | Balance Remaining
+                      = A + B + C − D − E − F
                     </p>
                     <button
                       type="button"
@@ -599,16 +621,23 @@ const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
                       Holiday Balance Calculation
                     </p>
                     <p className="mt-1.5">
-                      <span className="font-semibold">C + H = O</span> &rarr;
-                      Carry Forward + Holiday Accrued = the Opening
-                      balance for this year.
+                      <span className="font-semibold">
+                        A + C = Total Allowance
+                      </span>{' '}
+                      &rarr; Carry Forward + Holiday Accrued.
                     </p>
                     <p className="mt-1">
                       <span className="font-semibold">
-                        O − (T + B) = Balance Remaining
+                        A + C − D − E − F = Eligible Position
                       </span>{' '}
-                      &rarr; Opening balance - (Taken + Booked hours)
-                      =  Remaining Balance.
+                      &rarr; Total Allowance − (Taken + Booked + Requested).
+                    </p>
+                    <p className="mt-1">
+                      <span className="font-semibold">
+                        A + B + C − D − E − F = Balance Remaining
+                      </span>{' '}
+                      &rarr; Carry Forward + Entitlement + Accrued − (Taken +
+                      Booked + Requested).
                     </p>
                   </div>
                 )}

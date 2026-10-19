@@ -1269,12 +1269,11 @@ const CompanyLeaveApprovalPage: React.FC = () => {
       ? [
           { label: 'Carry Forward From Last Year', value: allowance.carryForward, color: 'text-gray-900', labelClass: 'text-gray-500' },
           { label: 'Present Year Holiday Entitlement', value: allowance.holidayEntitlement, color: 'text-gray-900', labelClass: 'text-gray-500' },
-          { label: 'Opening This Year', value: allowance.holidayAllowance, color: 'text-red-700', labelClass: 'text-gray-500' },
           { label: 'Holiday Accrued', value: allowance.holidayAccured, color: 'text-gray-900', labelClass: 'text-gray-500' },
           { label: 'Taken', value: allowance.usedHours, color: 'text-green-600', labelClass: 'text-gray-500' },
           { label: 'Booked', value: allowance.bookedHours, color: 'text-orange-600', labelClass: 'text-gray-500' },
           { label: 'Requested', value: allowance.requestedHours, color: 'text-yellow-500', labelClass: 'text-gray-500' },
-          { label: 'Balance Remaining', value: allowance.remainingHours, color: 'text-red-700', labelClass: 'font-bold text-gray-900' },
+          { label: 'Balance Remaining', value: allowance.carryForward + allowance.holidayEntitlement + allowance.holidayAccured - allowance.usedHours - allowance.bookedHours - allowance.requestedHours, color: 'text-red-700', labelClass: 'font-bold text-gray-900' },
           { label: 'Unpaid Leave Taken', value: allowance.unpaidLeaveTaken, color: 'text-cyan-500', labelClass: 'text-gray-500' },
           { label: 'Unpaid Booked', value: allowance.unpaidBookedHours, color: 'text-blue-600', labelClass: 'text-gray-500' },
           { label: 'Unpaid Requested', value: allowance.unpaidLeaveRequest, color: 'text-blue-600', labelClass: 'text-gray-500' }
