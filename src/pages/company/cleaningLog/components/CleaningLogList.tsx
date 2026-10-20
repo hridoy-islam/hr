@@ -206,7 +206,9 @@ export function CleaningLogTimeline({
     return (
       <div
         key={log._id}
-        className="flex w-full flex-col gap-2 rounded-xl bg-white px-2 py-2 lg:flex-row lg:items-center lg:justify-between lg:gap-3 lg:py-1 lg:pr-3.5"
+                  onClick={() => onView(log)}
+
+        className="cursor-pointer flex w-full flex-col gap-2 rounded-xl bg-white px-2 py-2 lg:flex-row lg:items-center lg:justify-between lg:gap-3 lg:py-1 lg:pr-3.5"
       >
         {/* Area */}
         <div

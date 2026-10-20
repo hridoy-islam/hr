@@ -89,7 +89,7 @@ const SESSION_TOAST: Record<SessionAction, string> = {
   start: 'Cleaning started',
   pause: 'Cleaning paused. Finish it any time from your unfinished areas.',
   resume: 'Cleaning resumed',
-  stop: 'Cleaning stopped. Sign and complete to submit.',
+  stop: 'Cleaning stopped. Sign and submit.',
   discard: 'Session discarded'
 };
 
@@ -103,11 +103,12 @@ const TIME_LABEL: Record<TimeField, string> = {
 // A 24-hour clock time, e.g. 09:00 or 17:30
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 
-// Both times are optional; one typed in must be valid
-const validateTimes = (times: Record<TimeField, string>) => {
+// Both times are required on the company side and must be valid. `strict`
+// off lets an empty field pass while it is still being filled in.
+const validateTimes = (times: Record<TimeField, string>, strict = true) => {
   const check = (field: TimeField) => {
     const value = times[field].trim();
-    if (!value) return '';
+    if (!value) return strict ? `${TIME_LABEL[field]} is required` : '';
     return TIME_PATTERN.test(value)
       ? ''
       : `${TIME_LABEL[field]} is invalid (HH:MM)`;
@@ -353,10 +354,10 @@ export function CleaningLogWizard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openDraftId]);
   const draftStatus = draft?.status as CleaningLogStatus | undefined;
-  // Everyone goes straight to the checklist, times and signature; the timer
-  // is optional
-  const showChecklist = areaPicked;
-  const showSign = areaPicked;
+  // The company side goes straight to the checklist, times and signature. An
+  // employee presses Start to see the checklist, and signs once stopped.
+  const showChecklist = areaPicked && (isAdmin || Boolean(draft));
+  const showSign = areaPicked && (isAdmin || draftStatus === 'stopped');
   const busy = isSubmitting || busyAction !== null;
 
   // An employee's ticks and times are saved as they go once the log exists,
@@ -495,17 +496,14 @@ export function CleaningLogWizard({
       setBusyAction(action);
       let record: CleaningLogRecord | null = null;
 
-      // The ticks and times so far travel with the first save and every
-      // pause, so nothing is lost when the employee switches area
-      const progress = { items: itemsPayload(), ...savableTimes(times) };
+      // The ticks so far travel with every pause, so nothing is lost when
+      // the employee switches area
+      const progress = { items: itemsPayload() };
 
-      if (!draft && (action === 'start' || action === 'pause')) {
-        // Pausing before any Start keeps the work without running the timer
+      if (!draft && action === 'start') {
         const res = await axiosInstance.post('/cleaning-log/start', {
           companyId,
-          areaId,
-          ...progress,
-          ...(action === 'pause' ? { paused: true } : {})
+          areaId
         });
         record = res.data?.data;
       } else if (action === 'discard') {
@@ -513,7 +511,7 @@ export function CleaningLogWizard({
       } else {
         const res = await axiosInstance.patch(
           `/cleaning-log/${draft!._id}/${action}`,
-          action === 'pause' ? progress : { items: progress.items }
+          progress
         );
         record = res.data?.data;
       }
@@ -581,8 +579,8 @@ export function CleaningLogWizard({
     if (!areaId) return 'Please select an area';
     if (rows.length === 0)
       return 'This area has no elements yet. Ask an admin to add them first.';
-    // Optional, and only typed in on the company side; an employee's come
-    // from the timer, if at all
+    // Required, and typed in on the company side; an employee's come from
+    // the timer
     if (isAdmin) {
       const nextTimeErrors = validateTimes(times);
       setTimeErrors(nextTimeErrors);
@@ -1054,7 +1052,7 @@ export function CleaningLogWizard({
     setTimes(next);
     // Once an error shows, it clears as soon as the value turns valid
     if (timeErrors.startTime || timeErrors.endTime) {
-      const errors = validateTimes(next);
+      const errors = validateTimes(next, false);
       setTimeErrors((current) => ({
         startTime: current.startTime && errors.startTime,
         endTime: current.endTime && errors.endTime
@@ -1067,7 +1065,7 @@ export function CleaningLogWizard({
     setTimes(next);
     // An employee's open log keeps the typed times too
     if (next[field] !== (draft?.[field] || '')) queueTickSave(checkedIds, next);
-    const errors = validateTimes(next);
+    const errors = validateTimes(next, false);
     // The end time is only flagged once it has been filled in
     setTimeErrors((current) => ({
       ...current,
@@ -1127,14 +1125,13 @@ export function CleaningLogWizard({
           </span>
         </p>
       )} */}
-      {/* Optional, and only on the company side */}
+      {/* Required, and only on the company side */}
       {isAdmin && (
-        <div className="max-w-md space-y-1.5">
+        <div className="max-w-md">
           <div className="grid grid-cols-2 gap-3">
-            {renderTimeInput('startTime', 'Start Time (HH:MM)', '09:00')}
-            {renderTimeInput('endTime', 'End Time (HH:MM)', '10:00')}
+            {renderTimeInput('startTime', 'Start Time (HH:MM)*', '09:00')}
+            {renderTimeInput('endTime', 'End Time (HH:MM)*', '10:00')}
           </div>
-          <p className="text-xs text-black">Optional.</p>
         </div>
       )}
 
@@ -1224,7 +1221,6 @@ export function CleaningLogWizard({
               draft={draft}
               busy={busyAction}
               onAction={runSession}
-              hasTicks={checkedIds.size > 0}
             />
           ))}
 
@@ -1255,7 +1251,8 @@ export function CleaningLogWizard({
               </>
             ) : (
               <>
-                <CheckCircle2 className="mr-1.5 h-4 w-4" /> Complete
+                <CheckCircle2 className="mr-1.5 h-4 w-4" />{' '}
+                {isAdmin ? 'Complete' : 'Submit'}
               </>
             )}
           </Button>
@@ -1319,7 +1316,7 @@ export function CleaningLogWizard({
                   <span className="font-semibold">{selectedAreaName}</span> will
                   end and{' '}
                   <span className="font-semibold">cannot be resumed</span>. You
-                  will then sign and complete it. To take a break instead, use
+                  will then sign and submit it. To take a break instead, use
                   Pause.
                 </>
               ) : (

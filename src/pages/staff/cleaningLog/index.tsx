@@ -4,6 +4,7 @@ import {
   CalendarDays,
   CalendarRange,
   CheckCircle2,
+  ClipboardCheck,
   FileBarChart2,
   Play,
   Plus,
@@ -21,14 +22,19 @@ import {
   CleaningType,
   completion,
   formatDateTime,
-  formatDuration
+  formatDuration,
+  today
 } from '@/pages/company/cleaningLog/shared';
 import { CleaningLogWizard } from '@/pages/company/cleaningLog/components/CleaningLogWizard';
+import { CleaningLogDetailsDialog } from '@/pages/company/cleaningLog/components/CleaningLogDetailsDialog';
 import {
   StatusBadge,
   useElapsed
 } from '@/pages/company/cleaningLog/components/CleaningSession';
-import { TypeBadge } from '@/pages/company/cleaningLog/components/CleaningLogList';
+import {
+  CleaningLogTimeline,
+  TypeBadge
+} from '@/pages/company/cleaningLog/components/CleaningLogList';
 
 // One unfinished session, with its clock still ticking if it is running
 function ActiveSessionCard({
@@ -110,6 +116,9 @@ function ActiveSessionCard({
   );
 }
 
+// How long the "submitted" card stays up before the form comes back
+const SUBMITTED_CARD_SECONDS = 15;
+
 const TYPE_CARDS: {
   type: CleaningType;
   icon: typeof CalendarDays;
@@ -134,7 +143,11 @@ export default function StaffCleaningLogPage() {
   const [type, setType] = useState<CleaningType | null>(null);
   // Remounts the wizard for a fresh log after each submission
   const [wizardKey, setWizardKey] = useState(0);
+  // Shown in place of the form for a few seconds after submitting
   const [submitted, setSubmitted] = useState<CleaningLogRecord | null>(null);
+  const [secondsLeft, setSecondsLeft] = useState(SUBMITTED_CARD_SECONDS);
+  const [todayLogs, setTodayLogs] = useState<CleaningLogRecord[]>([]);
+  const [viewingLog, setViewingLog] = useState<CleaningLogRecord | null>(null);
   // Sessions started but not completed yet, and the one opened from them
   const [active, setActive] = useState<CleaningLogRecord[]>([]);
   const [resumeDraft, setResumeDraft] = useState<CleaningLogRecord | null>(
@@ -170,6 +183,47 @@ export default function StaffCleaningLogPage() {
   useEffect(() => {
     fetchActive();
   }, [fetchActive]);
+
+  const fetchToday = useCallback(() => {
+    axiosInstance
+      .get('/cleaning-log', {
+        params: {
+          companyId: id,
+          today: true,
+          limit: 'all',
+          sort: '-completedAt'
+        }
+      })
+      .then((res) => setTodayLogs(res.data?.data?.result || []))
+      .catch(() => setTodayLogs([]));
+  }, [id]);
+
+  useEffect(() => {
+    fetchToday();
+  }, [fetchToday]);
+
+  // The form starts afresh on the same type, and the log joins today's list
+  const handleSubmitted = (log: CleaningLogRecord) => {
+    setSubmitted(log);
+    setResumeDraft(null);
+    setWizardKey((key) => key + 1);
+    fetchToday();
+  };
+
+  // The card counts down and then makes way for the form again
+  useEffect(() => {
+    if (!submitted) return;
+    setSecondsLeft(SUBMITTED_CARD_SECONDS);
+    const timer = window.setInterval(
+      () => setSecondsLeft((seconds) => seconds - 1),
+      1000
+    );
+    return () => window.clearInterval(timer);
+  }, [submitted]);
+
+  useEffect(() => {
+    if (submitted && secondsLeft <= 0) setSubmitted(null);
+  }, [submitted, secondsLeft]);
 
   // The wizard hands back each log as it changes, so the list is kept in
   // step locally rather than fetched again after every tap. A known log keeps
@@ -208,9 +262,9 @@ export default function StaffCleaningLogPage() {
             Cleaning Logs
           </h2>
           <p className="mt-1 text-xs text-black sm:text-sm">
-            Pick an area, tick the elements and enter the start and end time (or
-            use the optional timer). Pause to finish later, then sign and
-            Complete.
+            Pick an area and press Start: the timer runs while you tick the
+            elements. Pause to take a break or switch area, then Stop, sign and
+            Submit.
           </p>
         </div>
         <Button
@@ -311,8 +365,8 @@ export default function StaffCleaningLogPage() {
           </h3>
           <p className="max-w-md text-sm text-black">
             {submitted.areaName} · {completion(submitted.items).done} of{' '}
-            {completion(submitted.items).total} elements checked · signed at{' '}
-            {formatDateTime(submitted.signedAt)}
+            {completion(submitted.items).total} elements checked ·{' '}
+            {submitted.startTime || '-'} - {submitted.endTime || '-'} 
           </p>
           <div className="flex w-full flex-col gap-2 pt-2 sm:w-auto sm:flex-row">
             <Button
@@ -325,6 +379,9 @@ export default function StaffCleaningLogPage() {
               <FileBarChart2 className="mr-1.5 h-4 w-4" /> View Report
             </Button>
           </div>
+          {/* <p className="text-xs text-black">
+            Closing in {Math.max(secondsLeft, 0)}s
+          </p> */}
         </div>
       ) : type ? (
         <CleaningLogWizard
@@ -333,7 +390,7 @@ export default function StaffCleaningLogPage() {
           mode="employee"
           type={type}
           draft={resumeDraft}
-          onSubmitted={setSubmitted}
+          onSubmitted={handleSubmitted}
           onSessionChange={updateActive}
           onOpenDraftChange={setOpenDraftId}
           onCancel={() => startNew(null)}
@@ -345,6 +402,28 @@ export default function StaffCleaningLogPage() {
           start a cleaning log.
         </div>
       )}
+
+      {/* Today's submissions, laid out like the report */}
+      {todayLogs.length > 0 && (
+        <div className="space-y-2">
+          {/* <p className="flex items-center gap-2 text-sm font-bold text-black">
+            <ClipboardCheck className="h-4 w-4" />
+            Submitted today ({todayLogs.length})
+          </p> */}
+          <CleaningLogTimeline
+            logs={todayLogs}
+            fromDate={today()}
+            toDate={today()}
+            showEmployee={false}
+            onView={setViewingLog}
+          />
+        </div>
+      )}
+
+      <CleaningLogDetailsDialog
+        log={viewingLog}
+        onClose={() => setViewingLog(null)}
+      />
     </div>
   );
 }

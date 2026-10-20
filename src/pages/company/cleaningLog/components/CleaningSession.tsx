@@ -64,18 +64,14 @@ interface CleaningSessionProps {
   draft: CleaningLogRecord | null;
   busy: SessionAction | null;
   onAction: (action: SessionAction) => void;
-  // Something is ticked already: the employee has chosen to work without
-  // the timer, so Start is no longer offered
-  hasTicks?: boolean;
 }
 
-// Plain buttons for an untimed log, or, for one started with the timer, the
-// clock with Pause / Resume / Stop
+// Start for a new log, or, once the timer runs, the clock with Pause /
+// Resume / Stop
 export function CleaningSession({
   draft,
   busy,
-  onAction,
-  hasTicks = false
+  onAction
 }: CleaningSessionProps) {
   const seconds = useElapsed(draft);
   const disabled = busy !== null;
@@ -135,18 +131,30 @@ export function CleaningSession({
   // A log that never started the timer has no clock to show
   const timed = (draft?.sessions || []).length > 0;
 
-  // Untimed, the times are typed in below:
-  //   new log            -> Start (until something is ticked) and Pause
-  //   paused, no timer   -> highlighted, Resume only
+  // Untimed:
+  //   new log            -> Start, which shows the checklist
+  //   paused, no timer   -> highlighted, Resume only (starts the timer)
   //   resumed, no timer  -> Pause and Discard session
+  // The last two are only left by logs saved before the timer was required.
   // Once Start is pressed the log is timed and gets the full clock card.
   if (!timed) {
-    const pauseButton = pillButton(
-      'pause',
-      'Pause',
-      Pause,
-      'bg-orange-500 text-white hover:bg-orange-600 hover:text-white'
-    );
+    if (!draft) {
+      return (
+        <div className="flex flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-theme/40 bg-theme/5 px-4 py-6 text-center">
+          <p className="text-sm text-black">
+            Press <span className="font-semibold">Start</span> to begin. The
+            timer runs while you clean; you can pause it, and submit once you
+            stop it.
+          </p>
+          {actionButton(
+            'start',
+            'Start',
+            Play,
+            'w-full bg-theme text-white hover:bg-theme/90 hover:text-white sm:w-auto'
+          )}
+        </div>
+      );
+    }
 
     if (status === 'paused') {
       return (
@@ -171,22 +179,18 @@ export function CleaningSession({
 
     return (
       <div className="flex flex-wrap items-center justify-end gap-2">
-        {!draft &&
-          !hasTicks &&
-          pillButton(
-            'start',
-            'Start',
-            Play,
-            'bg-theme text-white hover:bg-theme/90 hover:text-white'
-          )}
-        {pauseButton}
-        {draft &&
-          pillButton(
-            'discard',
-            'Discard session',
-            Trash2,
-            'border border-red-200 bg-white text-red-600 shadow-none hover:bg-red-50 hover:text-red-700'
-          )}
+        {pillButton(
+          'pause',
+          'Pause',
+          Pause,
+          'bg-orange-500 text-white hover:bg-orange-600 hover:text-white'
+        )}
+        {pillButton(
+          'discard',
+          'Discard session',
+          Trash2,
+          'border border-red-200 bg-white text-red-600 shadow-none hover:bg-red-50 hover:text-red-700'
+        )}
       </div>
     );
   }
@@ -230,7 +234,8 @@ export function CleaningSession({
                 Play,
                 'border-2 border-theme bg-white text-theme shadow-sm hover:bg-theme hover:text-white'
               )}
-            {status !== 'stopped' &&
+            {/* A paused session resumes before it can be stopped */}
+            {status === 'in_progress' &&
               actionButton(
                 'stop',
                 'Stop',
@@ -258,8 +263,8 @@ export function CleaningSession({
         {status === 'in_progress'
           ? 'Tick the elements as you clean. Pause to switch to another area, or Stop when you are done.'
           : status === 'paused'
-            ? 'Paused, not submitted yet. Your ticks and times are saved. Resume to carry on.'
-            : 'Stopped. The timer is final. Check the list, sign below and press Complete to submit.'}
+            ? 'Paused, not submitted yet. Your ticks and time are saved. Resume to carry on.'
+            : `Stopped at ${draft?.endTime || '-'} (started ${draft?.startTime || '-'}). Check the list, sign below and press Submit.`}
       </p>
     </div>
   );
