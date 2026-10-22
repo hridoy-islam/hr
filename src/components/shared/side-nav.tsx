@@ -64,7 +64,8 @@ import {
   Search,
   ClipboardList,
   ListTodo,
-  SprayCan
+  SprayCan,
+  ChefHat
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Link, useNavigate, useLocation, useParams } from 'react-router-dom';
@@ -140,6 +141,13 @@ const navItems = [
     href: 'cleaning-log',
     roles: ['employee'],
     requiresCleaningAccess: true
+  },
+  {
+    icon: ChefHat,
+    label: 'Kitchen',
+    href: 'kitchen-log',
+    roles: ['employee'],
+    requiresKitchenAccess: true
   },
 
   // --- Admin Specific ---
@@ -337,6 +345,12 @@ const navItems = [
     icon: SprayCan,
     label: 'Cleaning Logs',
     href: 'cleaning-log',
+    roles: ['company', 'companyAdmin']
+  },
+  {
+    icon: ChefHat,
+    label: 'Kitchen Logs',
+    href: 'kitchen-log',
     roles: ['company', 'companyAdmin']
   },
   {
@@ -724,6 +738,7 @@ export function SideNav() {
   >([]);
   const [hasJobBoardAccess, setHasJobBoardAccess] = useState(false);
   const [hasCleaningAccess, setHasCleaningAccess] = useState(false);
+  const [hasKitchenAccess, setHasKitchenAccess] = useState(false);
   const { id } = useParams();
 
   const { hasAccess } = useCompanyAccess(); // Fetch access utility for filtering
@@ -806,6 +821,26 @@ export function SideNav() {
     };
 
     fetchCleaningAccess();
+  }, [userRole, user?._id]);
+
+  // Kitchen only shows once the company adds the employee to the module
+  useEffect(() => {
+    const fetchKitchenAccess = async () => {
+      if (userRole !== 'employee') {
+        setHasKitchenAccess(false);
+        return;
+      }
+
+      try {
+        const response = await axiosInstance.get('/kitchen-access/staff-access');
+        setHasKitchenAccess(Boolean(response.data?.data?.hasKitchenAccess));
+      } catch (error) {
+        console.error('Error fetching kitchen log access:', error);
+        setHasKitchenAccess(false);
+      }
+    };
+
+    fetchKitchenAccess();
   }, [userRole, user?._id]);
 
   useEffect(() => {
@@ -953,6 +988,10 @@ export function SideNav() {
     .filter((item: any) => {
       if (!item.requiresCleaningAccess) return true;
       return userRole === 'employee' && hasCleaningAccess;
+    })
+    .filter((item: any) => {
+      if (!item.requiresKitchenAccess) return true;
+      return userRole === 'employee' && hasKitchenAccess;
     });
 
   const sidebarContent = (

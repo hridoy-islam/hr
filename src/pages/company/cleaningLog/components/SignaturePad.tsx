@@ -20,6 +20,8 @@ interface SignaturePadProps {
   disabled?: boolean;
   onDraw?: () => void;
   error?: string;
+  // Canvas height in pixels
+  height?: number;
 }
 
 export interface SignatureResult {
@@ -38,7 +40,15 @@ const CANVAS_HEIGHT = 160;
 
 export const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(
   function SignaturePad(
-    { entityId, signatureUrl, signedAt, disabled, onDraw, error },
+    {
+      entityId,
+      signatureUrl,
+      signedAt,
+      disabled,
+      onDraw,
+      error,
+      height = CANVAS_HEIGHT
+    },
     ref
   ) {
     const signatureRef = useRef<SignatureCanvas>(null);
@@ -140,7 +150,7 @@ export const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(
           className={`relative overflow-hidden rounded-xl border-2 border-dashed bg-white ${
             error ? 'border-red-400' : 'border-gray-300'
           }`}
-          style={{ height: CANVAS_HEIGHT }}
+          style={{ height }}
         >
           {canvasWidth > 0 && (
             <SignatureCanvas
@@ -152,7 +162,7 @@ export const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(
               }}
               canvasProps={{
                 width: canvasWidth,
-                height: CANVAS_HEIGHT,
+                height,
                 className: 'touch-none'
               }}
             />

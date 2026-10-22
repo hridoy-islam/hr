@@ -129,6 +129,10 @@ import CleaningReportPage from '@/pages/company/cleaningLog/report';
 import AreaElementsPage from '@/pages/company/cleaningLog/areas/AreaElementsPage';
 import StaffCleaningLogPage from '@/pages/staff/cleaningLog';
 import StaffCleaningReportPage from '@/pages/staff/cleaningLog/reportPage';
+import KitchenLogPage from '@/pages/company/kitchenLog';
+import KitchenLogFormPage from '@/pages/company/kitchenLog/KitchenLogFormPage';
+import KitchenReportPage from '@/pages/company/kitchenLog/report';
+import StaffKitchenLogPage from '@/pages/staff/kitchenLog';
 import OfficeMeetingPage from '@/pages/company/officeMeeting';
 import MeetingDetailsPage from '@/pages/company/officeMeeting/meetingDetails/MeetingDetailsPage';
 import StaffMeetingPage from '@/pages/staff/Meeting';
@@ -406,6 +410,10 @@ export default function AppRouter() {
         { path: 'cleaning-log/:lid/edit', element: <CleaningLogFormPage /> },
         { path: 'cleaning-log/areas', element: <CleaningAreaPage /> },
         { path: 'cleaning-log/areas/:aid', element: <AreaElementsPage /> },
+        { path: 'kitchen-log', element: <KitchenLogPage /> },
+        { path: 'kitchen-log/create', element: <KitchenLogFormPage /> },
+        { path: 'kitchen-log/report', element: <KitchenReportPage /> },
+        { path: 'kitchen-log/:lid/edit', element: <KitchenLogFormPage /> },
       ]
     }
   ];
@@ -443,7 +451,8 @@ export default function AppRouter() {
         { path: 'job-board', element: <JobBoardPage /> },
         { path: 'job-board/:jid', element: <JobBoardDetailsPage /> },
         { path: 'cleaning-log', element: <StaffCleaningLogPage /> },
-        { path: 'cleaning-log/report', element: <StaffCleaningReportPage /> }
+        { path: 'cleaning-log/report', element: <StaffCleaningReportPage /> },
+        { path: 'kitchen-log', element: <StaffKitchenLogPage /> }
       ]
     }
   ];
