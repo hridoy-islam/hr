@@ -19,9 +19,6 @@ import axiosInstance from '@/lib/axios';
 import { cn } from '@/lib/utils';
 import {
   apiError,
-  CleaningEmployee,
-  personName,
-  SelectOption,
   selectStyles,
   toApiDate
 } from '@/pages/company/cleaningLog/shared';
@@ -51,7 +48,22 @@ const MODULE_OPTIONS = KITCHEN_FREQUENCIES.map(({ key, label }) => ({
   }))
 }));
 
-const ALL_EMPLOYEES: SelectOption = { value: '', label: 'All employees' };
+// The log picker: every text black, the frequency headings bold
+const logSelectStyles: typeof selectStyles = {
+  ...selectStyles,
+  option: (base, state) => ({
+    ...selectStyles.option!(base, state),
+    color: state.isSelected ? 'white' : 'black'
+  }),
+  groupHeading: (base) => ({
+    ...base,
+    color: 'black',
+    fontSize: 13,
+    fontWeight: 700
+  }),
+  placeholder: (base) => ({ ...base, color: 'black' }),
+  singleValue: (base) => ({ ...base, color: 'black' })
+};
 
 // Kept in step with the API's limit
 const MAX_DAYS = 366;
@@ -114,8 +126,6 @@ export default function KitchenReportPage() {
   const [module, setModule] = useState<KitchenModule | null>(null);
   const [fromDate, setFromDate] = useState<Date | null>(null);
   const [toDate, setToDate] = useState<Date | null>(null);
-  const [employee, setEmployee] = useState<SelectOption>(ALL_EMPLOYEES);
-  const [employees, setEmployees] = useState<CleaningEmployee[]>([]);
   const [companyName, setCompanyName] = useState('');
 
   const [layout, setLayout] = useState<KitchenReportLayout | null>(null);
@@ -126,22 +136,56 @@ export default function KitchenReportPage() {
 
   useEffect(() => {
     axiosInstance
-      .get('/kitchen-access', { params: { companyId: id } })
-      .then((res) => setEmployees(res.data?.data?.employeeId || []))
-      .catch(() => setEmployees([]));
-    axiosInstance
       .get(`/users/${id}`)
       .then((res) => setCompanyName(res.data?.data?.name || ''))
       .catch(() => setCompanyName(''));
   }, [id]);
 
-  const employeeOptions: SelectOption[] = [
-    ALL_EMPLOYEES,
-    ...employees.map((emp) => ({ value: emp._id, label: personName(emp) }))
-  ];
+  const frequency = module ? KITCHEN_MODULES[module].frequency : 'daily';
+  const byWeek = frequency === 'weekly' || frequency === 'twice_weekly';
+  const byMonth = frequency === 'monthly';
+
+  // Switching between a daily, weekly and monthly log starts the period over
+  const pickModule = (next: KitchenModule | null) => {
+    const nextFrequency = next ? KITCHEN_MODULES[next].frequency : 'daily';
+    if (nextFrequency !== frequency) {
+      setFromDate(null);
+      setToDate(null);
+    }
+    setModule(next);
+    setError('');
+  };
+
+  // Any day picked stands for its whole Monday to Sunday week
+  const pickWeek = (date: Date | null) => {
+    if (!date) {
+      setFromDate(null);
+      setToDate(null);
+    } else {
+      const monday = new Date(
+        date.getFullYear(),
+        date.getMonth(),
+        date.getDate()
+      );
+      monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+      setFromDate(monday);
+      setToDate(
+        new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6)
+      );
+    }
+    setError('');
+  };
+
+  const pickMonth = (date: Date | null) => {
+    setFromDate(date && new Date(date.getFullYear(), date.getMonth(), 1));
+    setToDate(date && new Date(date.getFullYear(), date.getMonth() + 1, 0));
+    setError('');
+  };
 
   const validate = () => {
     if (!module) return 'Please select a log';
+    if (byWeek && !fromDate) return 'Please select a week';
+    if (byMonth && !fromDate) return 'Please select a month';
     if (!fromDate) return 'Please select a from date';
     if (!toDate) return 'Please select a to date';
     if (toDate < fromDate) return 'To date cannot be before from date';
@@ -168,8 +212,7 @@ export default function KitchenReportPage() {
           companyId: id,
           module,
           fromDate: toApiDate(fromDate!),
-          toDate: toApiDate(toDate!),
-          ...(employee.value ? { employeeId: employee.value } : {})
+          toDate: toApiDate(toDate!)
         }
       });
       const logs: KitchenLogRecord[] = res.data?.data?.logs || [];
@@ -183,8 +226,7 @@ export default function KitchenReportPage() {
         companyName: companyName || 'Company',
         module: module!,
         fromDate: fromDate!,
-        toDate: toDate!,
-        employeeName: employee.value ? employee.label : ''
+        toDate: toDate!
       });
     } catch (err) {
       setLayout(null);
@@ -245,29 +287,88 @@ export default function KitchenReportPage() {
     </div>
   );
 
+  const renderPeriodPicker = (
+    label: string,
+    onChange: (date: Date | null) => void,
+    options: {
+      showWeekPicker?: boolean;
+      showMonthYearPicker?: boolean;
+      dateFormat: string;
+      placeholderText: string;
+      value?: string;
+    }
+  ) => (
+    <div className="space-y-1.5">
+      <p className="text-sm font-semibold text-black">{label}</p>
+      <div className="relative">
+        <CalendarDays className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-theme" />
+        <DatePicker
+          selected={fromDate}
+          onChange={onChange}
+          calendarStartDay={1}
+          wrapperClassName="w-full"
+          className={pickerClass}
+          {...options}
+        />
+      </div>
+    </div>
+  );
+
+  const renderDateFilters = () => {
+    if (byWeek)
+      return renderPeriodPicker('Week*', pickWeek, {
+        showWeekPicker: true,
+        dateFormat: 'dd-MM-yyyy',
+        placeholderText: 'Select week',
+        value:
+          fromDate && toDate
+            ? rangeLabel({
+                companyName,
+                module: module!,
+                fromDate,
+                toDate
+              })
+            : ''
+      });
+    if (byMonth)
+      return renderPeriodPicker('Month*', pickMonth, {
+        showMonthYearPicker: true,
+        dateFormat: 'MMMM yyyy',
+        placeholderText: 'Select month'
+      });
+    return (
+      <>
+        {renderPicker('From Date*', fromDate, setFromDate)}
+        {renderPicker('To Date*', toDate, setToDate)}
+      </>
+    );
+  };
+
   const renderCell = (cell: ReportCell, cellIndex: number, sheet?: boolean) => (
     <td
       key={cellIndex}
       colSpan={cell.span}
       className={cn(
-        'px-2 py-1.5 align-top',
+        'whitespace-pre-line px-2 py-1.5 align-top',
         sheet
           ? 'border border-gray-800'
           : 'border-b border-r border-gray-200 last:border-r-0',
         !sheet && cellIndex === 0 && 'font-semibold',
         cell.strong && 'font-bold',
-        cell.large && 'text-sm sm:text-base',
+        !cell.heading && 'text-sm sm:text-base',
         cell.align === 'center' && 'text-center',
         cell.align === 'right' && 'text-right',
-        cell.tall && 'h-16',
-        cell.flag && 'font-semibold text-red-600'
+        cell.tall && 'h-16'
       )}
     >
       {cell.image && (
         <img
           src={cell.image}
           alt="Signature"
-          className="mb-1 h-10 max-w-[160px] object-contain"
+          className={cn(
+            'mb-1 h-10 max-w-[160px] object-contain',
+            cell.align === 'center' && 'mx-auto block'
+          )}
         />
       )}
       {cell.label && <span className="font-bold">{cell.label}</span>}
@@ -289,7 +390,7 @@ export default function KitchenReportPage() {
         <table
           className={cn(
             'w-full border-collapse text-xs text-black',
-            section.sheet ? 'min-w-[520px] max-w-3xl' : 'min-w-[720px]'
+            section.sheet ? 'min-w-[520px]' : 'min-w-[720px]'
           )}
         >
           {!section.sheet && (
@@ -320,6 +421,11 @@ export default function KitchenReportPage() {
           </tbody>
         </table>
       </div>
+      {section.note && (
+        <p className="whitespace-pre-line pt-1 text-xs text-black">
+          {section.note}
+        </p>
+      )}
     </div>
   );
 
@@ -338,8 +444,7 @@ export default function KitchenReportPage() {
               {[
                 meta.companyName,
                 FREQUENCY_LABEL[config.frequency],
-                rangeLabel(meta),
-                meta.employeeName
+                rangeLabel(meta)
               ]
                 .filter(Boolean)
                 .join(' · ')}
@@ -421,7 +526,14 @@ export default function KitchenReportPage() {
       </div>
 
       {/* Filters */}
-      <div className="grid grid-cols-1 gap-3 rounded-xl border border-gray-200 p-3 sm:grid-cols-2 sm:p-4 lg:grid-cols-[1.4fr_1fr_1fr_1fr_auto] lg:items-end">
+      <div
+        className={cn(
+          'grid grid-cols-1 gap-3 rounded-xl border border-gray-200 p-3 sm:grid-cols-2 sm:p-4 lg:items-end',
+          byWeek || byMonth
+            ? 'lg:grid-cols-[1.4fr_2fr_auto]'
+            : 'lg:grid-cols-[1.4fr_1fr_1fr_auto]'
+        )}
+      >
         <div className="space-y-1.5">
           <p className="text-sm font-semibold text-black">Log*</p>
           <Select
@@ -431,30 +543,13 @@ export default function KitchenReportPage() {
                 ? { value: module, label: KITCHEN_MODULES[module].label }
                 : null
             }
-            onChange={(option: any) => {
-              setModule(option?.value || null);
-              setError('');
-            }}
+            onChange={(option: any) => pickModule(option?.value || null)}
             placeholder="Select log"
-            styles={selectStyles}
+            styles={logSelectStyles}
             menuPortalTarget={document.body}
           />
         </div>
-        {renderPicker('From Date*', fromDate, setFromDate)}
-        {renderPicker('To Date*', toDate, setToDate)}
-        <div className="space-y-1.5">
-          <p className="text-sm font-semibold text-black">Employee</p>
-          <Select
-            options={employeeOptions}
-            value={employee}
-            onChange={(option: any) => {
-              setEmployee(option || ALL_EMPLOYEES);
-              setError('');
-            }}
-            styles={selectStyles}
-            menuPortalTarget={document.body}
-          />
-        </div>
+        {renderDateFilters()}
         <Button
           className="h-10 w-full bg-theme text-white hover:bg-theme/90 sm:col-span-2 lg:col-span-1 lg:w-auto"
           disabled={loading}
@@ -483,7 +578,8 @@ export default function KitchenReportPage() {
         renderReport()
       ) : (
         <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-12 text-center text-sm text-black">
-          Select the log, from date and to date, then press{' '}
+          Select the log and its{' '}
+          {byWeek ? 'week' : byMonth ? 'month' : 'from and to date'}, then press{' '}
           <span className="font-semibold">Generate</span>.
         </div>
       )}

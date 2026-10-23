@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { useDebouncedCallback } from 'use-debounce';
 import {
-  ArrowLeft,
   CalendarDays,
   CheckCircle2,
   Loader2,
@@ -23,7 +22,6 @@ import {
   SignaturePadHandle
 } from '@/pages/company/cleaningLog/components/SignaturePad';
 import {
-  KITCHEN_DEEP_CLEAN_TIME,
   KITCHEN_MODULES,
   KITCHEN_SHIFTS,
   KitchenModule,
@@ -64,7 +62,9 @@ interface KitchenSessionProps {
   target: KitchenBoardTarget;
   // The employee's own session on this target, if one is open
   log: KitchenLogRecord | null;
-  onBack: () => void;
+  // While a start / stop / complete / discard is running, so the page's
+  // Back waits for it
+  onBusyChange: (busy: boolean) => void;
   // Any change to the session, so the board can follow
   onChange: () => void;
   onCompleted: (log: KitchenLogRecord) => void;
@@ -77,7 +77,7 @@ export function KitchenSession({
   module,
   target,
   log: initialLog,
-  onBack,
+  onBusyChange,
   onChange,
   onCompleted
 }: KitchenSessionProps) {
@@ -164,7 +164,7 @@ export function KitchenSession({
       setLog(res.data?.data);
       onChange();
     } catch (err) {
-      fail(err, 'Failed to stop');
+      fail(err, 'Failed to end');
     } finally {
       setBusy(null);
     }
@@ -189,7 +189,7 @@ export function KitchenSession({
   const complete = async () => {
     if (checksLeft) {
       setShowRequired(true);
-      setError('Please tick every check before finishing.');
+      setError('Please tick every check before submitting.');
       document
         .getElementById('kitchen-checklist')
         ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -222,7 +222,7 @@ export function KitchenSession({
       onChange();
       onCompleted(res.data?.data);
     } catch (err) {
-      fail(err, 'Failed to complete');
+      fail(err, 'Failed to submit');
     } finally {
       setBusy(null);
     }
@@ -247,10 +247,14 @@ export function KitchenSession({
   const date = log?.logDate || new Date().toISOString();
   const disabled = busy !== null;
 
+  useEffect(() => {
+    onBusyChange(disabled);
+  }, [disabled, onBusyChange]);
+
   return (
     <div className="space-y-4 rounded-2xl border border-gray-200 p-3 sm:p-5">
       {/* What this log is for */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div>
         <div className="min-w-0 space-y-1">
           <p className="text-xs font-semibold uppercase tracking-wide text-black">
             {config.label}
@@ -271,20 +275,8 @@ export function KitchenSession({
               <CalendarDays className="h-4 w-4" />
               {moment(date).format('dddd, DD MMMM YYYY')}
             </span>
-            {module === 'kitchen_deep_clean' && (
-              <span className="font-medium">{KITCHEN_DEEP_CLEAN_TIME}</span>
-            )}
           </p>
         </div>
-        <Button
-          size="sm"
-          variant="outline"
-          className="w-full sm:w-auto"
-          disabled={disabled}
-          onClick={onBack}
-        >
-          <ArrowLeft className="mr-1.5 h-4 w-4" /> Back
-        </Button>
       </div>
 
       {/* Not started yet */}
@@ -293,7 +285,7 @@ export function KitchenSession({
           <Timer className="h-10 w-10 text-theme" />
           <p className="max-w-sm text-sm text-black">
             Press Start when you begin. The start time is taken now and the
-            timer runs until you press Stop.
+            timer runs until you press End.
           </p>
           <Button
             size="lg"
@@ -335,7 +327,7 @@ export function KitchenSession({
             </p>
             <p className="text-xs text-black">
               Started {log.startTime || '-'}
-              {log.endTime && ` · Stopped ${log.endTime}`}
+              {log.endTime && ` · Ended ${log.endTime}`}
             </p>
           </div>
           <Button
@@ -398,7 +390,7 @@ export function KitchenSession({
                 ) : (
                   <Square className="mr-1.5 h-4 w-4" />
                 )}
-                {module === 'kitchen_cleaning' ? 'End' : 'Stop'}
+                End
               </Button>
             )}
             {(!config.timed || log?.status === 'stopped') && (
@@ -412,7 +404,7 @@ export function KitchenSession({
                 ) : (
                   <CheckCircle2 className="mr-1.5 h-4 w-4" />
                 )}
-                {module === 'kitchen_cleaning' ? 'Finish' : 'Complete'}
+                Submit
               </Button>
             )}
           </div>

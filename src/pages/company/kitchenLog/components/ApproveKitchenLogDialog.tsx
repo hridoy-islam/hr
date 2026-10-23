@@ -84,7 +84,7 @@ export function ApproveKitchenLogDialog({
               </p>
             </div>
 
-            <div className="space-y-1.5">
+            {/* <div className="space-y-1.5">
               <p className="text-sm font-semibold text-black">Comment</p>
               <Textarea
                 value={comment}
@@ -93,7 +93,7 @@ export function ApproveKitchenLogDialog({
                 placeholder="Optional comment on the area checked"
                 rows={2}
               />
-            </div>
+            </div> */}
 
             <div className="space-y-1.5">
               <p className="text-sm font-semibold text-black">

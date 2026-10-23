@@ -123,6 +123,39 @@ export const LOG_STATUS_LABEL: Record<KitchenLogStatus, string> = {
   completed: 'Completed'
 };
 
+// A colour per frequency, and one for the approval list: the tab text and
+// underline, solid on a picked log button, soft on the badges
+export const FREQUENCY_COLOR: Record<
+  KitchenFrequency | 'approval',
+  { text: string; solid: string; soft: string }
+> = {
+  daily: {
+    text: 'border-blue-600 text-blue-600',
+    solid: 'border-blue-600 bg-blue-600 text-white',
+    soft: 'border-blue-200 bg-blue-50 text-blue-700'
+  },
+  weekly: {
+    text: 'border-violet-600 text-violet-600',
+    solid: 'border-violet-600 bg-violet-600 text-white',
+    soft: 'border-violet-200 bg-violet-50 text-violet-700'
+  },
+  twice_weekly: {
+    text: 'border-teal-600 text-teal-600',
+    solid: 'border-teal-600 bg-teal-600 text-white',
+    soft: 'border-teal-200 bg-teal-50 text-teal-700'
+  },
+  monthly: {
+    text: 'border-amber-600 text-amber-600',
+    solid: 'border-amber-600 bg-amber-600 text-white',
+    soft: 'border-amber-200 bg-amber-50 text-amber-700'
+  },
+  approval: {
+    text: 'border-red-600 text-red-600',
+    solid: 'border-red-600 bg-red-600 text-white',
+    soft: 'border-red-200 bg-red-50 text-red-700'
+  }
+};
+
 export const LOG_STATUS_BADGE: Record<KitchenLogStatus, string> = {
   in_progress: 'bg-amber-50 text-amber-700 ring-amber-200',
   stopped: 'bg-sky-50 text-sky-700 ring-sky-200',

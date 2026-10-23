@@ -198,19 +198,23 @@ export function KitchenLogDetailsDialog({
 
             <div>
               <Row label="Date" value={logPeriodLabel(log)} />
-              <Row label="Item / Shift" value={logTarget(log)} />
+              <Row label="Area" value={logTarget(log)} />
               <Row label="Employee" value={personName(log.employeeId)} />
               <Row
-                label="Time"
-                value={`${log.startTime || '-'} - ${log.endTime || '-'}`}
+                label="Start Time"
+                value={`${log.startTime || '-'} `}
               />
-              {Boolean(log.durationSeconds) && (
+              <Row
+                label="End Time"
+                value={`${log.endTime || '-'}`}
+              />
+              {/* {Boolean(log.durationSeconds) && (
                 <Row
                   label="Duration"
                   value={formatDuration(log.durationSeconds || 0)}
                 />
-              )}
-              <Row label="Completed" value={formatDateTime(log.completedAt)} />
+              )} */}
+              <Row label="Signed At" value={formatDateTime(log.completedAt)} />
               {log.note && <Row label="Note" value={log.note} />}
             </div>
 

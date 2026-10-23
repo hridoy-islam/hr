@@ -26,7 +26,6 @@ const MUTED = '#6b7280';
 const HEAD_BG = '#f1f5f9';
 const RULE = '#e2e8f0';
 const BORDER = '#cbd5e1';
-const FLAG = '#dc2626';
 
 const styles = StyleSheet.create({
   page: {
@@ -92,7 +91,6 @@ const styles = StyleSheet.create({
   },
   firstCell: { borderLeftWidth: 0.75, borderLeftColor: BORDER },
   signature: { height: 24, objectFit: 'contain', marginBottom: 2 },
-  flag: { color: FLAG, fontFamily: 'Helvetica-Bold' },
   notes: { marginTop: 4, fontSize: 8, color: INK },
   sheetCell: {
     borderRightWidth: 0.75,
@@ -108,6 +106,7 @@ const styles = StyleSheet.create({
   strong: { fontFamily: 'Helvetica-Bold' },
   large: { fontSize: 11 },
   tall: { minHeight: 46, justifyContent: 'flex-start' },
+  sectionNote: { marginTop: 6, fontSize: 8 },
   instructions: { marginTop: 2 },
   instructionsTitle: {
     fontSize: 11,
@@ -182,12 +181,13 @@ const Cell = ({
     ]}
   >
     {cell.image && <Image src={cell.image} style={styles.signature} />}
-    {cell.label || cell.text ? (
+    {!cell.screenOnly && (cell.label || cell.text) ? (
       <Text
         style={[
           cell.strong ? styles.strong : {},
-          cell.large ? styles.large : {},
-          cell.flag ? styles.flag : {}
+          cell.align === 'center' ? { textAlign: 'center' } : {},
+          // One size for every sheet, its column headings a little smaller
+          cell.heading ? {} : styles.large
         ]}
       >
         {cell.label && <Text style={styles.strong}>{cell.label}</Text>}
@@ -219,7 +219,7 @@ const Table = ({
   };
 
   return (
-    <View style={styles.section} wrap={!section.sheet}>
+    <View style={styles.section} wrap={!section.sheet || section.breakable}>
       {section.title && (
         <Text style={styles.sectionTitle} minPresenceAhead={60}>
           {section.title}
@@ -256,6 +256,7 @@ const Table = ({
           ))}
         </View>
       ))}
+      {section.note && <Text style={styles.sectionNote}>{section.note}</Text>}
     </View>
   );
 };
@@ -317,7 +318,6 @@ export function KitchenReportPDF({ layout, meta }: KitchenReportPDFProps) {
           <View style={styles.infoBlock}>
             {info('Frequency', FREQUENCY_LABEL[config.frequency])}
             {info('Period', rangeLabel(meta))}
-            {meta.employeeName && info('Employee', meta.employeeName)}
           </View>
         </View>
 

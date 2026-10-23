@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import {
+  ArrowLeft,
   CalendarClock,
   CalendarDays,
   CalendarRange,
@@ -20,6 +21,7 @@ import axiosInstance from '@/lib/axios';
 import { cn } from '@/lib/utils';
 import { apiError, personName } from '@/pages/company/cleaningLog/shared';
 import {
+  FREQUENCY_LABEL,
   KITCHEN_FREQUENCIES,
   KITCHEN_MODULES,
   KitchenFrequency,
@@ -64,6 +66,8 @@ export default function StaffKitchenLogPage() {
   const [session, setSession] = useState<KitchenLogRecord | null>(null);
   const [opening, setOpening] = useState(false);
   const [completed, setCompleted] = useState<KitchenLogRecord | null>(null);
+  // The open session is saving, so Back waits
+  const [sessionBusy, setSessionBusy] = useState(false);
 
   const fetchBoard = useCallback(
     async (next: KitchenFrequency, quiet = false) => {
@@ -133,6 +137,17 @@ export default function StaffKitchenLogPage() {
     setCompleted(null);
   };
 
+  // One step back: from a log to the logs of its frequency, from there to the
+  // frequencies
+  const goBack = () => {
+    if (module) {
+      setModule(null);
+      return;
+    }
+    setFrequency(null);
+    setBoard(null);
+  };
+
   const pickModule = (entry: KitchenBoardModule) => {
     setModule(entry.module);
     setTarget(null);
@@ -140,7 +155,12 @@ export default function StaffKitchenLogPage() {
     setCompleted(null);
     // Done or held by someone else, it stays a card below instead
     const only = entry.targets[0];
-    if (!pickTargetFirst(entry.module) && only && !only.isDone && !blockedBy(only)) {
+    if (
+      !pickTargetFirst(entry.module) &&
+      only &&
+      !only.isDone &&
+      !blockedBy(only)
+    ) {
       openTarget(entry.module, only);
     }
   };
@@ -160,7 +180,10 @@ export default function StaffKitchenLogPage() {
     return null;
   };
 
-  const renderTarget = (entry: KitchenBoardModule, item: KitchenBoardTarget) => {
+  const renderTarget = (
+    entry: KitchenBoardModule,
+    item: KitchenBoardTarget
+  ) => {
     const holder = blockedBy(item);
     const ownOpen = item.entries.some(
       (log) => log.status !== 'completed' && mine(log)
@@ -223,51 +246,52 @@ export default function StaffKitchenLogPage() {
 
   return (
     <div className="min-h-[97vh] space-y-4 rounded-md bg-white p-3 shadow-sm max-md:mt-8 sm:p-4 lg:space-y-5 lg:p-5">
-      <div>
-        <h2 className="flex items-center gap-2 text-xl font-bold text-black lg:text-2xl">
-          <ChefHat className="h-5 w-5 lg:h-6 lg:w-6" />
-          Kitchen
-        </h2>
-        <p className="mt-1 text-xs text-black sm:text-sm">
-          Pick how often the log is done, then the log itself. Press Start,
-          fill it in, sign, then Stop and Complete.
-        </p>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="flex items-center gap-2 text-xl font-bold text-black lg:text-2xl">
+            <ChefHat className="h-5 w-5 lg:h-6 lg:w-6" />
+            Kitchen
+          </h2>
+          <p className="mt-1 text-xs text-black sm:text-sm">
+            Pick how often the log is done, then the log itself. Press Start,
+            fill it in, sign, then End and Submit.
+          </p>
+        </div>
+        {frequency && !completed && (
+          <Button
+            size="sm"
+            className="shrink-0"
+            disabled={opening || (Boolean(target) && sessionBusy)}
+            onClick={target ? backFromSession : goBack}
+          >
+            <ArrowLeft className="mr-1.5 h-4 w-4" /> Back
+          </Button>
+        )}
       </div>
 
       {/* Daily / Weekly / Twice a week / Monthly */}
-      <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
-        {KITCHEN_FREQUENCIES.map(({ key, label }) => {
-          const Icon = FREQUENCY_ICON[key];
-          const active = frequency === key;
-          return (
-            <button
-              key={key}
-              type="button"
-              onClick={() => pickFrequency(key)}
-              className={cn(
-                'group flex items-center gap-3 rounded-2xl border-2 p-3 text-left transition-all sm:p-4',
-                active
-                  ? 'border-theme bg-theme/5 shadow-md'
-                  : 'border-gray-200 hover:-translate-y-0.5 hover:border-gray-300 hover:shadow-md'
-              )}
-            >
-              <span
-                className={cn(
-                  'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-colors sm:h-12 sm:w-12',
-                  active
-                    ? 'bg-theme text-white'
-                    : 'bg-gray-100 text-black group-hover:bg-theme group-hover:text-white'
-                )}
+      {!frequency && (
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+          {KITCHEN_FREQUENCIES.map(({ key, label }) => {
+            const Icon = FREQUENCY_ICON[key];
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => pickFrequency(key)}
+                className="group flex items-center gap-3 rounded-2xl border-2 border-gray-200 p-3 text-left transition-all hover:-translate-y-0.5 hover:border-gray-300 hover:shadow-md sm:p-4"
               >
-                <Icon className="h-5 w-5 sm:h-6 sm:w-6" />
-              </span>
-              <span className="text-sm font-bold text-black sm:text-base">
-                {label}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gray-100 text-black transition-colors group-hover:bg-theme group-hover:text-white sm:h-12 sm:w-12">
+                  <Icon className="h-5 w-5 sm:h-6 sm:w-6" />
+                </span>
+                <span className="text-sm font-bold text-black sm:text-base">
+                  {label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {!frequency ? (
         <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-12 text-center text-sm text-black">
@@ -276,18 +300,18 @@ export default function StaffKitchenLogPage() {
           <span className="font-semibold">Twice a Week</span> or{' '}
           <span className="font-semibold">Monthly</span> above.
         </div>
-      ) : loading || opening ? (
-        <div className="flex justify-center py-16">
-          <BlinkingDots size="large" color="bg-theme" />
-        </div>
-      ) : !board ? null : completed ? (
+      ) : completed ? (
         <div className="flex flex-col items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/60 px-4 py-10 text-center">
           <CheckCircle2 className="h-12 w-12 text-emerald-600" />
           <h3 className="text-lg font-bold text-black">
-            {KITCHEN_MODULES[completed.module].label} completed
+            {KITCHEN_MODULES[completed.module].label} submitted
           </h3>
           <p className="max-w-md text-sm text-black">
-            {[logTarget(completed), completed.startTime && `${completed.startTime} - ${completed.endTime || '-'}`]
+            {[
+              logTarget(completed),
+              completed.startTime &&
+                `${completed.startTime} - ${completed.endTime || '-'}`
+            ]
               .filter(Boolean)
               .join(' · ')}
           </p>
@@ -313,7 +337,7 @@ export default function StaffKitchenLogPage() {
           module={module}
           target={target}
           log={session}
-          onBack={backFromSession}
+          onBusyChange={setSessionBusy}
           onChange={() => fetchBoard(frequency, true)}
           onCompleted={(log) => {
             setCompleted(log);
@@ -322,22 +346,24 @@ export default function StaffKitchenLogPage() {
           }}
         />
       ) : (
-        <div className="space-y-4">
-          {/* The logs of the picked frequency */}
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3 lg:grid-cols-3">
-            {board.modules.map((entry) => {
-              const active = module === entry.module;
-              return (
+        <div className="space-y-3 rounded-2xl border border-gray-200 p-3 sm:p-4">
+          <h3 className="break-words text-lg font-bold text-black">
+            {current ? current.label : FREQUENCY_LABEL[frequency]}
+          </h3>
+
+          {loading || opening ? (
+            <div className="flex justify-center py-16">
+              <BlinkingDots size="large" color="bg-theme" />
+            </div>
+          ) : !board ? null : !current ? (
+            /* The logs of the picked frequency */
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3 lg:grid-cols-3">
+              {board.modules.map((entry) => (
                 <button
                   key={entry.module}
                   type="button"
                   onClick={() => pickModule(entry)}
-                  className={cn(
-                    'flex items-center justify-between gap-3 rounded-xl border-2 p-4 text-left transition-all',
-                    active
-                      ? 'border-theme bg-theme/5 shadow-md'
-                      : 'border-gray-200 hover:-translate-y-0.5 hover:border-gray-300 hover:shadow-md'
-                  )}
+                  className="flex items-center justify-between gap-3 rounded-xl border-2 border-gray-200 p-4 text-left transition-all hover:-translate-y-0.5 hover:border-gray-300 hover:shadow-md"
                 >
                   <span className="min-w-0">
                     <span className="block text-base font-bold text-black">
@@ -355,13 +381,11 @@ export default function StaffKitchenLogPage() {
                     <ChevronRight className="h-5 w-5 shrink-0 text-black" />
                   )}
                 </button>
-              );
-            })}
-          </div>
-
-          {/* Shifts or items of the picked log */}
-          {current && pickTargetFirst(current.module) && (
-            <div className="space-y-2 rounded-2xl border border-gray-200 p-3 sm:p-4">
+              ))}
+            </div>
+          ) : pickTargetFirst(current.module) ? (
+            /* Shifts or items of the picked log */
+            <div className="space-y-2">
               <p className="text-sm font-bold text-black">
                 {current.module === 'kitchen_cleaning'
                   ? 'Pick a shift'
@@ -378,16 +402,14 @@ export default function StaffKitchenLogPage() {
                 {current.targets.map((item) => renderTarget(current, item))}
               </div>
             </div>
-          )}
-
-          {/* A single-target log that is done or held by someone else */}
-          {current &&
-            !pickTargetFirst(current.module) &&
+          ) : (
+            /* A single-target log that is done or held by someone else */
             current.targets[0] && (
               <div className="grid grid-cols-1 sm:max-w-sm">
                 {renderTarget(current, current.targets[0])}
               </div>
-            )}
+            )
+          )}
         </div>
       )}
     </div>

@@ -43,14 +43,14 @@ export interface KitchenModuleConfig {
 export const KITCHEN_MODULES: Record<KitchenModule, KitchenModuleConfig> = {
   kitchen_cleaning: {
     label: 'Kitchen Cleaning Logs',
-    sheetTitle: 'Kitchen Daily Cleaning',
+    sheetTitle: 'Kitchen Cleaning Logs',
     frequency: 'daily',
     requiresApproval: false,
     timed: true,
     perPeriod: 1
   },
   kitchen_deep_clean: {
-    label: 'Kitchen Deep Clean',
+    label: 'Kitchen Deep Cleaning Schedule Kitchen Assistant 2PM-3PM',
     sheetTitle: 'Kitchen Deep Cleaning Schedule Kitchen Assistant 2PM - 3PM',
     frequency: 'daily',
     requiresApproval: true,
@@ -108,9 +108,10 @@ export const modulesOf = (frequency: KitchenFrequency) =>
     (key) => KITCHEN_MODULES[key].frequency === frequency
   );
 
-// For now every approval is signed with this test signature (served from
-// public/) instead of one drawn by the approver
-export const TEST_APPROVAL_SIGNATURE = '/test-approval-signature.jpg';
+// For now every approval is signed with this test signature instead of one
+// drawn by the approver
+export const TEST_APPROVAL_SIGNATURE =
+  'https://storage.googleapis.com/watney/1792756559518-test-sign.jpg';
 
 // ---- Kitchen Cleaning Logs ------------------------------------------------
 
@@ -188,8 +189,6 @@ export const KITCHEN_CLEANING_DISCLAIMER =
   'Signing off closing checks indicates that all the above have been completed.';
 
 // ---- Kitchen Deep Clean ---------------------------------------------------
-
-export const KITCHEN_DEEP_CLEAN_TIME = '2PM - 3PM';
 
 // Keyed by ISO weekday, 1 = Monday ... 7 = Sunday
 export const KITCHEN_DEEP_CLEAN_SCHEDULE: Record<number, string> = {

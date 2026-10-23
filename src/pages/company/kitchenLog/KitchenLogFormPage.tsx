@@ -33,10 +33,12 @@ import {
   KITCHEN_SHIFTS,
   KitchenModule,
   KitchenShift,
-  modulesOf
+  modulesOf,
+  TEST_APPROVAL_SIGNATURE
 } from './constants';
 import {
   emptyValues,
+  KitchenBoard,
   KitchenFieldValues,
   KitchenLogRecord,
   logTarget,
@@ -124,6 +126,10 @@ export default function KitchenLogFormPage() {
   });
   const [values, setValues] = useState<KitchenFieldValues>(emptyValues());
 
+  // The shifts / items already logged in the picked date's day, week or month
+  // ("single" for a log with one per period)
+  const [taken, setTaken] = useState<Set<string>>(new Set());
+
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [signatureError, setSignatureError] = useState('');
@@ -162,6 +168,37 @@ export default function KitchenLogFormPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lid]);
 
+  useEffect(() => {
+    setTaken(new Set());
+    if (isEdit || !module || !logDate) return;
+    let current = true;
+    axiosInstance
+      .get('/kitchen-log/board', {
+        params: {
+          companyId: id,
+          frequency: KITCHEN_MODULES[module].frequency,
+          date: toApiDate(logDate)
+        }
+      })
+      .then((res) => {
+        const board: KitchenBoard | undefined = res.data?.data;
+        const entry = board?.modules.find((item) => item.module === module);
+        if (!current || !entry) return;
+        // In progress counts too: the slot is held until it is discarded
+        setTaken(
+          new Set(
+            entry.targets
+              .filter((target) => target.entries.length >= target.required)
+              .map((target) => target.key)
+          )
+        );
+      })
+      .catch(() => current && setTaken(new Set()));
+    return () => {
+      current = false;
+    };
+  }, [id, isEdit, module, logDate]);
+
   const config = module ? KITCHEN_MODULES[module] : null;
   const items = module ? DEEP_CLEAN_ITEMS[module] : undefined;
   const targetOptions: SelectOption[] =
@@ -172,6 +209,25 @@ export default function KitchenLogFormPage() {
         }))
       : (items || []).map((item) => ({ value: item.key, label: item.item }));
   const selectedItem = items?.find((item) => item.key === targetKey);
+
+  // The day, week or month the picked date falls in, as the form names it
+  const periodName = () => {
+    if (!config) return '';
+    if (config.frequency === 'monthly') return 'this month';
+    if (config.frequency === 'daily') return 'this day';
+    return 'this week';
+  };
+  const takenMessage = () => {
+    if (isEdit || !config) return '';
+    if (targetOptions.length) {
+      if (!targetKey || !taken.has(targetKey)) return '';
+      const option = targetOptions.find((opt) => opt.value === targetKey);
+      return `${option?.label || 'This'} has already been logged for ${periodName()}`;
+    }
+    return taken.has('single')
+      ? `${config.label} has already been logged for ${periodName()}`
+      : '';
+  };
 
   const employeeOptions: SelectOption[] = employees.map((emp) => ({
     value: emp._id,
@@ -196,6 +252,8 @@ export default function KitchenLogFormPage() {
       return module === 'kitchen_cleaning'
         ? 'Please select a shift'
         : 'Please select an item';
+    const alreadyTaken = takenMessage();
+    if (alreadyTaken) return alreadyTaken;
     return missingField(
       module,
       values,
@@ -244,7 +302,11 @@ export default function KitchenLogFormPage() {
           module,
           logDate: toApiDate(logDate!),
           ...(module === 'kitchen_cleaning' ? { shift: targetKey } : {}),
-          ...(items ? { itemKey: targetKey } : {})
+          ...(items ? { itemKey: targetKey } : {}),
+          // A log created here is approved straight away
+          ...(KITCHEN_MODULES[module!].requiresApproval
+            ? { approvalSignature: TEST_APPROVAL_SIGNATURE }
+            : {})
         });
       }
 
@@ -416,6 +478,12 @@ export default function KitchenLogFormPage() {
                 value={
                   targetOptions.find((opt) => opt.value === targetKey) || null
                 }
+                isOptionDisabled={(option: any) => taken.has(option.value)}
+                formatOptionLabel={(option: any, { context }: any) =>
+                  context === 'menu' && taken.has(option.value)
+                    ? `${option.label} (already logged)`
+                    : option.label
+                }
                 onChange={(option: any) => setTargetKey(option?.value || '')}
                 placeholder={
                   module === 'kitchen_cleaning' ? 'Select shift' : 'Select item'
@@ -439,6 +507,18 @@ export default function KitchenLogFormPage() {
           </div>
         )}
       </div>
+
+      {takenMessage() && (
+        <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 sm:text-sm">
+          {takenMessage()}. Pick another{' '}
+          {targetOptions.length
+            ? module === 'kitchen_cleaning'
+              ? 'shift or date'
+              : 'item or date'
+            : 'date'}
+          .
+        </p>
+      )}
 
       {selectedItem && (
         <p className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-black">
@@ -497,7 +577,7 @@ export default function KitchenLogFormPage() {
       <div className="flex justify-end">
         <Button
           className="w-full bg-theme text-white hover:bg-theme/90 sm:w-auto"
-          disabled={saving || !module}
+          disabled={saving || !module || Boolean(takenMessage())}
           onClick={submit}
         >
           {saving ? (
