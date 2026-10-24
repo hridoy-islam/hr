@@ -94,7 +94,7 @@ export function KitchenLogFields({
           >
             <div className="flex items-center justify-between gap-2">
               <p className="text-sm font-bold text-black">
-                {config.checklistTitle}*
+                {config.checklistTitle}
               </p>
               <span
                 className={cn(

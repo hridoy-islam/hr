@@ -321,7 +321,7 @@ export default function KitchenLogPage() {
       </div>
 
       {/* Tabs, a colour each */}
-      <div className="flex flex-wrap gap-1 border-b border-gray-200">
+      <div className="flex flex-wrap gap-1">
         {tabs.map((item) => {
           const active = tab === item.key;
           const color = FREQUENCY_COLOR[item.key];
@@ -331,14 +331,20 @@ export default function KitchenLogPage() {
               type="button"
               onClick={() => switchTab(item.key)}
               className={cn(
-                '-mb-px flex shrink-0 items-center gap-2 border-b-2 px-3 py-2 text-sm font-semibold transition-colors',
-                color.text,
-                !active && 'border-transparent hover:border-gray-300'
+                'flex shrink-0 items-center gap-2 rounded-md border-2 px-3 py-2 text-sm font-semibold transition-colors',
+                active
+                  ? cn(color.solid, 'shadow-sm')
+                  : cn(color.text, 'bg-white hover:bg-gray-50')
               )}
             >
               {item.label}
               {item.badge > 0 && (
-                <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1 text-xs font-bold text-white">
+                <span
+                  className={cn(
+                    'flex h-5 min-w-[20px] items-center justify-center rounded-full px-1 text-xs font-bold',
+                    active ? 'bg-white text-red-600' : 'bg-red-500 text-white'
+                  )}
+                >
                   {item.badge}
                 </span>
               )}

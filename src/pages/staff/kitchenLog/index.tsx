@@ -165,6 +165,24 @@ export default function StaffKitchenLogPage() {
     }
   };
 
+  // Back to the very start, as when the page was first opened
+  const resetAll = () => {
+    setCompleted(null);
+    setFrequency(null);
+    setBoard(null);
+    setModule(null);
+    setTarget(null);
+    setSession(null);
+  };
+
+  // The submitted message clears itself after 10 seconds
+  useEffect(() => {
+    if (!completed) return;
+    const timer = window.setTimeout(resetAll, 10000);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [completed]);
+
   const backFromSession = () => {
     setTarget(null);
     setSession(null);
@@ -301,6 +319,7 @@ export default function StaffKitchenLogPage() {
           <span className="font-semibold">Monthly</span> above.
         </div>
       ) : completed ? (
+        /* Shown for 10 seconds after a submit, then the page starts over */
         <div className="flex flex-col items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/60 px-4 py-10 text-center">
           <CheckCircle2 className="h-12 w-12 text-emerald-600" />
           <h3 className="text-lg font-bold text-black">
@@ -320,15 +339,6 @@ export default function StaffKitchenLogPage() {
               Sent to management for approval.
             </p>
           )}
-          <Button
-            className="bg-theme text-white hover:bg-theme/90"
-            onClick={() => {
-              setCompleted(null);
-              if (module && !pickTargetFirst(module)) setModule(null);
-            }}
-          >
-            Done
-          </Button>
         </div>
       ) : target && module ? (
         <KitchenSession

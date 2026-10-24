@@ -483,8 +483,7 @@ const kitchenCleaningLayout = (
           reading(afternoon, entry.key)
         ]),
         [{ label: 'Notes: ', text: notes, span: 3, tall: true }]
-      ],
-      title: moment(key).format('DD MMMM YYYY')
+      ]
     };
   });
 

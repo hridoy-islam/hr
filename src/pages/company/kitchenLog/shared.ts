@@ -297,14 +297,10 @@ export const payloadFromValues = (
 export const missingField = (
   module: KitchenModule,
   values: KitchenFieldValues,
-  shift?: KitchenShift
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _shift?: KitchenShift
 ) => {
-  if (module === 'kitchen_cleaning' && shift) {
-    const unticked = KITCHEN_SHIFTS[shift].checklist.find(
-      (item) => !values.checklist[item.key]
-    );
-    if (unticked) return `Tick every check before finishing: ${unticked.label}`;
-  }
+  // Kitchen cleaning checks are optional, any of them can be left unticked
   if (module === 'equipment_temperature') {
     for (const field of EQUIPMENT_TEMPERATURE_FIELDS) {
       const value = values.temperatures[field.key];

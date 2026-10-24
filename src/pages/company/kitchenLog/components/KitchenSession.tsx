@@ -21,12 +21,7 @@ import {
   SignaturePad,
   SignaturePadHandle
 } from '@/pages/company/cleaningLog/components/SignaturePad';
-import {
-  KITCHEN_MODULES,
-  KITCHEN_SHIFTS,
-  KitchenModule,
-  KitchenShift
-} from '../constants';
+import { KITCHEN_MODULES, KitchenModule, KitchenShift } from '../constants';
 import {
   KitchenBoardTarget,
   KitchenFieldValues,
@@ -92,7 +87,6 @@ export function KitchenSession({
   );
   const [busy, setBusy] = useState<Busy>(null);
   const [error, setError] = useState('');
-  const [showRequired, setShowRequired] = useState(false);
   const [signatureError, setSignatureError] = useState('');
   const signatureRef = useRef<SignaturePadHandle>(null);
   const seconds = useKitchenTimer(log);
@@ -170,31 +164,8 @@ export function KitchenSession({
     }
   };
 
-  // Kitchen cleaning can only be finished once every check is ticked
-  const checksLeft =
-    module === 'kitchen_cleaning' &&
-    (shift ? KITCHEN_SHIFTS[shift].checklist : []).some(
-      (item) => !values.checklist[item.key]
-    );
-
-  // Once a finish was tried, the unticked checks stay marked until all are
-  // ticked
-  useEffect(() => {
-    if (showRequired && !checksLeft) {
-      setShowRequired(false);
-      setError('');
-    }
-  }, [showRequired, checksLeft]);
-
+  // Kitchen cleaning checks are optional, any of them can be left unticked
   const complete = async () => {
-    if (checksLeft) {
-      setShowRequired(true);
-      setError('Please tick every check before submitting.');
-      document
-        .getElementById('kitchen-checklist')
-        ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      return;
-    }
     const missing = missingField(module, values, shift);
     if (missing) {
       setError(missing);
@@ -355,7 +326,6 @@ export function KitchenSession({
             values={values}
             onChange={changeValues}
             disabled={disabled}
-            highlightUnticked={showRequired}
           />
 
           <div className="w-full space-y-1.5 md:max-w-md">
