@@ -731,7 +731,7 @@ const HolidayPage: React.FC = () => {
       {
         label: 'Balance Remaining',
         code: 'BR',
-        formula: 'A + B + C − D − E − F',
+        formula: 'A + B − D − E − F',
         value: balanceRemaining,
         color: 'text-red-600',
         isBold: true

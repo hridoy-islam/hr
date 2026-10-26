@@ -405,7 +405,7 @@ const HolidayTab: React.FC<HolidayTabProps> = ({ formData }) => {
       {
         label: 'Balance Remaining',
         code: 'BR',
-        formula: 'A + B + C − D − E − F',
+        formula: 'A + B − D − E − F',
         value: balanceRemaining,
         color: 'text-red-600',
         isBold: true
