@@ -10,6 +10,8 @@ import {
   ChefHat,
   ChevronRight,
   Lock,
+  PauseCircle,
+  Play,
   Repeat,
   Timer
 } from 'lucide-react';
@@ -19,7 +21,11 @@ import { useToast } from '@/components/ui/use-toast';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
 import axiosInstance from '@/lib/axios';
 import { cn } from '@/lib/utils';
-import { apiError, personName } from '@/pages/company/cleaningLog/shared';
+import {
+  apiError,
+  formatDuration,
+  personName
+} from '@/pages/company/cleaningLog/shared';
 import {
   FREQUENCY_LABEL,
   KITCHEN_FREQUENCIES,
@@ -32,6 +38,7 @@ import {
   KitchenBoardModule,
   KitchenBoardTarget,
   KitchenLogRecord,
+  formatLogDate,
   logTarget
 } from '@/pages/company/kitchenLog/shared';
 import { KitchenSession } from '@/pages/company/kitchenLog/components/KitchenSession';
@@ -68,6 +75,19 @@ export default function StaffKitchenLogPage() {
   const [completed, setCompleted] = useState<KitchenLogRecord | null>(null);
   // The open session is saving, so Back waits
   const [sessionBusy, setSessionBusy] = useState(false);
+  // The employee's paused logs, listed at the top until they are finished
+  const [paused, setPaused] = useState<KitchenLogRecord[]>([]);
+
+  const fetchPaused = useCallback(() => {
+    axiosInstance
+      .get('/kitchen-log/paused', { params: { companyId: id } })
+      .then((res) => setPaused(res.data?.data || []))
+      .catch(() => setPaused([]));
+  }, [id]);
+
+  useEffect(() => {
+    fetchPaused();
+  }, [fetchPaused]);
 
   const fetchBoard = useCallback(
     async (next: KitchenFrequency, quiet = false) => {
@@ -119,6 +139,48 @@ export default function StaffKitchenLogPage() {
       const res = await axiosInstance.get(`/kitchen-log/${own._id}`);
       setSession(res.data?.data || null);
       setTarget(nextTarget);
+    } catch (err) {
+      toast({
+        title: apiError(err, 'Failed to open the log'),
+        className: 'bg-red-500 border-none text-white'
+      });
+    } finally {
+      setOpening(false);
+    }
+  };
+
+  // Opens a paused log from the list at the top. Its shift or item is taken
+  // from the board when the log belongs to the current period; an older one
+  // is opened from the log itself.
+  const openPaused = async (log: KitchenLogRecord) => {
+    try {
+      setOpening(true);
+      setCompleted(null);
+      const [boardRes, logRes] = await Promise.all([
+        axiosInstance.get('/kitchen-log/board', {
+          params: { companyId: id, frequency: log.frequency }
+        }),
+        axiosInstance.get(`/kitchen-log/${log._id}`)
+      ]);
+      const nextBoard: KitchenBoard | null = boardRes.data?.data || null;
+      const fromBoard = nextBoard?.modules
+        .find((entry) => entry.module === log.module)
+        ?.targets.find((item) =>
+          item.entries.some((entry) => entry._id === log._id)
+        );
+      const fallback: KitchenBoardTarget = {
+        key: log.shift || log.itemKey || 'single',
+        label: logTarget(log) || KITCHEN_MODULES[log.module].label,
+        required: 1,
+        done: 0,
+        isDone: false,
+        entries: []
+      };
+      setBoard(nextBoard);
+      setFrequency(log.frequency);
+      setModule(log.module);
+      setSession(logRes.data?.data || log);
+      setTarget(fromBoard || fallback);
     } catch (err) {
       toast({
         title: apiError(err, 'Failed to open the log'),
@@ -203,9 +265,10 @@ export default function StaffKitchenLogPage() {
     item: KitchenBoardTarget
   ) => {
     const holder = blockedBy(item);
-    const ownOpen = item.entries.some(
+    const ownLog = item.entries.find(
       (log) => log.status !== 'completed' && mine(log)
     );
+    const ownOpen = Boolean(ownLog);
     const locked = item.isDone || Boolean(holder);
     const lastDone = [...item.entries]
       .reverse()
@@ -251,7 +314,9 @@ export default function StaffKitchenLogPage() {
             : holder
               ? `In progress by ${holder}`
               : ownOpen
-                ? 'Your session is open - tap to continue'
+                ? ownLog?.status === 'paused'
+                  ? 'Your session is paused - tap to resume'
+                  : 'Your session is open - tap to continue'
                 : item.required > 1
                   ? `${item.done} of ${item.required} done this week`
                   : 'Not done yet'}
@@ -261,6 +326,8 @@ export default function StaffKitchenLogPage() {
   };
 
   const current = boardModule(module);
+  // The one open below is not listed again
+  const pausedList = paused.filter((log) => log._id !== session?._id);
 
   return (
     <div className="min-h-[97vh] space-y-4 rounded-md bg-white p-3 shadow-sm max-md:mt-8 sm:p-4 lg:space-y-5 lg:p-5">
@@ -272,7 +339,7 @@ export default function StaffKitchenLogPage() {
           </h2>
           <p className="mt-1 text-xs text-black sm:text-sm">
             Pick how often the log is done, then the log itself. Press Start,
-            fill it in, sign, then End and Submit.
+            fill it in (Pause to take a break), sign, then End and Submit.
           </p>
         </div>
         {frequency && !completed && (
@@ -286,6 +353,55 @@ export default function StaffKitchenLogPage() {
           </Button>
         )}
       </div>
+
+      {/* Paused logs, still waiting to be finished and submitted */}
+      {pausedList.length > 0 && !completed && (
+        <div className="space-y-2 rounded-2xl border border-orange-200 bg-orange-50/50 p-3 sm:p-4">
+          <p className="flex items-center gap-2 text-sm font-bold text-black">
+            <PauseCircle className="h-4 w-4 text-orange-600" />
+            Your paused logs
+            <span className="rounded-full bg-orange-500 px-2 py-0.5 text-xs font-semibold text-white">
+              {pausedList.length} paused
+            </span>
+          </p>
+          <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
+            {pausedList.map((log) => (
+              <div
+                key={log._id}
+                className="flex min-w-0 flex-col gap-3 rounded-xl border-2 border-orange-400 bg-orange-50 p-3 ring-4 ring-orange-100 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div className="min-w-0 space-y-1">
+                  <p className="break-words text-sm font-semibold text-black">
+                    {KITCHEN_MODULES[log.module].label}
+                    {logTarget(log) && (
+                      <span className="ml-1 font-medium">
+                        ({logTarget(log)})
+                      </span>
+                    )}
+                  </p>
+                  <p className="flex flex-wrap items-center gap-x-2 text-xs text-black">
+                    <span>{formatLogDate(log.logDate)}</span>
+                    <span className="font-mono font-semibold tabular-nums">
+                      {formatDuration(log.durationSeconds || 0)}
+                    </span>
+                    <span className="font-semibold text-orange-700">
+                      · not submitted yet
+                    </span>
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  className="w-full bg-theme text-white hover:bg-theme/90 sm:w-auto"
+                  disabled={opening || sessionBusy}
+                  onClick={() => openPaused(log)}
+                >
+                  <Play className="mr-1.5 h-4 w-4" /> Continue
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Daily / Weekly / Twice a week / Monthly */}
       {!frequency && (
@@ -348,7 +464,10 @@ export default function StaffKitchenLogPage() {
           target={target}
           log={session}
           onBusyChange={setSessionBusy}
-          onChange={() => fetchBoard(frequency, true)}
+          onChange={() => {
+            fetchBoard(frequency, true);
+            fetchPaused();
+          }}
           onCompleted={(log) => {
             setCompleted(log);
             setTarget(null);

@@ -1,4 +1,11 @@
-import { Eye, Pencil, ShieldCheck, Trash2 } from 'lucide-react';
+import {
+  CheckCircle2,
+  Eye,
+  Pencil,
+  ShieldCheck,
+  Trash2,
+  XCircle
+} from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -52,7 +59,10 @@ interface KitchenLogTableProps {
   showFrequency?: boolean;
   onView: (log: KitchenLogRecord) => void;
   onApprove?: (log: KitchenLogRecord) => void;
+  // A completed log is edited; an unfinished one is completed for the
+  // employee through the same form
   onEdit?: (log: KitchenLogRecord) => void;
+  onDiscard?: (log: KitchenLogRecord) => void;
   onDelete?: (log: KitchenLogRecord) => void;
 }
 
@@ -63,6 +73,7 @@ export function KitchenLogTable({
   onView,
   onApprove,
   onEdit,
+  onDiscard,
   onDelete
 }: KitchenLogTableProps) {
   if (logs.length === 0) {
@@ -90,6 +101,7 @@ export function KitchenLogTable({
         </thead>
         <tbody>
           {logs.map((log) => {
+            const open = log.status !== 'completed';
             const frequency =
               KITCHEN_MODULES[log.module]?.frequency || log.frequency;
             return (
@@ -159,9 +171,29 @@ export function KitchenLogTable({
                     >
                       <Eye className="mr-1 h-4 w-4" /> View
                     </Button>
-                    {onEdit && log.status === 'completed' && (
-                      <Button size="sm" onClick={() => onEdit(log)}>
-                        <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
+                    {onEdit &&
+                      (open ? (
+                        <Button
+                          size="sm"
+                          className="bg-emerald-600 text-white hover:bg-emerald-700"
+                          onClick={() => onEdit(log)}
+                        >
+                          <CheckCircle2 className="mr-2 h-3.5 w-3.5" />{' '}
+                          Complete
+                        </Button>
+                      ) : (
+                        <Button size="sm" onClick={() => onEdit(log)}>
+                          <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
+                        </Button>
+                      ))}
+                    {onDiscard && open && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                        onClick={() => onDiscard(log)}
+                      >
+                        <XCircle className="mr-2 h-3.5 w-3.5" /> Discard
                       </Button>
                     )}
                     {onDelete && (

@@ -1273,7 +1273,7 @@ const CompanyLeaveApprovalPage: React.FC = () => {
           { label: 'Taken', value: allowance.usedHours, color: 'text-green-600', labelClass: 'text-gray-500' },
           { label: 'Booked', value: allowance.bookedHours, color: 'text-orange-600', labelClass: 'text-gray-500' },
           { label: 'Requested', value: allowance.requestedHours, color: 'text-yellow-500', labelClass: 'text-gray-500' },
-          { label: 'Balance Remaining', value: allowance.carryForward + allowance.holidayEntitlement + allowance.holidayAccured - allowance.usedHours - allowance.bookedHours - allowance.requestedHours, color: 'text-red-700', labelClass: 'font-bold text-gray-900' },
+          { label: 'Balance Remaining', value: allowance.carryForward + allowance.holidayEntitlement - allowance.usedHours - allowance.bookedHours - allowance.requestedHours, color: 'text-red-700', labelClass: 'font-bold text-gray-900' },
           { label: 'Unpaid Leave Taken', value: allowance.unpaidLeaveTaken, color: 'text-cyan-500', labelClass: 'text-gray-500' },
           { label: 'Unpaid Booked', value: allowance.unpaidBookedHours, color: 'text-blue-600', labelClass: 'text-gray-500' },
           { label: 'Unpaid Requested', value: allowance.unpaidLeaveRequest, color: 'text-blue-600', labelClass: 'text-gray-500' }

@@ -5,6 +5,7 @@ import {
   CalendarDays,
   CheckCircle2,
   Loader2,
+  Pause,
   Play,
   Square,
   Timer,
@@ -34,7 +35,8 @@ import {
 } from '../shared';
 import { KitchenLogFields } from './KitchenLogFields';
 
-// Seconds on the clock: from the start to the stop, or to now while running
+// Seconds on the clock: the stretches closed by a pause or the stop, plus the
+// one running now
 export function useKitchenTimer(log: KitchenLogRecord | null) {
   const running = log?.status === 'in_progress';
   const [now, setNow] = useState(Date.now());
@@ -46,9 +48,13 @@ export function useKitchenTimer(log: KitchenLogRecord | null) {
     return () => window.clearInterval(timer);
   }, [running, log]);
 
-  if (!log?.startedAt) return log?.durationSeconds || 0;
-  const end = log.stoppedAt ? new Date(log.stoppedAt).getTime() : now;
-  return Math.max(0, (end - new Date(log.startedAt).getTime()) / 1000);
+  if (!log) return 0;
+  const worked = log.durationSeconds || 0;
+  if (!running) return worked;
+  // Logs started before pausing existed have no runningSince
+  const since = log.runningSince || log.startedAt;
+  if (!since) return worked;
+  return worked + Math.max(0, (now - new Date(since).getTime()) / 1000);
 }
 
 interface KitchenSessionProps {
@@ -65,7 +71,14 @@ interface KitchenSessionProps {
   onCompleted: (log: KitchenLogRecord) => void;
 }
 
-type Busy = 'start' | 'stop' | 'complete' | 'discard' | null;
+type Busy =
+  | 'start'
+  | 'pause'
+  | 'resume'
+  | 'stop'
+  | 'complete'
+  | 'discard'
+  | null;
 
 export function KitchenSession({
   companyId,
@@ -96,6 +109,7 @@ export function KitchenSession({
     | KitchenShift
     | undefined;
   const open = log && log.status !== 'completed';
+  const paused = log?.status === 'paused';
   // Untimed logs (equipment temperatures) are filled in straight away
   const editable = !config.timed || Boolean(open);
 
@@ -141,6 +155,26 @@ export function KitchenSession({
       onChange();
     } catch (err) {
       fail(err, 'Failed to start');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  // Pause and resume keep what has been filled in so far
+  const pauseOrResume = async (action: 'pause' | 'resume') => {
+    if (!log) return;
+    try {
+      setBusy(action);
+      setError('');
+      saveProgress.cancel();
+      const res = await axiosInstance.patch(
+        `/kitchen-log/${log._id}/${action}`,
+        payloadFromValues(module, values)
+      );
+      setLog(res.data?.data);
+      onChange();
+    } catch (err) {
+      fail(err, action === 'pause' ? 'Failed to pause' : 'Failed to resume');
     } finally {
       setBusy(null);
     }
@@ -281,7 +315,9 @@ export function KitchenSession({
             'flex flex-col gap-3 rounded-xl border-2 p-3 sm:flex-row sm:items-center sm:justify-between',
             log.status === 'in_progress'
               ? 'border-amber-300 bg-amber-50/60'
-              : 'border-sky-200 bg-sky-50/60'
+              : paused
+                ? 'border-orange-400 bg-orange-50 ring-4 ring-orange-100'
+                : 'border-sky-200 bg-sky-50/60'
           )}
         >
           <div className="space-y-1">
@@ -300,21 +336,59 @@ export function KitchenSession({
               Started {log.startTime || '-'}
               {log.endTime && ` · Ended ${log.endTime}`}
             </p>
-          </div>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="text-red-600 hover:bg-red-50 hover:text-red-700"
-            disabled={disabled}
-            onClick={discard}
-          >
-            {busy === 'discard' ? (
-              <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-            ) : (
-              <Trash2 className="mr-1.5 h-4 w-4" />
+            {paused && (
+              <p className="text-xs font-semibold text-orange-700">
+                Paused, not submitted yet. Your progress and time are saved.
+                Resume to carry on.
+              </p>
             )}
-            Discard
-          </Button>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            {log.status === 'in_progress' && (
+              <Button
+                size="sm"
+                className="border-2 border-slate-400 bg-white text-black shadow-sm hover:border-slate-500 hover:bg-slate-100 hover:text-black"
+                disabled={disabled}
+                onClick={() => pauseOrResume('pause')}
+              >
+                {busy === 'pause' ? (
+                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                ) : (
+                  <Pause className="mr-1.5 h-4 w-4" />
+                )}
+                Pause
+              </Button>
+            )}
+            {paused && (
+              <Button
+                size="sm"
+                className="bg-theme text-white hover:bg-theme/90 hover:text-white"
+                disabled={disabled}
+                onClick={() => pauseOrResume('resume')}
+              >
+                {busy === 'resume' ? (
+                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                ) : (
+                  <Play className="mr-1.5 h-4 w-4" />
+                )}
+                Resume
+              </Button>
+            )}
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-red-600 hover:bg-red-50 hover:text-red-700"
+              disabled={disabled}
+              onClick={discard}
+            >
+              {busy === 'discard' ? (
+                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="mr-1.5 h-4 w-4" />
+              )}
+              Discard
+            </Button>
+          </div>
         </div>
       )}
 
@@ -325,7 +399,7 @@ export function KitchenSession({
             shift={shift}
             values={values}
             onChange={changeValues}
-            disabled={disabled}
+            disabled={disabled || paused}
           />
 
           <div className="w-full space-y-1.5 md:max-w-md">
@@ -335,7 +409,7 @@ export function KitchenSession({
               entityId={user?._id || companyId}
               signatureUrl=""
               signedAt={null}
-              disabled={disabled}
+              disabled={disabled || paused}
               onDraw={() => setSignatureError('')}
               error={signatureError}
               height={200}

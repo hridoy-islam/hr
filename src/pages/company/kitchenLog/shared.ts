@@ -10,12 +10,24 @@ import {
   KitchenShift
 } from './constants';
 
-export type KitchenLogStatus = 'in_progress' | 'stopped' | 'completed';
+export type KitchenLogStatus =
+  | 'in_progress'
+  | 'paused'
+  | 'stopped'
+  | 'completed';
 
 export interface KitchenLogHistory {
   _id?: string;
   title: string;
-  action: 'start' | 'stop' | 'complete' | 'create' | 'update' | 'approve';
+  action:
+    | 'start'
+    | 'pause'
+    | 'resume'
+    | 'stop'
+    | 'complete'
+    | 'create'
+    | 'update'
+    | 'approve';
   updatedBy?: CleaningEmployee;
   date: string;
 }
@@ -34,6 +46,9 @@ export interface KitchenLogRecord {
   endTime?: string;
   startedAt?: string;
   stoppedAt?: string;
+  // When the running stretch began: the start, or the last resume
+  runningSince?: string;
+  // Time worked across the stretches closed by a pause or the stop
   durationSeconds?: number;
   signatureUrl?: string;
   signedAt?: string;
@@ -119,6 +134,7 @@ export type ApprovalCounts = Record<KitchenFrequency | 'total', number>;
 
 export const LOG_STATUS_LABEL: Record<KitchenLogStatus, string> = {
   in_progress: 'In Progress',
+  paused: 'Paused',
   stopped: 'Awaiting Completion',
   completed: 'Completed'
 };
@@ -158,6 +174,8 @@ export const FREQUENCY_COLOR: Record<
 
 export const LOG_STATUS_BADGE: Record<KitchenLogStatus, string> = {
   in_progress: 'bg-amber-50 text-amber-700 ring-amber-200',
+  // Loud on purpose: a paused log is work still waiting to be finished
+  paused: 'bg-orange-100 text-orange-700 ring-orange-300',
   stopped: 'bg-sky-50 text-sky-700 ring-sky-200',
   completed: 'bg-emerald-50 text-emerald-700 ring-emerald-200'
 };

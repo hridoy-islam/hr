@@ -670,7 +670,7 @@ const HolidayPage: React.FC = () => {
   const holidayYears = useMemo(() => generateHolidayYears(20, 50), []);
 
   // Total Allowance = A + C | Eligible Position = A + C − D − E − F
-  // Balance Remaining = A + B + C − D − E − F
+  // Balance Remaining = A + B − D − E − F (the label still shows the C)
   const totalAllowance =
     leaveAllowance.carryForward + leaveAllowance.holidayAccured;
   const usedAndPending =
@@ -679,7 +679,9 @@ const HolidayPage: React.FC = () => {
     leaveAllowance.requestedHours;
   const eligiblePosition = totalAllowance - usedAndPending;
   const balanceRemaining =
-    totalAllowance + leaveAllowance.holidayEntitlement - usedAndPending;
+    leaveAllowance.carryForward +
+    leaveAllowance.holidayEntitlement -
+    usedAndPending;
 
   const allowanceStatsList: {
     label: string;

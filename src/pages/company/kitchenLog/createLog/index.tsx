@@ -3,7 +3,18 @@ import { useNavigate, useParams } from 'react-router-dom';
 import Select from 'react-select';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-import { ArrowLeft, CalendarDays, ChefHat, Loader2, Save } from 'lucide-react';
+import {
+  ArrowLeft,
+  CalendarDays,
+  CheckCircle2,
+  ChefHat,
+  Eye,
+  Loader2,
+  Pencil,
+  Save,
+  Trash2,
+  XCircle
+} from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -35,10 +46,14 @@ import {
   KitchenShift,
   modulesOf,
   TEST_APPROVAL_SIGNATURE
-} from './constants';
+} from '../constants';
 import {
   emptyValues,
   KitchenBoard,
+  KitchenBoardEntry,
+  KitchenBoardTarget,
+  LOG_STATUS_BADGE,
+  LOG_STATUS_LABEL,
   KitchenFieldValues,
   KitchenLogRecord,
   logTarget,
@@ -48,9 +63,13 @@ import {
   typeTime,
   payloadFromValues,
   valuesFromLog
-} from './shared';
-import { KitchenLogFields } from './components/KitchenLogFields';
-import { logPeriodLabel } from './components/KitchenLogTable';
+} from '../shared';
+import { KitchenLogFields } from '../components/KitchenLogFields';
+import { logPeriodLabel } from '../components/KitchenLogTable';
+import {
+  KitchenLogAction,
+  KitchenLogActionDialog
+} from '../components/KitchenLogActionDialog';
 
 const MODULE_OPTIONS = KITCHEN_FREQUENCIES.map(({ key, label }) => ({
   label,
@@ -99,9 +118,9 @@ const validateTimes = (times: Record<TimeField, string>, strict = true) => {
   return { startTime, endTime };
 };
 
-// Completes a typed time on blur, e.g. 9 -> 09:00, 930 -> 09:30
-// The company side records a finished log for an employee in one go, or
-// corrects one already completed
+// The company side records a finished log for an employee in one go,
+// corrects one already completed, or completes one the employee left
+// unfinished (in progress, paused or awaiting completion)
 export default function KitchenLogFormPage() {
   const { id, lid } = useParams(); // companyId, logId (edit)
   const navigate = useNavigate();
@@ -109,6 +128,12 @@ export default function KitchenLogFormPage() {
   const isEdit = Boolean(lid);
 
   const [existing, setExisting] = useState<KitchenLogRecord | null>(null);
+  // An unfinished log is completed rather than edited, and stays with the
+  // employee who started it
+  const completing = Boolean(existing && existing.status !== 'completed');
+  const backPath = isEdit
+    ? `/company/${id}/kitchen-log/${lid}`
+    : `/company/${id}/kitchen-log`;
   const [loading, setLoading] = useState(isEdit);
   const [employees, setEmployees] = useState<CleaningEmployee[]>([]);
 
@@ -126,9 +151,15 @@ export default function KitchenLogFormPage() {
   });
   const [values, setValues] = useState<KitchenFieldValues>(emptyValues());
 
-  // The shifts / items already logged in the picked date's day, week or month
-  // ("single" for a log with one per period)
-  const [taken, setTaken] = useState<Set<string>>(new Set());
+  // The shifts / items of the picked date's day, week or month with the logs
+  // already on them ("single" for a log with one per period)
+  const [targets, setTargets] = useState<KitchenBoardTarget[]>([]);
+  // Bumped after a log is discarded or deleted here, to load them again
+  const [reload, setReload] = useState(0);
+  const [acting, setActing] = useState<{
+    log: KitchenLogRecord;
+    action: KitchenLogAction;
+  } | null>(null);
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -169,7 +200,7 @@ export default function KitchenLogFormPage() {
   }, [lid]);
 
   useEffect(() => {
-    setTaken(new Set());
+    setTargets([]);
     if (isEdit || !module || !logDate) return;
     let current = true;
     axiosInstance
@@ -184,20 +215,13 @@ export default function KitchenLogFormPage() {
         const board: KitchenBoard | undefined = res.data?.data;
         const entry = board?.modules.find((item) => item.module === module);
         if (!current || !entry) return;
-        // In progress counts too: the slot is held until it is discarded
-        setTaken(
-          new Set(
-            entry.targets
-              .filter((target) => target.entries.length >= target.required)
-              .map((target) => target.key)
-          )
-        );
+        setTargets(entry.targets);
       })
-      .catch(() => current && setTaken(new Set()));
+      .catch(() => current && setTargets([]));
     return () => {
       current = false;
     };
-  }, [id, isEdit, module, logDate]);
+  }, [id, isEdit, module, logDate, reload]);
 
   const config = module ? KITCHEN_MODULES[module] : null;
   const items = module ? DEEP_CLEAN_ITEMS[module] : undefined;
@@ -209,6 +233,36 @@ export default function KitchenLogFormPage() {
         }))
       : (items || []).map((item) => ({ value: item.key, label: item.item }));
   const selectedItem = items?.find((item) => item.key === targetKey);
+
+  // In progress and paused count too: the slot is held until it is discarded
+  const taken = new Set(
+    targets
+      .filter((target) => target.entries.length >= target.required)
+      .map((target) => target.key)
+  );
+  // The logs already on the picked shift / item, shown before the form
+  const pickedKey = targetOptions.length ? targetKey : 'single';
+  const pickedEntries: KitchenBoardEntry[] =
+    (!isEdit && pickedKey
+      ? targets.find((target) => target.key === pickedKey)?.entries
+      : undefined) || [];
+  // Where the shift / item stands, for its option in the list
+  const targetStatus = (key: string) => {
+    const entries = targets.find((target) => target.key === key)?.entries;
+    const latest = entries?.[entries.length - 1];
+    return latest ? LOG_STATUS_LABEL[latest.status] : '';
+  };
+  // The board sends a light entry; the dialogs need the log around it
+  const asLog = (entry: KitchenBoardEntry) =>
+    ({
+      ...entry,
+      module,
+      ...(module === 'kitchen_cleaning'
+        ? { shift: targetKey }
+        : { item: selectedItem?.item })
+    }) as KitchenLogRecord;
+  const logPath = (entry: KitchenBoardEntry) =>
+    `/company/${id}/kitchen-log/${entry._id}`;
 
   // The day, week or month the picked date falls in, as the form names it
   const periodName = () => {
@@ -222,10 +276,10 @@ export default function KitchenLogFormPage() {
     if (targetOptions.length) {
       if (!targetKey || !taken.has(targetKey)) return '';
       const option = targetOptions.find((opt) => opt.value === targetKey);
-      return `${option?.label || 'This'} has already been logged for ${periodName()}`;
+      return `${option?.label || 'This'} is already ${targetStatus(targetKey).toLowerCase()} for ${periodName()}`;
     }
     return taken.has('single')
-      ? `${config.label} has already been logged for ${periodName()}`
+      ? `${config.label} is already ${targetStatus('single').toLowerCase()} for ${periodName()}`
       : '';
   };
 
@@ -293,7 +347,9 @@ export default function KitchenLogFormPage() {
           : {})
       };
 
-      if (isEdit) {
+      if (completing) {
+        await axiosInstance.patch(`/kitchen-log/${lid}/complete`, payload);
+      } else if (isEdit) {
         await axiosInstance.patch(`/kitchen-log/${lid}`, payload);
       } else {
         await axiosInstance.post('/kitchen-log', {
@@ -311,10 +367,14 @@ export default function KitchenLogFormPage() {
       }
 
       toast({
-        title: isEdit ? 'Kitchen log updated' : 'Kitchen log created',
+        title: completing
+          ? 'Kitchen log completed'
+          : isEdit
+            ? 'Kitchen log updated'
+            : 'Kitchen log created',
         className: 'bg-theme border-none text-white'
       });
-      navigate(`/company/${id}/kitchen-log`);
+      navigate(isEdit ? backPath : `/company/${id}/kitchen-log`);
     } catch (err) {
       setError(apiError(err, 'Failed to save the log'));
     } finally {
@@ -390,12 +450,16 @@ export default function KitchenLogFormPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="flex items-center gap-2 text-xl font-bold text-black lg:text-2xl">
           <ChefHat className="h-5 w-5 lg:h-6 lg:w-6" />
-          {isEdit ? 'Edit Kitchen Log' : 'Create Kitchen Log'}
+          {completing
+            ? 'Complete Kitchen Log'
+            : isEdit
+              ? 'Edit Kitchen Log'
+              : 'Create Kitchen Log'}
         </h2>
         <Button
           size="sm"
           className="w-full sm:w-auto"
-          onClick={() => navigate(`/company/${id}/kitchen-log`)}
+          onClick={() => navigate(backPath)}
         >
           <ArrowLeft className="mr-1.5 h-4 w-4" /> Back
         </Button>
@@ -410,6 +474,7 @@ export default function KitchenLogFormPage() {
               employeeOptions.find((opt) => opt.value === employeeId) || null
             }
             onChange={(option: any) => setEmployeeId(option?.value || '')}
+            isDisabled={completing}
             placeholder="Select employee"
             styles={selectStyles}
             menuPortalTarget={document.body}
@@ -478,10 +543,9 @@ export default function KitchenLogFormPage() {
                 value={
                   targetOptions.find((opt) => opt.value === targetKey) || null
                 }
-                isOptionDisabled={(option: any) => taken.has(option.value)}
                 formatOptionLabel={(option: any, { context }: any) =>
-                  context === 'menu' && taken.has(option.value)
-                    ? `${option.label} (already logged)`
+                  context === 'menu' && targetStatus(option.value)
+                    ? `${option.label} (${targetStatus(option.value)})`
                     : option.label
                 }
                 onChange={(option: any) => setTargetKey(option?.value || '')}
@@ -508,17 +572,116 @@ export default function KitchenLogFormPage() {
         )}
       </div>
 
-      {takenMessage() && (
-        <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 sm:text-sm">
-          {takenMessage()}. Pick another{' '}
-          {targetOptions.length
-            ? module === 'kitchen_cleaning'
-              ? 'shift or date'
-              : 'item or date'
-            : 'date'}
-          .
-        </p>
+      {/* The logs already on the picked shift / item, with what can be done
+          to each */}
+      {pickedEntries.length > 0 && (
+        <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50/50 p-3 sm:p-4">
+          {takenMessage() && (
+            <p className="text-sm font-semibold text-black">
+              {takenMessage()}. Open it below, or pick another{' '}
+              {targetOptions.length
+                ? module === 'kitchen_cleaning'
+                  ? 'shift or date'
+                  : 'item or date'
+                : 'date'}
+              .
+            </p>
+          )}
+          {pickedEntries.map((entry) => {
+            const open = entry.status !== 'completed';
+            return (
+              <div
+                key={entry._id}
+                className={cn(
+                  'flex flex-col gap-3 rounded-xl border-2 bg-white p-3 lg:flex-row lg:items-center lg:justify-between',
+                  entry.status === 'paused'
+                    ? 'border-orange-400 ring-4 ring-orange-100'
+                    : open
+                      ? 'border-amber-300'
+                      : 'border-emerald-200'
+                )}
+              >
+                <div className="min-w-0 space-y-1">
+                  <span
+                    className={cn(
+                      'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset',
+                      LOG_STATUS_BADGE[entry.status]
+                    )}
+                  >
+                    {LOG_STATUS_LABEL[entry.status]}
+                  </span>
+                  <p className="text-sm text-black">
+                    <span className="font-semibold">
+                      {personName(entry.employeeId)}
+                    </span>{' '}
+                    · {entry.startTime || '-'} - {entry.endTime || '-'}
+                    {open && (
+                      <span className="ml-1 font-semibold text-orange-700">
+                        · not submitted yet
+                      </span>
+                    )}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  <Button
+                    size="sm"
+                    variant="default"
+                    onClick={() => navigate(logPath(entry))}
+                  >
+                    <Eye className="mr-1 h-4 w-4" /> View
+                  </Button>
+                  {open ? (
+                    <Button
+                      size="sm"
+                      className="bg-emerald-600 text-white hover:bg-emerald-700"
+                      onClick={() => navigate(`${logPath(entry)}/edit`)}
+                    >
+                      <CheckCircle2 className="mr-1 h-4 w-4" /> Complete
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      onClick={() => navigate(`${logPath(entry)}/edit`)}
+                    >
+                      <Pencil className="mr-1 h-4 w-4" /> Edit
+                    </Button>
+                  )}
+                  {open && (
+                    <Button
+                      size="sm"
+                      className="bg-orange-500 text-white hover:bg-orange-600 hover:text-white"
+                      onClick={() =>
+                        setActing({ log: asLog(entry), action: 'discard' })
+                      }
+                    >
+                      <XCircle className="mr-1 h-4 w-4" /> Discard
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() =>
+                      setActing({ log: asLog(entry), action: 'delete' })
+                    }
+                  >
+                    <Trash2 className="mr-1 h-4 w-4" /> Delete
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       )}
+
+      <KitchenLogActionDialog
+        log={acting?.log || null}
+        action={acting?.action || null}
+        onClose={() => setActing(null)}
+        onDone={() => {
+          setActing(null);
+          setReload((count) => count + 1);
+        }}
+      />
 
       {selectedItem && (
         <p className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-black">
@@ -527,7 +690,7 @@ export default function KitchenLogFormPage() {
         </p>
       )}
 
-      {module && (
+      {module && !takenMessage() && (
         <div className="space-y-4">
           {/* Required, and only on the company side */}
           <div className="max-w-md">
@@ -574,20 +737,22 @@ export default function KitchenLogFormPage() {
         </p>
       )}
 
-      <div className="flex justify-end">
-        <Button
-          className="w-full bg-theme text-white hover:bg-theme/90 sm:w-auto"
-          disabled={saving || !module || Boolean(takenMessage())}
-          onClick={submit}
-        >
-          {saving ? (
-            <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-          ) : (
-            <Save className="mr-1.5 h-4 w-4" />
-          )}
-          {isEdit ? 'Update Log' : 'Create Log'}
-        </Button>
-      </div>
+      {!takenMessage() && (
+        <div className="flex justify-end">
+          <Button
+            className="w-full bg-theme text-white hover:bg-theme/90 sm:w-auto"
+            disabled={saving || !module}
+            onClick={submit}
+          >
+            {saving ? (
+              <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="mr-1.5 h-4 w-4" />
+            )}
+            {completing ? 'Complete Log' : isEdit ? 'Update Log' : 'Create Log'}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
