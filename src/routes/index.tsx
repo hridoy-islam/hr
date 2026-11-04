@@ -414,6 +414,11 @@ export default function AppRouter() {
         { path: 'kitchen-log', element: <KitchenLogPage /> },
         { path: 'kitchen-log/create', element: <KitchenLogFormPage /> },
         { path: 'kitchen-log/report', element: <KitchenReportPage /> },
+        {
+          path: 'kitchen-log/report/csv',
+          // The key makes this a fresh page, not the report's state carried over
+          element: <KitchenReportPage key="csv" csv />
+        },
         { path: 'kitchen-log/:lid', element: <KitchenLogDetailsPage /> },
         { path: 'kitchen-log/:lid/edit', element: <KitchenLogFormPage /> },
       ]
