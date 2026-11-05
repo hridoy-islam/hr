@@ -17,6 +17,7 @@ import axiosInstance from '@/lib/axios';
 import {
   apiError,
   areaLabel,
+  CLEANING_TYPE_LABEL,
   CleaningArea,
   CleaningEmployee,
   CleaningType,
@@ -27,7 +28,12 @@ import {
   toApiDate
 } from '../shared';
 import { CleaningReport, formatPickedDate } from '../report/reportData';
-import { buildCsv } from './components/buildCsv';
+import {
+  areaGrid,
+  CleaningGrid,
+  fetchAreaGrid
+} from '../components/buildGrid';
+import { buildCsv, buildGridCsv } from './components/buildCsv';
 
 const TYPE_OPTIONS: SelectOption<CleaningType>[] = [
   { value: 'daily', label: 'Daily' },
@@ -41,11 +47,15 @@ const pickerClass =
   'h-10 w-full rounded-md border border-gray-200 pl-9 pr-3 text-sm text-black focus:border-theme focus:outline-none';
 
 interface GeneratedCsv {
-  report: CleaningReport;
+  csv: string;
+  completed: number;
   fileName: string;
   period: string;
   employeeName: string;
 }
+
+const countCompleted = (rows: { cells: object }[]) =>
+  rows.reduce((count, row) => count + Object.keys(row.cells).length, 0);
 
 export default function CleaningCsvReportPage() {
   const { id } = useParams(); // companyId
@@ -115,6 +125,53 @@ export default function CleaningCsvReportPage() {
     return '';
   };
 
+  const fetchReport = async (from: Date, to: Date) => {
+    const res = await axiosInstance.get('/cleaning-log/report', {
+      params: {
+        companyId: id,
+        type,
+        fromDate: toApiDate(from),
+        toDate: toApiDate(to),
+        ...(employee.value ? { employeeId: employee.value } : {})
+      }
+    });
+    const data: CleaningReport = res.data?.data;
+    return { ...data, rows: sortAreasByRoom(data?.rows || []) };
+  };
+
+  // Laid out as the PDF once narrowed to an area or an employee; everything
+  // else stays a row per completed area per day
+  const buildFile = async (from: Date, to: Date, period: string) => {
+    const gridFile = (grid: CleaningGrid) => ({
+      csv: buildGridCsv(grid, [
+        ['Period', period],
+        ...(employee.value ? [['Employee', employee.label]] : []),
+        ['Type', CLEANING_TYPE_LABEL[type!]],
+        ...(area.value ? [['Area', area.label]] : [])
+      ]),
+      completed: countCompleted(grid.rows)
+    });
+
+    if (area.value) {
+      return gridFile(
+        await fetchAreaGrid({
+          companyId: id,
+          type: type!,
+          areaId: area.value,
+          employeeId: employee.value,
+          employees,
+          from,
+          to
+        })
+      );
+    }
+
+    const report = await fetchReport(from, to);
+    return employee.value
+      ? gridFile(areaGrid(report, type!))
+      : { csv: buildCsv(report), completed: countCompleted(report.rows) };
+  };
+
   const generate = async () => {
     const message = validate();
     if (message) {
@@ -125,26 +182,14 @@ export default function CleaningCsvReportPage() {
 
     const from = fromDate!;
     const to = toDate!;
+    const period = `${formatPickedDate(from)} to ${formatPickedDate(to)}`;
 
     try {
       setLoading(true);
-      const res = await axiosInstance.get('/cleaning-log/report', {
-        params: {
-          companyId: id,
-          type,
-          fromDate: toApiDate(from),
-          toDate: toApiDate(to),
-          ...(employee.value ? { employeeId: employee.value } : {})
-        }
-      });
-      const data: CleaningReport = res.data?.data;
-      const rows = (data?.rows || []).filter(
-        (row) => !area.value || row.areaId === area.value
-      );
       setGenerated({
-        report: { ...data, rows: sortAreasByRoom(rows) },
+        ...(await buildFile(from, to, period)),
         fileName: `Cleaning_Report_${type}_${toApiDate(from)}_${toApiDate(to)}.csv`,
-        period: `${formatPickedDate(from)} to ${formatPickedDate(to)}`,
+        period,
         employeeName: employee.value ? employee.label : ''
       });
     } catch (err) {
@@ -158,7 +203,7 @@ export default function CleaningCsvReportPage() {
     if (!generated) return;
     // The BOM lets Excel read the file as UTF-8
     const blob = new Blob(
-      [String.fromCharCode(0xfeff), buildCsv(generated.report)],
+      [String.fromCharCode(0xfeff), generated.csv],
       { type: 'text/csv;charset=utf-8;' }
     );
     const url = URL.createObjectURL(blob);
@@ -198,12 +243,7 @@ export default function CleaningCsvReportPage() {
 
   const renderResult = () => {
     if (!generated) return null;
-    const { report, fileName, period, employeeName } = generated;
-
-    const completed = report.rows.reduce(
-      (count, row) => count + Object.keys(row.cells).length,
-      0
-    );
+    const { completed, fileName, period, employeeName } = generated;
 
     if (completed === 0) {
       return (

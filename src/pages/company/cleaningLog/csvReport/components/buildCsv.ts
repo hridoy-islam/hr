@@ -3,6 +3,7 @@ import {
   durationLabel,
   tableToCsv
 } from '@/pages/company/kitchenLog/csvReport/components/reportCsv';
+import { CleaningGrid } from '../../components/buildGrid';
 import { CleaningReport } from '../../report/reportData';
 
 const HEADERS = [
@@ -45,3 +46,27 @@ export const buildCsv = ({ columns, rows }: CleaningReport) =>
         });
     })
   });
+
+// Laid out like the PDF: the report details, then a row per area, employee or
+// element under a column per day, with a tick where the box is ticked
+export const buildGridCsv = (
+  { firstColumn, subtitleColumn, columns, rows }: CleaningGrid,
+  details: string[][]
+) => {
+  const [firstDetail, ...otherDetails] = details;
+  return [
+    tableToCsv({ headers: firstDetail, rows: otherDetails }),
+    tableToCsv({
+      headers: [
+        firstColumn,
+        ...(subtitleColumn ? [subtitleColumn] : []),
+        ...columns.map((key) => moment(key, 'YYYY-MM-DD').format('DD-MM-YYYY'))
+      ],
+      rows: rows.map((row) => [
+        row.title,
+        ...(subtitleColumn ? [row.subtitle || ''] : []),
+        ...columns.map((key) => (row.cells[key] ? '✓' : ''))
+      ])
+    })
+  ].join('\r\n\r\n');
+};

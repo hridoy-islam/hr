@@ -1,3 +1,4 @@
+import axiosInstance from '@/lib/axios';
 import moment from '@/lib/moment-setup';
 import {
   CleaningElement,
@@ -6,8 +7,8 @@ import {
   CleaningType,
   personName,
   toApiDate
-} from '../../shared';
-import { CleaningReport, cellTitle } from '../reportData';
+} from '../shared';
+import { CleaningReport, cellTitle } from '../report/reportData';
 
 // A cell is there only when its box is ticked
 export interface CleaningGridRow {
@@ -18,10 +19,12 @@ export interface CleaningGridRow {
   cells: Record<string, { tip?: string }>;
 }
 
-// What the screen and the PDF draw: a row per area, employee or element under
-// a column per day
+// What the screen, the PDF and the CSV draw: a row per area, employee or element
+// under a column per day
 export interface CleaningGrid {
   firstColumn: string;
+  // The CSV gives the subtitle its own column under this heading
+  subtitleColumn?: string;
   emptyText: string;
   columns: string[];
   rows: CleaningGridRow[];
@@ -52,6 +55,7 @@ export const areaGrid = (
   type: CleaningType
 ): CleaningGrid => ({
   firstColumn: 'Area',
+  subtitleColumn: 'Room',
   emptyText: `No ${type} area has been set up yet.`,
   columns: report.columns,
   rows: report.rows.map((row, index) => ({
@@ -99,6 +103,7 @@ export const employeeGrid = (
 
   return {
     firstColumn: 'Employee',
+    subtitleColumn: 'Email',
     emptyText: 'No employee is on cleaning yet.',
     columns,
     rows: Array.from(rows.values()).sort((a, b) =>
@@ -138,4 +143,57 @@ export const elementGrid = (
     columns,
     rows: Array.from(rows.values())
   };
+};
+
+interface AreaGridFilters {
+  companyId?: string;
+  type: CleaningType;
+  areaId: string;
+  // Left out for all employees
+  employeeId?: string;
+  employees: CleaningEmployee[];
+  from: Date;
+  to: Date;
+}
+
+// One area: a row per employee, or per element once narrowed to one person
+export const fetchAreaGrid = async ({
+  companyId,
+  type,
+  areaId,
+  employeeId,
+  employees,
+  from,
+  to
+}: AreaGridFilters) => {
+  // The list reads its dates as UTC days and the report as UK days, so a day
+  // earlier keeps the first morning; the grid drops what is out of range
+  const dayBefore = new Date(
+    from.getFullYear(),
+    from.getMonth(),
+    from.getDate() - 1
+  );
+  const [logsRes, elementsRes] = await Promise.all([
+    axiosInstance.get('/cleaning-log', {
+      params: {
+        companyId,
+        type,
+        areaId,
+        fromDate: toApiDate(dayBefore),
+        toDate: toApiDate(to),
+        limit: 'all',
+        ...(employeeId ? { employeeId } : {})
+      }
+    }),
+    employeeId
+      ? axiosInstance.get('/cleaning-element', {
+          params: { areaId, limit: 'all' }
+        })
+      : null
+  ]);
+  const logs: CleaningLogRecord[] = logsRes.data?.data?.result || [];
+  if (!employeeId) return employeeGrid(logs, employees, from, to);
+
+  const elements: CleaningElement[] = elementsRes?.data?.data?.result || [];
+  return elementGrid(logs, elements, from, to);
 };

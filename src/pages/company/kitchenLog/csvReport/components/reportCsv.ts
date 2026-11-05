@@ -179,7 +179,13 @@ export const buildCsvTable = (
 // spreadsheet. Negative readings like -18 or -18°C are left as they are.
 const FORMULA_START = /^[=+@\t\r]|^-(?!$|\d+(\.\d+)?(°C)?$)/;
 
+const DATE_VALUE = /^\d{2}-\d{2}-\d{4}( \d{2}:\d{2})?$/;
+
 const toField = (value: string) => {
+  // Excel turns a bare 01-06-2026 into its own date, shown as 1/6/2026, but
+  // leaves 13-09-2026 alone when it can't read it as one. As ="..." it stays
+  // the text it was given, so every date reads the same.
+  if (DATE_VALUE.test(value)) return `"=""${value}"""`;
   const safe = FORMULA_START.test(value) ? `'${value}` : value;
   return `"${safe.replace(/"/g, '""')}"`;
 };

@@ -14,7 +14,7 @@ import {
   monthGroups,
   rangeLabel
 } from './reportData';
-import { CleaningGrid } from './components/buildGrid';
+import { CleaningGrid } from '../components/buildGrid';
 
 // A4 landscape is 842pt wide; what is left after the margins and the area
 // column is shared by the date columns of each page

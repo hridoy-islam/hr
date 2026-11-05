@@ -22,9 +22,7 @@ import {
   apiError,
   areaLabel,
   CleaningArea,
-  CleaningElement,
   CleaningEmployee,
-  CleaningLogRecord,
   CleaningType,
   personName,
   SelectOption,
@@ -43,9 +41,8 @@ import { CleaningReportPDF } from './CleaningReportPDF';
 import {
   areaGrid,
   CleaningGrid,
-  elementGrid,
-  employeeGrid
-} from './components/buildGrid';
+  fetchAreaGrid
+} from '../components/buildGrid';
 
 const TYPE_OPTIONS: SelectOption<CleaningType>[] = [
   { value: 'daily', label: 'Daily' },
@@ -146,40 +143,6 @@ export default function CleaningReportPage() {
     );
   };
 
-  // One area: a row per employee, or per element once narrowed to one person
-  const areaDetailGrid = async (from: Date, to: Date) => {
-    // The list reads its dates as UTC days and the report as UK days, so a day
-    // earlier keeps the first morning; the grid drops what is out of range
-    const dayBefore = new Date(
-      from.getFullYear(),
-      from.getMonth(),
-      from.getDate() - 1
-    );
-    const [logsRes, elementsRes] = await Promise.all([
-      axiosInstance.get('/cleaning-log', {
-        params: {
-          companyId: id,
-          type,
-          areaId: area.value,
-          fromDate: toApiDate(dayBefore),
-          toDate: toApiDate(to),
-          limit: 'all',
-          ...(employee.value ? { employeeId: employee.value } : {})
-        }
-      }),
-      employee.value
-        ? axiosInstance.get('/cleaning-element', {
-            params: { areaId: area.value, limit: 'all' }
-          })
-        : null
-    ]);
-    const logs: CleaningLogRecord[] = logsRes.data?.data?.result || [];
-    if (!employee.value) return employeeGrid(logs, employees, from, to);
-
-    const elements: CleaningElement[] = elementsRes?.data?.data?.result || [];
-    return elementGrid(logs, elements, from, to);
-  };
-
   const generate = async () => {
     const message = validate();
     if (message) {
@@ -194,7 +157,17 @@ export default function CleaningReportPage() {
     try {
       setLoading(true);
       setGrid(
-        await (area.value ? areaDetailGrid(from, to) : allAreasGrid(from, to))
+        await (area.value
+          ? fetchAreaGrid({
+              companyId: id,
+              type: type!,
+              areaId: area.value,
+              employeeId: employee.value,
+              employees,
+              from,
+              to
+            })
+          : allAreasGrid(from, to))
       );
       setMeta({
         companyName: companyName || 'Company',
