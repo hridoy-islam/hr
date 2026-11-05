@@ -18,7 +18,7 @@ import { KitchenLogRecord, logTarget, needsApproval } from '../shared';
 import {
   KitchenLogDetailsBody,
   KitchenLogHistory
-} from '../components/KitchenLogDetails';
+} from './components/KitchenLogDetails';
 import { ApproveKitchenLogDialog } from '../components/ApproveKitchenLogDialog';
 import {
   KitchenLogAction,

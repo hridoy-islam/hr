@@ -6,10 +6,10 @@ import {
   formatDuration,
   personName
 } from '@/pages/company/cleaningLog/shared';
-import { KITCHEN_MODULES } from '../constants';
-import { KitchenLogRecord, logTarget } from '../shared';
-import { ProbeCalibrationNote } from './KitchenLogFields';
-import { ApprovalBadge, logPeriodLabel, StatusPill } from './KitchenLogTable';
+import { KITCHEN_MODULES } from '../../constants';
+import { KitchenLogRecord, logTarget } from '../../shared';
+import { ProbeCalibrationNote } from '../../components/KitchenLogFields';
+import { ApprovalBadge, logPeriodLabel, StatusPill } from '../../components/KitchenLogTable';
 
 const Row = ({ label, value }: { label: string; value?: React.ReactNode }) => (
   <div className="grid grid-cols-[130px_1fr] gap-2 border-b border-gray-100 py-1.5 text-sm text-black last:border-b-0">

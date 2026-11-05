@@ -37,9 +37,8 @@ import {
   rangeLabel,
   ReportCell,
   ReportSection
-} from './reportLayout';
-import { KitchenReportPDF } from './KitchenReportPDF';
-import { buildCsvTable, KitchenCsvTable, tableToCsv } from './reportCsv';
+} from './components/reportLayout';
+import { KitchenReportPDF } from './components/KitchenReportPDF';
 
 const MODULE_OPTIONS = KITCHEN_FREQUENCIES.map(({ key, label }) => ({
   label,
@@ -119,9 +118,7 @@ const inlineImages = async (
   };
 };
 
-// With `csv` this is the CSV page: the same filters, but Generate only offers
-// the file to download instead of showing the sheets
-export default function KitchenReportPage({ csv = false }: { csv?: boolean }) {
+export default function KitchenReportPage() {
   const { id } = useParams(); // companyId
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -133,7 +130,6 @@ export default function KitchenReportPage({ csv = false }: { csv?: boolean }) {
 
   const [layout, setLayout] = useState<KitchenReportLayout | null>(null);
   const [meta, setMeta] = useState<KitchenReportMeta | null>(null);
-  const [csvTable, setCsvTable] = useState<KitchenCsvTable | null>(null);
   const [loading, setLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState('');
@@ -220,7 +216,6 @@ export default function KitchenReportPage({ csv = false }: { csv?: boolean }) {
         }
       });
       const logs: KitchenLogRecord[] = res.data?.data?.logs || [];
-      setCsvTable(buildCsvTable(module!, logs));
       setLayout(
         buildReportLayout(module!, logs, {
           fromDate: fromDate!,
@@ -263,20 +258,6 @@ export default function KitchenReportPage({ csv = false }: { csv?: boolean }) {
     } finally {
       setDownloading(false);
     }
-  };
-
-  const downloadCsv = () => {
-    if (!csvTable || !meta) return;
-    // The BOM lets Excel read the file as UTF-8, so °C displays correctly
-    const blob = new Blob([String.fromCharCode(0xfeff), tableToCsv(csvTable)], {
-      type: 'text/csv;charset=utf-8;'
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `Kitchen_${meta.module}_${toApiDate(meta.fromDate)}_${toApiDate(meta.toDate)}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
   };
 
   const renderPicker = (
@@ -452,24 +433,6 @@ export default function KitchenReportPage({ csv = false }: { csv?: boolean }) {
     if (!layout || !meta) return null;
     const config = KITCHEN_MODULES[meta.module];
 
-    // if (csv) {
-    //   return layout.logCount > 0 ? (
-    //     <div className="flex justify-end">
-    //       <Button
-    //         className="w-full bg-black text-white hover:bg-black/90 sm:w-auto"
-    //         onClick={downloadCsv}
-    //       >
-    //         <Download className="mr-1.5 h-4 w-4" />
-    //         Download CSV
-    //       </Button>
-    //     </div>
-    //   ) : (
-    //     <div className="rounded-xl border border-dashed border-gray-200 py-12 text-center text-sm text-black">
-    //       No {config.label.toLowerCase()} was completed in this period.
-    //     </div>
-    //   );
-    // }
-
     return (
       <div className="space-y-3">
         <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-gray-50/60 p-3 sm:flex-row sm:items-center sm:justify-between">
@@ -547,26 +510,19 @@ export default function KitchenReportPage({ csv = false }: { csv?: boolean }) {
         <div>
           <h2 className="flex items-center gap-2 text-xl font-bold text-black lg:text-2xl">
             <FileBarChart2 className="h-5 w-5 lg:h-6 lg:w-6" />
-            {csv ? 'Kitchen Report CSV' : 'Kitchen Report'}
+            Kitchen Report
           </h2>
           <p className="mt-1 text-xs text-black sm:text-sm">
-            {csv
-              ? 'Pick a log and a date range to generate its CSV.'
-              : 'Pick a log and a date range to see it laid out like its paper sheet.'}
+            Pick a log and a date range to see it laid out like its paper sheet.
           </p>
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <Button
-            size="sm"
-            className="w-full sm:w-auto"
-            onClick={() =>
-              navigate(`/company/${id}/kitchen-log${csv ? '/report' : ''}`)
-            }
-          >
-            <ArrowLeft className="mr-1.5 h-4 w-4" /> Back
-          </Button>
-       
-        </div>
+        <Button
+          size="sm"
+          className="w-full sm:w-auto"
+          onClick={() => navigate(`/company/${id}/kitchen-log`)}
+        >
+          <ArrowLeft className="mr-1.5 h-4 w-4" /> Back
+        </Button>
       </div>
 
       {/* Filters */}

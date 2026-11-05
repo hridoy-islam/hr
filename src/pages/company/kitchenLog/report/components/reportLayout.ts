@@ -12,8 +12,8 @@ import {
   KITCHEN_SHIFTS,
   KitchenModule,
   PROBE_CALIBRATION_NOTE
-} from '../constants';
-import { KitchenLogRecord } from '../shared';
+} from '../../constants';
+import { KitchenLogRecord } from '../../shared';
 
 // One table cell: text, a signature image, or both. `label` is a bold lead-in
 // such as "Notes:".

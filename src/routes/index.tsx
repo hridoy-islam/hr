@@ -134,6 +134,7 @@ import KitchenLogPage from '@/pages/company/kitchenLog/logList';
 import KitchenLogFormPage from '@/pages/company/kitchenLog/createLog';
 import KitchenLogDetailsPage from '@/pages/company/kitchenLog/logDetails';
 import KitchenReportPage from '@/pages/company/kitchenLog/report';
+import KitchenCsvReportPage from '@/pages/company/kitchenLog/csvReport';
 import StaffKitchenLogPage from '@/pages/staff/kitchenLog';
 import OfficeMeetingPage from '@/pages/company/officeMeeting';
 import MeetingDetailsPage from '@/pages/company/officeMeeting/meetingDetails/MeetingDetailsPage';
@@ -416,11 +417,7 @@ export default function AppRouter() {
         { path: 'kitchen-log', element: <KitchenLogPage /> },
         { path: 'kitchen-log/create', element: <KitchenLogFormPage /> },
         { path: 'kitchen-log/report', element: <KitchenReportPage /> },
-        {
-          path: 'kitchen-log/report/csv',
-          // The key makes this a fresh page, not the report's state carried over
-          element: <KitchenReportPage key="csv" csv />
-        },
+        { path: 'kitchen-log/csv-report', element: <KitchenCsvReportPage /> },
         { path: 'kitchen-log/:lid', element: <KitchenLogDetailsPage /> },
         { path: 'kitchen-log/:lid/edit', element: <KitchenLogFormPage /> },
       ]

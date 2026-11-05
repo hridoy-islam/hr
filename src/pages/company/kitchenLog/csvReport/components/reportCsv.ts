@@ -6,11 +6,9 @@ import {
   KITCHEN_CLEANING_READINGS,
   KITCHEN_DEEP_CLEAN_SCHEDULE,
   KITCHEN_MODULES,
-  KITCHEN_SHIFT_KEYS,
-  KITCHEN_SHIFTS,
   KitchenModule
-} from '../constants';
-import { KitchenLogRecord, LOG_STATUS_LABEL, logTarget } from '../shared';
+} from '../../constants';
+import { KitchenLogRecord, logTarget } from '../../shared';
 
 export interface KitchenCsvTable {
   headers: string[];
@@ -26,13 +24,48 @@ const yesNo = (value?: boolean) =>
 const dateTime = (date?: string) =>
   date ? moment(date).format('DD-MM-YYYY HH:mm') : '';
 
+// 5100 -> 1h 25m, to the nearest minute
+const hoursAndMinutes = (seconds: number) => {
+  const minutes = Math.round(seconds / 60);
+  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+};
+
+const minutesOf = (time: string) => {
+  const [hours, minutes] = time.split(':').map(Number);
+  return hours * 60 + minutes;
+};
+
+// The timer's total is used unless it would read as 0h 0m: older logs hold 0,
+// and a timer paused straight after starting holds a few seconds. Those fall
+// back to the start and end times, which then include any paused time.
+export const durationLabel = (cell: {
+  durationSeconds?: number;
+  startTime?: string;
+  endTime?: string;
+}) => {
+  const timer = cell.durationSeconds || 0;
+  const span =
+    cell.startTime && cell.endTime
+      ? (minutesOf(cell.endTime) - minutesOf(cell.startTime)) * 60
+      : 0;
+  const seconds = timer >= 30 ? timer : Math.max(timer, span);
+  return seconds > 0 ? hoursAndMinutes(seconds) : '';
+};
+
 const COMMON_COLUMNS: CsvColumn[] = [
   ['Date', (log) => moment(log.logDate).format('DD-MM-YYYY')],
   ['Day', (log) => moment(log.logDate).format('dddd')],
-  ['Employee', (log) => personName(log.employeeId)],
+  ['Employee Name', (log) => personName(log.employeeId)],
+  ['Employee Email', (log) => log.employeeId?.email],
   ['Start Time', (log) => log.startTime],
   ['End Time', (log) => log.endTime],
-  ['Status', (log) => LOG_STATUS_LABEL[log.status] || log.status],
+  [
+    'Duration',
+    (log) =>
+      log.startTime && log.startTime === log.endTime
+        ? '0h 0m'
+        : durationLabel(log)
+  ],
   ['Signed At', (log) => dateTime(log.signedAt)]
 ];
 
@@ -42,27 +75,27 @@ const APPROVAL_COLUMNS: CsvColumn[] = [
   ['Approval Comment', (log) => log.approvalComment]
 ];
 
-// A check belongs to one shift, so it stays blank on the other shift's rows
+// Separate number columns, as a cell like 5/5 would open as a date in Excel.
+// A log without a checklist stays blank rather than reading as 0.
+const CHECKLIST_SUMMARY_COLUMNS: CsvColumn[] = [
+  ['Total Checklist Items', (log) => log.checklist?.length || undefined],
+  [
+    'Completed Checklist Items',
+    (log) =>
+      log.checklist?.length
+        ? log.checklist.filter((item) => item.checked).length
+        : undefined
+  ]
+];
+
 const kitchenCleaningColumns = (): CsvColumn[] => [
   ['Shift', logTarget],
+  ...CHECKLIST_SUMMARY_COLUMNS,
   ...KITCHEN_CLEANING_READINGS.map(
     ({ key, label }): CsvColumn => [
       label,
       (log) => log.readings?.find((entry) => entry.key === key)?.value
     ]
-  ),
-  ...KITCHEN_SHIFT_KEYS.flatMap((shift) =>
-    KITCHEN_SHIFTS[shift].checklist.map(
-      ({ key, label }): CsvColumn => [
-        label,
-        (log) =>
-          log.shift === shift
-            ? yesNo(
-                Boolean(log.checklist?.find((item) => item.key === key)?.checked)
-              )
-            : ''
-      ]
-    )
   )
 ];
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ChefHat, FileBarChart2, Plus } from 'lucide-react';
+import { ChefHat, FileBarChart2, FileSpreadsheet, Plus } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { BlinkingDots } from '@/components/shared/blinking-dots';
@@ -142,6 +142,13 @@ export default function KitchenLogListPage() {
             onClick={() => navigate('report')}
           >
             <FileBarChart2 className="mr-1.5 h-4 w-4" /> Report
+          </Button>
+          <Button
+            size="sm"
+            className="flex-1 border-none bg-violet-600 text-white hover:bg-violet-700 sm:flex-none"
+            onClick={() => navigate('csv-report')}
+          >
+            <FileSpreadsheet className="mr-1.5 h-4 w-4" /> CSV Report
           </Button>
           <Button
             size="sm"

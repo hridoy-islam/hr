@@ -7,7 +7,7 @@ import {
   View
 } from '@react-pdf/renderer';
 import moment from '@/lib/moment-setup';
-import { FREQUENCY_LABEL, KITCHEN_MODULES } from '../constants';
+import { FREQUENCY_LABEL, KITCHEN_MODULES } from '../../constants';
 import {
   KitchenReportLayout,
   KitchenReportMeta,
