@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Select from 'react-select';
 import DatePicker from 'react-datepicker';
@@ -20,7 +20,11 @@ import axiosInstance from '@/lib/axios';
 import { cn } from '@/lib/utils';
 import {
   apiError,
+  areaLabel,
+  CleaningArea,
+  CleaningElement,
   CleaningEmployee,
+  CleaningLogRecord,
   CleaningType,
   personName,
   SelectOption,
@@ -31,18 +35,24 @@ import {
 import {
   CleaningReport,
   CleaningReportMeta,
-  cellTitle,
   columnLabel,
   monthGroups,
   rangeLabel
 } from './reportData';
 import { CleaningReportPDF } from './CleaningReportPDF';
+import {
+  areaGrid,
+  CleaningGrid,
+  elementGrid,
+  employeeGrid
+} from './components/buildGrid';
 
 const TYPE_OPTIONS: SelectOption<CleaningType>[] = [
   { value: 'daily', label: 'Daily' },
   { value: 'monthly', label: 'Monthly' }
 ];
 
+const ALL_AREAS: SelectOption = { value: '', label: 'All areas' };
 const ALL_EMPLOYEES: SelectOption = { value: '', label: 'All employees' };
 
 const pickerClass =
@@ -57,11 +67,13 @@ export default function CleaningReportPage() {
   const [fromDate, setFromDate] = useState<Date | null>(null);
   const [toDate, setToDate] = useState<Date | null>(null);
   const [type, setType] = useState<CleaningType | null>(null);
+  const [area, setArea] = useState<SelectOption>(ALL_AREAS);
+  const [areas, setAreas] = useState<CleaningArea[]>([]);
   const [employee, setEmployee] = useState<SelectOption>(ALL_EMPLOYEES);
   const [employees, setEmployees] = useState<CleaningEmployee[]>([]);
   const [companyName, setCompanyName] = useState('');
 
-  const [report, setReport] = useState<CleaningReport | null>(null);
+  const [grid, setGrid] = useState<CleaningGrid | null>(null);
   const [meta, setMeta] = useState<CleaningReportMeta | null>(null);
   const [loading, setLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
@@ -78,6 +90,32 @@ export default function CleaningReportPage() {
       .catch(() => setCompanyName(''));
   }, [id]);
 
+  // The area list follows the picked type
+  useEffect(() => {
+    setAreas([]);
+    if (!type) return;
+
+    let current = true;
+    axiosInstance
+      .get('/cleaning-area', {
+        params: { companyId: id, type, limit: 'all', sort: 'areaName' }
+      })
+      .then((res) => {
+        if (current) setAreas(sortAreasByRoom(res.data?.data?.result || []));
+      })
+      .catch(() => {
+        if (current) setAreas([]);
+      });
+    return () => {
+      current = false;
+    };
+  }, [id, type]);
+
+  const areaOptions: SelectOption[] = [
+    ALL_AREAS,
+    ...areas.map((item) => ({ value: item._id, label: areaLabel(item) }))
+  ];
+
   const employeeOptions: SelectOption[] = [
     ALL_EMPLOYEES,
     ...employees.map((emp) => ({ value: emp._id, label: personName(emp) }))
@@ -89,6 +127,57 @@ export default function CleaningReportPage() {
     if (toDate < fromDate) return 'To date cannot be before from date';
     if (!type) return 'Please select a type';
     return '';
+  };
+
+  const allAreasGrid = async (from: Date, to: Date) => {
+    const res = await axiosInstance.get('/cleaning-log/report', {
+      params: {
+        companyId: id,
+        type,
+        fromDate: toApiDate(from),
+        toDate: toApiDate(to),
+        ...(employee.value ? { employeeId: employee.value } : {})
+      }
+    });
+    const data: CleaningReport = res.data?.data;
+    return areaGrid(
+      { ...data, rows: sortAreasByRoom(data?.rows || []) },
+      type!
+    );
+  };
+
+  // One area: a row per employee, or per element once narrowed to one person
+  const areaDetailGrid = async (from: Date, to: Date) => {
+    // The list reads its dates as UTC days and the report as UK days, so a day
+    // earlier keeps the first morning; the grid drops what is out of range
+    const dayBefore = new Date(
+      from.getFullYear(),
+      from.getMonth(),
+      from.getDate() - 1
+    );
+    const [logsRes, elementsRes] = await Promise.all([
+      axiosInstance.get('/cleaning-log', {
+        params: {
+          companyId: id,
+          type,
+          areaId: area.value,
+          fromDate: toApiDate(dayBefore),
+          toDate: toApiDate(to),
+          limit: 'all',
+          ...(employee.value ? { employeeId: employee.value } : {})
+        }
+      }),
+      employee.value
+        ? axiosInstance.get('/cleaning-element', {
+            params: { areaId: area.value, limit: 'all' }
+          })
+        : null
+    ]);
+    const logs: CleaningLogRecord[] = logsRes.data?.data?.result || [];
+    if (!employee.value) return employeeGrid(logs, employees, from, to);
+
+    const elements: CleaningElement[] = elementsRes?.data?.data?.result || [];
+    return elementGrid(logs, elements, from, to);
   };
 
   const generate = async () => {
@@ -104,27 +193,20 @@ export default function CleaningReportPage() {
 
     try {
       setLoading(true);
-      const res = await axiosInstance.get('/cleaning-log/report', {
-        params: {
-          companyId: id,
-          type,
-          fromDate: toApiDate(from),
-          toDate: toApiDate(to),
-          ...(employee.value ? { employeeId: employee.value } : {})
-        }
-      });
-      const data: CleaningReport = res.data?.data;
-      setReport({ ...data, rows: sortAreasByRoom(data?.rows || []) });
+      setGrid(
+        await (area.value ? areaDetailGrid(from, to) : allAreasGrid(from, to))
+      );
       setMeta({
         companyName: companyName || 'Company',
         type: type!,
         fromDate: from,
         toDate: to,
         // Left blank for everyone, so only a narrowed report names a person
-        employeeName: employee.value ? employee.label : ''
+        employeeName: employee.value ? employee.label : '',
+        areaName: area.value ? area.label : ''
       });
     } catch (err) {
-      setReport(null);
+      setGrid(null);
       setError(apiError(err, 'Failed to generate the report'));
     } finally {
       setLoading(false);
@@ -132,11 +214,11 @@ export default function CleaningReportPage() {
   };
 
   const downloadPdf = async () => {
-    if (!report || !meta) return;
+    if (!grid || !meta) return;
     try {
       setDownloading(true);
       const blob = await pdf(
-        <CleaningReportPDF report={report} meta={meta} />
+        <CleaningReportPDF grid={grid} meta={meta} />
       ).toBlob();
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -154,15 +236,6 @@ export default function CleaningReportPage() {
       setDownloading(false);
     }
   };
-
-  const summary = useMemo(() => {
-    if (!report) return { done: 0, total: 0 };
-    const done = report.rows.reduce(
-      (count, row) => count + Object.keys(row.cells).length,
-      0
-    );
-    return { done, total: report.rows.length * report.columns.length };
-  }, [report]);
 
   const renderPicker = (
     label: string,
@@ -193,8 +266,8 @@ export default function CleaningReportPage() {
   );
 
   const renderGrid = () => {
-    if (!report || !meta) return null;
-    const groups = monthGroups(report.columns);
+    if (!grid || !meta) return null;
+    const groups = monthGroups(grid.columns);
 
     return (
       <div className="space-y-3">
@@ -205,14 +278,30 @@ export default function CleaningReportPage() {
             </p>
             <p className="text-xs text-black sm:text-sm">
               {[
-                meta.companyName,
                 rangeLabel(meta),
-                meta.employeeName,
-                `${summary.done} completed`
+                // With an area, the line below names the person
+                !meta.areaName && meta.employeeName
               ]
                 .filter(Boolean)
                 .join(' · ')}
             </p>
+            {meta.areaName && (
+              <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-black sm:text-sm">
+                {meta.employeeName && (
+                  <p>
+                    <span className="font-bold">Employee:</span>{' '}
+                    {meta.employeeName}
+                  </p>
+                )}
+                <p>
+                  <span className="font-bold">Type:</span>{' '}
+                  {meta.type === 'monthly' ? 'Monthly' : 'Daily'}
+                </p>
+                <p>
+                  <span className="font-bold">Area:</span> {meta.areaName}
+                </p>
+              </div>
+            )}
           </div>
           <Button
             className="w-full bg-theme text-white hover:bg-theme/90 sm:w-auto"
@@ -228,12 +317,12 @@ export default function CleaningReportPage() {
           </Button>
         </div>
 
-        {report.rows.length === 0 ? (
+        {grid.rows.length === 0 ? (
           <div className="rounded-xl border border-dashed border-gray-200 py-12 text-center text-sm text-black">
-            No {meta.type} area has been set up yet.
+            {grid.emptyText}
           </div>
         ) : (
-          // Scrolls sideways on small screens with the area column pinned
+          // Scrolls sideways on small screens with the first column pinned
           <div className="overflow-x-auto rounded-xl border border-gray-200">
             <table className="w-full border-collapse text-xs text-black">
               <thead>
@@ -253,9 +342,9 @@ export default function CleaningReportPage() {
                 )}
                 <tr className="bg-gray-100">
                   <th className="sticky left-0 z-20 min-w-[140px] border-b border-r border-gray-200 bg-gray-100 px-3 py-2 text-left font-bold sm:min-w-[200px]">
-                    Area
+                    {grid.firstColumn}
                   </th>
-                  {report.columns.map((key) => {
+                  {grid.columns.map((key) => {
                     const label = columnLabel(key);
                     return (
                       <th
@@ -272,29 +361,29 @@ export default function CleaningReportPage() {
                 </tr>
               </thead>
               <tbody>
-                {report.rows.map((row, rowIndex) => {
+                {grid.rows.map((row, rowIndex) => {
                   const stripe = rowIndex % 2 === 1 ? 'bg-gray-50' : 'bg-white';
                   return (
-                    <tr key={`${row.areaId || row.areaName}-${rowIndex}`} className={stripe}>
+                    <tr key={row.key} className={stripe}>
                       <td
                         className={cn(
                           'sticky left-0 z-10 border-b border-r border-gray-200 px-3 py-2 font-semibold',
                           stripe
                         )}
                       >
-                        <span className="block break-words">{row.areaName}</span>
-                        {row.roomNumber && (
-                          <span className="block text-[11px] font-normal">
-                            Room {row.roomNumber}
+                        <span className="block break-words">{row.title}</span>
+                        {row.subtitle && (
+                          <span className="block break-words text-[11px] font-normal">
+                            {row.subtitle}
                           </span>
                         )}
                       </td>
-                      {report.columns.map((key) => {
+                      {grid.columns.map((key) => {
                         const cell = row.cells[key];
                         return (
                           <td
                             key={key}
-                            title={cell ? cellTitle(cell) : undefined}
+                            title={cell?.tip}
                             className="border-b border-r border-gray-200 p-1 text-center"
                           >
                             <span
@@ -343,7 +432,7 @@ export default function CleaningReportPage() {
       </div>
 
       {/* Filters */}
-      <div className="grid grid-cols-1 gap-3 rounded-xl border border-gray-200 p-3 sm:grid-cols-2 sm:p-4 lg:grid-cols-[1fr_1fr_180px_1fr_auto] lg:items-end">
+      <div className="grid grid-cols-1 gap-3 rounded-xl border border-gray-200 p-3 sm:grid-cols-2 sm:p-4 lg:grid-cols-[1fr_1fr_160px_1fr_1fr_auto] lg:items-end">
         {renderPicker('From Date*', fromDate, setFromDate)}
         {renderPicker('To Date*', toDate, setToDate)}
         <div className="space-y-1.5">
@@ -353,10 +442,25 @@ export default function CleaningReportPage() {
             value={TYPE_OPTIONS.find((opt) => opt.value === type) || null}
             onChange={(option: any) => {
               setType(option?.value || null);
+              setArea(ALL_AREAS);
               setError('');
             }}
             placeholder="Select type"
             isSearchable={false}
+            styles={selectStyles}
+            menuPortalTarget={document.body}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <p className="text-sm font-semibold text-black">Area</p>
+          <Select
+            options={areaOptions}
+            value={area}
+            onChange={(option: any) => {
+              setArea(option || ALL_AREAS);
+              setError('');
+            }}
+            isDisabled={!type}
             styles={selectStyles}
             menuPortalTarget={document.body}
           />
@@ -398,7 +502,7 @@ export default function CleaningReportPage() {
         <div className="flex justify-center py-16">
           <BlinkingDots size="large" color="bg-theme" />
         </div>
-      ) : report ? (
+      ) : grid ? (
         renderGrid()
       ) : (
         <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-12 text-center text-sm text-black">

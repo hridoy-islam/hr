@@ -9,12 +9,12 @@ import {
 } from '@react-pdf/renderer';
 import moment from '@/lib/moment-setup';
 import {
-  CleaningReport,
   CleaningReportMeta,
   columnLabel,
   monthGroups,
   rangeLabel
 } from './reportData';
+import { CleaningGrid } from './components/buildGrid';
 
 // A4 landscape is 842pt wide; what is left after the margins and the area
 // column is shared by the date columns of each page
@@ -25,9 +25,8 @@ const DATE_SPACE = 842 - PAGE_PADDING * 2 - AREA_WIDTH;
 // month, so a short or partial month keeps the same column width.
 const COLUMN_WIDTH = DATE_SPACE / 31;
 
-// A light palette: soft grey lines and tints, dark text only where it is read
-const INK = '#1f2937';
-const MUTED = '#6b7280';
+// A light palette: soft grey lines and tints, every text black
+const INK = '#000000';
 const HEAD_BG = '#f1f5f9';
 const GROUP_BG = '#f8fafc';
 const RULE = '#e2e8f0';
@@ -62,20 +61,28 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 10,
     marginTop: 4,
-    color: MUTED,
+    color: INK,
     textTransform: 'uppercase',
     letterSpacing: 1.5
   },
-  infoBlock: { alignItems: 'flex-end' },
+  // A two column table without borders, both columns right aligned
+  infoBlock: { width: 180 },
   infoRow: { flexDirection: 'row', marginTop: 2 },
   infoLabel: {
+    width: 60,
     fontSize: 7.5,
-    color: MUTED,
+    color: INK,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
-    marginRight: 6
+    textAlign: 'right'
   },
-  infoValue: { fontSize: 8.5, fontFamily: 'Helvetica-Bold', color: INK },
+  infoValue: {
+    flex: 1,
+    fontSize: 8.5,
+    fontFamily: 'Helvetica-Bold',
+    color: INK,
+    textAlign: 'right'
+  },
   row: { flexDirection: 'row' },
   groupCell: {
     backgroundColor: GROUP_BG,
@@ -103,7 +110,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 3
   },
-  headDay: { fontSize: 5.5, color: MUTED },
+  headDay: { fontSize: 5.5, color: INK },
   headDate: { fontSize: 7.5, fontFamily: 'Helvetica-Bold' },
   cell: {
     borderRightWidth: 0.5,
@@ -121,7 +128,7 @@ const styles = StyleSheet.create({
     borderLeftColor: BORDER
   },
   areaName: { fontSize: 7.5, fontFamily: 'Helvetica-Bold' },
-  areaRoom: { fontSize: 6, color: MUTED, marginTop: 1 },
+  areaRoom: { fontSize: 6, color: INK, marginTop: 1 },
   box: {
     width: 9,
     height: 9,
@@ -143,9 +150,9 @@ const styles = StyleSheet.create({
     borderTopWidth: 0.5,
     borderTopColor: RULE,
     fontSize: 7,
-    color: MUTED
+    color: INK
   },
-  empty: { marginTop: 24, fontSize: 10, textAlign: 'center', color: MUTED }
+  empty: { marginTop: 24, fontSize: 10, textAlign: 'center', color: INK }
 });
 
 const Checkbox = ({ done }: { done: boolean }) => (
@@ -176,15 +183,15 @@ const byMonth = (columns: string[]) => {
 };
 
 interface CleaningReportPDFProps {
-  report: CleaningReport;
+  grid: CleaningGrid;
   meta: CleaningReportMeta;
 }
 
-export function CleaningReportPDF({ report, meta }: CleaningReportPDFProps) {
-  const { type, columns, rows } = report;
+export function CleaningReportPDF({ grid, meta }: CleaningReportPDFProps) {
+  const { columns, rows } = grid;
   const parts = byMonth(columns);
   const generatedAt = moment().format('DD-MM-YYYY, HH:mm');
-  const typeLabel = type === 'monthly' ? 'Monthly' : 'Daily';
+  const typeLabel = meta.type === 'monthly' ? 'Monthly' : 'Daily';
 
   const info = (label: string, value: string) => (
     <View style={styles.infoRow}>
@@ -218,14 +225,19 @@ export function CleaningReportPDF({ report, meta }: CleaningReportPDFProps) {
                 {info('Period', rangeLabel(meta))}
                 {/* Only a report narrowed to one person names them */}
                 {meta.employeeName && info('Employee', meta.employeeName)}
-                {info('Areas', String(rows.length))}
+                {meta.areaName ? (
+                  <>
+                    {info('Type', typeLabel)}
+                    {info('Area', meta.areaName)}
+                  </>
+                ) : (
+                  info('Areas', String(rows.length))
+                )}
               </View>
             </View>
 
             {rows.length === 0 ? (
-              <Text style={styles.empty}>
-                No {type} area has been set up for this company.
-              </Text>
+              <Text style={styles.empty}>{grid.emptyText}</Text>
             ) : (
               <View>
                 {/* Column heads repeat on every page the table runs onto */}
@@ -258,7 +270,7 @@ export function CleaningReportPDF({ report, meta }: CleaningReportPDFProps) {
                         }
                       ]}
                     >
-                      <Text style={styles.headDate}>Area</Text>
+                      <Text style={styles.headDate}>{grid.firstColumn}</Text>
                     </View>
                     {partColumns.map((key) => {
                       const label = columnLabel(key);
@@ -274,7 +286,7 @@ export function CleaningReportPDF({ report, meta }: CleaningReportPDFProps) {
 
                 {rows.map((row, rowIndex) => (
                   <View
-                    key={`${row.areaId || row.areaName}-${rowIndex}`}
+                    key={row.key}
                     style={[
                       styles.row,
                       rowIndex % 2 === 1 ? { backgroundColor: STRIPE } : {}
@@ -282,9 +294,9 @@ export function CleaningReportPDF({ report, meta }: CleaningReportPDFProps) {
                     wrap={false}
                   >
                     <View style={[styles.cell, styles.areaCell]}>
-                      <Text style={styles.areaName}>{row.areaName}</Text>
-                      {row.roomNumber && (
-                        <Text style={styles.areaRoom}>Room {row.roomNumber}</Text>
+                      <Text style={styles.areaName}>{row.title}</Text>
+                      {row.subtitle && (
+                        <Text style={styles.areaRoom}>{row.subtitle}</Text>
                       )}
                     </View>
                     {partColumns.map((key) => (

@@ -35,6 +35,8 @@ export interface CleaningReportMeta {
   fromDate: Date;
   toDate: Date;
   employeeName: string;
+  // Only a report narrowed to one area names it
+  areaName?: string;
 }
 
 const columnMoment = (key: string) => moment(key, 'YYYY-MM-DD');
