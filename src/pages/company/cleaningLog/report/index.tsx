@@ -45,9 +45,6 @@ const TYPE_OPTIONS: SelectOption<CleaningType>[] = [
 
 const ALL_EMPLOYEES: SelectOption = { value: '', label: 'All employees' };
 
-// Kept in step with the API's limit
-const MAX_DAYS = 93;
-
 const pickerClass =
   'h-10 w-full rounded-md border border-gray-200 pl-9 pr-3 text-sm text-black focus:border-theme focus:outline-none';
 
@@ -90,9 +87,6 @@ export default function CleaningReportPage() {
     if (!fromDate) return 'Please select a from date';
     if (!toDate) return 'Please select a to date';
     if (toDate < fromDate) return 'To date cannot be before from date';
-    // Plain day count from the picked dates; moment would read them in UK time
-    if (Math.round((toDate.getTime() - fromDate.getTime()) / 86400000) + 1 > MAX_DAYS)
-      return `A report can cover up to ${MAX_DAYS} days`;
     if (!type) return 'Please select a type';
     return '';
   };

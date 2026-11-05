@@ -230,9 +230,9 @@ export default function CleaningLogPage() {
             <SprayCan className="h-5 w-5 lg:h-6 lg:w-6" />
             Cleaning Logs
           </h2>
-          <p className="mt-1 text-xs text-black sm:text-sm">
+          {/* <p className="mt-1 text-xs text-black sm:text-sm">
             Daily and monthly cleaning checklists signed by your staff.
-          </p>
+          </p> */}
         </div>
 
         <DateRangeNav
@@ -244,31 +244,42 @@ export default function CleaningLogPage() {
           }}
         />
 
-        <div className="flex w-full flex-wrap items-center gap-2 lg:w-auto">
-          <Button
-            size="sm"
-            variant="outline"
-            className="flex-1 sm:flex-none"
-            onClick={() => navigate('areas')}
-          >
-            <LayoutGrid className="mr-1.5 h-4 w-4" /> Area
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className="flex-1 sm:flex-none"
-            onClick={() => navigate('report')}
-          >
-            <FileBarChart2 className="mr-1.5 h-4 w-4" /> Generate Report
-          </Button>
-          <Button
-            size="sm"
-            className="flex-1 bg-theme text-white hover:bg-theme/90 sm:flex-none"
-            onClick={() => navigate('create')}
-          >
-            <Plus className="mr-1.5 h-4 w-4" /> Create Log
-          </Button>
-        </div>
+       <div className="flex w-full flex-wrap items-center gap-2 lg:w-auto lg:flex-nowrap">
+  <Button
+    size="sm"
+    variant="outline"
+    className="flex-1 whitespace-nowrap sm:flex-none"
+    onClick={() => navigate('areas')}
+  >
+    <LayoutGrid className="mr-1.5 h-4 w-4" /> Area
+  </Button>
+
+  <Button
+    size="sm"
+    variant="outline"
+    className="whitespace-nowrap border-none bg-violet-600 text-white hover:bg-violet-700"
+    onClick={() => navigate('csv-report')}
+  >
+    <FileBarChart2 className="mr-1.5 h-4 w-4" /> Generate CSV Report
+  </Button>
+
+  <Button
+    size="sm"
+    variant="outline"
+    className="flex-1 whitespace-nowrap sm:flex-none"
+    onClick={() => navigate('report')}
+  >
+    <FileBarChart2 className="mr-1.5 h-4 w-4" /> Generate Report
+  </Button>
+
+  <Button
+    size="sm"
+    className="flex-1 whitespace-nowrap bg-theme text-white hover:bg-theme/90 sm:flex-none"
+    onClick={() => navigate('create')}
+  >
+    <Plus className="mr-1.5 h-4 w-4" /> Create Log
+  </Button>
+</div>
       </div>
 
       {/* Employees on the cleaning module */}

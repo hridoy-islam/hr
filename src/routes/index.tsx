@@ -126,6 +126,7 @@ import CleaningLogFormPage from '@/pages/company/cleaningLog/CleaningLogFormPage
 import CleaningLogDetailsPage from '@/pages/company/cleaningLog/CleaningLogDetailsPage';
 import CleaningAreaPage from '@/pages/company/cleaningLog/areas';
 import CleaningReportPage from '@/pages/company/cleaningLog/report';
+import CleaningCsvReportPage from '@/pages/company/cleaningLog/csvReport';
 import AreaElementsPage from '@/pages/company/cleaningLog/areas/AreaElementsPage';
 import StaffCleaningLogPage from '@/pages/staff/cleaningLog';
 import StaffCleaningReportPage from '@/pages/staff/cleaningLog/reportPage';
@@ -407,6 +408,7 @@ export default function AppRouter() {
         { path: 'cleaning-log', element: <CleaningLogPage /> },
         { path: 'cleaning-log/create', element: <CleaningLogFormPage /> },
         { path: 'cleaning-log/report', element: <CleaningReportPage /> },
+        { path: 'cleaning-log/csv-report', element: <CleaningCsvReportPage /> },
         { path: 'cleaning-log/:lid', element: <CleaningLogDetailsPage /> },
         { path: 'cleaning-log/:lid/edit', element: <CleaningLogFormPage /> },
         { path: 'cleaning-log/areas', element: <CleaningAreaPage /> },

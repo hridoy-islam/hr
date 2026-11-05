@@ -452,23 +452,23 @@ export default function KitchenReportPage({ csv = false }: { csv?: boolean }) {
     if (!layout || !meta) return null;
     const config = KITCHEN_MODULES[meta.module];
 
-    if (csv) {
-      return layout.logCount > 0 ? (
-        <div className="flex justify-end">
-          <Button
-            className="w-full bg-black text-white hover:bg-black/90 sm:w-auto"
-            onClick={downloadCsv}
-          >
-            <Download className="mr-1.5 h-4 w-4" />
-            Download CSV
-          </Button>
-        </div>
-      ) : (
-        <div className="rounded-xl border border-dashed border-gray-200 py-12 text-center text-sm text-black">
-          No {config.label.toLowerCase()} was completed in this period.
-        </div>
-      );
-    }
+    // if (csv) {
+    //   return layout.logCount > 0 ? (
+    //     <div className="flex justify-end">
+    //       <Button
+    //         className="w-full bg-black text-white hover:bg-black/90 sm:w-auto"
+    //         onClick={downloadCsv}
+    //       >
+    //         <Download className="mr-1.5 h-4 w-4" />
+    //         Download CSV
+    //       </Button>
+    //     </div>
+    //   ) : (
+    //     <div className="rounded-xl border border-dashed border-gray-200 py-12 text-center text-sm text-black">
+    //       No {config.label.toLowerCase()} was completed in this period.
+    //     </div>
+    //   );
+    // }
 
     return (
       <div className="space-y-3">
@@ -565,15 +565,7 @@ export default function KitchenReportPage({ csv = false }: { csv?: boolean }) {
           >
             <ArrowLeft className="mr-1.5 h-4 w-4" /> Back
           </Button>
-          {!csv && (
-            <Button
-              size="sm"
-              className="w-full bg-black text-white hover:bg-black/90 sm:w-auto"
-              onClick={() => navigate(`/company/${id}/kitchen-log/report/csv`)}
-            >
-              <Download className="mr-1.5 h-4 w-4" /> Download CSV
-            </Button>
-          )}
+       
         </div>
       </div>
 

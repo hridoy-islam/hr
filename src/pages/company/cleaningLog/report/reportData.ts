@@ -4,8 +4,12 @@ import { CleaningType } from '../shared';
 export interface CleaningReportCell {
   logId: string;
   employeeName: string;
+  employeeEmail?: string;
   startTime?: string;
   endTime?: string;
+  totalElement?: number;
+  checkedElement?: number;
+  durationSeconds?: number;
 }
 
 export interface CleaningReportRow {
