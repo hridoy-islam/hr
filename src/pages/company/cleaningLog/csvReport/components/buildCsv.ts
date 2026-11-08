@@ -1,6 +1,7 @@
 import moment from '@/lib/moment-setup';
 import {
-  durationLabel,
+  DURATION_HEADER,
+  durationHours,
   tableToCsv
 } from '@/pages/company/kitchenLog/csvReport/components/reportCsv';
 import { CleaningGrid } from '../../components/buildGrid';
@@ -17,7 +18,7 @@ const HEADERS = [
   'Completed Element',
   'Start Time',
   'End Time',
-  'Duration'
+  DURATION_HEADER
 ];
 
 // One row per completed area per day, earliest date first
@@ -41,7 +42,7 @@ export const buildCsv = ({ columns, rows }: CleaningReport) =>
             String(cell.checkedElement ?? ''),
             cell.startTime || '',
             cell.endTime || '',
-            durationLabel(cell)
+            durationHours(cell)
           ];
         });
     })

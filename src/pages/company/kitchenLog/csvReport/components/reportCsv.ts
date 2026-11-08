@@ -24,21 +24,20 @@ const yesNo = (value?: boolean) =>
 const dateTime = (date?: string) =>
   date ? moment(date).format('DD-MM-YYYY HH:mm') : '';
 
-// 5100 -> 1h 25m, to the nearest minute
-const hoursAndMinutes = (seconds: number) => {
-  const minutes = Math.round(seconds / 60);
-  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
-};
+export const DURATION_HEADER = 'Duration (hour)';
+
+// 5100 -> 1.42, a plain number so the column can be summed in a spreadsheet
+const toHours = (seconds: number) => (seconds / 3600).toFixed(2);
 
 const minutesOf = (time: string) => {
   const [hours, minutes] = time.split(':').map(Number);
   return hours * 60 + minutes;
 };
 
-// The timer's total is used unless it would read as 0h 0m: older logs hold 0,
-// and a timer paused straight after starting holds a few seconds. Those fall
+// The timer's total is used unless it would round to nothing: older logs hold
+// 0, and a timer paused straight after starting holds a few seconds. Those fall
 // back to the start and end times, which then include any paused time.
-export const durationLabel = (cell: {
+export const durationHours = (cell: {
   durationSeconds?: number;
   startTime?: string;
   endTime?: string;
@@ -49,7 +48,7 @@ export const durationLabel = (cell: {
       ? (minutesOf(cell.endTime) - minutesOf(cell.startTime)) * 60
       : 0;
   const seconds = timer >= 30 ? timer : Math.max(timer, span);
-  return seconds > 0 ? hoursAndMinutes(seconds) : '';
+  return seconds > 0 ? toHours(seconds) : '';
 };
 
 const COMMON_COLUMNS: CsvColumn[] = [
@@ -60,11 +59,11 @@ const COMMON_COLUMNS: CsvColumn[] = [
   ['Start Time', (log) => log.startTime],
   ['End Time', (log) => log.endTime],
   [
-    'Duration',
+    DURATION_HEADER,
     (log) =>
       log.startTime && log.startTime === log.endTime
-        ? '0h 0m'
-        : durationLabel(log)
+        ? '0.00'
+        : durationHours(log)
   ],
   ['Signed At', (log) => dateTime(log.signedAt)]
 ];
@@ -107,10 +106,7 @@ const equipmentTemperatureColumns = (): CsvColumn[] =>
       [`${label} Time`, (log) => reading(log)?.time],
       [`${label} Temp (°C)`, (log) => reading(log)?.temperature],
       [`${label} Out of Range`, (log) => yesNo(reading(log)?.outOfRange)],
-      [
-        `${label} Reported`,
-        (log) => yesNo(reading(log)?.reportedToManagement)
-      ]
+      [`${label} Reported`, (log) => yesNo(reading(log)?.reportedToManagement)]
     ];
   });
 
@@ -162,9 +158,10 @@ export const buildCsvTable = (
 
   const sorted = [...logs].sort(
     (a, b) =>
-      moment(a.logDate).format('YYYY-MM-DD').localeCompare(
-        moment(b.logDate).format('YYYY-MM-DD')
-      ) || (a.startTime || '').localeCompare(b.startTime || '')
+      moment(a.logDate)
+        .format('YYYY-MM-DD')
+        .localeCompare(moment(b.logDate).format('YYYY-MM-DD')) ||
+      (a.startTime || '').localeCompare(b.startTime || '')
   );
 
   return {

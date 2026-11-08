@@ -111,7 +111,7 @@ export const modulesOf = (frequency: KitchenFrequency) =>
 // For now every approval is signed with this test signature instead of one
 // drawn by the approver
 export const TEST_APPROVAL_SIGNATURE =
-  'https://storage.googleapis.com/watney/1792756559518-test-sign.jpg';
+  'https://storage.googleapis.com/hrsystems/1794154892334-approval-signature.png';
 
 // ---- Kitchen Cleaning Logs ------------------------------------------------
 
