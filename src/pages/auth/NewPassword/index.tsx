@@ -1,5 +1,4 @@
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import {
   Form,
   FormControl,
@@ -9,135 +8,183 @@ import {
   FormMessage
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { requestOtp } from '@/redux/features/authSlice';
-import { AppDispatch } from '@/redux/store';
 import { useRouter } from '@/routes/hooks';
 import { zodResolver } from '@hookform/resolvers/zod';
+import axios from 'axios';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { useDispatch, useSelector } from 'react-redux';
-
 import { Link } from 'react-router-dom';
+import { CheckCircle2 } from 'lucide-react';
 import { z } from 'zod';
 
+import AuthLayout from '../components/auth-layout';
 import resetpass from '../../../assets/imges/home/resetpassword.png';
 
-const formSchema = z.object({
-  email: z.string().email({ message: 'Enter a valid email address' })
-});
+const formSchema = z
+  .object({
+    newPassword: z
+      .string()
+      .min(6, { message: 'Password must be at least 6 characters' }),
+    confirmPassword: z.string()
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: 'Passwords do not match',
+    path: ['confirmPassword']
+  });
 
 type UserFormValue = z.infer<typeof formSchema>;
 
+const getResetData = (): { email?: string; token?: string } => {
+  try {
+    return JSON.parse(localStorage.getItem('tp_user_data') || '{}');
+  } catch {
+    return {};
+  }
+};
+
 export default function NewPassword() {
-  const { loading, error } = useSelector((state: any) => state.auth);
   const router = useRouter();
-  const dispatch = useDispatch<AppDispatch>();
-  const defaultValues = {
-    email: '',
-    password: ''
-  };
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
+  // Read once on mount: the data is cleared after a successful reset
+  const [{ email, token }] = useState(getResetData);
+
+  useEffect(() => {
+    if (!success && (!email || !token)) router.push('/forgot-password');
+  }, [email, token, router, success]);
+
   const form = useForm<UserFormValue>({
     resolver: zodResolver(formSchema),
-    defaultValues
+    defaultValues: { newPassword: '', confirmPassword: '' }
   });
 
   const onSubmit = async (data: UserFormValue) => {
-    const result: any = await dispatch(requestOtp(data));
-    if (result?.payload?.success) {
-      localStorage.setItem('tp_otp_email', data.email);
-      router.push('/otp');
+    setError('');
+    setLoading(true);
+    try {
+      await axios.post(
+        `${import.meta.env.VITE_API_URL}/auth/reset`,
+        { email, newPassword: data.newPassword },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: token as string
+          }
+        }
+      );
+      localStorage.removeItem('tp_user_data');
+      localStorage.removeItem('tp_otp_email');
+      setSuccess(true);
+    } catch (err: any) {
+      setError(
+        err?.response?.data?.message ||
+          'Could not update password. Please try again.'
+      );
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <>
-      <div className="container py-10  h-svh items-center justify-center bg-primary bg-purple-50 lg:max-w-none lg:px-0">
-        <div className='w-8/12 mx-auto shadow-2xl flex p-5'>
-          <div>
-            <img
-              src={resetpass}
-              alt="Forgot Password Illustration"
-              width={350}
-              height={200}
-            />
-          </div>
-          <div className="mx-auto flex w-full flex-col justify-center space-y-2 sm:w-[480px] lg:p-6">
-            <div className="mb-4 flex items-center justify-center">
-              {/* <img src="/logo.png" alt="Logo" className="w-1/2" /> */}
-              <h3 className="text-4xl font-bold text-supperagent">HR</h3>
-            </div>
-            <Card className="p-6">
-              <div className="mb-2 flex flex-col space-y-2 text-left">
-                <h1 className="text-md font-semibold tracking-tight">
-                  New Password 
-                </h1>
-                <p className="text-sm text-muted">
-                  Enter your registered email and <br /> we will send you a link
-                  to reset your password.
-                </p>
-                <Form {...form}>
-                  <form
-                    onSubmit={form.handleSubmit(onSubmit)}
-                    className="w-full space-y-3"
-                  >
-                    <FormField
-                      control={form.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Confirm Password</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="password"
-                              placeholder="Confirm Password..."
-                              disabled={loading}
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>New Password</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="password"
-                              placeholder="Enter New Password..."
-                              disabled={loading}
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <Button
-                      disabled={loading}
-                      className="ml-auto w-full bg-supperagent text-white hover:bg-supperagent hover:bg-opacity-80"
-                      type="submit"
-                    >
-                      Reset Password
-                    </Button>
-                  </form>
-                </Form>
-              </div>
-              {/* <ForgotForm /> */}
-              <p className="mt-4 px-8 text-center text-sm text-muted">
-                Don't have an account?{' '}
-                <Link to="/sign-up" className="underline text-supperagent underline-offset-4">
-                  Sign up
-                </Link>
-                .
+    <AuthLayout
+      title={success ? 'Password Updated' : 'Set New Password'}
+      description={
+        success ? undefined : (
+          <>
+            Choose a new password for{' '}
+            <strong className="text-gray-900">{email}</strong>.
+          </>
+        )
+      }
+      image={resetpass}
+      imageAlt="Reset password illustration"
+      heading="Almost there — choose a secure password."
+    >
+      {success ? (
+        <div className="space-y-6">
+          <div className="flex items-start gap-3 rounded-md border border-green-200 bg-green-50 p-4">
+            <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-green-600" />
+            <div>
+              <p className="text-sm font-semibold text-green-800">
+                Password updated successfully
               </p>
-            </Card>
+              <p className="mt-1 text-sm text-green-700">
+                You can now sign in to your account using your new password.
+              </p>
+            </div>
           </div>
+          <Button
+            type="button"
+            onClick={() => router.push('/')}
+            className="w-full bg-supperagent text-white hover:bg-supperagent/90"
+          >
+            Login
+          </Button>
         </div>
-      </div>
-    </>
+      ) : (
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            {error && (
+              <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-500">
+                {error}
+              </div>
+            )}
+
+            <FormField
+              control={form.control}
+              name="newPassword"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>New Password</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="password"
+                      placeholder="Enter new password..."
+                      disabled={loading}
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="confirmPassword"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Confirm Password</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="password"
+                      placeholder="Confirm new password..."
+                      disabled={loading}
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <Button
+              disabled={loading}
+              type="submit"
+              className="w-full bg-supperagent text-white hover:bg-supperagent/90"
+            >
+              {loading ? 'Saving...' : 'Set Password'}
+            </Button>
+
+            <p className="text-center text-sm text-gray-600">
+              Remembered it?{' '}
+              <Link to="/" className="text-supperagent hover:underline">
+                Back to Sign In
+              </Link>
+            </p>
+          </form>
+        </Form>
+      )}
+    </AuthLayout>
   );
 }

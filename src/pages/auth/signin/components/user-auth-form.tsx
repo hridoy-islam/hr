@@ -125,19 +125,9 @@ await dispatch(loginUser(data));
           {error && <Badge className="mt-2 text-red-500">{error}</Badge>}
           <p className="text-center text-sm text-gray-600">
             By signin up, you agree to our{' '}
-            <Link
-              to="/terms"
-              className="text-supperagent hover:text-supperagent"
-            >
-              Terms and Conditions
-            </Link>{' '}
+            <span className="font-medium text-supperagent">Terms and Conditions</span>{' '}
             &{' '}
-            <Link
-              to="/privacy"
-              className="text-supperagent hover:text-supperagent"
-            >
-              Privacy Policy
-            </Link>
+            <span className="font-medium text-supperagent">Privacy Policy</span>
           </p>
         </form>
       </Form>

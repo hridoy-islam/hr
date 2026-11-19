@@ -1,160 +1,178 @@
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { validateRequestOtp } from '@/redux/features/authSlice';
+import { requestOtp, validateRequestOtp } from '@/redux/features/authSlice';
 import { AppDispatch } from '@/redux/store';
 import { useRouter } from '@/routes/hooks';
 import { jwtDecode } from 'jwt-decode';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useDispatch } from 'react-redux';
-
 import { Link } from 'react-router-dom';
 
-import OTP from "../../../assets/imges/home/OTP.png"
+import AuthLayout from '../components/auth-layout';
+import OTP from '../../../assets/imges/home/OTP.png';
+
+const OTP_LENGTH = 4;
 
 export default function Otp() {
-  const [otp, setOtp] = useState(Array(4).fill(''));
+  const [otp, setOtp] = useState<string[]>(Array(OTP_LENGTH).fill(''));
   const [error, setError] = useState('');
+  const [info, setInfo] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [resending, setResending] = useState(false);
   const dispatch = useDispatch<AppDispatch>();
-  const inputRefs = useRef([]);
+  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const router = useRouter();
   const email = localStorage.getItem('tp_otp_email');
 
-  const handleKeyDown = (e) => {
+  useEffect(() => {
+    if (!email) router.push('/forgot-password');
+  }, [email, router]);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (
       !/^[0-9]{1}$/.test(e.key) &&
       e.key !== 'Backspace' &&
       e.key !== 'Delete' &&
       e.key !== 'Tab' &&
-      !e.metaKey
+      !e.metaKey &&
+      !e.ctrlKey
     ) {
       e.preventDefault();
     }
 
     if (e.key === 'Delete' || e.key === 'Backspace') {
-      const index = inputRefs.current.indexOf(e.target);
-      if (index > 0) {
-        setOtp((prevOtp) => [
-          ...prevOtp.slice(0, index - 1),
-          '',
-          ...prevOtp.slice(index)
-        ]);
-        inputRefs.current[index - 1].focus();
+      const index = inputRefs.current.indexOf(e.currentTarget);
+      if (otp[index]) {
+        setOtp((prev) => prev.map((d, i) => (i === index ? '' : d)));
+      } else if (index > 0) {
+        setOtp((prev) => prev.map((d, i) => (i === index - 1 ? '' : d)));
+        inputRefs.current[index - 1]?.focus();
       }
+      e.preventDefault();
     }
   };
 
-  const handleInput = (e) => {
+  const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { target } = e;
     const index = inputRefs.current.indexOf(target);
-    if (target.value) {
-      setOtp((prevOtp) => [
-        ...prevOtp.slice(0, index),
-        target.value,
-        ...prevOtp.slice(index + 1)
-      ]);
-      if (index < otp.length - 1) {
-        inputRefs.current[index + 1].focus();
-      }
-    }
+    const value = target.value.slice(-1);
+    if (!/^[0-9]$/.test(value)) return;
+    setOtp((prev) => prev.map((d, i) => (i === index ? value : d)));
+    if (index < OTP_LENGTH - 1) inputRefs.current[index + 1]?.focus();
   };
 
-  const handleFocus = (e) => {
-    e.target.select();
-  };
-
-  const handlePaste = (e) => {
+  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
     e.preventDefault();
-    const text = e.clipboardData.getData('text');
-    if (!new RegExp(`^[0-9]{${otp.length}}$`).test(text)) {
-      return;
-    }
-    const digits = text.split('');
-    setOtp(digits);
+    const text = e.clipboardData.getData('text').trim();
+    if (!new RegExp(`^[0-9]{${OTP_LENGTH}}$`).test(text)) return;
+    setOtp(text.split(''));
+    inputRefs.current[OTP_LENGTH - 1]?.focus();
   };
 
-  const handleOtpSubmit = async (e) => {
+  const handleOtpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const otpCode = otp.join('');
-    if (!email) router.push('/forgot-password');
+    if (!email) return router.push('/forgot-password');
+    setError('');
+    setInfo('');
+    setSubmitting(true);
     const result: any = await dispatch(
-      validateRequestOtp({ email, otp: otpCode })
+      validateRequestOtp({ email, otp: otp.join('') })
     );
+    setSubmitting(false);
     if (result?.payload?.success) {
-      const decoded = jwtDecode(result?.payload?.data?.resetToken);
+      const resetToken = result.payload.data.resetToken;
+      const decoded = jwtDecode(resetToken);
       localStorage.setItem(
         'tp_user_data',
-        JSON.stringify({ ...decoded, token: result?.payload?.data?.resetToken })
+        JSON.stringify({ ...decoded, token: resetToken })
       );
       router.push('/new-password');
     } else {
-      setError('Invalid OTP');
+      setError('Invalid or expired code. Please try again.');
+    }
+  };
+
+  const handleResend = async () => {
+    if (!email) return;
+    setError('');
+    setInfo('');
+    setResending(true);
+    const result: any = await dispatch(requestOtp({ email }));
+    setResending(false);
+    if (result?.payload?.success) {
+      setOtp(Array(OTP_LENGTH).fill(''));
+      inputRefs.current[0]?.focus();
+      setInfo('A new code has been sent to your email.');
+    } else {
+      setError(result?.payload || 'Could not resend code. Please try again.');
     }
   };
 
   return (
-    <>
-      <div className="container bg-purple-50 py-4 h-svh flex-col items-center justify-center bg-primary lg:max-w-none lg:px-0">
-        <div className=" flex lg:w-9/12 gap-6 items-center mx-auto shadow-2xl justify-center space-y-2 sm:w-[480px] lg:p-7">
-          <div className="mb-4 flex items-center justify-center">
-            <img src={OTP} alt="OTP" className="w-full" />            
+    <AuthLayout
+      title="Verification Code"
+      description={
+        <>
+          Enter the {OTP_LENGTH}-digit code sent to{' '}
+          <strong className="text-gray-900">{email}</strong>.
+        </>
+      }
+      image={OTP}
+      imageAlt="Verification illustration"
+      heading="Verify it's you to keep your account secure."
+    >
+      <form onSubmit={handleOtpSubmit} className="space-y-6">
+        {error && (
+          <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-500">
+            {error}
           </div>
-          <Card className="p-6">
-            <div className="mb-2 flex flex-col space-y-2 text-left">
-              <h1 className="text-md font-semibold tracking-tight text-supperagent">
-                Verification Code
-              </h1>
-              <p className="text-sm text-muted">
-                Enter the verification code sent to your email
-              </p>
-              {error && <p className="text-sm text-red-500">{error}</p>}
-              <section className="bg-white py-5">
-                <div className="container">
-                  <div>
-                    <p className="text-dark mb-1.5 text-sm font-medium dark:text-white">
-                      Secure code
-                    </p>
-                    <form id="otp-form" className="flex gap-2">
-                      {otp.map((digit, index) => (
-                        <input
-                          key={index}
-                          type="text"
-                          maxLength={1}
-                          value={digit}
-                          onChange={handleInput}
-                          onKeyDown={handleKeyDown}
-                          onFocus={handleFocus}
-                          onPaste={handlePaste}
-                          ref={(el) => (inputRefs.current[index] = el)}
-                          className="shadow-xs border-stroke text-gray-5 dark:border-dark-3 flex w-[64px] items-center justify-center rounded-lg border bg-white p-2 text-center text-2xl font-medium outline-none dark:bg-white/5 sm:text-4xl"
-                        />
-                      ))}
-                    </form>
-                    <Button
-                      disabled={otp.some((digit) => digit === '')}
-                      onClick={handleOtpSubmit}
-                      className="ml-auto mt-5 w-full bg-supperagent text-white hover:bg-background"
-                      variant="outline"
-                    >
-                      Verify OTP
-                    </Button>
-                  </div>
-                </div>
-              </section>
-            </div>
-            {/* <ForgotForm /> */}
-            <p className="mt-4 px-8 text-center text-sm text-muted">
-              Don't have an account?{' '}
-              <Link
-                to="/sign-up"
-                className=" underline underline-offset-4 text-supperagent"
-              >
-                Sign up
-              </Link>
-              .
-            </p>
-          </Card>
+        )}
+        {info && (
+          <div className="rounded-md border border-green-200 bg-green-50 p-3 text-sm font-medium text-green-700">
+            {info}
+          </div>
+        )}
+
+        <div className="flex justify-between gap-3">
+          {otp.map((digit, index) => (
+            <input
+              key={index}
+              type="text"
+              inputMode="numeric"
+              autoComplete={index === 0 ? 'one-time-code' : 'off'}
+              maxLength={1}
+              value={digit}
+              onChange={handleInput}
+              onKeyDown={handleKeyDown}
+              onFocus={(e) => e.target.select()}
+              onPaste={handlePaste}
+              ref={(el) => (inputRefs.current[index] = el)}
+              className="h-16 w-full rounded-lg border border-gray-300 bg-white text-center text-3xl font-semibold text-gray-900 outline-none transition focus:border-supperagent focus:ring-2 focus:ring-supperagent/30"
+            />
+          ))}
         </div>
-      </div>
-    </>
+
+        <Button
+          type="submit"
+          disabled={submitting || otp.some((d) => d === '')}
+          className="w-full bg-supperagent text-white hover:bg-supperagent/90"
+        >
+          {submitting ? 'Verifying...' : 'Verify Code'}
+        </Button>
+
+        <div className="flex items-center justify-between text-sm text-gray-600">
+          <button
+            type="button"
+            onClick={handleResend}
+            disabled={resending}
+            className="text-supperagent hover:underline disabled:opacity-50"
+          >
+            {resending ? 'Sending...' : 'Resend code'}
+          </button>
+          <Link to="/" className="text-supperagent hover:underline">
+            Back to Sign In
+          </Link>
+        </div>
+      </form>
+    </AuthLayout>
   );
 }

@@ -1,5 +1,4 @@
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import {
   Form,
   FormControl,
@@ -9,17 +8,17 @@ import {
   FormMessage
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { requestOtp, resetError } from '@/redux/features/authSlice'; // Added resetError just in case
+import { requestOtp, resetError } from '@/redux/features/authSlice';
 import { AppDispatch } from '@/redux/store';
 import { useRouter } from '@/routes/hooks';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { useDispatch, useSelector } from 'react-redux';
-import { useEffect } from 'react'; // Added useEffect to clear errors on mount
-
 import { Link } from 'react-router-dom';
 import { z } from 'zod';
 
+import AuthLayout from '../components/auth-layout';
 import forgotpass from '../../../assets/imges/home/forgotPassword.png';
 
 const formSchema = z.object({
@@ -32,18 +31,12 @@ export default function ForgotPassword() {
   const { loading, error } = useSelector((state: any) => state.auth);
   const router = useRouter();
   const dispatch = useDispatch<AppDispatch>();
-  
-  const defaultValues = {
-    email: '',
-    password: ''
-  };
-  
+
   const form = useForm<UserFormValue>({
     resolver: zodResolver(formSchema),
-    defaultValues
+    defaultValues: { email: '' }
   });
 
-  // Optional but recommended: Clear any leftover errors when the page loads
   useEffect(() => {
     dispatch(resetError());
   }, [dispatch]);
@@ -57,84 +50,56 @@ export default function ForgotPassword() {
   };
 
   return (
-    <>
-      <div className="container pt-20 h-svh items-center justify-center bg-primary bg-purple-50 lg:max-w-none lg:px-0">
-        <div className='w-8/12 mx-auto shadow-2xl flex p-5'>
-          <div>
-            <img
-              src={forgotpass}
-              alt="Forgot Password Illustration"
-              width={350}
-              height={200}
-            />
-          </div>
-          <div className="mx-auto flex w-full flex-col justify-center space-y-2 sm:w-[480px] lg:p-8">
-            <div className="mb-4 flex items-center justify-center">
-              <h3 className="text-4xl font-bold text-supperagent">HR</h3>
+    <AuthLayout
+      title="Forgot Password"
+      description="Enter your registered email and we will send you a verification code to set your password."
+      image={forgotpass}
+      imageAlt="Forgot password illustration"
+      heading="Set or reset your password in a few steps."
+    >
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          {error && (
+            <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-500">
+              {error}
             </div>
-            <Card className="p-6">
-              <div className="mb-2 flex flex-col space-y-2 text-left">
-                <h1 className="text-md font-semibold tracking-tight">
-                  Forgot Password ?
-                </h1>
-                <p className="text-sm text-muted">
-                  Enter your registered email and <br /> we will send you a link
-                  to reset your password.
-                </p>
+          )}
 
-                {/* --- ERROR MESSAGE DISPLAY --- */}
-                {error && (
-                  <div className="rounded-md bg-red-50 p-3 text-sm text-red-500 font-medium border border-red-200">
-                    {error}
-                  </div>
-                )}
-                {/* ------------------------------- */}
+          <FormField
+            control={form.control}
+            name="email"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Email</FormLabel>
+                <FormControl>
+                  <Input
+                    type="email"
+                    placeholder="Enter your email..."
+                    disabled={loading}
+                    {...field}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
-                <Form {...form}>
-                  <form
-                    onSubmit={form.handleSubmit(onSubmit)}
-                    className="w-full space-y-2"
-                  >
-                    <FormField
-                      control={form.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Email</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="email"
-                              placeholder="Enter your email..."
-                              disabled={loading}
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+          <Button
+            disabled={loading}
+            type="submit"
+            className="w-full bg-supperagent text-white hover:bg-supperagent/90"
+          >
+            {loading ? 'Sending...' : 'Send Verification Code'}
+          </Button>
 
-                    <Button
-                      disabled={loading}
-                      className="ml-auto w-full bg-supperagent text-white hover:bg-purple-700"
-                      type="submit"
-                    >
-                      Reset Password
-                    </Button>
-                  </form>
-                </Form>
-              </div>
-              <p className="mt-4 px-8 text-center text-sm text-muted">
-                Don't have an account?{' '}
-                <Link to="/sign-up" className="underline text-supperagent underline-offset-4">
-                  Sign up
-                </Link>
-                .
-              </p>
-            </Card>
-          </div>
-        </div>
-      </div>
-    </>
+          <p className="text-center text-sm text-gray-600">
+            Remembered your password?{' '}
+            <Link to="/" className="text-supperagent hover:underline">
+              Back to Sign In
+            </Link>
+          </p>
+        </form>
+      </Form>
+    </AuthLayout>
   );
 }

@@ -10,7 +10,9 @@ import {
   AlertCircle,
   User,
   Phone,
-  Lock
+  Lock,
+  Mail,
+  Send
 } from 'lucide-react';
 import { useParams } from 'react-router-dom';
 import axiosInstance from '@/lib/axios';
@@ -108,6 +110,30 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
     {}
   );
   const { toast } = useToast();
+
+  // --- Send Login Details State ---
+  const [isSendLoginDialogOpen, setIsSendLoginDialogOpen] = useState(false);
+  const [isSendingLogin, setIsSendingLogin] = useState(false);
+
+  const handleSendLoginDetails = async () => {
+    setIsSendingLogin(true);
+    try {
+      await axiosInstance.post(`/users/${id}/send-login-details`);
+      setIsSendLoginDialogOpen(false);
+      toast({
+        title: 'Login details sent',
+        description: `An email has been sent to ${formData.email}.`
+      });
+    } catch (error: any) {
+      toast({
+        title:
+          error?.response?.data?.message || 'Failed to send login details',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsSendingLogin(false);
+    }
+  };
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -414,6 +440,30 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
               </Button>
             </div>
           </div>
+
+          {/* Portal Access */}
+          <div className="h-fit overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+            <SectionHeader icon={Mail} title="Portal Access" />
+            <div className="flex flex-col p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+              <div>
+                <h4 className="text-sm font-medium text-gray-900">
+                  Send Login Details
+                </h4>
+                <p className="text-sm text-gray-500">
+                  Email the employee their login ID with a secure link to set
+                  their password.
+                </p>
+              </div>
+              <Button
+                className="mt-3 shrink-0 sm:mt-0"
+                onClick={() => setIsSendLoginDialogOpen(true)}
+                disabled={!formData.email}
+              >
+                <Send className="mr-2 h-4 w-4" />
+                Send Login Details
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -488,6 +538,57 @@ const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({
               disabled={isUploading}
             >
               Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Send Login Details Confirmation Dialog */}
+      <Dialog
+        open={isSendLoginDialogOpen}
+        onOpenChange={(open) => !isSendingLogin && setIsSendLoginDialogOpen(open)}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Send Login Details?</DialogTitle>
+            <DialogDescription>
+              The employee will receive an email with their login ID and a link
+              to the HR portal, where they can verify their email with a
+              one-time code and set their own password.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-1 rounded-md border border-gray-200 bg-gray-50 p-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+              Email will be sent to
+            </p>
+            <p className="break-all text-sm font-semibold text-gray-900">
+              {formData.email}
+            </p>
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setIsSendLoginDialogOpen(false)}
+              disabled={isSendingLogin}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSendLoginDetails}
+              disabled={isSendingLogin}
+            >
+              {isSendingLogin ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                'Send Email'
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
