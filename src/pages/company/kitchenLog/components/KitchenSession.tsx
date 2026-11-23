@@ -12,7 +12,17 @@ import {
   Trash2
 } from 'lucide-react';
 
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import axiosInstance from '@/lib/axios';
 import moment from '@/lib/moment-setup';
@@ -101,6 +111,8 @@ export function KitchenSession({
   const [busy, setBusy] = useState<Busy>(null);
   const [error, setError] = useState('');
   const [signatureError, setSignatureError] = useState('');
+  // Stopping is final, so it is confirmed first
+  const [confirmStop, setConfirmStop] = useState(false);
   const signatureRef = useRef<SignaturePadHandle>(null);
   const seconds = useKitchenTimer(log);
 
@@ -112,6 +124,10 @@ export function KitchenSession({
   const paused = log?.status === 'paused';
   // Untimed logs (equipment temperatures) are filled in straight away
   const editable = !config.timed || Boolean(open);
+  // A timed log is only signed and submitted once it has been stopped
+  const canSubmit = !config.timed || log?.status === 'stopped';
+  const hasNote = config.note !== false;
+  const hasSignature = config.signature !== false;
 
   const fail = (err: unknown, fallback: string) => {
     const message = apiError(err, fallback);
@@ -182,6 +198,7 @@ export function KitchenSession({
 
   const stop = async () => {
     if (!log) return;
+    setConfirmStop(false);
     try {
       setBusy('stop');
       saveProgress.cancel();
@@ -205,7 +222,7 @@ export function KitchenSession({
       setError(missing);
       return;
     }
-    if (signatureRef.current?.isEmpty()) {
+    if (hasSignature && (signatureRef.current?.isEmpty() ?? true)) {
       setSignatureError('Please sign before completing');
       return;
     }
@@ -214,7 +231,9 @@ export function KitchenSession({
       setBusy('complete');
       setError('');
       saveProgress.cancel();
-      const signature = await signatureRef.current!.save();
+      const signature = hasSignature
+        ? await signatureRef.current!.save()
+        : {};
       const payload = { ...payloadFromValues(module, values), ...signature };
 
       const res = log
@@ -290,7 +309,7 @@ export function KitchenSession({
           <Timer className="h-10 w-10 text-theme" />
           <p className="max-w-sm text-sm text-black">
             Press Start when you begin. The start time is taken now and the
-            timer runs until you press End.
+            timer runs until you press Stop.
           </p>
           <Button
             size="lg"
@@ -336,10 +355,25 @@ export function KitchenSession({
               Started {log.startTime || '-'}
               {log.endTime && ` · Ended ${log.endTime}`}
             </p>
+            {log.status === 'in_progress' && (
+              <p className="text-xs text-black">
+                Pause to take a break, or Stop when you are done to sign and
+                submit.
+              </p>
+            )}
             {paused && (
               <p className="text-xs font-semibold text-orange-700">
                 Paused, not submitted yet. Your progress and time are saved.
                 Resume to carry on.
+              </p>
+            )}
+            {log.status === 'stopped' && (
+              <p className="text-xs font-semibold text-black">
+                {hasNote || hasSignature
+                  ? `Stopped. Check the log, ${
+                      hasSignature ? 'sign ' : 'add a note '
+                    }below and press Submit.`
+                  : 'Stopped. Press Submit below.'}
               </p>
             )}
           </div>
@@ -357,6 +391,22 @@ export function KitchenSession({
                   <Pause className="mr-1.5 h-4 w-4" />
                 )}
                 Pause
+              </Button>
+            )}
+            {/* A paused session resumes before it can be stopped */}
+            {log.status === 'in_progress' && (
+              <Button
+                size="sm"
+                className="bg-red-600 text-white hover:bg-red-700 hover:text-white"
+                disabled={disabled}
+                onClick={() => setConfirmStop(true)}
+              >
+                {busy === 'stop' ? (
+                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                ) : (
+                  <Square className="mr-1.5 h-4 w-4" />
+                )}
+                Stop
               </Button>
             )}
             {paused && (
@@ -400,21 +450,40 @@ export function KitchenSession({
             values={values}
             onChange={changeValues}
             disabled={disabled || paused}
+            hideNote
           />
 
-          <div className="w-full space-y-1.5 md:max-w-md">
-            <p className="text-sm font-semibold text-black">Signature*</p>
-            <SignaturePad
-              ref={signatureRef}
-              entityId={user?._id || companyId}
-              signatureUrl=""
-              signedAt={null}
-              disabled={disabled || paused}
-              onDraw={() => setSignatureError('')}
-              error={signatureError}
-              height={200}
-            />
-          </div>
+          {/* Note and signature only come up once the log is stopped */}
+          {canSubmit && hasNote && (
+            <div className="space-y-1.5">
+              <p className="text-sm font-semibold text-black">Note</p>
+              <Textarea
+                value={values.note}
+                disabled={disabled}
+                onChange={(e) =>
+                  changeValues({ ...values, note: e.target.value })
+                }
+                placeholder="Anything management should know..."
+                rows={3}
+              />
+            </div>
+          )}
+
+          {canSubmit && hasSignature && (
+            <div className="w-full space-y-1.5 md:max-w-md">
+              <p className="text-sm font-semibold text-black">Signature*</p>
+              <SignaturePad
+                ref={signatureRef}
+                entityId={user?._id || companyId}
+                signatureUrl=""
+                signedAt={null}
+                disabled={disabled}
+                onDraw={() => setSignatureError('')}
+                error={signatureError}
+                height={200}
+              />
+            </div>
+          )}
 
           {error && (
             <p className="rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-600 sm:text-sm">
@@ -423,21 +492,7 @@ export function KitchenSession({
           )}
 
           <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-            {config.timed && log?.status === 'in_progress' && (
-              <Button
-                className="bg-red-600 text-white hover:bg-red-700"
-                disabled={disabled}
-                onClick={stop}
-              >
-                {busy === 'stop' ? (
-                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-                ) : (
-                  <Square className="mr-1.5 h-4 w-4" />
-                )}
-                End
-              </Button>
-            )}
-            {(!config.timed || log?.status === 'stopped') && (
+            {canSubmit && (
               <Button
                 className="bg-emerald-600 text-white hover:bg-emerald-700"
                 disabled={disabled}
@@ -454,6 +509,34 @@ export function KitchenSession({
           </div>
         </>
       )}
+
+      <AlertDialog open={confirmStop} onOpenChange={setConfirmStop}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-black">
+              Stop this log?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-black">
+              The timer ends now and cannot be resumed.
+              {hasNote || hasSignature
+                ? ` You will then ${
+                    hasSignature ? 'sign' : 'add a note'
+                  } and submit.`
+                : ' You will then submit it.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="">Cancel</AlertDialogCancel>
+            <Button
+              className="bg-red-600 text-white hover:bg-red-700 hover:text-white"
+              onClick={stop}
+            >
+              <Square className="mr-1.5 h-4 w-4" />
+              Stop
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

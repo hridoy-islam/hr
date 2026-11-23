@@ -37,6 +37,10 @@ export interface KitchenModuleConfig {
   // Start -> stop -> complete; otherwise filled in and submitted in one go
   timed: boolean;
   perPeriod: number;
+  // Shown only, not mirrored by the API: set false for a log that is
+  // submitted without a note or a signature. Both are on when left out.
+  note?: boolean;
+  signature?: boolean;
 }
 
 // In the order the buttons show

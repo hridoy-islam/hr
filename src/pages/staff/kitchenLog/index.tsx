@@ -316,7 +316,9 @@ export default function StaffKitchenLogPage() {
               : ownOpen
                 ? ownLog?.status === 'paused'
                   ? 'Your session is paused - tap to resume'
-                  : 'Your session is open - tap to continue'
+                  : ownLog?.status === 'stopped'
+                    ? 'Stopped, not submitted - tap to submit'
+                    : 'Your session is open - tap to continue'
                 : item.required > 1
                   ? `${item.done} of ${item.required} done this week`
                   : 'Not done yet'}
@@ -328,6 +330,10 @@ export default function StaffKitchenLogPage() {
   const current = boardModule(module);
   // The one open below is not listed again
   const pausedList = paused.filter((log) => log._id !== session?._id);
+  const stoppedCount = pausedList.filter(
+    (log) => log.status === 'stopped'
+  ).length;
+  const pausedCount = pausedList.length - stoppedCount;
 
   return (
     <div className="min-h-[97vh] space-y-4 rounded-md bg-white p-3 shadow-sm max-md:mt-8 sm:p-4 lg:space-y-5 lg:p-5">
@@ -339,7 +345,7 @@ export default function StaffKitchenLogPage() {
           </h2>
           <p className="mt-1 text-xs text-black sm:text-sm">
             Pick how often the log is done, then the log itself. Press Start,
-            fill it in (Pause to take a break), sign, then End and Submit.
+            fill it in (Pause to take a break), then Stop, sign and Submit.
           </p>
         </div>
         {frequency && !completed && (
@@ -354,15 +360,22 @@ export default function StaffKitchenLogPage() {
         )}
       </div>
 
-      {/* Paused logs, still waiting to be finished and submitted */}
+      {/* Paused or stopped logs, still waiting to be finished and submitted */}
       {pausedList.length > 0 && !completed && (
         <div className="space-y-2 rounded-2xl border border-orange-200 bg-orange-50/50 p-3 sm:p-4">
-          <p className="flex items-center gap-2 text-sm font-bold text-black">
+          <p className="flex flex-wrap items-center gap-2 text-sm font-bold text-black">
             <PauseCircle className="h-4 w-4 text-orange-600" />
-            Your paused logs
-            <span className="rounded-full bg-orange-500 px-2 py-0.5 text-xs font-semibold text-white">
-              {pausedList.length} paused
-            </span>
+            Your unfinished logs
+            {pausedCount > 0 && (
+              <span className="rounded-full bg-orange-500 px-2 py-0.5 text-xs font-semibold text-white">
+                {pausedCount} paused
+              </span>
+            )}
+            {stoppedCount > 0 && (
+              <span className="rounded-full bg-sky-600 px-2 py-0.5 text-xs font-semibold text-white">
+                {stoppedCount} stopped
+              </span>
+            )}
           </p>
           <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
             {pausedList.map((log) => (
@@ -385,7 +398,8 @@ export default function StaffKitchenLogPage() {
                       {formatDuration(log.durationSeconds || 0)}
                     </span>
                     <span className="font-semibold text-orange-700">
-                      · not submitted yet
+                      · {log.status === 'stopped' ? 'stopped, ' : ''}not
+                      submitted yet
                     </span>
                   </p>
                 </div>
@@ -395,7 +409,7 @@ export default function StaffKitchenLogPage() {
                   disabled={opening || sessionBusy}
                   onClick={() => openPaused(log)}
                 >
-                  <Play className="mr-1.5 h-4 w-4" /> Continue
+                  <Play className="mr-1.5 h-4 w-4" /> Resume
                 </Button>
               </div>
             ))}

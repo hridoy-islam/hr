@@ -33,6 +33,8 @@ interface KitchenLogFieldsProps {
   disabled?: boolean;
   // Marks the checks still unticked after a finish was tried
   highlightUnticked?: boolean;
+  // The caller shows the note itself, e.g. with the signature once stopped
+  hideNote?: boolean;
 }
 
 const outside = (value: string, range: { min: number; max: number }) =>
@@ -57,12 +59,13 @@ export function KitchenLogFields({
   values,
   onChange,
   disabled,
-  highlightUnticked
+  highlightUnticked,
+  hideNote
 }: KitchenLogFieldsProps) {
   const set = (patch: Partial<KitchenFieldValues>) =>
     onChange({ ...values, ...patch });
 
-  const noteField = (
+  const noteField = hideNote ? null : (
     <div className="space-y-1.5">
       <p className="text-sm font-semibold text-black">Note</p>
       <Textarea
