@@ -361,7 +361,17 @@ const UnscheduleAttendancePage = () => {
       setRotaOptions(
         result.map((rota: any) => ({
           value: rota._id,
-          label: `${rota.shiftName || ''} (${rota.startTime || ''} – ${rota.endTime || ''})`
+          label: (() => {
+            const start = rota.startDate
+              ? moment(rota.startDate).format('DD-MM-YYYY')
+              : '';
+            const end = rota.endDate
+              ? moment(rota.endDate).format('DD-MM-YYYY')
+              : '';
+            const base = `${rota.shiftName || ''} (${rota.startTime || ''} – ${rota.endTime || ''})`;
+            const dates = !end || start === end ? start : `${start} → ${end}`;
+            return dates ? `${base} | ${dates}` : base;
+          })()
         }))
       );
     } catch (error) {
@@ -1518,6 +1528,7 @@ const TableSection = ({
                         menuPortalTarget={document.body}
                         styles={{
                           menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+                          option: (base) => ({ ...base, fontSize: '11px', padding: '4px 8px' }),
                           control: (base) => ({
                             ...base,
                             minHeight: '32px',
