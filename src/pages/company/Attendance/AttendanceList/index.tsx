@@ -524,12 +524,23 @@ const handleDownloadCSV = () => {
         result.map((rota: any) => ({
           value: rota._id,
           label: (() => {
-            const start = rota.startDate
-              ? moment(rota.startDate).format('DD-MM-YYYY')
-              : '';
-            const end = rota.endDate
-              ? moment(rota.endDate).format('DD-MM-YYYY')
-              : '';
+            const ukDate = (d: string) =>
+              moment.tz(d, ['YYYY-MM-DD', moment.ISO_8601], 'Europe/London');
+            const startMom = rota.startDate ? ukDate(rota.startDate) : null;
+            let endMom = rota.endDate ? ukDate(rota.endDate) : startMom?.clone() || null;
+            // Overnight shift stored with same start/end date -> ends next day
+            if (
+              startMom &&
+              endMom &&
+              endMom.isSame(startMom, 'day') &&
+              rota.startTime &&
+              rota.endTime &&
+              rota.endTime <= rota.startTime
+            ) {
+              endMom = endMom.clone().add(1, 'day');
+            }
+            const start = startMom ? startMom.format('DD-MM-YYYY') : '';
+            const end = endMom ? endMom.format('DD-MM-YYYY') : '';
             const base = `${rota.shiftName || ''} (${rota.startTime || ''} – ${rota.endTime || ''})`;
             const dates = !end || start === end ? start : `${start} → ${end}`;
             return dates ? `${base} | ${dates}` : base;
